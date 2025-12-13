@@ -85,8 +85,16 @@ class SmartWebTestCase(WebTests, CompatTestCase):
         return {b"git-receive-pack": NoSideBand64kReceivePackHandler}
 
     def _check_app(self, app) -> None:
+        from dulwich.protocol import Protocol
+
         receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
-        caps = receive_pack_handler_cls.capabilities()
+        # Create a handler instance to check capabilities
+        handler = receive_pack_handler_cls(
+            app.backend,
+            [b"/"],
+            Protocol(lambda x: b"", lambda x: None),
+        )
+        caps = handler.capabilities()
         self.assertNotIn(b"side-band-64k", caps)
 
     def _make_app(self, backend):
@@ -101,16 +109,16 @@ class SmartWebTestCase(WebTests, CompatTestCase):
 
 def patch_capabilities(handler, caps_removed):
     # Patch a handler's capabilities by specifying a list of them to be
-    # removed, and return the original classmethod for restoration.
+    # removed, and return the original method for restoration.
     original_capabilities = handler.capabilities
-    filtered_capabilities = [
-        i for i in original_capabilities() if i not in caps_removed
-    ]
 
-    def capabilities(cls):
-        return filtered_capabilities
+    def capabilities(self):
+        # Call original to get base capabilities (including object-format)
+        base_caps = original_capabilities(self)
+        # Filter out the capabilities we want to remove
+        return [i for i in base_caps if i not in caps_removed]
 
-    handler.capabilities = classmethod(capabilities)
+    handler.capabilities = capabilities
     return original_capabilities
 
 
@@ -135,8 +143,16 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
         return None  # default handlers include side-band-64k
 
     def _check_app(self, app) -> None:
+        from dulwich.protocol import Protocol
+
         receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
-        caps = receive_pack_handler_cls.capabilities()
+        # Create a handler instance to check capabilities
+        handler = receive_pack_handler_cls(
+            app.backend,
+            [b"/"],
+            Protocol(lambda x: b"", lambda x: None),
+        )
+        caps = handler.capabilities()
         self.assertIn(b"side-band-64k", caps)
         self.assertNotIn(b"no-done", caps)
 
@@ -153,8 +169,16 @@ class SmartWebSideBand64kNoDoneTestCase(SmartWebTestCase):
         return None  # default handlers include side-band-64k
 
     def _check_app(self, app) -> None:
+        from dulwich.protocol import Protocol
+
         receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
-        caps = receive_pack_handler_cls.capabilities()
+        # Create a handler instance to check capabilities
+        handler = receive_pack_handler_cls(
+            app.backend,
+            [b"/"],
+            Protocol(lambda x: b"", lambda x: None),
+        )
+        caps = handler.capabilities()
         self.assertIn(b"side-band-64k", caps)
         self.assertIn(b"no-done", caps)
 

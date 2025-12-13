@@ -616,6 +616,7 @@ who\"
         handler = logging.StreamHandler(log_capture)
         handler.setLevel(logging.DEBUG)
         logger = logging.getLogger("dulwich.config")
+        old_level = logger.level
         logger.addHandler(handler)
         logger.setLevel(logging.DEBUG)
 
@@ -636,6 +637,7 @@ who\"
                 self.assertIn("nonexistent.config", log_output)
         finally:
             logger.removeHandler(handler)
+            logger.setLevel(old_level)
 
     def test_invalid_include_path_logging(self) -> None:
         """Test that invalid include paths are logged but don't cause failure."""
@@ -647,6 +649,7 @@ who\"
         handler = logging.StreamHandler(log_capture)
         handler.setLevel(logging.DEBUG)
         logger = logging.getLogger("dulwich.config")
+        old_level = logger.level
         logger.addHandler(handler)
         logger.setLevel(logging.DEBUG)
 
@@ -667,6 +670,7 @@ who\"
                 self.assertIn("Invalid include path", log_output)
         finally:
             logger.removeHandler(handler)
+            logger.setLevel(old_level)
 
     def test_unknown_includeif_condition_logging(self) -> None:
         """Test that unknown includeIf conditions are logged."""
@@ -678,6 +682,7 @@ who\"
         handler = logging.StreamHandler(log_capture)
         handler.setLevel(logging.DEBUG)
         logger = logging.getLogger("dulwich.config")
+        old_level = logger.level
         logger.addHandler(handler)
         logger.setLevel(logging.DEBUG)
 
@@ -700,6 +705,7 @@ who\"
                 self.assertIn("futurefeature:value", log_output)
         finally:
             logger.removeHandler(handler)
+            logger.setLevel(old_level)
 
     def test_custom_file_opener_with_include_depth(self) -> None:
         """Test that custom file opener is passed through include chain."""

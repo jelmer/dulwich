@@ -68,8 +68,12 @@ compatible.
    Dulwich version, and installed dependencies with their versions.
    (Jelmer Vernooĳ, #1835)
 
- * Add basic ``dulwich restore`` and ``dulwich switch``
-   commands. (Jelmer Vernooĳ, #1777)
+ * Add initial support for SHA256 repositories. Dulwich can now read and write Git
+   repositories using SHA256 object format. This includes support for loose
+   objects, pack files (v1 and v2 indexes), and tree parsing with SHA256 hashes.
+   The Rust extensions have been updated to support variable hash lengths.
+   SHA256 repositories require format version 1 and the objectFormat extension.
+   (Jelmer Vernooĳ, #1115)
 
 0.24.10	2025-11-10
 
@@ -550,8 +554,7 @@ compatible.
  * Add support for pack index format version 3. This format supports variable
    hash sizes to enable future SHA-256 support. The implementation includes
    reading and writing v3 indexes with proper hash algorithm identification
-   (1 for SHA-1, 2 for SHA-256). Note that SHA-256 support itself is not yet
-   implemented and will raise NotImplementedError. (Jelmer Vernooĳ)
+   (1 for SHA-1, 2 for SHA-256). (Jelmer Vernooĳ)
 
  * Fix ``LocalGitClient`` assertion error when fetching externally cloned repositories
    into ``MemoryRepo``. Previously, the client would fail with an AssertionError

@@ -70,13 +70,13 @@ class ChecksumMismatch(Exception):
             got: The actual checksum value (bytes or hex string).
             extra: Optional additional error information.
         """
-        if isinstance(expected, bytes) and len(expected) == 20:
+        if isinstance(expected, bytes) and len(expected) in (20, 32):
             expected_str = binascii.hexlify(expected).decode("ascii")
         else:
             expected_str = (
                 expected if isinstance(expected, str) else expected.decode("ascii")
             )
-        if isinstance(got, bytes) and len(got) == 20:
+        if isinstance(got, bytes) and len(got) in (20, 32):
             got_str = binascii.hexlify(got).decode("ascii")
         else:
             got_str = got if isinstance(got, str) else got.decode("ascii")

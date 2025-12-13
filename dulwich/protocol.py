@@ -39,6 +39,7 @@ __all__ = [
     "CAPABILITY_MULTI_ACK_DETAILED",
     "CAPABILITY_NO_DONE",
     "CAPABILITY_NO_PROGRESS",
+    "CAPABILITY_OBJECT_FORMAT",
     "CAPABILITY_OFS_DELTA",
     "CAPABILITY_QUIET",
     "CAPABILITY_REPORT_STATUS",
@@ -78,6 +79,7 @@ __all__ = [
     "ack_type",
     "agent_string",
     "capability_agent",
+    "capability_object_format",
     "capability_symref",
     "extract_capabilities",
     "extract_capability_names",
@@ -171,6 +173,7 @@ CAPABILITY_ALLOW_TIP_SHA1_IN_WANT = b"allow-tip-sha1-in-want"
 CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT = b"allow-reachable-sha1-in-want"
 CAPABILITY_FETCH = b"fetch"
 CAPABILITY_FILTER = b"filter"
+CAPABILITY_OBJECT_FORMAT = b"object-format"
 
 # Magic ref that is used to attach capabilities to when
 # there are no refs. Should always be ste to ZERO_SHA.
@@ -231,6 +234,18 @@ def capability_agent() -> bytes:
       Agent capability with dulwich version
     """
     return CAPABILITY_AGENT + b"=" + agent_string()
+
+
+def capability_object_format(fmt: str) -> bytes:
+    """Generate the object-format capability string.
+
+    Args:
+      fmt: Object format name (e.g., "sha1" or "sha256")
+
+    Returns:
+      Object-format capability with format name
+    """
+    return CAPABILITY_OBJECT_FORMAT + b"=" + fmt.encode("ascii")
 
 
 def capability_symref(from_ref: bytes, to_ref: bytes) -> bytes:

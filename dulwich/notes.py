@@ -174,11 +174,12 @@ class NotesTree:
 
         # If we have files at the root level, check if they're full SHA names
         if has_files and not has_dirs:
-            # Check if any file names are full 40-char hex strings
+            # Check if any file names are full hex strings (40 for SHA-1, 64 for SHA-256)
+            hex_length = self._object_store.object_format.hex_length
             for name, mode, sha in self._tree.items():
                 assert name is not None
                 assert mode is not None
-                if stat.S_ISREG(mode) and len(name) == 40:
+                if stat.S_ISREG(mode) and len(name) == hex_length:
                     try:
                         int(name, 16)  # Verify it's a valid hex string
                         return 0  # No fanout

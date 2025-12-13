@@ -33,6 +33,7 @@ from typing import NoReturn
 
 from dulwich.errors import ApplyDeltaError, ChecksumMismatch
 from dulwich.file import GitFile
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, Commit, Tree, hex_to_sha, sha_to_hex
 from dulwich.pack import (
@@ -100,17 +101,22 @@ class PackTests(TestCase):
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha."""
         return load_pack_index(
-            os.path.join(self.datadir, "pack-{}.idx".format(sha.decode("ascii")))
+            os.path.join(self.datadir, "pack-{}.idx".format(sha.decode("ascii"))),
+            DEFAULT_OBJECT_FORMAT,
         )
 
     def get_pack_data(self, sha):
         """Returns a PackData object from the datadir with the given sha."""
         return PackData(
-            os.path.join(self.datadir, "pack-{}.pack".format(sha.decode("ascii")))
+            os.path.join(self.datadir, "pack-{}.pack".format(sha.decode("ascii"))),
+            object_format=DEFAULT_OBJECT_FORMAT,
         )
 
     def get_pack(self, sha):
-        return Pack(os.path.join(self.datadir, "pack-{}".format(sha.decode("ascii"))))
+        return Pack(
+            os.path.join(self.datadir, "pack-{}".format(sha.decode("ascii"))),
+            object_format=DEFAULT_OBJECT_FORMAT,
+        )
 
     def assertSucceeds(self, func, *args, **kwargs) -> None:
         try:
@@ -472,7 +478,7 @@ class TestPackData(PackTests):
             self.datadir, "pack-{}.pack".format(pack1_sha.decode("ascii"))
         )
         with open(path, "rb") as f:
-            PackData.from_file(f, os.path.getsize(path))
+            PackData.from_file(f, DEFAULT_OBJECT_FORMAT, os.path.getsize(path))
 
     def test_pack_len(self) -> None:
         with self.get_pack_data(pack1_sha) as p:
@@ -565,7 +571,7 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             filename = os.path.join(self.tempdir, "v1test.idx")
             p.create_index_v1(filename)
-            idx1 = load_pack_index(filename)
+            idx1 = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
             idx2 = self.get_pack_index(pack1_sha)
             self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
@@ -574,7 +580,7 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             filename = os.path.join(self.tempdir, "v2test.idx")
             p.create_index_v2(filename)
-            idx1 = load_pack_index(filename)
+            idx1 = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
             idx2 = self.get_pack_index(pack1_sha)
             self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
@@ -583,7 +589,7 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             filename = os.path.join(self.tempdir, "v3test.idx")
             p.create_index_v3(filename)
-            idx1 = load_pack_index(filename)
+            idx1 = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
             idx2 = self.get_pack_index(pack1_sha)
             self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
@@ -594,7 +600,7 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             filename = os.path.join(self.tempdir, "version3test.idx")
             p.create_index(filename, version=3)
-            idx = load_pack_index(filename)
+            idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
             self.assertIsInstance(idx, PackIndex3)
             self.assertEqual(idx.version, 3)
 
@@ -602,23 +608,32 @@ class TestPackData(PackTests):
         f = BytesIO(b"abcd1234wxyz")
         try:
             self.assertEqual(
-                sha1(b"abcd1234wxyz").hexdigest(), compute_file_sha(f).hexdigest()
+                sha1(b"abcd1234wxyz").hexdigest(),
+                compute_file_sha(f, DEFAULT_OBJECT_FORMAT.hash_func).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"abcd1234wxyz").hexdigest(),
-                compute_file_sha(f, buffer_size=5).hexdigest(),
+                compute_file_sha(
+                    f, DEFAULT_OBJECT_FORMAT.hash_func, buffer_size=5
+                ).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"abcd1234").hexdigest(),
-                compute_file_sha(f, end_ofs=-4).hexdigest(),
+                compute_file_sha(
+                    f, DEFAULT_OBJECT_FORMAT.hash_func, end_ofs=-4
+                ).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"1234wxyz").hexdigest(),
-                compute_file_sha(f, start_ofs=4).hexdigest(),
+                compute_file_sha(
+                    f, DEFAULT_OBJECT_FORMAT.hash_func, start_ofs=4
+                ).hexdigest(),
             )
             self.assertEqual(
                 sha1(b"1234").hexdigest(),
-                compute_file_sha(f, start_ofs=4, end_ofs=-4).hexdigest(),
+                compute_file_sha(
+                    f, DEFAULT_OBJECT_FORMAT.hash_func, start_ofs=4, end_ofs=-4
+                ).hexdigest(),
             )
         finally:
             f.close()
@@ -626,10 +641,28 @@ class TestPackData(PackTests):
     def test_compute_file_sha_short_file(self) -> None:
         f = BytesIO(b"abcd1234wxyz")
         try:
-            self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=-20)
-            self.assertRaises(AssertionError, compute_file_sha, f, end_ofs=20)
             self.assertRaises(
-                AssertionError, compute_file_sha, f, start_ofs=10, end_ofs=-12
+                AssertionError,
+                compute_file_sha,
+                f,
+                DEFAULT_OBJECT_FORMAT.hash_func,
+                -20,
+            )
+            self.assertRaises(
+                AssertionError,
+                compute_file_sha,
+                f,
+                DEFAULT_OBJECT_FORMAT.hash_func,
+                0,
+                20,
+            )
+            self.assertRaises(
+                AssertionError,
+                compute_file_sha,
+                f,
+                DEFAULT_OBJECT_FORMAT.hash_func,
+                10,
+                -12,
             )
         finally:
             f.close()
@@ -684,9 +717,11 @@ class TestPack(PackTests):
         with self.get_pack(pack1_sha) as origpack:
             self.assertSucceeds(origpack.index.check)
             basename = os.path.join(self.tempdir, "Elch")
-            write_pack(basename, origpack.pack_tuples())
+            write_pack(
+                basename, origpack.pack_tuples(), object_format=DEFAULT_OBJECT_FORMAT
+            )
 
-            with Pack(basename) as newpack:
+            with Pack(basename, object_format=DEFAULT_OBJECT_FORMAT) as newpack:
                 self.assertEqual(origpack, newpack)
                 self.assertSucceeds(newpack.index.check)
                 self.assertEqual(origpack.name(), newpack.name())
@@ -711,8 +746,10 @@ class TestPack(PackTests):
 
     def _copy_pack(self, origpack):
         basename = os.path.join(self.tempdir, "somepack")
-        write_pack(basename, origpack.pack_tuples())
-        return Pack(basename)
+        write_pack(
+            basename, origpack.pack_tuples(), object_format=DEFAULT_OBJECT_FORMAT
+        )
+        return Pack(basename, object_format=DEFAULT_OBJECT_FORMAT)
 
     def test_keep_no_message(self) -> None:
         with self.get_pack(pack1_sha) as p:
@@ -758,7 +795,7 @@ class TestPack(PackTests):
             write_pack_header(bad_file.write, 9999)
             bad_file.write(data._file.read())
             bad_file = BytesIO(bad_file.getvalue())
-            bad_data = PackData("", file=bad_file)
+            bad_data = PackData("", file=bad_file, object_format=DEFAULT_OBJECT_FORMAT)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
             self.assertRaises(AssertionError, lambda: bad_pack.data)
             self.assertRaises(AssertionError, bad_pack.check_length_and_checksum)
@@ -770,7 +807,7 @@ class TestPack(PackTests):
 
             data._file.seek(0)
             bad_file = BytesIO(data._file.read()[:-20] + (b"\xff" * 20))
-            bad_data = PackData("", file=bad_file)
+            bad_data = PackData("", file=bad_file, object_format=DEFAULT_OBJECT_FORMAT)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
             self.assertRaises(ChecksumMismatch, lambda: bad_pack.data)
             self.assertRaises(ChecksumMismatch, bad_pack.check_length_and_checksum)
@@ -846,7 +883,7 @@ class TestThinPack(PackTests):
 
         # Index the new pack.
         with self.make_pack(True) as pack:
-            with PackData(pack._data_path) as data:
+            with PackData(pack._data_path, object_format=DEFAULT_OBJECT_FORMAT) as data:
                 data.create_index(
                     self.pack_prefix + ".idx", resolve_ext_ref=pack.resolve_ext_ref
                 )
@@ -856,6 +893,7 @@ class TestThinPack(PackTests):
     def make_pack(self, resolve_ext_ref):
         return Pack(
             self.pack_prefix,
+            object_format=DEFAULT_OBJECT_FORMAT,
             resolve_ext_ref=self.store.get_raw if resolve_ext_ref else None,
         )
 
@@ -919,12 +957,16 @@ class WritePackTests(TestCase):
         try:
             f.write(b"header")
             offset = f.tell()
-            crc32 = write_pack_object(f.write, Blob.type_num, b"blob")
+            crc32 = write_pack_object(
+                f.write, Blob.type_num, b"blob", object_format=DEFAULT_OBJECT_FORMAT
+            )
             self.assertEqual(crc32, zlib.crc32(f.getvalue()[6:]) & 0xFFFFFFFF)
 
             f.write(b"x")  # unpack_object needs extra trailing data.
             f.seek(offset)
-            unpacked, unused = unpack_object(f.read, compute_crc32=True)
+            unpacked, unused = unpack_object(
+                f.read, DEFAULT_OBJECT_FORMAT.hash_func, compute_crc32=True
+            )
             self.assertEqual(Blob.type_num, unpacked.pack_type_num)
             self.assertEqual(Blob.type_num, unpacked.obj_type_num)
             self.assertEqual([b"blob"], unpacked.decomp_chunks)
@@ -939,7 +981,13 @@ class WritePackTests(TestCase):
         offset = f.tell()
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
-        write_pack_object(f.write, Blob.type_num, b"blob", sha=sha_a)
+        write_pack_object(
+            f.write,
+            Blob.type_num,
+            b"blob",
+            sha=sha_a,
+            object_format=DEFAULT_OBJECT_FORMAT,
+        )
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
         self.assertEqual(sha_a.digest(), sha_b.digest())
@@ -951,7 +999,12 @@ class WritePackTests(TestCase):
         sha_a = sha1(b"foo")
         sha_b = sha_a.copy()
         write_pack_object(
-            f.write, Blob.type_num, b"blob", sha=sha_a, compression_level=6
+            f.write,
+            Blob.type_num,
+            b"blob",
+            sha=sha_a,
+            compression_level=6,
+            object_format=DEFAULT_OBJECT_FORMAT,
         )
         self.assertNotEqual(sha_a.digest(), sha_b.digest())
         sha_b.update(f.getvalue()[offset:])
@@ -1032,7 +1085,7 @@ class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
     def index(self, filename, entries, pack_checksum):
         path = os.path.join(self.tempdir, filename)
         self.writeIndex(path, entries, pack_checksum)
-        idx = load_pack_index(path)
+        idx = load_pack_index(path, DEFAULT_OBJECT_FORMAT)
         self.assertSucceeds(idx.check)
         self.assertEqual(idx.version, self._expected_version)
         return idx
@@ -1050,7 +1103,9 @@ class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):
         self._supports_large = True
 
     def index(self, filename, entries, pack_checksum):
-        return MemoryPackIndex(entries, pack_checksum)
+        from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+
+        return MemoryPackIndex(entries, DEFAULT_OBJECT_FORMAT, pack_checksum)
 
     def tearDown(self) -> None:
         TestCase.tearDown(self)
@@ -1102,10 +1157,10 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         entries = [(b"abcd" * 5, 0, zlib.crc32(b""))]
         filename = os.path.join(self.tempdir, "test.idx")
         self.writeIndex(filename, entries, b"1234567890" * 2)
-        idx = load_pack_index(filename)
+        idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
         self.assertIsInstance(idx, PackIndex3)
         self.assertEqual(idx.version, 3)
-        self.assertEqual(idx.hash_algorithm, 1)  # SHA-1
+        self.assertEqual(idx.hash_format, 1)  # SHA-1
         self.assertEqual(idx.hash_size, 20)
         self.assertEqual(idx.shortened_oid_len, 20)
 
@@ -1115,9 +1170,9 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         filename = os.path.join(self.tempdir, "test_hash.idx")
         # Write v3 index with SHA-1 (algorithm=1)
         with GitFile(filename, "wb") as f:
-            write_pack_index_v3(f, entries, b"1" * 20, hash_algorithm=1)
-        idx = load_pack_index(filename)
-        self.assertEqual(idx.hash_algorithm, 1)
+            write_pack_index_v3(f, entries, b"1" * 20, hash_format=1)
+        idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
+        self.assertEqual(idx.hash_format, 1)
         self.assertEqual(idx.hash_size, 20)
 
     def test_v3_sha256_length(self) -> None:
@@ -1128,7 +1183,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         # SHA-256 should raise NotImplementedError
         with self.assertRaises(NotImplementedError) as cm:
             with GitFile(filename, "wb") as f:
-                write_pack_index_v3(f, entries, b"1" * 32, hash_algorithm=2)
+                write_pack_index_v3(f, entries, b"1" * 32, hash_format=2)
         self.assertIn("SHA-256", str(cm.exception))
 
     def test_v3_invalid_hash_algorithm(self) -> None:
@@ -1138,7 +1193,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         # Invalid hash algorithm should raise ValueError
         with self.assertRaises(ValueError) as cm:
             with GitFile(filename, "wb") as f:
-                write_pack_index_v3(f, entries, b"1" * 20, hash_algorithm=99)
+                write_pack_index_v3(f, entries, b"1" * 20, hash_format=99)
         self.assertIn("Unknown hash algorithm", str(cm.exception))
 
     def test_v3_wrong_hash_length(self) -> None:
@@ -1148,7 +1203,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         filename = os.path.join(self.tempdir, "test_wrong_len.idx")
         with self.assertRaises(ValueError) as cm:
             with GitFile(filename, "wb") as f:
-                write_pack_index_v3(f, entries, b"1" * 20, hash_algorithm=1)
+                write_pack_index_v3(f, entries, b"1" * 20, hash_format=1)
         self.assertIn("wrong length", str(cm.exception))
 
 
@@ -1179,7 +1234,7 @@ class WritePackIndexTests(TestCase):
         with GitFile(filename, "wb") as f:
             write_pack_index(f, entries, b"P" * 20)
 
-        idx = load_pack_index(filename)
+        idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
         self.assertEqual(DEFAULT_PACK_INDEX_VERSION, idx.version)
 
     def test_write_pack_index_version_1(self) -> None:
@@ -1196,7 +1251,7 @@ class WritePackIndexTests(TestCase):
         with GitFile(filename, "wb") as f:
             write_pack_index(f, entries, b"P" * 20, version=1)
 
-        idx = load_pack_index(filename)
+        idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
         self.assertEqual(1, idx.version)
 
     def test_write_pack_index_version_3(self) -> None:
@@ -1213,7 +1268,7 @@ class WritePackIndexTests(TestCase):
         with GitFile(filename, "wb") as f:
             write_pack_index(f, entries, b"P" * 20, version=3)
 
-        idx = load_pack_index(filename)
+        idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
         self.assertEqual(3, idx.version)
 
     def test_write_pack_index_invalid_version(self) -> None:
@@ -1385,7 +1440,7 @@ class TestPackStreamReader(TestCase):
     def test_read_objects_emtpy(self) -> None:
         f = BytesIO()
         build_pack(f, [])
-        reader = PackStreamReader(f.read)
+        reader = PackStreamReader(DEFAULT_OBJECT_FORMAT.hash_func, f.read)
         self.assertEqual(0, len(list(reader.read_objects())))
 
     def test_read_objects(self) -> None:
@@ -1397,7 +1452,7 @@ class TestPackStreamReader(TestCase):
                 (OFS_DELTA, (0, b"blob1")),
             ],
         )
-        reader = PackStreamReader(f.read)
+        reader = PackStreamReader(DEFAULT_OBJECT_FORMAT.hash_func, f.read)
         objects = list(reader.read_objects(compute_crc32=True))
         self.assertEqual(2, len(objects))
 
@@ -1430,11 +1485,13 @@ class TestPackStreamReader(TestCase):
                 (OFS_DELTA, (0, b"blob1")),
             ],
         )
-        reader = PackStreamReader(f.read, zlib_bufsize=4)
+        reader = PackStreamReader(
+            DEFAULT_OBJECT_FORMAT.hash_func, f.read, zlib_bufsize=4
+        )
         self.assertEqual(2, len(list(reader.read_objects())))
 
     def test_read_objects_empty(self) -> None:
-        reader = PackStreamReader(BytesIO().read)
+        reader = PackStreamReader(DEFAULT_OBJECT_FORMAT.hash_func, BytesIO().read)
         self.assertRaises(AssertionError, list, reader.read_objects())
 
 
@@ -1490,14 +1547,14 @@ class DeltaChainIteratorTests(TestCase):
         if thin is None:
             thin = bool(list(self.store))
         resolve_ext_ref = (thin and self.get_raw_no_repeat) or None
-        data = PackData("test.pack", file=f)
+        data = PackData("test.pack", file=f, object_format=DEFAULT_OBJECT_FORMAT)
         return TestPackIterator.for_pack_data(data, resolve_ext_ref=resolve_ext_ref)
 
     def make_pack_iter_subset(self, f, subset, thin=None):
         if thin is None:
             thin = bool(list(self.store))
         resolve_ext_ref = (thin and self.get_raw_no_repeat) or None
-        data = PackData("test.pack", file=f)
+        data = PackData("test.pack", file=f, object_format=DEFAULT_OBJECT_FORMAT)
         assert data
         index = MemoryPackIndex.for_pack(data)
         pack = Pack.from_objects(data, index)
@@ -1764,7 +1821,7 @@ class DeltaChainIteratorTests(TestCase):
         )
         fsize = f.tell()
         f.seek(0)
-        packdata = PackData.from_file(f, fsize)
+        packdata = PackData.from_file(f, DEFAULT_OBJECT_FORMAT, fsize)
         td = tempfile.mkdtemp()
         idx_path = os.path.join(td, "test.idx")
         self.addCleanup(shutil.rmtree, td)
@@ -1773,13 +1830,13 @@ class DeltaChainIteratorTests(TestCase):
             version=2,
             resolve_ext_ref=self.get_raw_no_repeat,
         )
-        packindex = load_pack_index(idx_path)
+        packindex = load_pack_index(idx_path, DEFAULT_OBJECT_FORMAT)
         pack = Pack.from_objects(packdata, packindex)
         try:
             # Attempting to open this REF_DELTA object would loop forever
             pack[b1.id]
         except UnresolvedDeltas as e:
-            self.assertEqual([hex_to_sha(b1.id)], e.shas)
+            self.assertEqual([b1.id], [sha_to_hex(sha) for sha in e.shas])
 
 
 class DeltaEncodeSizeTests(TestCase):

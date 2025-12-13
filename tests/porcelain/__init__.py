@@ -6938,9 +6938,9 @@ class ReceivePackTests(PorcelainTestCase):
         outlines = outf.getvalue().splitlines()
         self.assertEqual(
             [
-                b"0091319b56ce3aee2d489f759736a79cc552c9bb86d9 HEAD\x00 report-status "
+                b"00a4319b56ce3aee2d489f759736a79cc552c9bb86d9 HEAD\x00 report-status "
                 b"delete-refs quiet ofs-delta side-band-64k "
-                b"no-done symref=HEAD:refs/heads/master",
+                b"no-done object-format=sha1 symref=HEAD:refs/heads/master",
                 b"003f319b56ce3aee2d489f759736a79cc552c9bb86d9 refs/heads/master",
                 b"0000",
             ],

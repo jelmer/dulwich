@@ -1164,17 +1164,24 @@ class GitClient:
                 else:
                     head = None
             else:
-                from dulwich import porcelain
-
                 _set_origin_head(target.refs, origin.encode("utf-8"), origin_head)
 
-                default_branch_name = porcelain.var(
-                    target, variable="GIT_DEFAULT_BRANCH"
-                ).encode("utf-8")
-                default_branch: bytes | None = default_branch_name
-                default_ref = Ref(b"refs/remotes/origin/" + default_branch_name)
-                if default_ref not in target.refs:
-                    default_branch = None
+                # If origin_head is None (missing HEAD), fall back to configured default branch
+                default_branch: bytes | None = None
+                if origin_head is None:
+                    target_config = target.get_config()
+                    try:
+                        default_branch_name = target_config.get(
+                            (b"init",), b"defaultBranch"
+                        )
+                    except KeyError:
+                        # Git's default is "master"
+                        default_branch_name = b"master"
+
+                    default_ref = Ref(b"refs/remotes/origin/" + default_branch_name)
+                    if default_ref in target.refs:
+                        default_branch = default_branch_name
+
                 head_ref = _set_default_branch(
                     target.refs,
                     origin.encode("utf-8"),

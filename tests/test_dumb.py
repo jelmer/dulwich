@@ -308,3 +308,9 @@ fedcba9876543210fedcba9876543210fedcba98\trefs/tags/v1.0
     def test_object_store_property(self) -> None:
         self.assertIsInstance(self.repo.object_store, DumbHTTPObjectStore)
         self.assertEqual(self.base_url, self.repo.object_store.base_url)
+
+    def test_fetch_pack_data_missing_head(self) -> None:
+        refs_content = b"0123456789abcdef0123456789abcdef01234567\trefs/heads/master\n"
+        self._add_response("info/refs", refs_content)
+        self._add_response("HEAD", b"", status=404)
+        assert self.repo.get_head() is None

@@ -4,13 +4,46 @@
 is ahead of a 1.0 release, after which API changes will be kept backwards
 compatible.
 
+ * Split out worktree module from porcelain into separate ``dulwich.worktree``
+   module for better code organization. (Jelmer Vernooĳ, #2037)
+
+ * Split porcelain module into separate submodules: ``dulwich.porcelain.tags``,
+   ``dulwich.porcelain.notes``, ``dulwich.porcelain.submodule``, and
+   ``dulwich.porcelain.lfs``. Main porcelain module re-exports all functions
+   for backward compatibility. (Jelmer Vernooĳ, #2032)
+
+ * Ensure ``dulwich.porcelain`` package is properly installed as a directory
+   structure with submodules. (Jelmer Vernooĳ, #2035)
+
+ * Add tests for consistent license preamble across codebase and prevent
+   ``os.environ`` usage in lower layers. (Jelmer Vernooĳ, #2033)
+
+ * Add ``__all__`` exports to all modules for better API clarity and wildcard
+   import support. (Jelmer Vernooĳ, #2022)
+
  * Fix ParamikoSSHVendor interface compatibility with SSHVendor. (Jelmer Vernooĳ, #2028)
+
+ * Add fallback when HEAD is missing in dumb HTTP protocol, improving
+   compatibility with repositories that don't have a HEAD reference.
+   (Antoine Lambert, #2030)
 
  * Fix smudge filter subprocess fallback for special characters in path.
    (Petr Chmelar, #1878)
 
  * Fix UTF-8 decode error in process filter protocol when handling binary files.
    (Jelmer Vernooĳ, #2023)
+
+ * Fix ``porcelain.add()`` to correctly handle ``None`` values in pathspec
+   parameter. (Jelmer Vernooĳ, #2027)
+
+ * Add ``--stat`` argument to ``dulwich diff`` command to display diffstat
+   summary showing files changed and line additions/deletions. (Jelmer Vernooĳ, #2026)
+
+ * Avoid signing commits in ``porcelain.stash()`` operations to prevent
+   GPG prompt interruptions during automated stashing. (Jelmer Vernooĳ, #2012)
+
+ * Improve error handling when trying to remove non-empty directories during
+   worktree operations. (Jelmer Vernooĳ, #2004)
 
  * Move greenthreads support to dulwich/contrib.
    This code isn't really developed and only used
@@ -43,8 +76,25 @@ compatible.
    and filtering unchanged files. This provides significant performance
    improvements for repositories with LFS filters, where filter operations can
    be very expensive. The optimization matches Git's behavior of using mtime
-   and size comparisons to determine if files need processing.
-   (Jelmer Vernooĳ, #1999)
+   and size comparisons to determine if files need processing. File entries
+   now use nanosecond-resolution timestamps for more accurate change detection.
+   (Jelmer Vernooĳ, #1999, #2013)
+
+ * Add support for multi-pack index (MIDX) files for improved performance with
+   multiple pack files. Supports reading and writing MIDX files, including mmap
+   support for efficient loading. Enables faster object lookups across multiple
+   packs. (Jelmer Vernooĳ, #1998)
+
+ * Implement ``git restore`` and ``git switch`` commands with corresponding
+   porcelain functions. The ``restore`` command allows restoring files from
+   commits or the index, while ``switch`` provides branch switching functionality.
+   (Jelmer Vernooĳ, #2003)
+
+ * Add support for ``core.protectHFS`` configuration option to protect against
+   HFS+ filesystem vulnerabilities. (Jelmer Vernooĳ)
+
+ * Skip tests that require the merge3 module when it is not available, improving
+   test compatibility across different Python environments. (Jelmer Vernooĳ, #2002)
 
  * Drop support for Python 3.9. (Jelmer Vernooĳ)
 
@@ -68,12 +118,16 @@ compatible.
    Dulwich version, and installed dependencies with their versions.
    (Jelmer Vernooĳ, #1835)
 
- * Add initial support for SHA256 repositories. Dulwich can now read and write Git
+ * Add support for SHA256 repositories. Dulwich can now read and write Git
    repositories using SHA256 object format. This includes support for loose
-   objects, pack files (v1 and v2 indexes), and tree parsing with SHA256 hashes.
-   The Rust extensions have been updated to support variable hash lengths.
-   SHA256 repositories require format version 1 and the objectFormat extension.
-   (Jelmer Vernooĳ, #1115)
+   objects, pack files (v1 and v2 indexes), tree parsing with SHA256 hashes,
+   pack bitmap indexes, commit graphs, and network protocol operations
+   (clone, fetch, push). The Rust extensions have been updated to support
+   variable hash lengths. SHA256 repositories require format version 1 and the
+   objectFormat extension. The ``dulwich init`` command now supports
+   ``--objectformat`` option to create SHA256 repositories. Client and server
+   implementations advertise and negotiate object-format capabilities.
+   (Jelmer Vernooĳ, #1115, #1604)
 
 0.24.10	2025-11-10
 

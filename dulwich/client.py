@@ -1165,11 +1165,28 @@ class GitClient:
                     head = None
             else:
                 _set_origin_head(target.refs, origin.encode("utf-8"), origin_head)
+
+                # If origin_head is None (missing HEAD), fall back to configured default branch
+                default_branch: bytes | None = None
+                if origin_head is None:
+                    target_config = target.get_config()
+                    try:
+                        default_branch_name = target_config.get(
+                            (b"init",), b"defaultBranch"
+                        )
+                    except KeyError:
+                        # Git's default is "master"
+                        default_branch_name = b"master"
+
+                    default_ref = Ref(b"refs/remotes/origin/" + default_branch_name)
+                    if default_ref in target.refs:
+                        default_branch = default_branch_name
+
                 head_ref = _set_default_branch(
                     target.refs,
                     origin.encode("utf-8"),
                     origin_head,
-                    branch.encode("utf-8") if branch is not None else None,
+                    (branch.encode("utf-8") if branch is not None else default_branch),
                     ref_message,
                 )
 
@@ -4096,7 +4113,9 @@ class AbstractHttpGitClient(GitClient):
                 )
             )
 
-            symrefs[HEADREF] = dumb_repo.get_head()
+            head = dumb_repo.get_head()
+            if head is not None:
+                symrefs[HEADREF] = head
 
             # Write pack data
             if pack_data_list:

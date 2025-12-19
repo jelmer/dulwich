@@ -30,6 +30,8 @@ from dulwich.signature import (
     GPGCliSignatureVendor,
     GPGSignatureVendor,
     SignatureVendor,
+    SSHCliSignatureVendor,
+    SSHSignatureVendor,
     get_signature_vendor,
 )
 
@@ -307,11 +309,10 @@ class GetSignatureVendorTests(unittest.TestCase):
             get_signature_vendor(format="x509")
         self.assertIn("X.509", str(cm.exception))
 
-    def test_ssh_not_supported(self) -> None:
-        """Test that ssh format raises ValueError."""
-        with self.assertRaises(ValueError) as cm:
-            get_signature_vendor(format="ssh")
-        self.assertIn("SSH", str(cm.exception))
+    def test_ssh_format_supported(self) -> None:
+        """Test that ssh format is now supported."""
+        vendor = get_signature_vendor(format="ssh")
+        self.assertIsInstance(vendor, SSHCliSignatureVendor)
 
     def test_invalid_format(self) -> None:
         """Test that invalid format raises ValueError."""
@@ -328,3 +329,139 @@ class GetSignatureVendorTests(unittest.TestCase):
         # If CLI vendor is used, check that config was passed
         if isinstance(vendor, GPGCliSignatureVendor):
             self.assertEqual(vendor.gpg_command, "gpg2")
+
+    def test_ssh_format(self) -> None:
+        """Test requesting SSH format."""
+        vendor = get_signature_vendor(format="ssh")
+        self.assertIsInstance(vendor, SSHCliSignatureVendor)
+
+
+class SSHSignatureVendorTests(unittest.TestCase):
+    """Tests for SSHSignatureVendor base implementation."""
+
+    def test_not_implemented_sign(self) -> None:
+        """Test that sign raises NotImplementedError."""
+        vendor = SSHSignatureVendor()
+        with self.assertRaises(NotImplementedError):
+            vendor.sign(b"test data", keyid="dummy")
+
+    def test_not_implemented_verify(self) -> None:
+        """Test that verify raises NotImplementedError."""
+        vendor = SSHSignatureVendor()
+        with self.assertRaises(NotImplementedError):
+            vendor.verify(b"test data", b"fake signature")
+
+    def test_config_parsing(self) -> None:
+        """Test parsing SSH config options."""
+        config = ConfigDict()
+        config.set((b"gpg", b"ssh"), b"allowedSignersFile", b"/path/to/allowed")
+        config.set((b"gpg", b"ssh"), b"defaultKeyCommand", b"ssh-add -L")
+
+        vendor = SSHSignatureVendor(config=config)
+        self.assertEqual(vendor.allowed_signers_file, "/path/to/allowed")
+        self.assertEqual(vendor.default_key_command, "ssh-add -L")
+
+
+class SSHCliSignatureVendorTests(unittest.TestCase):
+    """Tests for SSHCliSignatureVendor."""
+
+    def setUp(self) -> None:
+        """Check if ssh-keygen is available."""
+        if shutil.which("ssh-keygen") is None:
+            self.skipTest("ssh-keygen command not available")
+
+    def test_ssh_program_from_config(self) -> None:
+        """Test reading gpg.ssh.program from config."""
+        config = ConfigDict()
+        config.set((b"gpg", b"ssh"), b"program", b"/usr/bin/ssh-keygen")
+
+        vendor = SSHCliSignatureVendor(config=config)
+        self.assertEqual(vendor.ssh_command, "/usr/bin/ssh-keygen")
+
+    def test_ssh_program_override(self) -> None:
+        """Test that ssh_command parameter overrides config."""
+        config = ConfigDict()
+        config.set((b"gpg", b"ssh"), b"program", b"/usr/bin/ssh-keygen")
+
+        vendor = SSHCliSignatureVendor(config=config, ssh_command="ssh-keygen")
+        self.assertEqual(vendor.ssh_command, "ssh-keygen")
+
+    def test_ssh_program_default(self) -> None:
+        """Test default ssh-keygen command when no config provided."""
+        vendor = SSHCliSignatureVendor()
+        self.assertEqual(vendor.ssh_command, "ssh-keygen")
+
+    def test_allowed_signers_from_config(self) -> None:
+        """Test reading gpg.ssh.allowedSignersFile from config."""
+        config = ConfigDict()
+        config.set((b"gpg", b"ssh"), b"allowedSignersFile", b"/tmp/allowed_signers")
+
+        vendor = SSHCliSignatureVendor(config=config)
+        self.assertEqual(vendor.allowed_signers_file, "/tmp/allowed_signers")
+
+    def test_sign_without_key_raises(self) -> None:
+        """Test that signing without a key raises ValueError."""
+        vendor = SSHCliSignatureVendor()
+        with self.assertRaises(ValueError) as cm:
+            vendor.sign(b"test data")
+        self.assertIn("key", str(cm.exception).lower())
+
+    def test_verify_without_allowed_signers_raises(self) -> None:
+        """Test that verify without allowedSignersFile raises ValueError."""
+        vendor = SSHCliSignatureVendor()
+        with self.assertRaises(ValueError) as cm:
+            vendor.verify(b"test data", b"fake signature")
+        self.assertIn("allowedSignersFile", str(cm.exception))
+
+    def test_sign_and_verify_with_ssh_key(self) -> None:
+        """Test sign and verify cycle with SSH key."""
+        import os
+        import tempfile
+
+        # Generate a test SSH key
+        with tempfile.TemporaryDirectory() as tmpdir:
+            private_key = os.path.join(tmpdir, "test_key")
+            public_key = private_key + ".pub"
+            allowed_signers = os.path.join(tmpdir, "allowed_signers")
+
+            # Generate Ed25519 key (no passphrase)
+            subprocess.run(
+                [
+                    "ssh-keygen",
+                    "-t",
+                    "ed25519",
+                    "-f",
+                    private_key,
+                    "-N",
+                    "",
+                    "-C",
+                    "test@example.com",
+                ],
+                capture_output=True,
+                check=True,
+            )
+
+            # Create allowed_signers file
+            with open(public_key) as pub:
+                pub_key_content = pub.read().strip()
+            with open(allowed_signers, "w") as allowed:
+                allowed.write(f"git {pub_key_content}\n")
+
+            # Create vendor with config
+            config = ConfigDict()
+            config.set(
+                (b"gpg", b"ssh"), b"allowedSignersFile", allowed_signers.encode()
+            )
+
+            vendor = SSHCliSignatureVendor(config=config)
+
+            # Test signing and verification
+            test_data = b"test data to sign with SSH"
+            signature = vendor.sign(test_data, keyid=private_key)
+
+            self.assertIsInstance(signature, bytes)
+            self.assertGreater(len(signature), 0)
+            self.assertTrue(signature.startswith(b"-----BEGIN SSH SIGNATURE-----"))
+
+            # Verify the signature
+            vendor.verify(test_data, signature)

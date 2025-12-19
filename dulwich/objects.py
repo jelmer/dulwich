@@ -1254,17 +1254,6 @@ class Tag(ShaFile):
 
     signature = serializable_property("signature", "Optional detached GPG signature")
 
-    def sign(self, keyid: str | None = None) -> None:
-        """Sign this tag with a GPG key.
-
-        Args:
-          keyid: Optional GPG key ID to use for signing. If not specified,
-                 the default GPG key will be used.
-        """
-        from dulwich.signature import gpg_vendor
-
-        self.signature = gpg_vendor.sign(self.as_raw_string(), keyid=keyid)
-
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
 
@@ -1302,27 +1291,6 @@ class Tag(ShaFile):
             raise ObjectFormatException("Unknown signature format")
 
         return payload, self._signature, sig_type
-
-    def verify(self, keyids: Iterable[str] | None = None) -> None:
-        """Verify GPG signature for this tag (if it is signed).
-
-        Args:
-          keyids: Optional iterable of trusted keyids for this tag.
-            If this tag is not signed by any key in keyids verification will
-            fail. If not specified, this function only verifies that the tag
-            has a valid signature.
-
-        Raises:
-          gpg.errors.BadSignatures: if GPG signature verification fails
-          gpg.errors.MissingSignatures: if tag was not signed by a key
-            specified in keyids
-        """
-        if self._signature is None:
-            return
-
-        from dulwich.signature import gpg_vendor
-
-        gpg_vendor.verify(self.raw_without_sig(), self._signature, keyids=keyids)
 
 
 class TreeEntry(NamedTuple):
@@ -2147,17 +2115,6 @@ class Commit(ShaFile):
 
         # TODO: optionally check for duplicate parents
 
-    def sign(self, keyid: str | None = None) -> None:
-        """Sign this commit with a GPG key.
-
-        Args:
-          keyid: Optional GPG key ID to use for signing. If not specified,
-                 the default GPG key will be used.
-        """
-        from dulwich.signature import gpg_vendor
-
-        self.gpgsig = gpg_vendor.sign(self.as_raw_string(), keyid=keyid)
-
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
 
@@ -2196,27 +2153,6 @@ class Commit(ShaFile):
             raise ObjectFormatException("Unknown signature format")
 
         return payload, self._gpgsig, sig_type
-
-    def verify(self, keyids: Iterable[str] | None = None) -> None:
-        """Verify GPG signature for this commit (if it is signed).
-
-        Args:
-          keyids: Optional iterable of trusted keyids for this commit.
-            If this commit is not signed by any key in keyids verification will
-            fail. If not specified, this function only verifies that the commit
-            has a valid signature.
-
-        Raises:
-          gpg.errors.BadSignatures: if GPG signature verification fails
-          gpg.errors.MissingSignatures: if commit was not signed by a key
-            specified in keyids
-        """
-        if self._gpgsig is None:
-            return
-
-        from dulwich.signature import gpg_vendor
-
-        gpg_vendor.verify(self.raw_without_sig(), self._gpgsig, keyids=keyids)
 
     def _serialize(self) -> list[bytes]:
         headers = []

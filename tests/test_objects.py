@@ -920,6 +920,254 @@ ZTpDKBGsVP6ydcKdZxAvJlUAAAAEZmlsZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtz
         with self.assertRaises(ObjectFormatException):
             c.extract_signature()
 
+    def test_parse_time_entry_broken_negative_date(self) -> None:
+        from dulwich.objects import parse_time_entry_broken
+
+        author_line = b"Jane Doe <jdoe@example.org> -12345 +0100"
+        expected_identity = b"Jane Doe <jdoe@example.org>"
+        expected_time = -12345
+        expected_timezone = +1 * 60 * 60
+
+        person, time, (timezone, timezone_neg_utc) = parse_time_entry_broken(
+            author_line
+        )
+
+        self.assertEqual(person, expected_identity)
+        self.assertEqual(time, expected_time)
+        self.assertEqual(timezone, expected_timezone)
+        self.assertFalse(timezone_neg_utc)
+
+    def test_parse_time_entry_broken_double_negative_timezone(self) -> None:
+        from dulwich.objects import parse_time_entry_broken
+
+        author_line = b"Jane Doe <jdoe@example.org> 12345 --700"
+        expected_identity = b"Jane Doe <jdoe@example.org>"
+        expected_time = 12345
+        expected_timezone = +7 * 60 * 60
+
+        person, time, (timezone, timezone_neg_utc) = parse_time_entry_broken(
+            author_line
+        )
+
+        self.assertEqual(person, expected_identity)
+        self.assertEqual(time, expected_time)
+        self.assertEqual(timezone, expected_timezone)
+        self.assertTrue(timezone_neg_utc)
+
+    def test_parse_time_entry_broken_long_timezone(self) -> None:
+        from dulwich.objects import parse_time_entry_broken
+
+        author_line = (
+            b"Geoff Cant <nem@lisp.geek.nz> 1170648114 -72000"  # codespell:ignore
+        )
+        expected_identity = b"Geoff Cant <nem@lisp.geek.nz>"  # codespell:ignore
+        expected_time = 1170648114
+        expected_timezone = -720 * 60 * 60
+
+        person, time, (timezone, _timezone_neg_utc) = parse_time_entry_broken(
+            author_line
+        )
+
+        self.assertEqual(person, expected_identity)
+        self.assertEqual(time, expected_time)
+        self.assertEqual(timezone, expected_timezone)
+
+    def test_parse_time_entry_broken_short_timezone(self) -> None:
+        from dulwich.objects import parse_time_entry_broken
+
+        author_line = (
+            b"Pl\xc3\xa1cidoMonteiro <Pl\xc3\xa1cidoMonteiro@.(none)> 1380083482 +02"
+        )
+        expected_identity = b"Pl\xc3\xa1cidoMonteiro <Pl\xc3\xa1cidoMonteiro@.(none)>"
+        expected_time = 1380083482
+        expected_timezone = +2 * 60
+
+        person, time, (timezone, _timezone_neg_utc) = parse_time_entry_broken(
+            author_line
+        )
+
+        self.assertEqual(person, expected_identity)
+        self.assertEqual(time, expected_time)
+        self.assertEqual(timezone, expected_timezone)
+
+    def test_parse_time_entry_broken_unsigned_timezone(self) -> None:
+        from dulwich.objects import parse_time_entry_broken
+
+        author_line = (
+            b"applehq <applehq@203d044e-caa7-11dc-91ec-67e1038599e7> 1205785941 0000"
+        )
+        expected_identity = b"applehq <applehq@203d044e-caa7-11dc-91ec-67e1038599e7>"
+        expected_time = 1205785941
+        expected_timezone = 0
+
+        person, time, (timezone, _timezone_neg_utc) = parse_time_entry_broken(
+            author_line
+        )
+
+        self.assertEqual(person, expected_identity)
+        self.assertEqual(time, expected_time)
+        self.assertEqual(timezone, expected_timezone)
+
+    def test_parse_time_entry_broken_nonsensical_timezone(self) -> None:
+        """Timezone is 'UTC + 5 hours and 75 minutes'."""
+        from dulwich.objects import parse_time_entry_broken
+
+        author_line = b"acpmasquerade <d@picovico.com> 1460127297 +0575"
+        expected_identity = b"acpmasquerade <d@picovico.com>"
+        expected_time = 1460127297
+        expected_timezone = +6 * 60 * 60 + 15 * 60
+
+        person, time, (timezone, _timezone_neg_utc) = parse_time_entry_broken(
+            author_line
+        )
+
+        self.assertEqual(person, expected_identity)
+        self.assertEqual(time, expected_time)
+        self.assertEqual(timezone, expected_timezone)
+
+    def test_parse_time_entry_broken_missing_brackets(self) -> None:
+        from dulwich.objects import parse_time_entry_broken
+
+        author_line = b"kapil.foss@gmail.com 1297013737 -0500"
+        expected_identity = b"kapil.foss@gmail.com"
+        expected_time = 1297013737
+        expected_timezone = -5 * 60 * 60
+
+        person, time, (timezone, _timezone_neg_utc) = parse_time_entry_broken(
+            author_line
+        )
+
+        self.assertEqual(person, expected_identity)
+        self.assertEqual(time, expected_time)
+        self.assertEqual(timezone, expected_timezone)
+
+
+class BrokenCommitParseTests(TestCase):
+    """Tests for parsing commits with broken author/committer lines using parse_commit_broken."""
+
+    def make_commit_text(
+        self,
+        tree=b"d80c186a03f423a81b39df39dc87fd269736ca86",
+        parents=None,
+        author=b"Test User <test@example.com> 1234567890 +0000",
+        committer=b"Test User <test@example.com> 1234567890 +0000",
+        encoding=None,
+        message=b"Test commit\n",
+        extra=None,
+    ):
+        lines = []
+        if tree is not None:
+            lines.append(b"tree " + tree)
+        if parents is not None:
+            lines.extend(b"parent " + p for p in parents)
+        if author is not None:
+            lines.append(b"author " + author)
+        if committer is not None:
+            lines.append(b"committer " + committer)
+        if encoding is not None:
+            lines.append(b"encoding " + encoding)
+        if extra is not None:
+            for name, value in sorted(extra.items()):
+                lines.append(name + b" " + value)
+        lines.append(b"")
+        if message is not None:
+            lines.append(message)
+        return b"\n".join(lines)
+
+    def test_negative_timestamp(self) -> None:
+        from dulwich.objects import parse_commit_broken
+
+        author_line = b"Jane Doe <jdoe@example.org> -12345 +0100"
+        commit_text = self.make_commit_text(author=author_line, committer=author_line)
+        commit = parse_commit_broken(commit_text)
+
+        self.assertEqual(commit.author, b"Jane Doe <jdoe@example.org>")
+        self.assertEqual(commit.author_time, -12345)
+        self.assertEqual(commit.author_timezone, +1 * 60 * 60)
+
+    def test_double_negative_timezone(self) -> None:
+        from dulwich.objects import parse_commit_broken
+
+        author_line = b"Jane Doe <jdoe@example.org> 12345 --700"
+        commit_text = self.make_commit_text(author=author_line, committer=author_line)
+        commit = parse_commit_broken(commit_text)
+
+        self.assertEqual(commit.author, b"Jane Doe <jdoe@example.org>")
+        self.assertEqual(commit.author_time, 12345)
+        self.assertEqual(commit.author_timezone, +7 * 60 * 60)
+        self.assertTrue(commit._author_timezone_neg_utc)
+
+    def test_long_timezone(self) -> None:
+        from dulwich.objects import parse_commit_broken
+
+        # Real example from https://github.com/lisp/geek-nz
+        author_line = (
+            b"Geoff Cant <nem@lisp.geek.nz> 1170648114 -72000"  # codespell:ignore
+        )
+        commit_text = self.make_commit_text(author=author_line, committer=author_line)
+        commit = parse_commit_broken(commit_text)
+
+        self.assertEqual(
+            commit.author,
+            b"Geoff Cant <nem@lisp.geek.nz>",  # codespell:ignore
+        )
+        self.assertEqual(commit.author_time, 1170648114)
+        self.assertEqual(commit.author_timezone, -720 * 60 * 60)
+
+    def test_short_timezone(self) -> None:
+        from dulwich.objects import parse_commit_broken
+
+        author_line = (
+            b"Pl\xc3\xa1cidoMonteiro <Pl\xc3\xa1cidoMonteiro@.(none)> 1380083482 +02"
+        )
+        commit_text = self.make_commit_text(author=author_line, committer=author_line)
+        commit = parse_commit_broken(commit_text)
+
+        self.assertEqual(
+            commit.author, b"Pl\xc3\xa1cidoMonteiro <Pl\xc3\xa1cidoMonteiro@.(none)>"
+        )
+        self.assertEqual(commit.author_time, 1380083482)
+        self.assertEqual(commit.author_timezone, +2 * 60)
+
+    def test_unsigned_timezone(self) -> None:
+        from dulwich.objects import parse_commit_broken
+
+        author_line = (
+            b"applehq <applehq@203d044e-caa7-11dc-91ec-67e1038599e7> 1205785941 0000"
+        )
+        commit_text = self.make_commit_text(author=author_line, committer=author_line)
+        commit = parse_commit_broken(commit_text)
+
+        self.assertEqual(
+            commit.author, b"applehq <applehq@203d044e-caa7-11dc-91ec-67e1038599e7>"
+        )
+        self.assertEqual(commit.author_time, 1205785941)
+        self.assertEqual(commit.author_timezone, 0)
+
+    def test_nonsensical_timezone(self) -> None:
+        from dulwich.objects import parse_commit_broken
+
+        # Timezone is 'UTC + 5 hours and 75 minutes'
+        author_line = b"acpmasquerade <d@picovico.com> 1460127297 +0575"
+        commit_text = self.make_commit_text(author=author_line, committer=author_line)
+        commit = parse_commit_broken(commit_text)
+
+        self.assertEqual(commit.author, b"acpmasquerade <d@picovico.com>")
+        self.assertEqual(commit.author_time, 1460127297)
+        self.assertEqual(commit.author_timezone, +6 * 60 * 60 + 15 * 60)
+
+    def test_missing_angle_brackets(self) -> None:
+        from dulwich.objects import parse_commit_broken
+
+        # Real example from https://github.com/noderabbit-team/tasks
+        author_line = b"kapil.foss@gmail.com 1297013737 -0500"
+        commit_text = self.make_commit_text(author=author_line, committer=author_line)
+        commit = parse_commit_broken(commit_text)
+
+        self.assertEqual(commit.author, b"kapil.foss@gmail.com")
+        self.assertEqual(commit.author_time, 1297013737)
+        self.assertEqual(commit.author_timezone, -5 * 60 * 60)
+
 
 _TREE_ITEMS = {
     b"a-c": (0o100755, b"d80c186a03f423a81b39df39dc87fd269736ca86"),

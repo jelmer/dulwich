@@ -26,6 +26,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from dulwich.config import Config
 
+# Git signature format constants
+SIGNATURE_FORMAT_OPENPGP = "openpgp"
+SIGNATURE_FORMAT_X509 = "x509"
+SIGNATURE_FORMAT_SSH = "ssh"
+
 
 class SignatureVendor:
     """A signature implementation for signing and verifying Git objects."""
@@ -325,12 +330,15 @@ class GPGCliSignatureVendor(SignatureVendor):
                 )
 
 
-class SSHSignatureVendor(SignatureVendor):
-    """Signature vendor that uses SSH keys for signing and verification.
+class SSHSigSignatureVendor(SignatureVendor):
+    """Signature vendor that uses the sshsig Python package for SSH signature verification.
+
+    Note: This vendor only supports verification, not signing. The sshsig package
+    does not provide signing functionality. For signing, use SSHCliSignatureVendor.
 
     Supports git config options:
     - gpg.ssh.allowedSignersFile: File containing allowed SSH public keys
-    - gpg.ssh.defaultKeyCommand: Command to get default SSH key
+    - gpg.ssh.defaultKeyCommand: Command to get default SSH key (currently unused)
     """
 
     def __init__(self, config: "Config | None" = None) -> None:
@@ -395,10 +403,11 @@ class SSHSignatureVendor(SignatureVendor):
           ValueError: if no allowed signers are configured or provided
           sshsig.sshsig.InvalidSignature: if signature verification fails
         """
+        from typing import Any
+
         import sshsig.allowed_signers
         import sshsig.ssh_public_key
         import sshsig.sshsig
-        from typing import Any
 
         # Determine allowed signers
         allowed_keys: list[Any] = []
@@ -639,15 +648,19 @@ def get_signature_vendor(
         if config is not None:
             try:
                 format_bytes = config.get((b"gpg",), b"format")
-                format = format_bytes.decode("utf-8") if format_bytes else "openpgp"
+                format = (
+                    format_bytes.decode("utf-8")
+                    if format_bytes
+                    else SIGNATURE_FORMAT_OPENPGP
+                )
             except KeyError:
-                format = "openpgp"
+                format = SIGNATURE_FORMAT_OPENPGP
         else:
-            format = "openpgp"
+            format = SIGNATURE_FORMAT_OPENPGP
 
     format_lower = format.lower()
 
-    if format_lower == "openpgp":
+    if format_lower == SIGNATURE_FORMAT_OPENPGP:
         # Try to use GPG package vendor first, fall back to CLI
         try:
             import gpg  # noqa: F401
@@ -655,14 +668,14 @@ def get_signature_vendor(
             return GPGSignatureVendor(config=config)
         except ImportError:
             return GPGCliSignatureVendor(config=config)
-    elif format_lower == "x509":
+    elif format_lower == SIGNATURE_FORMAT_X509:
         raise ValueError("X.509 signatures are not yet supported")
-    elif format_lower == "ssh":
+    elif format_lower == SIGNATURE_FORMAT_SSH:
         # Try to use sshsig package vendor first (verify-only), fall back to CLI
         try:
             import sshsig  # noqa: F401
 
-            return SSHSignatureVendor(config=config)
+            return SSHSigSignatureVendor(config=config)
         except ImportError:
             return SSHCliSignatureVendor(config=config)
     else:

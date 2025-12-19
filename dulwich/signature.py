@@ -126,5 +126,133 @@ class GPGSignatureVendor(SignatureVendor):
                 )
 
 
+class GPGCliSignatureVendor(SignatureVendor):
+    """Signature vendor that uses the GPG command-line tool for signing and verification."""
+
+    def __init__(self, gpg_command: str = "gpg") -> None:
+        """Initialize the GPG CLI vendor.
+
+        Args:
+          gpg_command: Path to the GPG command (defaults to 'gpg')
+        """
+        self.gpg_command = gpg_command
+
+    def sign(self, data: bytes, keyid: str | None = None) -> bytes:
+        """Sign data with a GPG key using the command-line tool.
+
+        Args:
+          data: The data to sign
+          keyid: Optional GPG key ID to use for signing. If not specified,
+                 the default GPG key will be used.
+
+        Returns:
+          The signature as bytes
+
+        Raises:
+          subprocess.CalledProcessError: if GPG command fails
+        """
+        import subprocess
+
+        args = [self.gpg_command, "--detach-sign", "--armor"]
+        if keyid is not None:
+            args.extend(["--local-user", keyid])
+
+        result = subprocess.run(
+            args,
+            input=data,
+            capture_output=True,
+            check=True,
+        )
+        return result.stdout
+
+    def verify(
+        self, data: bytes, signature: bytes, keyids: Iterable[str] | None = None
+    ) -> None:
+        """Verify a GPG signature using the command-line tool.
+
+        Args:
+          data: The data that was signed
+          signature: The signature to verify
+          keyids: Optional iterable of trusted GPG key IDs.
+            If the signature was not created by any key in keyids, verification will
+            fail. If not specified, this function only verifies that the signature
+            is valid.
+
+        Raises:
+          subprocess.CalledProcessError: if GPG signature verification fails
+          ValueError: if signature was not created by a trusted key
+        """
+        import subprocess
+        import tempfile
+
+        # GPG requires the signature and data in separate files for verification
+        with (
+            tempfile.NamedTemporaryFile(mode="wb", suffix=".sig") as sig_file,
+            tempfile.NamedTemporaryFile(mode="wb", suffix=".dat") as data_file,
+        ):
+            sig_file.write(signature)
+            sig_file.flush()
+
+            data_file.write(data)
+            data_file.flush()
+
+            args = [self.gpg_command, "--verify", sig_file.name, data_file.name]
+
+            result = subprocess.run(
+                args,
+                capture_output=True,
+                check=True,
+            )
+
+            # If keyids are specified, check that the signature was made by one of them
+            if keyids:
+                # Parse stderr to extract the key fingerprint/ID that made the signature
+                stderr_text = result.stderr.decode("utf-8", errors="replace")
+
+                # GPG outputs both subkey and primary key fingerprints
+                # Collect both to check against trusted keyids
+                signing_keys = []
+                for line in stderr_text.split("\n"):
+                    if (
+                        "using RSA key" in line
+                        or "using DSA key" in line
+                        or "using EDDSA key" in line
+                        or "using ECDSA key" in line
+                    ):
+                        # Extract the key ID from lines like "gpg: using RSA key ABCD1234..."
+                        parts = line.split()
+                        if "key" in parts:
+                            key_idx = parts.index("key")
+                            if key_idx + 1 < len(parts):
+                                signing_keys.append(parts[key_idx + 1])
+                    elif "Primary key fingerprint:" in line:
+                        # Extract fingerprint
+                        fpr = line.split(":", 1)[1].strip().replace(" ", "")
+                        signing_keys.append(fpr)
+
+                if not signing_keys:
+                    raise ValueError("Could not determine signing key from GPG output")
+
+                # Check if any of the signing keys (subkey or primary) match the trusted keyids
+                keyids_normalized = [k.replace(" ", "").upper() for k in keyids]
+
+                # Check each signing key against trusted keyids
+                for signed_by in signing_keys:
+                    signed_by_normalized = signed_by.replace(" ", "").upper()
+                    # Check if signed_by matches or is a suffix of any trusted keyid
+                    # (GPG sometimes shows short key IDs)
+                    if any(
+                        signed_by_normalized in keyid or keyid in signed_by_normalized
+                        for keyid in keyids_normalized
+                    ):
+                        return
+
+                # None of the signing keys matched
+                raise ValueError(
+                    f"Signature not created by a trusted key. "
+                    f"Signed by: {signing_keys}, trusted keys: {list(keyids)}"
+                )
+
+
 # Default GPG vendor instance
 gpg_vendor = GPGSignatureVendor()

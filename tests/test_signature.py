@@ -25,6 +25,7 @@ import shutil
 import subprocess
 import unittest
 
+from dulwich.config import ConfigDict
 from dulwich.signature import GPGCliSignatureVendor, GPGSignatureVendor, SignatureVendor
 
 try:
@@ -226,3 +227,31 @@ class GPGCliSignatureVendorTests(unittest.TestCase):
             self.assertIsInstance(signature, bytes)
         except subprocess.CalledProcessError as e:
             self.skipTest(f"GPG not available: {e}")
+
+    def test_gpg_program_from_config(self) -> None:
+        """Test reading gpg.program from config."""
+        # Create a config with gpg.program set
+        config = ConfigDict()
+        config.set((b"gpg",), b"program", b"gpg2")
+
+        vendor = GPGCliSignatureVendor(config=config)
+        self.assertEqual(vendor.gpg_command, "gpg2")
+
+    def test_gpg_program_override(self) -> None:
+        """Test that gpg_command parameter overrides config."""
+        config = ConfigDict()
+        config.set((b"gpg",), b"program", b"gpg2")
+
+        vendor = GPGCliSignatureVendor(config=config, gpg_command="gpg")
+        self.assertEqual(vendor.gpg_command, "gpg")
+
+    def test_gpg_program_default(self) -> None:
+        """Test default gpg command when no config provided."""
+        vendor = GPGCliSignatureVendor()
+        self.assertEqual(vendor.gpg_command, "gpg")
+
+    def test_gpg_program_default_when_not_in_config(self) -> None:
+        """Test default gpg command when config doesn't have gpg.program."""
+        config = ConfigDict()
+        vendor = GPGCliSignatureVendor(config=config)
+        self.assertEqual(vendor.gpg_command, "gpg")

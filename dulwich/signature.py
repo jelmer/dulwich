@@ -682,5 +682,58 @@ def get_signature_vendor(
         raise ValueError(f"Unsupported signature format: {format}")
 
 
+def detect_signature_format(signature: bytes) -> str:
+    """Detect the signature format from the signature data.
+
+    Git signatures are always in ASCII-armored format.
+
+    Args:
+      signature: The signature bytes
+
+    Returns:
+      Signature format constant (SIGNATURE_FORMAT_OPENPGP, SIGNATURE_FORMAT_SSH, etc.)
+
+    Raises:
+      ValueError: if signature format cannot be detected
+    """
+    # SSH signatures start with SSH armor header
+    if signature.startswith(b"-----BEGIN SSH SIGNATURE-----"):
+        return SIGNATURE_FORMAT_SSH
+
+    # GPG/PGP signatures start with PGP armor header
+    if signature.startswith(b"-----BEGIN PGP SIGNATURE-----"):
+        return SIGNATURE_FORMAT_OPENPGP
+
+    # X.509 signatures (S/MIME format)
+    if signature.startswith(
+        (b"-----BEGIN SIGNED MESSAGE-----", b"-----BEGIN PKCS7-----")
+    ):
+        return SIGNATURE_FORMAT_X509
+
+    raise ValueError("Unable to detect signature format")
+
+
+def get_signature_vendor_for_signature(
+    signature: bytes, config: "Config | None" = None
+) -> SignatureVendor:
+    """Get the appropriate signature vendor for a given signature.
+
+    This function detects the signature format and returns the appropriate
+    vendor to verify it.
+
+    Args:
+      signature: The signature bytes to detect format from
+      config: Optional Git configuration
+
+    Returns:
+      SignatureVendor instance appropriate for the signature format
+
+    Raises:
+      ValueError: if signature format cannot be detected or is not supported
+    """
+    format = detect_signature_format(signature)
+    return get_signature_vendor(format=format, config=config)
+
+
 # Default GPG vendor instance
 gpg_vendor = GPGSignatureVendor()

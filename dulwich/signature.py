@@ -325,6 +325,227 @@ class GPGCliSignatureVendor(SignatureVendor):
                 )
 
 
+class SSHSignatureVendor(SignatureVendor):
+    """Signature vendor that uses SSH keys for signing and verification.
+
+    Supports git config options:
+    - gpg.ssh.allowedSignersFile: File containing allowed SSH public keys
+    - gpg.ssh.defaultKeyCommand: Command to get default SSH key
+    """
+
+    def __init__(self, config: "Config | None" = None) -> None:
+        """Initialize the SSH signature vendor.
+
+        Args:
+          config: Optional Git configuration for SSH signature settings
+        """
+        super().__init__(config)
+
+        # Parse SSH-specific config
+        self.allowed_signers_file = None
+        self.default_key_command = None
+
+        if config is not None:
+            try:
+                signers_file = config.get((b"gpg", b"ssh"), b"allowedSignersFile")
+                if signers_file:
+                    self.allowed_signers_file = signers_file.decode("utf-8")
+            except KeyError:
+                pass
+
+            try:
+                key_command = config.get((b"gpg", b"ssh"), b"defaultKeyCommand")
+                if key_command:
+                    self.default_key_command = key_command.decode("utf-8")
+            except KeyError:
+                pass
+
+    def sign(self, data: bytes, keyid: str | None = None) -> bytes:
+        """Sign data with an SSH key.
+
+        Args:
+          data: The data to sign
+          keyid: Optional SSH key to use. Can be a path to private key or
+                 public key prefixed with "key::"
+
+        Returns:
+          The signature as bytes
+
+        Raises:
+          NotImplementedError: SSH signing not yet implemented
+        """
+        raise NotImplementedError("SSH signing not yet implemented")
+
+    def verify(
+        self, data: bytes, signature: bytes, keyids: Iterable[str] | None = None
+    ) -> None:
+        """Verify an SSH signature.
+
+        Args:
+          data: The data that was signed
+          signature: The signature to verify
+          keyids: Optional iterable of allowed SSH public keys
+
+        Raises:
+          NotImplementedError: SSH verification not yet implemented
+        """
+        raise NotImplementedError("SSH verification not yet implemented")
+
+
+class SSHCliSignatureVendor(SignatureVendor):
+    """Signature vendor that uses ssh-keygen command-line tool for SSH signatures.
+
+    Supports git config options:
+    - gpg.ssh.allowedSignersFile: File containing allowed SSH public keys
+    - gpg.ssh.program: Path to ssh-keygen command
+    """
+
+    def __init__(
+        self, config: "Config | None" = None, ssh_command: str | None = None
+    ) -> None:
+        """Initialize the SSH CLI vendor.
+
+        Args:
+          config: Optional Git configuration to read gpg.ssh settings from
+          ssh_command: Path to ssh-keygen command. If not specified, will try to
+                      read from config's gpg.ssh.program setting, or default to 'ssh-keygen'
+        """
+        super().__init__(config)
+
+        if ssh_command is not None:
+            self.ssh_command = ssh_command
+        elif config is not None:
+            try:
+                ssh_program = config.get((b"gpg", b"ssh"), b"program")
+                self.ssh_command = ssh_program.decode("utf-8")
+            except KeyError:
+                self.ssh_command = "ssh-keygen"
+        else:
+            self.ssh_command = "ssh-keygen"
+
+        # Parse SSH-specific config
+        self.allowed_signers_file = None
+        if config is not None:
+            try:
+                signers_file = config.get((b"gpg", b"ssh"), b"allowedSignersFile")
+                if signers_file:
+                    self.allowed_signers_file = signers_file.decode("utf-8")
+            except KeyError:
+                pass
+
+    def sign(self, data: bytes, keyid: str | None = None) -> bytes:
+        """Sign data with an SSH key using ssh-keygen.
+
+        Args:
+          data: The data to sign
+          keyid: Path to SSH private key. If not specified, ssh-keygen will
+                use the default key (typically from ssh-agent)
+
+        Returns:
+          The signature as bytes
+
+        Raises:
+          subprocess.CalledProcessError: if ssh-keygen command fails
+          ValueError: if keyid is not provided and no default key available
+        """
+        import os
+        import subprocess
+        import tempfile
+
+        if keyid is None:
+            raise ValueError("SSH signing requires a key to be specified")
+
+        # Create a temporary directory to hold both data and signature files
+        # ssh-keygen creates the signature file with .sig suffix
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_filename = os.path.join(tmpdir, "data.git")
+            sig_filename = data_filename + ".sig"
+
+            # Write data to file
+            with open(data_filename, "wb") as data_file:
+                data_file.write(data)
+
+            # Sign with ssh-keygen
+            args = [
+                self.ssh_command,
+                "-Y",
+                "sign",
+                "-f",
+                keyid,
+                "-n",
+                "git",  # namespace
+                data_filename,
+            ]
+
+            subprocess.run(args, capture_output=True, check=True)
+
+            # Read signature file
+            with open(sig_filename, "rb") as sig_file:
+                signature = sig_file.read()
+
+            return signature
+
+    def verify(
+        self, data: bytes, signature: bytes, keyids: Iterable[str] | None = None
+    ) -> None:
+        """Verify an SSH signature using ssh-keygen.
+
+        Args:
+          data: The data that was signed
+          signature: The signature to verify
+          keyids: Not used for SSH verification. Instead, allowed signers
+                 are read from gpg.ssh.allowedSignersFile config
+
+        Raises:
+          subprocess.CalledProcessError: if signature verification fails
+          ValueError: if allowedSignersFile is not configured
+        """
+        import os
+        import subprocess
+        import tempfile
+
+        if self.allowed_signers_file is None:
+            raise ValueError(
+                "SSH signature verification requires gpg.ssh.allowedSignersFile "
+                "to be configured"
+            )
+
+        # Create a temporary directory for data and signature files
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_filename = os.path.join(tmpdir, "data.git")
+            sig_filename = os.path.join(tmpdir, "data.git.sig")
+
+            # Write data and signature files
+            with open(data_filename, "wb") as data_file:
+                data_file.write(data)
+
+            with open(sig_filename, "wb") as sig_file:
+                sig_file.write(signature)
+
+            # Verify with ssh-keygen
+            # For git signatures, we use "git" as the signer identity
+            args = [
+                self.ssh_command,
+                "-Y",
+                "verify",
+                "-f",
+                self.allowed_signers_file,
+                "-I",
+                "git",  # signer identity
+                "-n",
+                "git",  # namespace
+                "-s",
+                sig_filename,
+            ]
+
+            subprocess.run(
+                args,
+                stdin=open(data_filename, "rb"),
+                capture_output=True,
+                check=True,
+            )
+
+
 def get_signature_vendor(
     format: str | None = None, config: "Config | None" = None
 ) -> SignatureVendor:
@@ -368,7 +589,8 @@ def get_signature_vendor(
     elif format_lower == "x509":
         raise ValueError("X.509 signatures are not yet supported")
     elif format_lower == "ssh":
-        raise ValueError("SSH signatures are not yet supported")
+        # For SSH, use CLI vendor (sshsig package support can be added later)
+        return SSHCliSignatureVendor(config=config)
     else:
         raise ValueError(f"Unsupported signature format: {format}")
 

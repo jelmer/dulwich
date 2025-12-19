@@ -21,10 +21,22 @@
 """Signature vendors for signing and verifying Git objects."""
 
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dulwich.config import Config
 
 
 class SignatureVendor:
     """A signature implementation for signing and verifying Git objects."""
+
+    def __init__(self, config: "Config | None" = None) -> None:
+        """Initialize the signature vendor.
+
+        Args:
+          config: Optional Git configuration to use for settings like gpg.program
+        """
+        self.config = config
 
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with a key.
@@ -60,6 +72,14 @@ class SignatureVendor:
 
 class GPGSignatureVendor(SignatureVendor):
     """Signature vendor that uses the GPG package for signing and verification."""
+
+    def __init__(self, config: "Config | None" = None) -> None:
+        """Initialize the GPG package vendor.
+
+        Args:
+          config: Optional Git configuration (currently unused by this vendor)
+        """
+        super().__init__(config)
 
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with a GPG key.
@@ -129,13 +149,28 @@ class GPGSignatureVendor(SignatureVendor):
 class GPGCliSignatureVendor(SignatureVendor):
     """Signature vendor that uses the GPG command-line tool for signing and verification."""
 
-    def __init__(self, gpg_command: str = "gpg") -> None:
+    def __init__(
+        self, config: "Config | None" = None, gpg_command: str | None = None
+    ) -> None:
         """Initialize the GPG CLI vendor.
 
         Args:
-          gpg_command: Path to the GPG command (defaults to 'gpg')
+          config: Optional Git configuration to read gpg.program setting from
+          gpg_command: Path to the GPG command. If not specified, will try to
+                      read from config's gpg.program setting, or default to 'gpg'
         """
-        self.gpg_command = gpg_command
+        super().__init__(config)
+
+        if gpg_command is not None:
+            self.gpg_command = gpg_command
+        elif config is not None:
+            try:
+                gpg_program = config.get((b"gpg",), b"program")
+                self.gpg_command = gpg_program.decode("utf-8")
+            except KeyError:
+                self.gpg_command = "gpg"
+        else:
+            self.gpg_command = "gpg"
 
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with a GPG key using the command-line tool.

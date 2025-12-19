@@ -1261,20 +1261,9 @@ class Tag(ShaFile):
           keyid: Optional GPG key ID to use for signing. If not specified,
                  the default GPG key will be used.
         """
-        import gpg
+        from dulwich.signature import gpg_vendor
 
-        with gpg.Context(armor=True) as c:
-            if keyid is not None:
-                key = c.get_key(keyid)
-                with gpg.Context(armor=True, signers=[key]) as ctx:
-                    self.signature, _unused_result = ctx.sign(
-                        self.as_raw_string(),
-                        mode=gpg.constants.sig.mode.DETACH,
-                    )
-            else:
-                self.signature, _unused_result = c.sign(
-                    self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
-                )
+        self.signature = gpg_vendor.sign(self.as_raw_string(), keyid=keyid)
 
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
@@ -1331,21 +1320,9 @@ class Tag(ShaFile):
         if self._signature is None:
             return
 
-        import gpg
+        from dulwich.signature import gpg_vendor
 
-        with gpg.Context() as ctx:
-            data, result = ctx.verify(
-                self.raw_without_sig(),
-                signature=self._signature,
-            )
-            if keyids:
-                keys = [ctx.get_key(key) for key in keyids]
-                for key in keys:
-                    for subkey in key.subkeys:
-                        for sig in result.signatures:
-                            if subkey.can_sign and subkey.fpr == sig.fpr:
-                                return
-                raise gpg.errors.MissingSignatures(result, keys, results=(data, result))
+        gpg_vendor.verify(self.raw_without_sig(), self._signature, keyids=keyids)
 
 
 class TreeEntry(NamedTuple):
@@ -2177,20 +2154,9 @@ class Commit(ShaFile):
           keyid: Optional GPG key ID to use for signing. If not specified,
                  the default GPG key will be used.
         """
-        import gpg
+        from dulwich.signature import gpg_vendor
 
-        with gpg.Context(armor=True) as c:
-            if keyid is not None:
-                key = c.get_key(keyid)
-                with gpg.Context(armor=True, signers=[key]) as ctx:
-                    self.gpgsig, _unused_result = ctx.sign(
-                        self.as_raw_string(),
-                        mode=gpg.constants.sig.mode.DETACH,
-                    )
-            else:
-                self.gpgsig, _unused_result = c.sign(
-                    self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
-                )
+        self.gpgsig = gpg_vendor.sign(self.as_raw_string(), keyid=keyid)
 
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
@@ -2248,21 +2214,9 @@ class Commit(ShaFile):
         if self._gpgsig is None:
             return
 
-        import gpg
+        from dulwich.signature import gpg_vendor
 
-        with gpg.Context() as ctx:
-            data, result = ctx.verify(
-                self.raw_without_sig(),
-                signature=self._gpgsig,
-            )
-            if keyids:
-                keys = [ctx.get_key(key) for key in keyids]
-                for key in keys:
-                    for subkey in key.subkeys:
-                        for sig in result.signatures:
-                            if subkey.can_sign and subkey.fpr == sig.fpr:
-                                return
-                raise gpg.errors.MissingSignatures(result, keys, results=(data, result))
+        gpg_vendor.verify(self.raw_without_sig(), self._gpgsig, keyids=keyids)
 
     def _serialize(self) -> list[bytes]:
         headers = []

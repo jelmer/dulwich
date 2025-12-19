@@ -71,15 +71,29 @@ class SignatureVendor:
 
 
 class GPGSignatureVendor(SignatureVendor):
-    """Signature vendor that uses the GPG package for signing and verification."""
+    """Signature vendor that uses the GPG package for signing and verification.
+
+    Supports git config options:
+    - gpg.minTrustLevel: Minimum trust level for signature verification
+    """
 
     def __init__(self, config: "Config | None" = None) -> None:
         """Initialize the GPG package vendor.
 
         Args:
-          config: Optional Git configuration (currently unused by this vendor)
+          config: Optional Git configuration for settings like gpg.minTrustLevel
         """
         super().__init__(config)
+
+        # Parse gpg.minTrustLevel from config
+        self.min_trust_level = None
+        if config is not None:
+            try:
+                trust_level = config.get((b"gpg",), b"minTrustLevel")
+                if trust_level:
+                    self.min_trust_level = trust_level.decode("utf-8").lower()
+            except KeyError:
+                pass
 
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with a GPG key.
@@ -126,14 +140,36 @@ class GPGSignatureVendor(SignatureVendor):
           gpg.errors.BadSignatures: if GPG signature verification fails
           gpg.errors.MissingSignatures: if the signature was not created by a key
             specified in keyids
+          ValueError: if signature trust level is below minimum configured level
         """
         import gpg
+
+        # Map trust level names to GPGME validity values
+        trust_level_map = {
+            "undefined": gpg.constants.validity.UNDEFINED,
+            "never": gpg.constants.validity.NEVER,
+            "marginal": gpg.constants.validity.MARGINAL,
+            "fully": gpg.constants.validity.FULL,
+            "ultimate": gpg.constants.validity.ULTIMATE,
+        }
 
         with gpg.Context() as ctx:
             verified_data, result = ctx.verify(
                 data,
                 signature=signature,
             )
+
+            # Check minimum trust level if configured
+            if self.min_trust_level is not None:
+                min_validity = trust_level_map.get(self.min_trust_level)
+                if min_validity is not None:
+                    for sig in result.signatures:
+                        if sig.validity < min_validity:
+                            raise ValueError(
+                                f"Signature trust level {sig.validity} is below "
+                                f"minimum required level {self.min_trust_level}"
+                            )
+
             if keyids:
                 keys = [ctx.get_key(key) for key in keyids]
                 for key in keys:

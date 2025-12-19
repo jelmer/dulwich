@@ -54,6 +54,19 @@ class SignatureVendorTests(unittest.TestCase):
 class GPGSignatureVendorTests(unittest.TestCase):
     """Tests for GPGSignatureVendor."""
 
+    def test_min_trust_level_from_config(self) -> None:
+        """Test reading gpg.minTrustLevel from config."""
+        config = ConfigDict()
+        config.set((b"gpg",), b"minTrustLevel", b"marginal")
+
+        vendor = GPGSignatureVendor(config=config)
+        self.assertEqual(vendor.min_trust_level, "marginal")
+
+    def test_min_trust_level_default(self) -> None:
+        """Test default when gpg.minTrustLevel not in config."""
+        vendor = GPGSignatureVendor()
+        self.assertIsNone(vendor.min_trust_level)
+
     def test_sign_and_verify(self) -> None:
         """Test basic sign and verify cycle.
 

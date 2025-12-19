@@ -26,7 +26,12 @@ import subprocess
 import unittest
 
 from dulwich.config import ConfigDict
-from dulwich.signature import GPGCliSignatureVendor, GPGSignatureVendor, SignatureVendor
+from dulwich.signature import (
+    GPGCliSignatureVendor,
+    GPGSignatureVendor,
+    SignatureVendor,
+    get_signature_vendor,
+)
 
 try:
     import gpg
@@ -268,3 +273,58 @@ class GPGCliSignatureVendorTests(unittest.TestCase):
         config = ConfigDict()
         vendor = GPGCliSignatureVendor(config=config)
         self.assertEqual(vendor.gpg_command, "gpg")
+
+
+class GetSignatureVendorTests(unittest.TestCase):
+    """Tests for get_signature_vendor function."""
+
+    def test_default_format(self) -> None:
+        """Test that default format is openpgp."""
+        vendor = get_signature_vendor()
+        self.assertIsInstance(vendor, (GPGSignatureVendor, GPGCliSignatureVendor))
+
+    def test_explicit_openpgp_format(self) -> None:
+        """Test explicitly requesting openpgp format."""
+        vendor = get_signature_vendor(format="openpgp")
+        self.assertIsInstance(vendor, (GPGSignatureVendor, GPGCliSignatureVendor))
+
+    def test_format_from_config(self) -> None:
+        """Test reading format from config."""
+        config = ConfigDict()
+        config.set((b"gpg",), b"format", b"openpgp")
+
+        vendor = get_signature_vendor(config=config)
+        self.assertIsInstance(vendor, (GPGSignatureVendor, GPGCliSignatureVendor))
+
+    def test_format_case_insensitive(self) -> None:
+        """Test that format is case-insensitive."""
+        vendor = get_signature_vendor(format="OpenPGP")
+        self.assertIsInstance(vendor, (GPGSignatureVendor, GPGCliSignatureVendor))
+
+    def test_x509_not_supported(self) -> None:
+        """Test that x509 format raises ValueError."""
+        with self.assertRaises(ValueError) as cm:
+            get_signature_vendor(format="x509")
+        self.assertIn("X.509", str(cm.exception))
+
+    def test_ssh_not_supported(self) -> None:
+        """Test that ssh format raises ValueError."""
+        with self.assertRaises(ValueError) as cm:
+            get_signature_vendor(format="ssh")
+        self.assertIn("SSH", str(cm.exception))
+
+    def test_invalid_format(self) -> None:
+        """Test that invalid format raises ValueError."""
+        with self.assertRaises(ValueError) as cm:
+            get_signature_vendor(format="invalid")
+        self.assertIn("Unsupported", str(cm.exception))
+
+    def test_config_passed_to_vendor(self) -> None:
+        """Test that config is passed to the vendor."""
+        config = ConfigDict()
+        config.set((b"gpg",), b"program", b"gpg2")
+
+        vendor = get_signature_vendor(format="openpgp", config=config)
+        # If CLI vendor is used, check that config was passed
+        if isinstance(vendor, GPGCliSignatureVendor):
+            self.assertEqual(vendor.gpg_command, "gpg2")

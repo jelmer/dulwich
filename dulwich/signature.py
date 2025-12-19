@@ -325,5 +325,53 @@ class GPGCliSignatureVendor(SignatureVendor):
                 )
 
 
+def get_signature_vendor(
+    format: str | None = None, config: "Config | None" = None
+) -> SignatureVendor:
+    """Get a signature vendor for the specified format.
+
+    Args:
+      format: Signature format. If None, reads from config's gpg.format setting.
+              Supported values:
+              - "openpgp": Use OpenPGP/GPG signatures (default)
+              - "x509": Use X.509 signatures (not yet implemented)
+              - "ssh": Use SSH signatures (not yet implemented)
+      config: Optional Git configuration
+
+    Returns:
+      SignatureVendor instance for the requested format
+
+    Raises:
+      ValueError: if the format is not supported
+    """
+    # Determine format from config if not specified
+    if format is None:
+        if config is not None:
+            try:
+                format_bytes = config.get((b"gpg",), b"format")
+                format = format_bytes.decode("utf-8") if format_bytes else "openpgp"
+            except KeyError:
+                format = "openpgp"
+        else:
+            format = "openpgp"
+
+    format_lower = format.lower()
+
+    if format_lower == "openpgp":
+        # Try to use GPG package vendor first, fall back to CLI
+        try:
+            import gpg  # noqa: F401
+
+            return GPGSignatureVendor(config=config)
+        except ImportError:
+            return GPGCliSignatureVendor(config=config)
+    elif format_lower == "x509":
+        raise ValueError("X.509 signatures are not yet supported")
+    elif format_lower == "ssh":
+        raise ValueError("SSH signatures are not yet supported")
+    else:
+        raise ValueError(f"Unsupported signature format: {format}")
+
+
 # Default GPG vendor instance
 gpg_vendor = GPGSignatureVendor()

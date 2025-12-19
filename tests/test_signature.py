@@ -31,7 +31,7 @@ from dulwich.signature import (
     GPGSignatureVendor,
     SignatureVendor,
     SSHCliSignatureVendor,
-    SSHSignatureVendor,
+    SSHSigSignatureVendor,
     get_signature_vendor,
 )
 
@@ -312,8 +312,8 @@ class GetSignatureVendorTests(unittest.TestCase):
     def test_ssh_format_supported(self) -> None:
         """Test that ssh format is now supported."""
         vendor = get_signature_vendor(format="ssh")
-        # Should be either SSHSignatureVendor or SSHCliSignatureVendor
-        self.assertIsInstance(vendor, (SSHSignatureVendor, SSHCliSignatureVendor))
+        # Should be either SSHSigSignatureVendor or SSHCliSignatureVendor
+        self.assertIsInstance(vendor, (SSHSigSignatureVendor, SSHCliSignatureVendor))
 
     def test_invalid_format(self) -> None:
         """Test that invalid format raises ValueError."""
@@ -334,23 +334,23 @@ class GetSignatureVendorTests(unittest.TestCase):
     def test_ssh_format(self) -> None:
         """Test requesting SSH format."""
         vendor = get_signature_vendor(format="ssh")
-        # Should be either SSHSignatureVendor or SSHCliSignatureVendor
-        self.assertIsInstance(vendor, (SSHSignatureVendor, SSHCliSignatureVendor))
+        # Should be either SSHSigSignatureVendor or SSHCliSignatureVendor
+        self.assertIsInstance(vendor, (SSHSigSignatureVendor, SSHCliSignatureVendor))
 
 
-class SSHSignatureVendorTests(unittest.TestCase):
-    """Tests for SSHSignatureVendor (sshsig package implementation)."""
+class SSHSigSignatureVendorTests(unittest.TestCase):
+    """Tests for SSHSigSignatureVendor (sshsig package implementation)."""
 
     def test_sign_not_supported(self) -> None:
         """Test that sign raises NotImplementedError with helpful message."""
-        vendor = SSHSignatureVendor()
+        vendor = SSHSigSignatureVendor()
         with self.assertRaises(NotImplementedError) as cm:
             vendor.sign(b"test data", keyid="dummy")
         self.assertIn("SSHCliSignatureVendor", str(cm.exception))
 
     def test_verify_without_config_raises(self) -> None:
         """Test that verify without config or keyids raises ValueError."""
-        vendor = SSHSignatureVendor()
+        vendor = SSHSigSignatureVendor()
         with self.assertRaises(ValueError) as cm:
             vendor.verify(b"test data", b"fake signature")
         self.assertIn("allowedSignersFile", str(cm.exception))
@@ -361,7 +361,7 @@ class SSHSignatureVendorTests(unittest.TestCase):
         config.set((b"gpg", b"ssh"), b"allowedSignersFile", b"/path/to/allowed")
         config.set((b"gpg", b"ssh"), b"defaultKeyCommand", b"ssh-add -L")
 
-        vendor = SSHSignatureVendor(config=config)
+        vendor = SSHSigSignatureVendor(config=config)
         self.assertEqual(vendor.allowed_signers_file, "/path/to/allowed")
         self.assertEqual(vendor.default_key_command, "ssh-add -L")
 
@@ -417,7 +417,7 @@ class SSHSignatureVendorTests(unittest.TestCase):
             pkg_config.set(
                 (b"gpg", b"ssh"), b"allowedSignersFile", allowed_signers.encode()
             )
-            pkg_vendor = SSHSignatureVendor(config=pkg_config)
+            pkg_vendor = SSHSigSignatureVendor(config=pkg_config)
 
             # This should succeed
             pkg_vendor.verify(test_data, signature)

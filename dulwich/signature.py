@@ -372,24 +372,93 @@ class SSHSignatureVendor(SignatureVendor):
           The signature as bytes
 
         Raises:
-          NotImplementedError: SSH signing not yet implemented
+          NotImplementedError: The sshsig package does not support signing.
+                              Use SSHCliSignatureVendor instead.
         """
-        raise NotImplementedError("SSH signing not yet implemented")
+        raise NotImplementedError(
+            "The sshsig package does not support signing. "
+            "Use SSHCliSignatureVendor instead."
+        )
 
     def verify(
         self, data: bytes, signature: bytes, keyids: Iterable[str] | None = None
     ) -> None:
-        """Verify an SSH signature.
+        """Verify an SSH signature using the sshsig package.
 
         Args:
           data: The data that was signed
-          signature: The signature to verify
-          keyids: Optional iterable of allowed SSH public keys
+          signature: The SSH signature to verify (armored format)
+          keyids: Optional iterable of allowed SSH public keys.
+                 If not provided, uses gpg.ssh.allowedSignersFile from config.
 
         Raises:
-          NotImplementedError: SSH verification not yet implemented
+          ValueError: if no allowed signers are configured or provided
+          sshsig.sshsig.InvalidSignature: if signature verification fails
         """
-        raise NotImplementedError("SSH verification not yet implemented")
+        import sshsig.allowed_signers
+        import sshsig.ssh_public_key
+        import sshsig.sshsig
+        from typing import Any
+
+        # Determine allowed signers
+        allowed_keys: list[Any] = []
+
+        if keyids:
+            # Parse keyids as SSH public keys
+            for keyid in keyids:
+                try:
+                    # mypy doesn't see PublicKey.from_string, use Any
+                    key: Any = sshsig.ssh_public_key.PublicKey.from_string(  # type: ignore[attr-defined]
+                        keyid.encode()
+                    )
+                    allowed_keys.append(key)
+                except Exception:
+                    # Try as a file path or ignore invalid keys
+                    try:
+                        with open(keyid, "rb") as f:
+                            key_str = f.read().strip()
+                            key = sshsig.ssh_public_key.PublicKey.from_string(  # type: ignore[attr-defined]
+                                key_str
+                            )
+                            allowed_keys.append(key)
+                    except Exception:
+                        pass
+        elif self.allowed_signers_file:
+            # Load from allowedSignersFile
+            import pathlib
+
+            try:
+                allowed_keys = list(
+                    sshsig.allowed_signers.load_for_git_allowed_signers_file(
+                        pathlib.Path(self.allowed_signers_file)
+                    )
+                )
+            except FileNotFoundError:
+                raise ValueError(
+                    f"Allowed signers file not found: {self.allowed_signers_file}"
+                )
+        else:
+            raise ValueError(
+                "SSH signature verification requires either keyids or "
+                "gpg.ssh.allowedSignersFile to be configured"
+            )
+
+        if not allowed_keys:
+            raise ValueError("No valid allowed signers found")
+
+        # Verify the signature
+        # sshsig.verify expects armored signature as string
+        sig_str = (
+            signature.decode("utf-8") if isinstance(signature, bytes) else signature
+        )
+
+        # Verify with namespace "git" (Git's default)
+        sshsig.sshsig.verify(
+            msg_in=data,
+            armored_signature=sig_str,
+            allowed_signers=allowed_keys,
+            namespace="git",
+        )
 
 
 class SSHCliSignatureVendor(SignatureVendor):
@@ -589,8 +658,13 @@ def get_signature_vendor(
     elif format_lower == "x509":
         raise ValueError("X.509 signatures are not yet supported")
     elif format_lower == "ssh":
-        # For SSH, use CLI vendor (sshsig package support can be added later)
-        return SSHCliSignatureVendor(config=config)
+        # Try to use sshsig package vendor first (verify-only), fall back to CLI
+        try:
+            import sshsig  # noqa: F401
+
+            return SSHSignatureVendor(config=config)
+        except ImportError:
+            return SSHCliSignatureVendor(config=config)
     else:
         raise ValueError(f"Unsupported signature format: {format}")
 

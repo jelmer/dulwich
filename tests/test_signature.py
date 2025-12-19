@@ -312,7 +312,8 @@ class GetSignatureVendorTests(unittest.TestCase):
     def test_ssh_format_supported(self) -> None:
         """Test that ssh format is now supported."""
         vendor = get_signature_vendor(format="ssh")
-        self.assertIsInstance(vendor, SSHCliSignatureVendor)
+        # Should be either SSHSignatureVendor or SSHCliSignatureVendor
+        self.assertIsInstance(vendor, (SSHSignatureVendor, SSHCliSignatureVendor))
 
     def test_invalid_format(self) -> None:
         """Test that invalid format raises ValueError."""
@@ -333,23 +334,26 @@ class GetSignatureVendorTests(unittest.TestCase):
     def test_ssh_format(self) -> None:
         """Test requesting SSH format."""
         vendor = get_signature_vendor(format="ssh")
-        self.assertIsInstance(vendor, SSHCliSignatureVendor)
+        # Should be either SSHSignatureVendor or SSHCliSignatureVendor
+        self.assertIsInstance(vendor, (SSHSignatureVendor, SSHCliSignatureVendor))
 
 
 class SSHSignatureVendorTests(unittest.TestCase):
-    """Tests for SSHSignatureVendor base implementation."""
+    """Tests for SSHSignatureVendor (sshsig package implementation)."""
 
-    def test_not_implemented_sign(self) -> None:
-        """Test that sign raises NotImplementedError."""
+    def test_sign_not_supported(self) -> None:
+        """Test that sign raises NotImplementedError with helpful message."""
         vendor = SSHSignatureVendor()
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(NotImplementedError) as cm:
             vendor.sign(b"test data", keyid="dummy")
+        self.assertIn("SSHCliSignatureVendor", str(cm.exception))
 
-    def test_not_implemented_verify(self) -> None:
-        """Test that verify raises NotImplementedError."""
+    def test_verify_without_config_raises(self) -> None:
+        """Test that verify without config or keyids raises ValueError."""
         vendor = SSHSignatureVendor()
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(ValueError) as cm:
             vendor.verify(b"test data", b"fake signature")
+        self.assertIn("allowedSignersFile", str(cm.exception))
 
     def test_config_parsing(self) -> None:
         """Test parsing SSH config options."""
@@ -360,6 +364,63 @@ class SSHSignatureVendorTests(unittest.TestCase):
         vendor = SSHSignatureVendor(config=config)
         self.assertEqual(vendor.allowed_signers_file, "/path/to/allowed")
         self.assertEqual(vendor.default_key_command, "ssh-add -L")
+
+    def test_verify_with_cli_generated_signature(self) -> None:
+        """Test verifying a signature created by SSH CLI vendor."""
+        import os
+        import tempfile
+
+        if shutil.which("ssh-keygen") is None:
+            self.skipTest("ssh-keygen not available")
+
+        # Generate a test SSH key and signature using CLI vendor
+        with tempfile.TemporaryDirectory() as tmpdir:
+            private_key = os.path.join(tmpdir, "test_key")
+            public_key = private_key + ".pub"
+            allowed_signers = os.path.join(tmpdir, "allowed_signers")
+
+            # Generate Ed25519 key
+            subprocess.run(
+                [
+                    "ssh-keygen",
+                    "-t",
+                    "ed25519",
+                    "-f",
+                    private_key,
+                    "-N",
+                    "",
+                    "-C",
+                    "test@example.com",
+                ],
+                capture_output=True,
+                check=True,
+            )
+
+            # Create allowed_signers file
+            with open(public_key) as pub:
+                pub_key_content = pub.read().strip()
+            with open(allowed_signers, "w") as allowed:
+                allowed.write(f"* {pub_key_content}\n")
+
+            # Sign with CLI vendor
+            cli_config = ConfigDict()
+            cli_config.set(
+                (b"gpg", b"ssh"), b"allowedSignersFile", allowed_signers.encode()
+            )
+            cli_vendor = SSHCliSignatureVendor(config=cli_config)
+
+            test_data = b"test data for sshsig verification"
+            signature = cli_vendor.sign(test_data, keyid=private_key)
+
+            # Verify with sshsig package vendor
+            pkg_config = ConfigDict()
+            pkg_config.set(
+                (b"gpg", b"ssh"), b"allowedSignersFile", allowed_signers.encode()
+            )
+            pkg_vendor = SSHSignatureVendor(config=pkg_config)
+
+            # This should succeed
+            pkg_vendor.verify(test_data, signature)
 
 
 class SSHCliSignatureVendorTests(unittest.TestCase):

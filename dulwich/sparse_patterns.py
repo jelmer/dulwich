@@ -28,7 +28,7 @@ __all__ = [
     "compute_included_paths_cone",
     "compute_included_paths_full",
     "determine_included_paths",
-    "match_gitignore_patterns",
+    "match_sparse_patterns",
     "parse_sparse_patterns",
 ]
 
@@ -339,37 +339,43 @@ def match_sparse_patterns(
                 matched = True
         else:
             matched = False
-        # If dir_only is True and path_is_dir is False, we skip matching
+        # If dir_only is True, handle directory-only matching separately
         if dir_only and not matched:
             if path_str == pattern + "/":
                 matched = not forbidden_path
             elif fnmatch(path_str, f"{pattern}/*"):
                 matched = True  # root subpath (anchored or unanchored)
             elif not anchored:
-                matched = fnmatch(path_str, f"*/{pattern}/*")  # unanchored subpath
-
-        # If anchored is True, pattern should match from the start of path_str.
-        # If not anchored, we can match anywhere.
-        if anchored and not matched:
-            # We match from the beginning. For example, pattern = "docs"
-            # path_str = "docs/readme.md" -> start is "docs"
-            # We'll just do a prefix check or prefix + slash check
-            # Or you can do a partial fnmatch. We'll do a manual approach:
-            if pattern == "":
-                # Means it was just "/", which can happen if line was "/"
-                # That might represent top-level only?
-                # We'll skip for simplicity or treat it as a special case.
-                continue
-            elif path_str == pattern:
-                matched = True
-            elif path_str.startswith(pattern + "/"):
-                matched = True
-            else:
-                matched = False
-        elif not matched:
-            # Not anchored: we can do a simple wildcard match or a substring match.
-            # For simplicity, let's use Python's fnmatch:
-            matched = fnmatch(path_str, pattern) or fnmatch(path_str, f"*/{pattern}")
+                # For unanchored dir-only patterns, match the directory at any level
+                # e.g., "docs/" should match "A/docs" as a directory and "A/docs/*" as files within
+                if fnmatch(path_str, f"*/{pattern}") and path_is_dir:
+                    matched = True
+                elif fnmatch(path_str, f"*/{pattern}/*"):
+                    matched = True  # unanchored subpath
+        # If dir_only is False, or if dir_only is True and we already matched, continue with other logic
+        elif not dir_only:
+            # If anchored is True, pattern should match from the start of path_str.
+            # If not anchored, we can match anywhere.
+            if anchored and not matched:
+                # We match from the beginning. For example, pattern = "docs"
+                # path_str = "docs/readme.md" -> start is "docs"
+                # We'll just do a prefix check or prefix + slash check
+                # Or you can do a partial fnmatch. We'll do a manual approach:
+                if pattern == "":
+                    # Means it was just "/", which should match everything recursively
+                    matched = True
+                elif path_str == pattern:
+                    matched = True
+                elif path_str.startswith(pattern + "/"):
+                    matched = True
+                else:
+                    matched = False
+            elif not matched:
+                # Not anchored: we can do a simple wildcard match or a substring match.
+                # For simplicity, let's use Python's fnmatch:
+                matched = fnmatch(path_str, pattern) or fnmatch(
+                    path_str, f"*/{pattern}"
+                )
 
         if matched:
             # If negation is True, that means 'exclude'. If negation is False, 'include'.

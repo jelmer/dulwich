@@ -124,9 +124,8 @@ class MatchSparsePatternsTests(TestCase):
         self.assertTrue(match_sparse_patterns("A/B/docs", parsed, path_is_dir=True))
         # Even if the path name is "docs", if it's a file, won't match:
         self.assertFalse(match_sparse_patterns("docs", parsed, path_is_dir=False))
-        # TODO: fix
-        # self.assertFalse(match_sparse_patterns("A/docs", parsed, path_is_dir=False)) #
-        # self.assertFalse(match_sparse_patterns("A/B/docs", parsed, path_is_dir=False))
+        self.assertFalse(match_sparse_patterns("A/docs", parsed, path_is_dir=False))
+        self.assertFalse(match_sparse_patterns("A/B/docs", parsed, path_is_dir=False))
         # Subfiles and subdirs of the included dir should match
         self.assertTrue(match_sparse_patterns("docs/x.md", parsed))
         self.assertTrue(match_sparse_patterns("docs/A/x.md", parsed))
@@ -156,16 +155,15 @@ class MatchSparsePatternsTests(TestCase):
 
     def test_anchored_empty_pattern(self):
         """Test handling of empty pattern with anchoring (e.g., '/')."""
-        # TODO: this is wrong: `/` should be recursive match of all files
+        # `/` should be recursive match of all files
         parsed = parse_sparse_patterns(["/"])
         self.assertEqual(parsed, [("", False, False, True)])  # anchored
         self.assertTrue(match_sparse_patterns("", parsed, path_is_dir=True))
-        # TODO: fix
-        # self.assertTrue(match_sparse_patterns("A", parsed, path_is_dir=True))
-        # self.assertTrue(match_sparse_patterns("A/B", parsed, path_is_dir=True))
-        # self.assertTrue(match_sparse_patterns("foo", parsed))
-        # self.assertTrue(match_sparse_patterns("A/foo", parsed))
-        # self.assertTrue(match_sparse_patterns("A/B/foo", parsed))
+        self.assertTrue(match_sparse_patterns("A", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("A/B", parsed, path_is_dir=True))
+        self.assertTrue(match_sparse_patterns("foo", parsed))
+        self.assertTrue(match_sparse_patterns("A/foo", parsed))
+        self.assertTrue(match_sparse_patterns("A/B/foo", parsed))
 
     def test_anchored_dir_only(self):
         """Test anchored directory-only patterns."""

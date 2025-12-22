@@ -292,6 +292,17 @@ class RepositoryRootTests(TestCase):
 
         self.assertRaises(ValueError, r.__delitem__, b"notrefs/foo")
 
+    def test_getitem_32_byte_ref(self) -> None:
+        """Test that accessing a ref name that's 32 bytes long works (issue #2040)."""
+        r = self.open_repo("a.git")
+        # Create a ref with exactly 32 bytes
+        ref_name = b"refs/heads/feat-backend-refactor"
+        self.assertEqual(len(ref_name), 32)
+        r[ref_name] = b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"
+        # This should not raise AssertionError
+        obj = r[ref_name]
+        self.assertEqual(obj.id, b"a90fa2d900a17e99b433217e988c4eb4a2e9a097")
+
     def test_get_refs(self) -> None:
         r = self.open_repo("a.git")
         self.assertEqual(

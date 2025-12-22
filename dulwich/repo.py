@@ -1197,18 +1197,27 @@ class BaseRepo:
         """
         if not isinstance(name, bytes):
             raise TypeError(f"'name' must be bytestring, not {type(name).__name__:.80}")
-        if len(name) in (20, 32, 40, 64):  # Support both SHA1 and SHA256
+        # If it looks like a ref name, only try refs
+        if name == b"HEAD" or name.startswith(b"refs/"):
             try:
-                # Try as ObjectID/RawObjectID
+                return self.object_store[self.refs[Ref(name)]]
+            except (RefFormatError, KeyError):
+                pass
+        # Otherwise, try as object ID if length matches
+        if len(name) in (
+            self.object_store.object_format.oid_length,
+            self.object_store.object_format.hex_length,
+        ):
+            try:
                 return self.object_store[
-                    ObjectID(name) if len(name) == 40 else RawObjectID(name)
+                    ObjectID(name)
+                    if len(name) == self.object_store.object_format.hex_length
+                    else RawObjectID(name)
                 ]
             except (KeyError, ValueError):
                 pass
-        try:
-            return self.object_store[self.refs[Ref(name)]]
-        except RefFormatError as exc:
-            raise KeyError(name) from exc
+        # If nothing worked, raise KeyError
+        raise KeyError(name)
 
     def __contains__(self, name: bytes) -> bool:
         """Check if a specific Git object or ref is present.

@@ -83,7 +83,7 @@ class SHA256PackTests(unittest.TestCase):
             self.assertEqual(found_offset, offset)
 
     def test_pack_index_v1_with_sha256(self):
-        """Test that pack index v1 correctly handles SHA256 hashes."""
+        """Test that pack index v1 correctly rejects SHA256 hashes."""
         # Create SHA256 entries manually
         entries = []
         for i in range(5):
@@ -104,24 +104,12 @@ class SHA256PackTests(unittest.TestCase):
         from hashlib import sha1
 
         pack_checksum = sha1(b"fake v1 pack data").digest()
-        write_pack_index_v1(index_buf, entries, pack_checksum)
 
-        # Load and verify the index
-        index_buf.seek(0)
-        pack_idx = load_pack_index_file("<memory>", index_buf, SHA256)
+        # Pack index v1 only supports SHA-1, so this should raise TypeError
+        with self.assertRaises(TypeError) as cm:
+            write_pack_index_v1(index_buf, entries, pack_checksum)
 
-        # Check that the index loaded correctly
-        self.assertEqual(len(pack_idx), 5)
-        self.assertEqual(pack_idx.version, 1)
-
-        # Verify hash_size detection
-        self.assertEqual(pack_idx.hash_size, 32)
-
-        # Verify we can look up objects by SHA256
-        for sha256_hash, offset, _ in entries:
-            # This should not raise KeyError
-            found_offset = pack_idx.object_offset(sha256_hash)
-            self.assertEqual(found_offset, offset)
+        self.assertIn("pack index v1 only supports SHA-1", str(cm.exception))
 
 
 if __name__ == "__main__":

@@ -592,6 +592,54 @@ class SSHCliSignatureVendorTests(unittest.TestCase):
             # Verify the signature
             vendor.verify(test_data, signature)
 
+    def test_default_key_command(self) -> None:
+        """Test gpg.ssh.defaultKeyCommand support."""
+        import os
+        import tempfile
+
+        # Generate a test SSH key
+        with tempfile.TemporaryDirectory() as tmpdir:
+            private_key = os.path.join(tmpdir, "test_key")
+
+            # Generate Ed25519 key (no passphrase)
+            subprocess.run(
+                [
+                    "ssh-keygen",
+                    "-t",
+                    "ed25519",
+                    "-f",
+                    private_key,
+                    "-N",
+                    "",
+                    "-C",
+                    "test@example.com",
+                ],
+                capture_output=True,
+                check=True,
+            )
+
+            # Create config with defaultKeyCommand that echoes the key path
+            config = ConfigDict()
+            config.set(
+                (b"gpg", b"ssh"), b"defaultKeyCommand", f"echo {private_key}".encode()
+            )
+
+            vendor = SSHCliSignatureVendor(config=config)
+            test_data = b"test data"
+
+            # Sign without providing keyid - should use defaultKeyCommand
+            signature = vendor.sign(test_data)
+            self.assertIsInstance(signature, bytes)
+            self.assertGreater(len(signature), 0)
+
+    def test_revocation_file_config(self) -> None:
+        """Test that revocation file is read from config."""
+        config = ConfigDict()
+        config.set((b"gpg", b"ssh"), b"revocationFile", b"/path/to/revoked_keys")
+
+        vendor = SSHCliSignatureVendor(config=config)
+        self.assertEqual(vendor.revocation_file, "/path/to/revoked_keys")
+
 
 class DetectSignatureFormatTests(unittest.TestCase):
     """Tests for detect_signature_format function."""

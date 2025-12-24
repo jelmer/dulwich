@@ -21,6 +21,9 @@
 
 """Tests for partial clone filter specifications."""
 
+import os
+import tempfile
+
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, Tree
 from dulwich.partial_clone import (
@@ -32,6 +35,7 @@ from dulwich.partial_clone import (
     filter_pack_objects,
     parse_filter_spec,
 )
+from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit
 
 from . import TestCase
@@ -419,3 +423,138 @@ class FilterPackObjectsTests(TestCase):
         self.assertNotIn(self.small_blob.id, filtered)
         self.assertNotIn(self.large_blob.id, filtered)
         self.assertIn(self.tree.id, filtered)
+
+
+class PartialCloneIntegrationTests(TestCase):
+    """Integration tests for partial clone with real repositories."""
+
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = tempfile.mkdtemp()
+        self.addCleanup(self._cleanup)
+        self.repo = Repo.init(self.repo_dir)
+
+    def _cleanup(self):
+        """Clean up test repository."""
+        import shutil
+        if os.path.exists(self.repo_dir):
+            shutil.rmtree(self.repo_dir)
+
+    def test_blob_none_filter_with_real_repo(self):
+        """Test blob:none filter excludes blobs in real repository."""
+        # Create a tree with files
+        tree = Tree()
+
+        # Add some blobs to the tree
+        blob1 = Blob.from_string(b"file1 content")
+        blob2 = Blob.from_string(b"file2 content")
+        tree.add(b"file1.txt", 0o100644, blob1.id)
+        tree.add(b"file2.txt", 0o100644, blob2.id)
+
+        # Add objects to repo
+        self.repo.object_store.add_object(blob1)
+        self.repo.object_store.add_object(blob2)
+        self.repo.object_store.add_object(tree)
+
+        # Create commit
+        commit = make_commit(tree=tree.id, message=b"Test commit")
+        self.repo.object_store.add_object(commit)
+
+        # Get all objects
+        object_ids = [blob1.id, blob2.id, tree.id, commit.id]
+
+        # Apply blob:none filter
+        filter_spec = BlobNoneFilter()
+        filtered = filter_pack_objects(
+            self.repo.object_store, object_ids, filter_spec
+        )
+
+        # Verify blobs are excluded
+        self.assertNotIn(blob1.id, filtered)
+        self.assertNotIn(blob2.id, filtered)
+        # But tree and commit are included
+        self.assertIn(tree.id, filtered)
+        self.assertIn(commit.id, filtered)
+
+        # Verify we have only 2 objects (tree + commit)
+        self.assertEqual(2, len(filtered))
+
+    def test_blob_limit_filter_with_mixed_sizes(self):
+        """Test blob:limit filter with mixed blob sizes."""
+        tree = Tree()
+
+        # Create blobs of different sizes
+        small_blob = Blob.from_string(b"small")  # 5 bytes
+        medium_blob = Blob.from_string(b"x" * 50)  # 50 bytes
+        large_blob = Blob.from_string(b"y" * 500)  # 500 bytes
+
+        tree.add(b"small.txt", 0o100644, small_blob.id)
+        tree.add(b"medium.txt", 0o100644, medium_blob.id)
+        tree.add(b"large.txt", 0o100644, large_blob.id)
+
+        # Add to repo
+        self.repo.object_store.add_object(small_blob)
+        self.repo.object_store.add_object(medium_blob)
+        self.repo.object_store.add_object(large_blob)
+        self.repo.object_store.add_object(tree)
+
+        commit = make_commit(tree=tree.id)
+        self.repo.object_store.add_object(commit)
+
+        # Test with 100 byte limit
+        object_ids = [
+            small_blob.id,
+            medium_blob.id,
+            large_blob.id,
+            tree.id,
+            commit.id,
+        ]
+
+        filter_spec = BlobLimitFilter(100)
+        filtered = filter_pack_objects(
+            self.repo.object_store, object_ids, filter_spec
+        )
+
+        # Small and medium should be included
+        self.assertIn(small_blob.id, filtered)
+        self.assertIn(medium_blob.id, filtered)
+        # Large should be excluded
+        self.assertNotIn(large_blob.id, filtered)
+        # Tree and commit included
+        self.assertIn(tree.id, filtered)
+        self.assertIn(commit.id, filtered)
+
+    def test_combined_filter_integration(self):
+        """Test combined filters in real scenario."""
+        tree = Tree()
+
+        blob1 = Blob.from_string(b"content1")
+        blob2 = Blob.from_string(b"x" * 1000)
+
+        tree.add(b"file1.txt", 0o100644, blob1.id)
+        tree.add(b"file2.txt", 0o100644, blob2.id)
+
+        self.repo.object_store.add_object(blob1)
+        self.repo.object_store.add_object(blob2)
+        self.repo.object_store.add_object(tree)
+
+        commit = make_commit(tree=tree.id)
+        self.repo.object_store.add_object(commit)
+
+        # Combine: limit to 500 bytes, but also apply blob:none
+        # This should exclude ALL blobs (blob:none overrides limit)
+        filter_spec = CombineFilter([
+            BlobLimitFilter(500),
+            BlobNoneFilter(),
+        ])
+
+        object_ids = [blob1.id, blob2.id, tree.id, commit.id]
+        filtered = filter_pack_objects(
+            self.repo.object_store, object_ids, filter_spec
+        )
+
+        # All blobs excluded
+        self.assertNotIn(blob1.id, filtered)
+        self.assertNotIn(blob2.id, filtered)
+        # Only tree and commit
+        self.assertEqual(2, len(filtered))

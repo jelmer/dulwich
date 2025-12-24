@@ -180,6 +180,11 @@ class UploadPackHandlerTestCase(TestCase):
         self._handler.progress(b"second message")
         self.assertRaises(IndexError, self._handler.proto.get_received_line, 2)
 
+    def test_filter_capability_advertised(self) -> None:
+        """Test that the filter capability is advertised by UploadPackHandler."""
+        caps = self._handler.capabilities()
+        self.assertIn(b"filter", caps)
+
     def test_get_tagged(self) -> None:
         refs = {
             b"refs/tags/tag1": ONE,

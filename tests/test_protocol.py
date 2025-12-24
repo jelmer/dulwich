@@ -25,6 +25,8 @@ from io import BytesIO
 
 from dulwich.errors import HangupException
 from dulwich.protocol import (
+    CAPABILITY_FILTER,
+    KNOWN_UPLOAD_CAPABILITIES,
     MULTI_ACK,
     MULTI_ACK_DETAILED,
     SINGLE_ACK,
@@ -348,3 +350,11 @@ class PktLineParserTests(TestCase):
         parser.parse(b"0005z0006aba")
         self.assertEqual(pktlines, [b"z", b"ab"])
         self.assertEqual(b"a", parser.get_tail())
+
+
+class CapabilitiesTests(TestCase):
+    """Tests for protocol capabilities."""
+
+    def test_filter_capability_in_known_upload_capabilities(self) -> None:
+        """Test that CAPABILITY_FILTER is in KNOWN_UPLOAD_CAPABILITIES."""
+        self.assertIn(CAPABILITY_FILTER, KNOWN_UPLOAD_CAPABILITIES)

@@ -84,6 +84,7 @@ __all__ = [
     "extract_capabilities",
     "extract_capability_names",
     "extract_want_line_capabilities",
+    "find_capability",
     "format_ack_line",
     "format_capability_line",
     "format_cmd_pkt",
@@ -720,6 +721,38 @@ def ack_type(capabilities: Iterable[bytes]) -> int:
     elif b"multi_ack" in capabilities:
         return MULTI_ACK
     return SINGLE_ACK
+
+
+def find_capability(capabilities: Iterable[bytes], *capability_names: bytes) -> bytes | None:
+    """Find a capability value in a list of capabilities.
+
+    This function looks for capabilities that may include arguments after an equals sign
+    and returns only the value part (after the '='). For capabilities without values,
+    returns the capability name itself.
+
+    Args:
+      capabilities: List of capability strings
+      capability_names: Capability name(s) to search for
+
+    Returns:
+      The value after '=' if found, or the capability name if no '=', or None if not found
+
+    Example:
+      >>> caps = [b'filter=blob:none', b'agent=git/2.0', b'thin-pack']
+      >>> find_capability(caps, b'filter')
+      b'blob:none'
+      >>> find_capability(caps, b'thin-pack')
+      b'thin-pack'
+      >>> find_capability(caps, b'missing')
+      None
+    """
+    for cap in capabilities:
+        for name in capability_names:
+            if cap == name:
+                return cap
+            elif cap.startswith(name + b"="):
+                return cap[len(name) + 1:]
+    return None
 
 
 class BufferedPktLineWriter:

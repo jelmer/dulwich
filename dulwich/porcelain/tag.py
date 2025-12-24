@@ -53,7 +53,7 @@ def verify_tag(
     tagname: str | bytes,
     keyids: list[str] | None = None,
 ) -> None:
-    """Verify GPG signature on a tag.
+    """Verify signature on a tag.
 
     Args:
       repo: Path to repository
@@ -67,6 +67,8 @@ def verify_tag(
       gpg.errors.MissingSignatures: if tag was not signed by a key
         specified in keyids
     """
+    from dulwich.signature import get_signature_vendor_for_signature
+
     from . import Error, open_repo_closing
 
     with open_repo_closing(repo) as r:
@@ -77,7 +79,15 @@ def verify_tag(
         tag_obj = r[tag_id]
         if not isinstance(tag_obj, Tag):
             raise Error(f"{tagname!r} does not point to a tag object")
-        tag_obj.verify(keyids)
+
+        payload, signature, _sig_type = tag_obj.extract_signature()
+        if signature is None:
+            return
+
+        vendor = get_signature_vendor_for_signature(
+            signature, config=r.get_config_stack()
+        )
+        vendor.verify(payload, signature, keyids=keyids)
 
 
 def tag_create(
@@ -164,15 +174,19 @@ def tag_create(
             else:
                 should_sign = sign
 
-            # Get the signing key from config if signing is enabled
-            keyid = None
+            # Get the signing key and format from config if signing is enabled
             if should_sign:
+                from dulwich.signature import get_signature_vendor
+
+                keyid = None
                 try:
                     keyid_bytes = config.get((b"user",), b"signingkey")
                     keyid = keyid_bytes.decode() if keyid_bytes else None
                 except KeyError:
                     keyid = None
-                tag_obj.sign(keyid)
+
+                vendor = get_signature_vendor(config=config)
+                tag_obj.signature = vendor.sign(tag_obj.as_raw_string(), keyid=keyid)
 
             r.object_store.add_object(tag_obj)
             tag_id = tag_obj.id

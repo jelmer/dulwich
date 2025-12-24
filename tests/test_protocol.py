@@ -38,6 +38,7 @@ from dulwich.protocol import (
     ack_type,
     extract_capabilities,
     extract_want_line_capabilities,
+    find_capability,
     pkt_line,
     pkt_seq,
 )
@@ -358,3 +359,33 @@ class CapabilitiesTests(TestCase):
     def test_filter_capability_in_known_upload_capabilities(self) -> None:
         """Test that CAPABILITY_FILTER is in KNOWN_UPLOAD_CAPABILITIES."""
         self.assertIn(CAPABILITY_FILTER, KNOWN_UPLOAD_CAPABILITIES)
+
+
+class FindCapabilityTests(TestCase):
+    """Tests for find_capability function."""
+
+    def test_find_capability_with_value(self) -> None:
+        """Test finding a capability with a value."""
+        caps = [b"filter=blob:none", b"agent=git/2.0"]
+        self.assertEqual(b"blob:none", find_capability(caps, b"filter"))
+
+    def test_find_capability_without_value(self) -> None:
+        """Test finding a capability without a value."""
+        caps = [b"thin-pack", b"ofs-delta"]
+        self.assertEqual(b"thin-pack", find_capability(caps, b"thin-pack"))
+
+    def test_find_capability_not_found(self) -> None:
+        """Test finding a capability that doesn't exist."""
+        caps = [b"thin-pack", b"ofs-delta"]
+        self.assertIsNone(find_capability(caps, b"missing"))
+
+    def test_find_capability_multiple_names(self) -> None:
+        """Test finding with multiple capability names."""
+        caps = [b"filter=blob:none", b"agent=git/2.0"]
+        # Should find first match
+        self.assertEqual(b"git/2.0", find_capability(caps, b"missing", b"agent"))
+
+    def test_find_capability_complex_value(self) -> None:
+        """Test finding capability with complex value."""
+        caps = [b"filter=combine:blob:none+tree:0"]
+        self.assertEqual(b"combine:blob:none+tree:0", find_capability(caps, b"filter"))

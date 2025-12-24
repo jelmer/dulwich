@@ -100,7 +100,14 @@ from .errors import (
 from .object_store import MissingObjectFinder, PackBasedObjectStore, find_shallow
 from .objects import Commit, ObjectID, Tree, valid_hexsha
 from .pack import ObjectContainer, write_pack_from_container
-from .partial_clone import filter_pack_objects, parse_filter_spec
+from .partial_clone import (
+    CombineFilter,
+    SparseOidFilter,
+    TreeDepthFilter,
+    filter_pack_objects,
+    filter_pack_objects_with_paths,
+    parse_filter_spec,
+)
 from .protocol import (
     CAPABILITIES_REF,
     CAPABILITY_AGENT,
@@ -491,7 +498,9 @@ class UploadPackHandler(PackHandler):
         filter_spec_bytes = find_capability(caps, CAPABILITY_FILTER)
         if filter_spec_bytes:
             try:
-                self.filter_spec = parse_filter_spec(filter_spec_bytes, object_store=self.repo.object_store)
+                self.filter_spec = parse_filter_spec(
+                    filter_spec_bytes, object_store=self.repo.object_store
+                )
             except ValueError as e:
                 raise GitProtocolError(f"Invalid filter specification: {e}")
 
@@ -616,14 +625,31 @@ class UploadPackHandler(PackHandler):
         # Apply filter if specified (partial clone support)
         if self.filter_spec is not None:
             original_count = len(object_ids)
-            object_ids = filter_pack_objects(
-                self.repo.object_store, object_ids, self.filter_spec
-            )
+
+            # Use path-aware filtering for tree depth and sparse:oid filters
+            # Check if filter requires path tracking
+            def needs_path_tracking(filter_spec):
+                if isinstance(filter_spec, (TreeDepthFilter, SparseOidFilter)):
+                    return True
+                if isinstance(filter_spec, CombineFilter):
+                    return any(needs_path_tracking(f) for f in filter_spec.filters)
+                return False
+
+            if needs_path_tracking(self.filter_spec):
+                object_ids = filter_pack_objects_with_paths(
+                    self.repo.object_store,
+                    wants,
+                    self.filter_spec,
+                    progress=self.progress,
+                )
+            else:
+                object_ids = filter_pack_objects(
+                    self.repo.object_store, object_ids, self.filter_spec
+                )
+
             filtered_count = original_count - len(object_ids)
             if filtered_count > 0:
-                self.progress(
-                    (f"filtered {filtered_count} objects.\n").encode("ascii")
-                )
+                self.progress((f"filtered {filtered_count} objects.\n").encode("ascii"))
 
         self.progress((f"counting objects: {len(object_ids)}, done.\n").encode("ascii"))
 

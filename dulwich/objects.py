@@ -2098,7 +2098,7 @@ class Commit(ShaFile):
             gpgsig,
             message,
             extra,
-        ) = parse_commit(chunks)
+        ) = _parse_commit(chunks)
 
         self._tree = tree
         self._parents = [ObjectID(p) for p in parents]

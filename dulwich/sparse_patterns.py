@@ -28,7 +28,7 @@ __all__ = [
     "compute_included_paths_cone",
     "compute_included_paths_full",
     "determine_included_paths",
-    "match_gitignore_patterns",
+    "match_sparse_patterns",
     "parse_sparse_patterns",
 ]
 
@@ -86,8 +86,8 @@ def compute_included_paths_full(index: Index, lines: Sequence[str]) -> set[str]:
     included = set()
     for path_bytes, entry in index.items():
         path_str = path_bytes.decode("utf-8")
-        # For .gitignore logic, match_gitignore_patterns returns True if 'included'
-        if match_gitignore_patterns(path_str, parsed, path_is_dir=False):
+        # For .gitignore logic, match_sparse_patterns returns True if 'included'
+        if match_sparse_patterns(path_str, parsed, path_is_dir=False):
             included.add(path_str)
     return included
 
@@ -252,9 +252,10 @@ def parse_sparse_patterns(lines: Sequence[str]) -> list[tuple[str, bool, bool, b
     anchoring, and directory-only markers, and returns data suitable for matching.
 
     Example:
-      ``line = "/*.txt" -> ("/.txt", False, False, True)``
-      ``line = "!/docs/" -> ("/docs/", True, True, True)``
-      ``line = "mydir/" -> ("mydir/", False, True, False)`` not anchored, no leading "/"
+      ``line = "*.txt" -> ("*.txt", False, False, False)`` not negated/dir/anchored
+      ``line = "/*.txt" -> ("*.txt", False, False, True)`` anchored, not negated/dir
+      ``line = "!/*.txt" -> ("*.txt", False, False, True)`` anchored/negated, not dir
+      ``line = "!/mydir/" -> ("mydir", True, True, True)`` anchored/negated/dir
 
     Args:
       lines: A list of raw lines (strings) from the sparse-checkout file.
@@ -277,19 +278,16 @@ def parse_sparse_patterns(lines: Sequence[str]) -> list[tuple[str, bool, bool, b
         if anchored:
             line = line[1:]  # remove leading '/'
 
-        # If pattern ends with '/', we consider it directory-only
-        # (like "docs/"). Real Git might treat it slightly differently,
-        # but we'll simplify and mark it as "dir_only" if it ends in "/".
-        dir_only = False
-        if line.endswith("/"):
-            dir_only = True
+        # If pattern ends with '/', we consider it directory-only (like "docs/").
+        dir_only = line.endswith("/")
+        if dir_only:
             line = line[:-1]
 
         results.append((line, negation, dir_only, anchored))
     return results
 
 
-def match_gitignore_patterns(
+def match_sparse_patterns(
     path_str: str,
     parsed_patterns: Sequence[tuple[str, bool, bool, bool]],
     path_is_dir: bool = False,
@@ -301,16 +299,22 @@ def match_gitignore_patterns(
       2. If a pattern matches, we set the "include" state depending on negation.
       3. Later matches override earlier ones.
 
-    In a .gitignore sense, lines that do not start with '!' are "ignore" patterns,
-    lines that start with '!' are "unignore" (re-include). But in sparse checkout,
-    it's effectively reversed: a non-negation line is "include," negation is "exclude."
-    However, many flows still rely on the same final logic: the last matching pattern
+    In a sparse checkout, lines that do not start with '!' are positive patterns,
+    indicating files/directories to check out (include in the index), and those that
+    start with '!' are negative ('negated'), meaning they indicate files not to check
+    out (not included in the index). This is fairly straightforward.
+
+    In a .gitignore, it's the same syntax but with a reverse effect: positive means
+    "ignore" (exclude from the index) and negative means "unignore" (re-include in the
+    index).
+
+    Many routines still rely on the same final logic: the last matching pattern
     decides "excluded" vs. "included."
 
     We'll interpret "include" as returning True, "exclude" as returning False.
 
-    Each pattern can include negation (!), directory-only markers, or be anchored
-    to the start of the path. The last matching pattern determines whether the
+    Each pattern can include negation ('!'), directory-only markers ('/' as suffix), or
+    be anchored ('/' as prefix). The last matching pattern determines whether the
     path is ultimately included or excluded.
 
     Args:
@@ -322,9 +326,8 @@ def match_gitignore_patterns(
     Returns:
       True if the path is included by the last matching pattern, False otherwise.
     """
-    # Start by assuming "excluded" (like a .gitignore starts by including everything
-    # until matched, but for sparse-checkout we often treat unmatched as "excluded").
-    # We will flip if we match an "include" pattern.
+    # Start by assuming "excluded". Like how .gitignore initially includes everything
+    # until matched, but reversed: sparse-checkout initially excludes everything.
     is_included = False
 
     for pattern, negation, dir_only, anchored in parsed_patterns:
@@ -336,37 +339,43 @@ def match_gitignore_patterns(
                 matched = True
         else:
             matched = False
-        # If dir_only is True and path_is_dir is False, we skip matching
+        # If dir_only is True, handle directory-only matching separately
         if dir_only and not matched:
             if path_str == pattern + "/":
                 matched = not forbidden_path
             elif fnmatch(path_str, f"{pattern}/*"):
                 matched = True  # root subpath (anchored or unanchored)
             elif not anchored:
-                matched = fnmatch(path_str, f"*/{pattern}/*")  # unanchored subpath
-
-        # If anchored is True, pattern should match from the start of path_str.
-        # If not anchored, we can match anywhere.
-        if anchored and not matched:
-            # We match from the beginning. For example, pattern = "docs"
-            # path_str = "docs/readme.md" -> start is "docs"
-            # We'll just do a prefix check or prefix + slash check
-            # Or you can do a partial fnmatch. We'll do a manual approach:
-            if pattern == "":
-                # Means it was just "/", which can happen if line was "/"
-                # That might represent top-level only?
-                # We'll skip for simplicity or treat it as a special case.
-                continue
-            elif path_str == pattern:
-                matched = True
-            elif path_str.startswith(pattern + "/"):
-                matched = True
-            else:
-                matched = False
-        elif not matched:
-            # Not anchored: we can do a simple wildcard match or a substring match.
-            # For simplicity, let's use Python's fnmatch:
-            matched = fnmatch(path_str, pattern) or fnmatch(path_str, f"*/{pattern}")
+                # For unanchored dir-only patterns, match the directory at any level
+                # e.g., "docs/" should match "A/docs" as a directory and "A/docs/*" as files within
+                if fnmatch(path_str, f"*/{pattern}") and path_is_dir:
+                    matched = True
+                elif fnmatch(path_str, f"*/{pattern}/*"):
+                    matched = True  # unanchored subpath
+        # If dir_only is False, or if dir_only is True and we already matched, continue with other logic
+        elif not dir_only:
+            # If anchored is True, pattern should match from the start of path_str.
+            # If not anchored, we can match anywhere.
+            if anchored and not matched:
+                # We match from the beginning. For example, pattern = "docs"
+                # path_str = "docs/readme.md" -> start is "docs"
+                # We'll just do a prefix check or prefix + slash check
+                # Or you can do a partial fnmatch. We'll do a manual approach:
+                if pattern == "":
+                    # Means it was just "/", which should match everything recursively
+                    matched = True
+                elif path_str == pattern:
+                    matched = True
+                elif path_str.startswith(pattern + "/"):
+                    matched = True
+                else:
+                    matched = False
+            elif not matched:
+                # Not anchored: we can do a simple wildcard match or a substring match.
+                # For simplicity, let's use Python's fnmatch:
+                matched = fnmatch(path_str, pattern) or fnmatch(
+                    path_str, f"*/{pattern}"
+                )
 
         if matched:
             # If negation is True, that means 'exclude'. If negation is False, 'include'.

@@ -35,6 +35,7 @@ from dulwich.signature import (
     SignatureVendor,
     SSHCliSignatureVendor,
     SSHSigSignatureVendor,
+    X509SignatureVendor,
     detect_signature_format,
     get_signature_vendor,
     get_signature_vendor_for_signature,
@@ -282,6 +283,61 @@ class GPGCliSignatureVendorTests(unittest.TestCase):
         self.assertEqual(vendor.gpg_command, "gpg")
 
 
+class X509SignatureVendorTests(unittest.TestCase):
+    """Tests for X509SignatureVendor."""
+
+    def test_gpgsm_program_default(self) -> None:
+        """Test default gpgsm command is 'gpgsm'."""
+        vendor = X509SignatureVendor()
+        self.assertEqual(vendor.gpgsm_command, "gpgsm")
+
+    def test_gpgsm_program_from_config(self) -> None:
+        """Test reading gpg.x509.program from config."""
+        config = ConfigDict()
+        config.set((b"gpg", b"x509"), b"program", b"/usr/local/bin/gpgsm")
+
+        vendor = X509SignatureVendor(config=config)
+        self.assertEqual(vendor.gpgsm_command, "/usr/local/bin/gpgsm")
+
+    def test_gpgsm_program_override(self) -> None:
+        """Test gpgsm_command parameter overrides config."""
+        config = ConfigDict()
+        config.set((b"gpg", b"x509"), b"program", b"/usr/local/bin/gpgsm")
+
+        vendor = X509SignatureVendor(config=config, gpgsm_command="/custom/gpgsm")
+        self.assertEqual(vendor.gpgsm_command, "/custom/gpgsm")
+
+    def test_gpgsm_program_default_when_not_in_config(self) -> None:
+        """Test default when gpg.x509.program not in config."""
+        config = ConfigDict()
+        vendor = X509SignatureVendor(config=config)
+        self.assertEqual(vendor.gpgsm_command, "gpgsm")
+
+    @unittest.skipIf(
+        shutil.which("gpgsm") is None, "gpgsm command not available in PATH"
+    )
+    def test_sign_and_verify(self) -> None:
+        """Test basic X.509 sign and verify cycle.
+
+        Note: This test requires gpgsm and an X.509 certificate to be configured.
+        It may be skipped in environments without gpgsm/certificate setup.
+        """
+        vendor = X509SignatureVendor()
+        test_data = b"test data to sign"
+
+        try:
+            # Try to sign the data
+            signature = vendor.sign(test_data)
+            self.assertIsInstance(signature, bytes)
+            self.assertGreater(len(signature), 0)
+
+            # Verify the signature
+            vendor.verify(test_data, signature)
+        except subprocess.CalledProcessError:
+            # Skip test if no X.509 certificate is available
+            self.skipTest("No X.509 certificate available for signing")
+
+
 class GetSignatureVendorTests(unittest.TestCase):
     """Tests for get_signature_vendor function."""
 
@@ -308,11 +364,10 @@ class GetSignatureVendorTests(unittest.TestCase):
         vendor = get_signature_vendor(format="OpenPGP")
         self.assertIsInstance(vendor, (GPGSignatureVendor, GPGCliSignatureVendor))
 
-    def test_x509_not_supported(self) -> None:
-        """Test that x509 format raises ValueError."""
-        with self.assertRaises(ValueError) as cm:
-            get_signature_vendor(format="x509")
-        self.assertIn("X.509", str(cm.exception))
+    def test_x509_format_supported(self) -> None:
+        """Test that x509 format is now supported."""
+        vendor = get_signature_vendor(format="x509")
+        self.assertIsInstance(vendor, X509SignatureVendor)
 
     def test_ssh_format_supported(self) -> None:
         """Test that ssh format is now supported."""
@@ -341,6 +396,11 @@ class GetSignatureVendorTests(unittest.TestCase):
         vendor = get_signature_vendor(format="ssh")
         # Should be either SSHSigSignatureVendor or SSHCliSignatureVendor
         self.assertIsInstance(vendor, (SSHSigSignatureVendor, SSHCliSignatureVendor))
+
+    def test_x509_format(self) -> None:
+        """Test requesting X.509 format."""
+        vendor = get_signature_vendor(format="x509")
+        self.assertIsInstance(vendor, X509SignatureVendor)
 
 
 class SSHSigSignatureVendorTests(unittest.TestCase):
@@ -579,11 +639,10 @@ class GetSignatureVendorForSignatureTests(unittest.TestCase):
         self.assertIsInstance(vendor, (GPGSignatureVendor, GPGCliSignatureVendor))
 
     def test_get_vendor_for_x509_signature(self) -> None:
-        """Test that X.509 signature raises ValueError (not supported)."""
+        """Test getting vendor for X.509 signature."""
         x509_sig = b"-----BEGIN PKCS7-----\nfoo\n-----END PKCS7-----"
-        with self.assertRaises(ValueError) as cm:
-            get_signature_vendor_for_signature(x509_sig)
-        self.assertIn("X.509", str(cm.exception))
+        vendor = get_signature_vendor_for_signature(x509_sig)
+        self.assertIsInstance(vendor, X509SignatureVendor)
 
     def test_get_vendor_with_config(self) -> None:
         """Test that config is passed to vendor."""

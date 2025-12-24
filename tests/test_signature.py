@@ -80,6 +80,11 @@ class GPGSignatureVendorTests(unittest.TestCase):
         vendor = GPGSignatureVendor()
         self.assertIsNone(vendor.min_trust_level)
 
+    def test_available(self) -> None:
+        """Test that available() returns boolean."""
+        result = GPGSignatureVendor.available()
+        self.assertIsInstance(result, bool)
+
     def test_sign_and_verify(self) -> None:
         """Test basic sign and verify cycle.
 
@@ -282,6 +287,11 @@ class GPGCliSignatureVendorTests(unittest.TestCase):
         vendor = GPGCliSignatureVendor(config=config)
         self.assertEqual(vendor.gpg_command, "gpg")
 
+    def test_available(self) -> None:
+        """Test that available() returns boolean."""
+        result = GPGCliSignatureVendor.available()
+        self.assertIsInstance(result, bool)
+
 
 class X509SignatureVendorTests(unittest.TestCase):
     """Tests for X509SignatureVendor."""
@@ -312,6 +322,11 @@ class X509SignatureVendorTests(unittest.TestCase):
         config = ConfigDict()
         vendor = X509SignatureVendor(config=config)
         self.assertEqual(vendor.gpgsm_command, "gpgsm")
+
+    def test_available(self) -> None:
+        """Test that available() returns boolean."""
+        result = X509SignatureVendor.available()
+        self.assertIsInstance(result, bool)
 
     @unittest.skipIf(
         shutil.which("gpgsm") is None, "gpgsm command not available in PATH"
@@ -429,6 +444,11 @@ class SSHSigSignatureVendorTests(unittest.TestCase):
         vendor = SSHSigSignatureVendor(config=config)
         self.assertEqual(vendor.allowed_signers_file, "/path/to/allowed")
         self.assertEqual(vendor.default_key_command, "ssh-add -L")
+
+    def test_available(self) -> None:
+        """Test that available() returns boolean."""
+        result = SSHSigSignatureVendor.available()
+        self.assertIsInstance(result, bool)
 
     def test_verify_with_cli_generated_signature(self) -> None:
         """Test verifying a signature created by SSH CLI vendor."""
@@ -639,6 +659,11 @@ class SSHCliSignatureVendorTests(unittest.TestCase):
 
         vendor = SSHCliSignatureVendor(config=config)
         self.assertEqual(vendor.revocation_file, "/path/to/revoked_keys")
+
+    def test_available(self) -> None:
+        """Test that available() returns boolean."""
+        result = SSHCliSignatureVendor.available()
+        self.assertIsInstance(result, bool)
 
 
 class DetectSignatureFormatTests(unittest.TestCase):

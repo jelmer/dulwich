@@ -40,6 +40,7 @@ __all__ = [
     "SparseOidFilter",
     "TreeDepthFilter",
     "filter_pack_objects",
+    "filter_pack_objects_with_paths",
     "parse_filter_spec",
 ]
 
@@ -47,6 +48,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from .object_store import BaseObjectStore
     from .objects import ObjectID
 
@@ -464,3 +467,147 @@ def filter_pack_objects(
             filtered_ids.append(oid)
 
     return filtered_ids
+
+
+def filter_pack_objects_with_paths(
+    object_store: "BaseObjectStore",
+    wants: list["ObjectID"],
+    filter_spec: FilterSpec,
+    *,
+    progress: "Callable[[bytes], None] | None" = None,
+) -> list["ObjectID"]:
+    """Filter objects for a pack with full path and depth tracking.
+
+    This function performs a complete tree traversal starting from the wanted
+    commits, tracking paths and depths to enable proper filtering for sparse:oid
+    and tree:<depth> filters.
+
+    Args:
+        object_store: Object store to retrieve objects from
+        wants: List of commit/tree/blob IDs that are wanted
+        filter_spec: Filter specification to apply
+        progress: Optional progress callback
+
+    Returns:
+        Filtered list of object IDs that should be included in the pack
+    """
+    import stat
+
+    from .objects import S_ISGITLINK, Blob, Commit, Tag, Tree
+
+    included_objects: set[ObjectID] = set()
+    # Track (oid, path, depth) tuples to process
+    to_process: list[tuple[ObjectID, str, int]] = []
+
+    # Start with the wanted commits
+    for want in wants:
+        try:
+            obj = object_store[want]
+        except KeyError:
+            continue
+
+        if isinstance(obj, Commit):
+            # Always include commits
+            included_objects.add(want)
+            # Add the root tree to process with depth 0
+            to_process.append((obj.tree, "", 0))
+        elif isinstance(obj, Tree):
+            # Direct tree wants start at depth 0
+            to_process.append((want, "", 0))
+        elif isinstance(obj, Tag):
+            # Always include tags
+            included_objects.add(want)
+            # Process the tagged object
+            tagged_oid = obj.object[1]
+            to_process.append((tagged_oid, "", 0))
+        elif isinstance(obj, Blob):
+            # Direct blob wants - check size filter
+            blob_size = len(obj.data)
+            if filter_spec.should_include_blob(blob_size):
+                included_objects.add(want)
+
+    # Process trees and their contents
+    processed_trees: set[ObjectID] = set()
+
+    while to_process:
+        oid, current_path, depth = to_process.pop()
+
+        # Skip if already processed
+        if oid in processed_trees:
+            continue
+
+        try:
+            obj = object_store[oid]
+        except KeyError:
+            continue
+
+        if isinstance(obj, Tree):
+            # Check if this tree should be included based on depth
+            if not filter_spec.should_include_tree(depth):
+                continue
+
+            # Include this tree
+            included_objects.add(oid)
+            processed_trees.add(oid)
+
+            # Process tree entries
+            for name, mode, entry_oid in obj.iteritems():
+                assert name is not None
+                assert mode is not None
+                assert entry_oid is not None
+
+                # Skip gitlinks
+                if S_ISGITLINK(mode):
+                    continue
+
+                # Build full path
+                if current_path:
+                    full_path = f"{current_path}/{name.decode('utf-8')}"
+                else:
+                    full_path = name.decode("utf-8")
+
+                if stat.S_ISDIR(mode):
+                    # It's a subdirectory - add to process list with increased depth
+                    to_process.append((entry_oid, full_path, depth + 1))
+                elif stat.S_ISREG(mode):
+                    # It's a blob - check filters
+                    try:
+                        blob = object_store[entry_oid]
+                    except KeyError:
+                        continue
+
+                    if not isinstance(blob, Blob):
+                        continue
+
+                    # Check filters
+                    blob_size = len(blob.data)
+
+                    # For non-path-based filters (size, blob:none), check directly
+                    if not filter_spec.should_include_blob(blob_size):
+                        continue
+
+                    # Check path filter for sparse:oid
+                    path_allowed = True
+                    if isinstance(filter_spec, SparseOidFilter):
+                        path_allowed = filter_spec.should_include_path(full_path)
+                    elif isinstance(filter_spec, CombineFilter):
+                        # Check path filters in combination
+                        for f in filter_spec.filters:
+                            if isinstance(f, SparseOidFilter):
+                                if not f.should_include_path(full_path):
+                                    path_allowed = False
+                                    break
+
+                    if not path_allowed:
+                        continue
+
+                    # Include this blob
+                    included_objects.add(entry_oid)
+
+        elif isinstance(obj, Blob):
+            # Standalone blob (shouldn't normally happen in tree traversal)
+            blob_size = len(obj.data)
+            if filter_spec.should_include_blob(blob_size):
+                included_objects.add(oid)
+
+    return list(included_objects)

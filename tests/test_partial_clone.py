@@ -707,3 +707,290 @@ class PartialCloneIntegrationTests(TestCase):
         self.assertNotIn(blob2.id, filtered)
         # Only tree and commit
         self.assertEqual(2, len(filtered))
+
+
+class FilterPackObjectsWithPathsTests(TestCase):
+    """Test filter_pack_objects_with_paths function."""
+
+    def setUp(self):
+        super().setUp()
+        self.object_store = MemoryObjectStore()
+
+    def test_tree_depth_filtering(self):
+        """Test filtering by tree depth."""
+        from dulwich.objects import Blob, Tree
+        from dulwich.partial_clone import (
+            TreeDepthFilter,
+            filter_pack_objects_with_paths,
+        )
+        from dulwich.tests.utils import make_commit
+
+        # Create a nested tree structure:
+        # root/
+        #   file1.txt (blob1)
+        #   dir1/
+        #     file2.txt (blob2)
+        #     dir2/
+        #       file3.txt (blob3)
+
+        blob1 = Blob.from_string(b"file1 content")
+        blob2 = Blob.from_string(b"file2 content")
+        blob3 = Blob.from_string(b"file3 content")
+
+        # deepest tree (dir2)
+        tree_dir2 = Tree()
+        tree_dir2.add(b"file3.txt", 0o100644, blob3.id)
+
+        # middle tree (dir1)
+        tree_dir1 = Tree()
+        tree_dir1.add(b"file2.txt", 0o100644, blob2.id)
+        tree_dir1.add(b"dir2", 0o040000, tree_dir2.id)
+
+        # root tree
+        tree_root = Tree()
+        tree_root.add(b"file1.txt", 0o100644, blob1.id)
+        tree_root.add(b"dir1", 0o040000, tree_dir1.id)
+
+        # Add all objects to store
+        for obj in [blob1, blob2, blob3, tree_dir2, tree_dir1, tree_root]:
+            self.object_store.add_object(obj)
+
+        commit = make_commit(tree=tree_root.id)
+        self.object_store.add_object(commit)
+
+        # Filter with depth=1 (root + 1 level deep)
+        filter_spec = TreeDepthFilter(1)
+        filtered = filter_pack_objects_with_paths(
+            self.object_store, [commit.id], filter_spec
+        )
+
+        # Should include: commit, tree_root (depth 0), tree_dir1 (depth 1),
+        # blob1 (in root), blob2 (in dir1)
+        # Should exclude: tree_dir2 (depth 2), blob3 (in dir2)
+        self.assertIn(commit.id, filtered)
+        self.assertIn(tree_root.id, filtered)
+        self.assertIn(tree_dir1.id, filtered)
+        self.assertIn(blob1.id, filtered)
+        self.assertIn(blob2.id, filtered)
+        self.assertNotIn(tree_dir2.id, filtered)
+        self.assertNotIn(blob3.id, filtered)
+
+    def test_sparse_oid_path_filtering(self):
+        """Test filtering by sparse checkout patterns."""
+        from dulwich.objects import Blob, Tree
+        from dulwich.partial_clone import (
+            SparseOidFilter,
+            filter_pack_objects_with_paths,
+        )
+        from dulwich.tests.utils import make_commit
+
+        # Create sparse patterns blob that includes only *.txt files
+        patterns = b"*.txt\n"
+        patterns_blob = Blob.from_string(patterns)
+        self.object_store.add_object(patterns_blob)
+
+        # Create a tree with mixed file types:
+        # root/
+        #   readme.txt (should be included)
+        #   script.py (should be excluded)
+        #   docs/
+        #     guide.txt (should be included)
+        #     image.png (should be excluded)
+
+        blob_readme = Blob.from_string(b"readme content")
+        blob_script = Blob.from_string(b"script content")
+        blob_guide = Blob.from_string(b"guide content")
+        blob_image = Blob.from_string(b"image content")
+
+        tree_docs = Tree()
+        tree_docs.add(b"guide.txt", 0o100644, blob_guide.id)
+        tree_docs.add(b"image.png", 0o100644, blob_image.id)
+
+        tree_root = Tree()
+        tree_root.add(b"readme.txt", 0o100644, blob_readme.id)
+        tree_root.add(b"script.py", 0o100644, blob_script.id)
+        tree_root.add(b"docs", 0o040000, tree_docs.id)
+
+        # Add all objects
+        for obj in [
+            blob_readme,
+            blob_script,
+            blob_guide,
+            blob_image,
+            tree_docs,
+            tree_root,
+        ]:
+            self.object_store.add_object(obj)
+
+        commit = make_commit(tree=tree_root.id)
+        self.object_store.add_object(commit)
+
+        # Create sparse filter
+        filter_spec = SparseOidFilter(patterns_blob.id, object_store=self.object_store)
+        filtered = filter_pack_objects_with_paths(
+            self.object_store, [commit.id], filter_spec
+        )
+
+        # Should include: commit, trees, and .txt blobs
+        self.assertIn(commit.id, filtered)
+        self.assertIn(tree_root.id, filtered)
+        self.assertIn(tree_docs.id, filtered)
+        self.assertIn(blob_readme.id, filtered)
+        self.assertIn(blob_guide.id, filtered)
+
+        # Should exclude: non-.txt blobs
+        self.assertNotIn(blob_script.id, filtered)
+        self.assertNotIn(blob_image.id, filtered)
+
+    def test_blob_size_filtering_with_paths(self):
+        """Test that blob size filtering still works with path tracking."""
+        from dulwich.objects import Blob, Tree
+        from dulwich.partial_clone import (
+            BlobLimitFilter,
+            filter_pack_objects_with_paths,
+        )
+        from dulwich.tests.utils import make_commit
+
+        # Create blobs of different sizes
+        blob_small = Blob.from_string(b"small")  # 5 bytes
+        blob_large = Blob.from_string(b"x" * 1000)  # 1000 bytes
+
+        tree = Tree()
+        tree.add(b"small.txt", 0o100644, blob_small.id)
+        tree.add(b"large.txt", 0o100644, blob_large.id)
+
+        for obj in [blob_small, blob_large, tree]:
+            self.object_store.add_object(obj)
+
+        commit = make_commit(tree=tree.id)
+        self.object_store.add_object(commit)
+
+        # Filter with 100 byte limit
+        filter_spec = BlobLimitFilter(100)
+        filtered = filter_pack_objects_with_paths(
+            self.object_store, [commit.id], filter_spec
+        )
+
+        # Should include small blob but not large
+        self.assertIn(commit.id, filtered)
+        self.assertIn(tree.id, filtered)
+        self.assertIn(blob_small.id, filtered)
+        self.assertNotIn(blob_large.id, filtered)
+
+    def test_combined_sparse_and_size_filter(self):
+        """Test combining sparse patterns with blob size limits."""
+        from dulwich.objects import Blob, Tree
+        from dulwich.partial_clone import (
+            BlobLimitFilter,
+            CombineFilter,
+            SparseOidFilter,
+            filter_pack_objects_with_paths,
+        )
+        from dulwich.tests.utils import make_commit
+
+        # Create sparse patterns: only *.txt files
+        patterns = b"*.txt\n"
+        patterns_blob = Blob.from_string(patterns)
+        self.object_store.add_object(patterns_blob)
+
+        # Create files:
+        # - small.txt (5 bytes, .txt) -> should be included
+        # - large.txt (1000 bytes, .txt) -> excluded by size
+        # - small.py (5 bytes, .py) -> excluded by pattern
+        # - large.py (1000 bytes, .py) -> excluded by both
+
+        blob_small_txt = Blob.from_string(b"small txt")
+        blob_large_txt = Blob.from_string(b"x" * 1000)
+        blob_small_py = Blob.from_string(b"small py")
+        blob_large_py = Blob.from_string(b"y" * 1000)
+
+        tree = Tree()
+        tree.add(b"small.txt", 0o100644, blob_small_txt.id)
+        tree.add(b"large.txt", 0o100644, blob_large_txt.id)
+        tree.add(b"small.py", 0o100644, blob_small_py.id)
+        tree.add(b"large.py", 0o100644, blob_large_py.id)
+
+        for obj in [blob_small_txt, blob_large_txt, blob_small_py, blob_large_py, tree]:
+            self.object_store.add_object(obj)
+
+        commit = make_commit(tree=tree.id)
+        self.object_store.add_object(commit)
+
+        # Combine: sparse filter + 100 byte limit
+        filter_spec = CombineFilter(
+            [
+                SparseOidFilter(patterns_blob.id, object_store=self.object_store),
+                BlobLimitFilter(100),
+            ]
+        )
+
+        filtered = filter_pack_objects_with_paths(
+            self.object_store, [commit.id], filter_spec
+        )
+
+        # Only small.txt should be included (matches pattern AND size limit)
+        self.assertIn(commit.id, filtered)
+        self.assertIn(tree.id, filtered)
+        self.assertIn(blob_small_txt.id, filtered)
+        self.assertNotIn(blob_large_txt.id, filtered)  # Too large
+        self.assertNotIn(blob_small_py.id, filtered)  # Wrong pattern
+        self.assertNotIn(blob_large_py.id, filtered)  # Both wrong
+
+    def test_blob_none_filter_with_paths(self):
+        """Test that blob:none excludes all blobs with path tracking."""
+        from dulwich.objects import Blob, Tree
+        from dulwich.partial_clone import BlobNoneFilter, filter_pack_objects_with_paths
+        from dulwich.tests.utils import make_commit
+
+        blob1 = Blob.from_string(b"content1")
+        blob2 = Blob.from_string(b"content2")
+
+        tree = Tree()
+        tree.add(b"file1.txt", 0o100644, blob1.id)
+        tree.add(b"file2.txt", 0o100644, blob2.id)
+
+        for obj in [blob1, blob2, tree]:
+            self.object_store.add_object(obj)
+
+        commit = make_commit(tree=tree.id)
+        self.object_store.add_object(commit)
+
+        filter_spec = BlobNoneFilter()
+        filtered = filter_pack_objects_with_paths(
+            self.object_store, [commit.id], filter_spec
+        )
+
+        # Should include commit and tree but no blobs
+        self.assertIn(commit.id, filtered)
+        self.assertIn(tree.id, filtered)
+        self.assertNotIn(blob1.id, filtered)
+        self.assertNotIn(blob2.id, filtered)
+
+    def test_direct_tree_want(self):
+        """Test filtering when a tree (not commit) is wanted."""
+        from dulwich.objects import Blob, Tree
+        from dulwich.partial_clone import (
+            BlobLimitFilter,
+            filter_pack_objects_with_paths,
+        )
+
+        blob_small = Blob.from_string(b"small")
+        blob_large = Blob.from_string(b"x" * 1000)
+
+        tree = Tree()
+        tree.add(b"small.txt", 0o100644, blob_small.id)
+        tree.add(b"large.txt", 0o100644, blob_large.id)
+
+        for obj in [blob_small, blob_large, tree]:
+            self.object_store.add_object(obj)
+
+        # Want the tree directly (not via commit)
+        filter_spec = BlobLimitFilter(100)
+        filtered = filter_pack_objects_with_paths(
+            self.object_store, [tree.id], filter_spec
+        )
+
+        # Should include tree and small blob
+        self.assertIn(tree.id, filtered)
+        self.assertIn(blob_small.id, filtered)
+        self.assertNotIn(blob_large.id, filtered)

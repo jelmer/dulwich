@@ -100,7 +100,7 @@ from .errors import (
 from .object_store import MissingObjectFinder, PackBasedObjectStore, find_shallow
 from .objects import Commit, ObjectID, Tree, valid_hexsha
 from .pack import ObjectContainer, write_pack_from_container
-from .partial_clone import FilterSpec, parse_filter_spec
+from .partial_clone import FilterSpec, filter_pack_objects, parse_filter_spec
 from .protocol import (
     CAPABILITIES_REF,
     CAPABILITY_AGENT,
@@ -612,6 +612,19 @@ class UploadPackHandler(PackHandler):
             return
 
         self._start_pack_send_phase()
+
+        # Apply filter if specified (partial clone support)
+        if self.filter_spec is not None:
+            original_count = len(object_ids)
+            object_ids = filter_pack_objects(
+                self.repo.object_store, object_ids, self.filter_spec
+            )
+            filtered_count = original_count - len(object_ids)
+            if filtered_count > 0:
+                self.progress(
+                    (f"filtered {filtered_count} objects.\n").encode("ascii")
+                )
+
         self.progress((f"counting objects: {len(object_ids)}, done.\n").encode("ascii"))
 
         write_pack_from_container(

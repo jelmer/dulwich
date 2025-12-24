@@ -122,13 +122,64 @@ class ParseFilterSpecTests(TestCase):
         """Test that invalid tree depth raises ValueError."""
         with self.assertRaises(ValueError) as cm:
             parse_filter_spec("tree:invalid")
-        self.assertIn("Invalid tree depth", str(cm.exception))
+        self.assertIn("Invalid tree filter", str(cm.exception))
 
     def test_parse_invalid_blob_limit(self):
         """Test that invalid blob limit raises ValueError."""
         with self.assertRaises(ValueError) as cm:
             parse_filter_spec("blob:limit=invalid")
-        self.assertIn("Invalid size specification", str(cm.exception))
+        self.assertIn("Invalid", str(cm.exception))
+
+    def test_parse_empty_spec(self):
+        """Test that empty filter spec raises ValueError."""
+        with self.assertRaises(ValueError) as cm:
+            parse_filter_spec("")
+        self.assertIn("cannot be empty", str(cm.exception))
+
+    def test_parse_blob_limit_no_value(self):
+        """Test that blob:limit without value raises ValueError."""
+        with self.assertRaises(ValueError) as cm:
+            parse_filter_spec("blob:limit=")
+        self.assertIn("requires a size value", str(cm.exception))
+
+    def test_parse_tree_no_value(self):
+        """Test that tree: without depth raises ValueError."""
+        with self.assertRaises(ValueError) as cm:
+            parse_filter_spec("tree:")
+        self.assertIn("requires a depth value", str(cm.exception))
+
+    def test_parse_tree_negative_depth(self):
+        """Test that negative tree depth raises ValueError."""
+        with self.assertRaises(ValueError) as cm:
+            parse_filter_spec("tree:-1")
+        self.assertIn("non-negative", str(cm.exception))
+
+    def test_parse_sparse_oid_invalid_length(self):
+        """Test that invalid OID length raises ValueError."""
+        with self.assertRaises(ValueError) as cm:
+            parse_filter_spec("sparse:oid=abc123")
+        self.assertIn("40 or 64 hex chars", str(cm.exception))
+
+    def test_parse_sparse_oid_invalid_hex(self):
+        """Test that non-hex OID raises ValueError."""
+        with self.assertRaises(ValueError) as cm:
+            parse_filter_spec("sparse:oid=" + "x" * 40)
+        self.assertIn("hexadecimal", str(cm.exception))
+
+    def test_parse_combine_single_filter(self):
+        """Test that combine with single filter raises ValueError."""
+        with self.assertRaises(ValueError) as cm:
+            parse_filter_spec("combine:blob:none")
+        self.assertIn("at least two filters", str(cm.exception))
+
+    def test_parse_unknown_with_helpful_message(self):
+        """Test that unknown spec gives helpful error message."""
+        with self.assertRaises(ValueError) as cm:
+            parse_filter_spec("unknown:spec")
+        error_msg = str(cm.exception)
+        self.assertIn("Unknown filter specification", error_msg)
+        self.assertIn("Supported formats", error_msg)
+        self.assertIn("blob:none", error_msg)
 
 
 class BlobNoneFilterTests(TestCase):

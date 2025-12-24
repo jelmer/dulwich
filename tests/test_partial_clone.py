@@ -327,6 +327,105 @@ class SparseOidFilterTests(TestCase):
         self.assertIn("SparseOidFilter", repr(filter_spec))
         self.assertIn("1234567890abcdef1234567890abcdef12345678", repr(filter_spec))
 
+    def test_load_patterns_from_blob(self):
+        """Test loading sparse patterns from a blob object."""
+        from dulwich.object_store import MemoryObjectStore
+        from dulwich.objects import Blob
+
+        # Create a sparse patterns blob
+        patterns = b"*.txt\n!*.log\n/src/\n"
+        blob = Blob.from_string(patterns)
+
+        object_store = MemoryObjectStore()
+        object_store.add_object(blob)
+
+        filter_spec = SparseOidFilter(blob.id, object_store=object_store)
+        filter_spec._load_patterns()
+
+        # Verify patterns were loaded
+        self.assertIsNotNone(filter_spec._patterns)
+        self.assertEqual(3, len(filter_spec._patterns))
+
+    def test_load_patterns_missing_blob(self):
+        """Test error when sparse blob is not found."""
+        from dulwich.object_store import MemoryObjectStore
+
+        oid = b"1234567890abcdef1234567890abcdef12345678"
+        object_store = MemoryObjectStore()
+
+        filter_spec = SparseOidFilter(oid, object_store=object_store)
+
+        with self.assertRaises(ValueError) as cm:
+            filter_spec._load_patterns()
+        self.assertIn("not found", str(cm.exception))
+
+    def test_load_patterns_not_a_blob(self):
+        """Test error when sparse OID points to non-blob object."""
+        from dulwich.object_store import MemoryObjectStore
+        from dulwich.objects import Tree
+
+        tree = Tree()
+        object_store = MemoryObjectStore()
+        object_store.add_object(tree)
+
+        filter_spec = SparseOidFilter(tree.id, object_store=object_store)
+
+        with self.assertRaises(ValueError) as cm:
+            filter_spec._load_patterns()
+        self.assertIn("not a blob", str(cm.exception))
+
+    def test_load_patterns_without_object_store(self):
+        """Test error when trying to load patterns without object store."""
+        oid = b"1234567890abcdef1234567890abcdef12345678"
+        filter_spec = SparseOidFilter(oid)
+
+        with self.assertRaises(ValueError) as cm:
+            filter_spec._load_patterns()
+        self.assertIn("without an object store", str(cm.exception))
+
+    def test_should_include_path_matching(self):
+        """Test path matching with sparse patterns."""
+        from dulwich.object_store import MemoryObjectStore
+        from dulwich.objects import Blob
+
+        # Create a sparse patterns blob: include *.txt files
+        patterns = b"*.txt\n"
+        blob = Blob.from_string(patterns)
+
+        object_store = MemoryObjectStore()
+        object_store.add_object(blob)
+
+        filter_spec = SparseOidFilter(blob.id, object_store=object_store)
+
+        # .txt files should be included
+        self.assertTrue(filter_spec.should_include_path("readme.txt"))
+        self.assertTrue(filter_spec.should_include_path("docs/file.txt"))
+
+        # Other files should not be included
+        self.assertFalse(filter_spec.should_include_path("readme.md"))
+        self.assertFalse(filter_spec.should_include_path("script.py"))
+
+    def test_should_include_path_negation(self):
+        """Test path matching with negation patterns."""
+        from dulwich.object_store import MemoryObjectStore
+        from dulwich.objects import Blob
+
+        # Include all .txt files except logs
+        patterns = b"*.txt\n!*.log\n"
+        blob = Blob.from_string(patterns)
+
+        object_store = MemoryObjectStore()
+        object_store.add_object(blob)
+
+        filter_spec = SparseOidFilter(blob.id, object_store=object_store)
+
+        # .txt files should be included
+        self.assertTrue(filter_spec.should_include_path("readme.txt"))
+
+        # But .log files should be excluded (even though they end in .txt pattern)
+        # Note: This depends on pattern order and sparse_patterns implementation
+        self.assertFalse(filter_spec.should_include_path("debug.log"))
+
 
 class CombineFilterTests(TestCase):
     """Test CombineFilter class."""
@@ -463,10 +562,12 @@ class FilterPackObjectsTests(TestCase):
         ]
 
         # Combine blob:limit with another filter
-        filter_spec = CombineFilter([
-            BlobLimitFilter(100),
-            BlobNoneFilter(),  # This will exclude ALL blobs
-        ])
+        filter_spec = CombineFilter(
+            [
+                BlobLimitFilter(100),
+                BlobNoneFilter(),  # This will exclude ALL blobs
+            ]
+        )
 
         filtered = filter_pack_objects(self.store, object_ids, filter_spec)
 
@@ -488,6 +589,7 @@ class PartialCloneIntegrationTests(TestCase):
     def _cleanup(self):
         """Clean up test repository."""
         import shutil
+
         if os.path.exists(self.repo_dir):
             shutil.rmtree(self.repo_dir)
 
@@ -516,9 +618,7 @@ class PartialCloneIntegrationTests(TestCase):
 
         # Apply blob:none filter
         filter_spec = BlobNoneFilter()
-        filtered = filter_pack_objects(
-            self.repo.object_store, object_ids, filter_spec
-        )
+        filtered = filter_pack_objects(self.repo.object_store, object_ids, filter_spec)
 
         # Verify blobs are excluded
         self.assertNotIn(blob1.id, filtered)
@@ -562,9 +662,7 @@ class PartialCloneIntegrationTests(TestCase):
         ]
 
         filter_spec = BlobLimitFilter(100)
-        filtered = filter_pack_objects(
-            self.repo.object_store, object_ids, filter_spec
-        )
+        filtered = filter_pack_objects(self.repo.object_store, object_ids, filter_spec)
 
         # Small and medium should be included
         self.assertIn(small_blob.id, filtered)
@@ -594,15 +692,15 @@ class PartialCloneIntegrationTests(TestCase):
 
         # Combine: limit to 500 bytes, but also apply blob:none
         # This should exclude ALL blobs (blob:none overrides limit)
-        filter_spec = CombineFilter([
-            BlobLimitFilter(500),
-            BlobNoneFilter(),
-        ])
+        filter_spec = CombineFilter(
+            [
+                BlobLimitFilter(500),
+                BlobNoneFilter(),
+            ]
+        )
 
         object_ids = [blob1.id, blob2.id, tree.id, commit.id]
-        filtered = filter_pack_objects(
-            self.repo.object_store, object_ids, filter_spec
-        )
+        filtered = filter_pack_objects(self.repo.object_store, object_ids, filter_spec)
 
         # All blobs excluded
         self.assertNotIn(blob1.id, filtered)

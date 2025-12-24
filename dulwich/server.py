@@ -100,6 +100,7 @@ from .errors import (
 from .object_store import MissingObjectFinder, PackBasedObjectStore, find_shallow
 from .objects import Commit, ObjectID, Tree, valid_hexsha
 from .pack import ObjectContainer, write_pack_from_container
+from .partial_clone import FilterSpec, parse_filter_spec
 from .protocol import (
     CAPABILITIES_REF,
     CAPABILITY_AGENT,
@@ -139,6 +140,7 @@ from .protocol import (
     capability_object_format,
     extract_capabilities,
     extract_want_line_capabilities,
+    find_capability,
     format_ack_line,
     format_ref_line,
     format_shallow_line,
@@ -379,6 +381,13 @@ class PackHandler(Handler):
         for cap in caps:
             if cap.startswith(CAPABILITY_AGENT + b"="):
                 continue
+            if cap.startswith(CAPABILITY_FILTER + b"="):
+                # Filter capability can have a value (e.g., filter=blob:none)
+                if CAPABILITY_FILTER not in allowable_caps:
+                    raise GitProtocolError(
+                        f"Client asked for capability {cap!r} that was not advertised."
+                    )
+                continue
             if cap not in allowable_caps:
                 raise GitProtocolError(
                     f"Client asked for capability {cap!r} that was not advertised."
@@ -439,6 +448,8 @@ class UploadPackHandler(PackHandler):
         # being processed, and the client is not accepting any other
         # data (such as side-band, see the progress method here).
         self._processing_have_lines = False
+        # Filter specification for partial clone support
+        self.filter_spec = None
 
     def capabilities(self) -> list[bytes]:
         """Return the list of capabilities supported by upload-pack.
@@ -468,6 +479,21 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_THIN_PACK,
             CAPABILITY_OFS_DELTA,
         )
+
+    def set_client_capabilities(self, caps: Iterable[bytes]) -> None:
+        """Set client capabilities and parse filter specification if present.
+
+        Args:
+            caps: List of capability strings from the client
+        """
+        super().set_client_capabilities(caps)
+        # Parse filter specification if present
+        filter_spec_bytes = find_capability(caps, CAPABILITY_FILTER)
+        if filter_spec_bytes:
+            try:
+                self.filter_spec = parse_filter_spec(filter_spec_bytes)
+            except ValueError as e:
+                raise GitProtocolError(f"Invalid filter specification: {e}")
 
     def progress(self, message: bytes) -> None:
         """Send a progress message to the client.

@@ -330,6 +330,144 @@ class GPGCliSignatureVendor(SignatureVendor):
                 )
 
 
+class X509SignatureVendor(SignatureVendor):
+    """Signature vendor that uses gpgsm (GnuPG for S/MIME) for X.509 signatures.
+
+    Supports git config options:
+    - gpg.x509.program: Path to gpgsm command (defaults to 'gpgsm')
+    """
+
+    def __init__(
+        self, config: "Config | None" = None, gpgsm_command: str | None = None
+    ) -> None:
+        """Initialize the X.509 signature vendor.
+
+        Args:
+          config: Optional Git configuration
+          gpgsm_command: Path to the gpgsm command. If not specified, will try to
+                        read from config's gpg.x509.program setting, or default to 'gpgsm'
+        """
+        super().__init__(config)
+
+        if gpgsm_command is not None:
+            self.gpgsm_command = gpgsm_command
+        elif config is not None:
+            try:
+                gpgsm_program = config.get((b"gpg", b"x509"), b"program")
+                self.gpgsm_command = gpgsm_program.decode("utf-8")
+            except KeyError:
+                self.gpgsm_command = "gpgsm"
+        else:
+            self.gpgsm_command = "gpgsm"
+
+    def sign(self, data: bytes, keyid: str | None = None) -> bytes:
+        """Sign data with an X.509 certificate using gpgsm.
+
+        Args:
+          data: The data to sign
+          keyid: Optional certificate ID to use for signing. If not specified,
+                 the default certificate will be used.
+
+        Returns:
+          The signature as bytes
+
+        Raises:
+          subprocess.CalledProcessError: if gpgsm command fails
+        """
+        import subprocess
+
+        args = [self.gpgsm_command, "--detach-sign", "--armor"]
+        if keyid is not None:
+            args.extend(["--local-user", keyid])
+
+        result = subprocess.run(
+            args,
+            input=data,
+            capture_output=True,
+            check=True,
+        )
+        return result.stdout
+
+    def verify(
+        self, data: bytes, signature: bytes, keyids: Iterable[str] | None = None
+    ) -> None:
+        """Verify an X.509 signature using gpgsm.
+
+        Args:
+          data: The data that was signed
+          signature: The signature to verify
+          keyids: Optional iterable of trusted certificate IDs.
+            If the signature was not created by any certificate in keyids, verification will
+            fail. If not specified, this function only verifies that the signature is valid.
+
+        Raises:
+          subprocess.CalledProcessError: if gpgsm signature verification fails
+          ValueError: if signature was not created by a trusted certificate
+        """
+        import subprocess
+        import tempfile
+
+        # gpgsm requires the signature and data in separate files for verification
+        with (
+            tempfile.NamedTemporaryFile(mode="wb", suffix=".sig") as sig_file,
+            tempfile.NamedTemporaryFile(mode="wb", suffix=".dat") as data_file,
+        ):
+            sig_file.write(signature)
+            sig_file.flush()
+
+            data_file.write(data)
+            data_file.flush()
+
+            args = [self.gpgsm_command, "--verify", sig_file.name, data_file.name]
+
+            result = subprocess.run(
+                args,
+                capture_output=True,
+                check=True,
+            )
+
+            # If keyids are specified, check that the signature was made by one of them
+            if keyids:
+                # Parse stderr to extract the certificate fingerprint/ID that made the signature
+                stderr_text = result.stderr.decode("utf-8", errors="replace")
+
+                # Collect signing certificate IDs
+                signing_certs = []
+                for line in stderr_text.split("\n"):
+                    if "using certificate ID" in line or "Good signature from" in line:
+                        # Extract certificate ID from the output
+                        parts = line.split()
+                        for i, part in enumerate(parts):
+                            if part.upper().startswith("0x"):
+                                signing_certs.append(part[2:])
+                            elif len(part) >= 8 and all(
+                                c in "0123456789ABCDEF" for c in part.upper()
+                            ):
+                                signing_certs.append(part)
+
+                if not signing_certs:
+                    raise ValueError(
+                        "Could not determine signing certificate from gpgsm output"
+                    )
+
+                # Check if any of the signing certs match the trusted keyids
+                keyids_normalized = [k.replace(" ", "").upper() for k in keyids]
+
+                for signed_by in signing_certs:
+                    signed_by_normalized = signed_by.replace(" ", "").upper()
+                    if any(
+                        signed_by_normalized in keyid or keyid in signed_by_normalized
+                        for keyid in keyids_normalized
+                    ):
+                        return
+
+                # None of the signing certs matched
+                raise ValueError(
+                    f"Signature not created by a trusted certificate. "
+                    f"Signed by: {signing_certs}, trusted certs: {list(keyids)}"
+                )
+
+
 class SSHSigSignatureVendor(SignatureVendor):
     """Signature vendor that uses the sshsig Python package for SSH signature verification.
 
@@ -669,7 +807,7 @@ def get_signature_vendor(
         except ImportError:
             return GPGCliSignatureVendor(config=config)
     elif format_lower == SIGNATURE_FORMAT_X509:
-        raise ValueError("X.509 signatures are not yet supported")
+        return X509SignatureVendor(config=config)
     elif format_lower == SIGNATURE_FORMAT_SSH:
         # Try to use sshsig package vendor first (verify-only), fall back to CLI
         try:

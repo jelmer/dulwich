@@ -2363,7 +2363,7 @@ def verify_commit(
     committish: str | bytes = "HEAD",
     keyids: list[str] | None = None,
 ) -> None:
-    """Verify GPG signature on a commit.
+    """Verify signature on a commit.
 
     Args:
       repo: Path to repository
@@ -2377,9 +2377,18 @@ def verify_commit(
       gpg.errors.MissingSignatures: if commit was not signed by a key
         specified in keyids
     """
+    from dulwich.signature import get_signature_vendor_for_signature
+
     with open_repo_closing(repo) as r:
         commit = parse_commit(r, committish)
-        commit.verify(keyids)
+        payload, signature, _sig_type = commit.extract_signature()
+        if signature is None:
+            return
+
+        vendor = get_signature_vendor_for_signature(
+            signature, config=r.get_config_stack()
+        )
+        vendor.verify(payload, signature, keyids=keyids)
 
 
 def replace_list(repo: RepoPath) -> list[tuple[ObjectID, ObjectID]]:

@@ -4595,10 +4595,9 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             if resp.status != 200:
                 raise GitProtocolError(f"unexpected http resp {resp.status} for {url}")
 
-        # With urllib3 >= 2.2, geturl() is always available
-        resp.content_type = resp.headers.get("Content-Type")  # type: ignore[union-attr]
+        resp.content_type = resp.headers.get("Content-Type")  # type: ignore[attr-defined]
         resp_url = resp.geturl()
-        resp.redirect_location = resp_url if resp_url != url else ""  # type: ignore[union-attr]
+        resp.redirect_location = resp_url if resp_url != url else ""  # type: ignore[attr-defined]
         return resp, _wrap_urllib3_exceptions(resp.read)  # type: ignore[return-value]
 
 

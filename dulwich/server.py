@@ -104,6 +104,7 @@ from .protocol import (
     CAPABILITIES_REF,
     CAPABILITY_AGENT,
     CAPABILITY_DELETE_REFS,
+    CAPABILITY_FILTER,
     CAPABILITY_INCLUDE_TAG,
     CAPABILITY_MULTI_ACK,
     CAPABILITY_MULTI_ACK_DETAILED,
@@ -455,6 +456,7 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_INCLUDE_TAG,
             CAPABILITY_SHALLOW,
             CAPABILITY_NO_DONE,
+            CAPABILITY_FILTER,
             capability_object_format(self.repo.object_format.name),
         ]
 

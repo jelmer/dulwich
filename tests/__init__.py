@@ -179,6 +179,8 @@ def self_test_suite() -> unittest.TestSuite:
         "repository",
         "rerere",
         "server",
+        "sha256",
+        "sha256_pack",
         "source",
         "sparse_patterns",
         "stash",

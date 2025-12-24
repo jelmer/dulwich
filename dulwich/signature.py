@@ -43,6 +43,15 @@ class SignatureVendor:
         """
         self.config = config
 
+    @classmethod
+    def available(cls) -> bool:
+        """Check if this signature vendor is available.
+
+        Returns:
+          True if the vendor's dependencies are available, False otherwise
+        """
+        return True  # Base class is always available
+
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with a key.
 
@@ -99,6 +108,17 @@ class GPGSignatureVendor(SignatureVendor):
                     self.min_trust_level = trust_level.decode("utf-8").lower()
             except KeyError:
                 pass
+
+    @classmethod
+    def available(cls) -> bool:
+        """Check if the gpg Python package is available.
+
+        Returns:
+          True if gpg package can be imported, False otherwise
+        """
+        import importlib.util
+
+        return importlib.util.find_spec("gpg") is not None
 
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with a GPG key.
@@ -212,6 +232,17 @@ class GPGCliSignatureVendor(SignatureVendor):
                 self.gpg_command = "gpg"
         else:
             self.gpg_command = "gpg"
+
+    @classmethod
+    def available(cls) -> bool:
+        """Check if the gpg command is available.
+
+        Returns:
+          True if gpg command is in PATH, False otherwise
+        """
+        import shutil
+
+        return shutil.which("gpg") is not None
 
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with a GPG key using the command-line tool.
@@ -359,6 +390,17 @@ class X509SignatureVendor(SignatureVendor):
                 self.gpgsm_command = "gpgsm"
         else:
             self.gpgsm_command = "gpgsm"
+
+    @classmethod
+    def available(cls) -> bool:
+        """Check if the gpgsm command is available.
+
+        Returns:
+          True if gpgsm command is in PATH, False otherwise
+        """
+        import shutil
+
+        return shutil.which("gpgsm") is not None
 
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with an X.509 certificate using gpgsm.
@@ -514,6 +556,17 @@ class SSHSigSignatureVendor(SignatureVendor):
                     self.default_key_command = key_command.decode("utf-8")
             except KeyError:
                 pass
+
+    @classmethod
+    def available(cls) -> bool:
+        """Check if the sshsig Python package is available.
+
+        Returns:
+          True if sshsig package can be imported, False otherwise
+        """
+        import importlib.util
+
+        return importlib.util.find_spec("sshsig") is not None
 
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with an SSH key.
@@ -676,6 +729,17 @@ class SSHCliSignatureVendor(SignatureVendor):
                     self.default_key_command = key_command.decode("utf-8")
             except KeyError:
                 pass
+
+    @classmethod
+    def available(cls) -> bool:
+        """Check if the ssh-keygen command is available.
+
+        Returns:
+          True if ssh-keygen command is in PATH, False otherwise
+        """
+        import shutil
+
+        return shutil.which("ssh-keygen") is not None
 
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with an SSH key using ssh-keygen.

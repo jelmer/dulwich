@@ -476,6 +476,7 @@ class SSHSigSignatureVendor(SignatureVendor):
 
     Supports git config options:
     - gpg.ssh.allowedSignersFile: File containing allowed SSH public keys
+    - gpg.ssh.revocationFile: File containing revoked SSH public keys
     - gpg.ssh.defaultKeyCommand: Command to get default SSH key (currently unused)
     """
 
@@ -489,6 +490,7 @@ class SSHSigSignatureVendor(SignatureVendor):
 
         # Parse SSH-specific config
         self.allowed_signers_file = None
+        self.revocation_file = None
         self.default_key_command = None
 
         if config is not None:
@@ -496,6 +498,13 @@ class SSHSigSignatureVendor(SignatureVendor):
                 signers_file = config.get((b"gpg", b"ssh"), b"allowedSignersFile")
                 if signers_file:
                     self.allowed_signers_file = signers_file.decode("utf-8")
+            except KeyError:
+                pass
+
+            try:
+                revoc_file = config.get((b"gpg", b"ssh"), b"revocationFile")
+                if revoc_file:
+                    self.revocation_file = revoc_file.decode("utf-8")
             except KeyError:
                 pass
 
@@ -613,7 +622,9 @@ class SSHCliSignatureVendor(SignatureVendor):
 
     Supports git config options:
     - gpg.ssh.allowedSignersFile: File containing allowed SSH public keys
+    - gpg.ssh.revocationFile: File containing revoked SSH public keys
     - gpg.ssh.program: Path to ssh-keygen command
+    - gpg.ssh.defaultKeyCommand: Command to get default SSH key for signing
     """
 
     def __init__(
@@ -641,6 +652,9 @@ class SSHCliSignatureVendor(SignatureVendor):
 
         # Parse SSH-specific config
         self.allowed_signers_file = None
+        self.revocation_file = None
+        self.default_key_command = None
+
         if config is not None:
             try:
                 signers_file = config.get((b"gpg", b"ssh"), b"allowedSignersFile")
@@ -649,13 +663,27 @@ class SSHCliSignatureVendor(SignatureVendor):
             except KeyError:
                 pass
 
+            try:
+                revoc_file = config.get((b"gpg", b"ssh"), b"revocationFile")
+                if revoc_file:
+                    self.revocation_file = revoc_file.decode("utf-8")
+            except KeyError:
+                pass
+
+            try:
+                key_command = config.get((b"gpg", b"ssh"), b"defaultKeyCommand")
+                if key_command:
+                    self.default_key_command = key_command.decode("utf-8")
+            except KeyError:
+                pass
+
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with an SSH key using ssh-keygen.
 
         Args:
           data: The data to sign
-          keyid: Path to SSH private key. If not specified, ssh-keygen will
-                use the default key (typically from ssh-agent)
+          keyid: Path to SSH private key. If not specified, will try to get
+                default key from gpg.ssh.defaultKeyCommand
 
         Returns:
           The signature as bytes
@@ -668,8 +696,25 @@ class SSHCliSignatureVendor(SignatureVendor):
         import subprocess
         import tempfile
 
+        # If no keyid specified, try to get default key from command
         if keyid is None:
-            raise ValueError("SSH signing requires a key to be specified")
+            if self.default_key_command:
+                # Run the default key command to get the key
+                result = subprocess.run(
+                    self.default_key_command,
+                    shell=True,
+                    capture_output=True,
+                    check=True,
+                    text=True,
+                )
+                keyid = result.stdout.strip()
+                if not keyid:
+                    raise ValueError("gpg.ssh.defaultKeyCommand returned empty key")
+            else:
+                raise ValueError(
+                    "SSH signing requires a key to be specified via keyid parameter "
+                    "or gpg.ssh.defaultKeyCommand configuration"
+                )
 
         # Create a temporary directory to hold both data and signature files
         # ssh-keygen creates the signature file with .sig suffix
@@ -753,6 +798,10 @@ class SSHCliSignatureVendor(SignatureVendor):
                 "-s",
                 sig_filename,
             ]
+
+            # Add revocation file if configured
+            if self.revocation_file:
+                args.extend(["-r", self.revocation_file])
 
             subprocess.run(
                 args,

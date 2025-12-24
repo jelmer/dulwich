@@ -1,5 +1,5 @@
-# __init__.py -- Compatibility tests for dulwich
-# Copyright (C) 2010 Jelmer Vernooij <jelmer@jelmer.uk>
+# __init__.py -- aiohttp support
+# Copyright (C) 2022 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
 # Dulwich is dual-licensed under the Apache License, Version 2.0 and the GNU
@@ -19,37 +19,4 @@
 # License, Version 2.0.
 #
 
-"""Compatibility tests for Dulwich."""
-
-import unittest
-
-
-def test_suite() -> unittest.TestSuite:
-    names = [
-        "aiohttp",
-        "bitmap",
-        "bundle",
-        "check_ignore",
-        "client",
-        "commit_graph",
-        "dumb",
-        "index",
-        "lfs",
-        "midx",
-        "pack",
-        "patch",
-        "porcelain",
-        "reftable",
-        "repository",
-        "server",
-        "sha256",
-        "sha256_packs",
-        "utils",
-        "web",
-    ]
-    module_names = ["tests.compat.test_" + name for name in names]
-    result = unittest.TestSuite()
-    loader = unittest.TestLoader()
-    suite = loader.loadTestsFromNames(module_names)
-    result.addTests(suite)
-    return result
+"""aiohttp support for Dulwich."""

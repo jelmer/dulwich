@@ -2746,6 +2746,8 @@ class MemoryRepo(BaseRepo):
         if self.filter_context is not None:
             self.filter_context.close()
             self.filter_context = None
+        # Close object store to release pack files
+        self.object_store.close()
 
     def do_commit(
         self,

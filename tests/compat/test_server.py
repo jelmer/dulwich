@@ -77,12 +77,12 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         server_thread.daemon = True  # Make thread daemon so it dies with main thread
         server_thread.start()
 
-        # Add cleanup in the correct order
+        # Add cleanup in the correct order - shutdown first, then close
         def cleanup_server():
             dul_server.shutdown()
-            dul_server.server_close()
-            # Give thread a moment to exit cleanly
+            # Give thread a moment to exit cleanly before closing socket
             server_thread.join(timeout=1.0)
+            dul_server.server_close()
 
         self.addCleanup(cleanup_server)
         self._server = dul_server
@@ -143,11 +143,12 @@ class GitServerSHA256TestCase(CompatTestCase):
         server_thread.daemon = True
         server_thread.start()
 
-        # Add cleanup
+        # Add cleanup - shutdown first, then close
         def cleanup_server():
             dul_server.shutdown()
-            dul_server.server_close()
+            # Give thread a moment to exit cleanly before closing socket
             server_thread.join(timeout=1.0)
+            dul_server.server_close()
 
         self.addCleanup(cleanup_server)
         self._server = dul_server

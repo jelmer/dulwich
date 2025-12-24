@@ -94,6 +94,8 @@ class AiohttpServerTests(ServerTests):
             future.result(timeout=5)
             loop.call_soon_threadsafe(loop.stop)
             thread.join(timeout=1.0)
+            # Close the event loop to avoid ResourceWarning
+            loop.close()
 
         self.addCleanup(cleanup)
         self._server = runner

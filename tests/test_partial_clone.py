@@ -21,14 +21,18 @@
 
 """Tests for partial clone filter specifications."""
 
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import Blob, Tree
 from dulwich.partial_clone import (
     BlobLimitFilter,
     BlobNoneFilter,
     CombineFilter,
     SparseOidFilter,
     TreeDepthFilter,
+    filter_pack_objects,
     parse_filter_spec,
 )
+from dulwich.tests.utils import make_commit
 
 from . import TestCase
 
@@ -307,3 +311,111 @@ class CombineFilterTests(TestCase):
         filters = [BlobNoneFilter()]
         filter_spec = CombineFilter(filters)
         self.assertIn("CombineFilter", repr(filter_spec))
+
+
+class FilterPackObjectsTests(TestCase):
+    """Test filter_pack_objects function."""
+
+    def setUp(self):
+        super().setUp()
+        self.store = MemoryObjectStore()
+
+        # Create test objects
+        self.small_blob = Blob.from_string(b"small")
+        self.large_blob = Blob.from_string(b"x" * 2000)
+        self.tree = Tree()
+        self.commit = make_commit(tree=self.tree.id)
+
+        # Add objects to store
+        self.store.add_object(self.small_blob)
+        self.store.add_object(self.large_blob)
+        self.store.add_object(self.tree)
+        self.store.add_object(self.commit)
+
+    def test_filter_blob_none(self):
+        """Test that blob:none filter excludes all blobs."""
+        object_ids = [
+            self.small_blob.id,
+            self.large_blob.id,
+            self.tree.id,
+            self.commit.id,
+        ]
+
+        filter_spec = BlobNoneFilter()
+        filtered = filter_pack_objects(self.store, object_ids, filter_spec)
+
+        # Should exclude both blobs but keep tree and commit
+        self.assertNotIn(self.small_blob.id, filtered)
+        self.assertNotIn(self.large_blob.id, filtered)
+        self.assertIn(self.tree.id, filtered)
+        self.assertIn(self.commit.id, filtered)
+
+    def test_filter_blob_limit(self):
+        """Test that blob:limit filter excludes blobs over size limit."""
+        object_ids = [
+            self.small_blob.id,
+            self.large_blob.id,
+            self.tree.id,
+        ]
+
+        # Set limit to 100 bytes
+        filter_spec = BlobLimitFilter(100)
+        filtered = filter_pack_objects(self.store, object_ids, filter_spec)
+
+        # Should keep small blob but exclude large blob
+        self.assertIn(self.small_blob.id, filtered)
+        self.assertNotIn(self.large_blob.id, filtered)
+        self.assertIn(self.tree.id, filtered)
+
+    def test_filter_no_filter_keeps_all(self):
+        """Test that without filtering all objects are kept."""
+        # Create a filter that includes everything
+        filter_spec = BlobLimitFilter(10000)  # Large limit
+
+        object_ids = [
+            self.small_blob.id,
+            self.large_blob.id,
+            self.tree.id,
+            self.commit.id,
+        ]
+
+        filtered = filter_pack_objects(self.store, object_ids, filter_spec)
+
+        # All objects should be included
+        self.assertEqual(len(filtered), len(object_ids))
+        for oid in object_ids:
+            self.assertIn(oid, filtered)
+
+    def test_filter_missing_object(self):
+        """Test that missing objects are skipped without error."""
+        from dulwich.objects import ObjectID
+
+        fake_id = ObjectID(b"0" * 40)
+        object_ids = [fake_id, self.small_blob.id]
+
+        filter_spec = BlobNoneFilter()
+        filtered = filter_pack_objects(self.store, object_ids, filter_spec)
+
+        # Should skip the missing object
+        self.assertNotIn(fake_id, filtered)
+
+    def test_filter_combine(self):
+        """Test combined filters."""
+        object_ids = [
+            self.small_blob.id,
+            self.large_blob.id,
+            self.tree.id,
+        ]
+
+        # Combine blob:limit with another filter
+        filter_spec = CombineFilter([
+            BlobLimitFilter(100),
+            BlobNoneFilter(),  # This will exclude ALL blobs
+        ])
+
+        filtered = filter_pack_objects(self.store, object_ids, filter_spec)
+
+        # Should exclude all blobs due to BlobNoneFilter
+        self.assertNotIn(self.small_blob.id, filtered)
+        self.assertNotIn(self.large_blob.id, filtered)
+        self.assertIn(self.tree.id, filtered)

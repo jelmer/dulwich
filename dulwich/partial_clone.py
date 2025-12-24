@@ -40,6 +40,7 @@ __all__ = [
     "SparseOidFilter",
     "CombineFilter",
     "parse_filter_spec",
+    "filter_pack_objects",
 ]
 
 from abc import ABC, abstractmethod
@@ -291,3 +292,56 @@ def parse_filter_spec(spec: str | bytes) -> FilterSpec:
         return CombineFilter(filters)
     else:
         raise ValueError(f"Unknown filter specification: {spec}")
+
+
+def filter_pack_objects(
+    object_store: "BaseObjectStore",
+    object_ids: list["ObjectID"],
+    filter_spec: FilterSpec,
+) -> list["ObjectID"]:
+    """Filter a list of object IDs based on a filter specification.
+
+    This function examines each object and excludes those that don't match
+    the filter criteria (e.g., blobs that are too large, trees beyond max depth).
+
+    Args:
+        object_store: Object store to retrieve objects from
+        object_ids: List of object IDs to filter
+        filter_spec: Filter specification to apply
+
+    Returns:
+        Filtered list of object IDs that should be included in the pack
+
+    Note:
+        This function currently supports blob size filtering. Tree depth filtering
+        requires additional path/depth tracking which is not yet implemented.
+    """
+    from .objects import Blob, Tree, Commit, Tag
+
+    filtered_ids = []
+
+    for oid in object_ids:
+        try:
+            obj = object_store[oid]
+        except KeyError:
+            # Object not found, skip it
+            continue
+
+        # Determine object type and apply appropriate filter
+        if isinstance(obj, Blob):
+            # Check if blob should be included based on size
+            blob_size = len(obj.data)
+            if filter_spec.should_include_blob(blob_size):
+                filtered_ids.append(oid)
+            # else: blob is filtered out
+        elif isinstance(obj, (Tree, Commit, Tag)):
+            # For now, include all trees, commits, and tags
+            # Tree depth filtering would require tracking depth during traversal
+            # which needs to be implemented at the object collection stage
+            if filter_spec.should_include_tree(0):  # depth=0 for now
+                filtered_ids.append(oid)
+        else:
+            # Unknown object type, include it to be safe
+            filtered_ids.append(oid)
+
+    return filtered_ids

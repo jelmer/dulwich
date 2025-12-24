@@ -51,6 +51,7 @@ dev = [
 merge = ["merge3"]
 fuzzing = ["atheris"]
 patiencediff = ["patiencediff"]
+aiohttp = ["aiohttp"]
 
 [project.scripts]
 dulwich = "dulwich.cli:main"

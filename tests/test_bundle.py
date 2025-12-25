@@ -330,6 +330,7 @@ class BundleTests(TestCase):
         """Test creating a bundle from a repository."""
         # Create a simple repository
         repo = MemoryRepo()
+        self.addCleanup(repo.close)
 
         # Create a blob
         blob = Blob.from_string(b"Hello world")

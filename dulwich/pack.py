@@ -1813,7 +1813,26 @@ class PackData:
 
     def close(self) -> None:
         """Close the underlying pack file."""
-        self._file.close()
+        if self._file is not None:
+            self._file.close()
+            self._file = None  # type: ignore
+
+    def __del__(self) -> None:
+        """Ensure pack file is closed when PackData is garbage collected."""
+        if self._file is not None:
+            import warnings
+
+            warnings.warn(
+                f"unclosed PackData {self!r}",
+                ResourceWarning,
+                stacklevel=2,
+                source=self,
+            )
+            try:
+                self.close()
+            except Exception:
+                # Ignore errors during cleanup
+                pass
 
     def __enter__(self) -> "PackData":
         """Enter context manager."""
@@ -4066,8 +4085,24 @@ class Pack:
         """Close the pack file and index."""
         if self._data is not None:
             self._data.close()
+            self._data = None  # type: ignore
         if self._idx is not None:
             self._idx.close()
+            self._idx = None  # type: ignore
+
+    def __del__(self) -> None:
+        """Ensure pack file is closed when Pack is garbage collected."""
+        if self._data is not None or self._idx is not None:
+            import warnings
+
+            warnings.warn(
+                f"unclosed Pack {self!r}", ResourceWarning, stacklevel=2, source=self
+            )
+            try:
+                self.close()
+            except Exception:
+                # Ignore errors during cleanup
+                pass
 
     def __enter__(self) -> "Pack":
         """Enter context manager."""

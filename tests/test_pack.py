@@ -788,7 +788,8 @@ class TestPack(PackTests):
     def test_length_mismatch(self) -> None:
         with self.get_pack_data(pack1_sha) as data:
             index = self.get_pack_index(pack1_sha)
-            Pack.from_objects(data, index).check_length_and_checksum()
+            pack = Pack.from_objects(data, index)
+            pack.check_length_and_checksum()
 
             data._file.seek(12)
             bad_file = BytesIO()
@@ -803,7 +804,8 @@ class TestPack(PackTests):
     def test_checksum_mismatch(self) -> None:
         with self.get_pack_data(pack1_sha) as data:
             index = self.get_pack_index(pack1_sha)
-            Pack.from_objects(data, index).check_length_and_checksum()
+            pack = Pack.from_objects(data, index)
+            pack.check_length_and_checksum()
 
             data._file.seek(0)
             bad_file = BytesIO(data._file.read()[:-20] + (b"\xff" * 20))

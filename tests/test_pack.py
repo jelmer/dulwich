@@ -1842,6 +1842,9 @@ class DeltaChainIteratorTests(TestCase):
             pack[b1.id]
         except UnresolvedDeltas as e:
             self.assertEqual([b1.id], [sha_to_hex(sha) for sha in e.shas])
+        finally:
+            pack.close()
+            packdata.close()
 
 
 class DeltaEncodeSizeTests(TestCase):

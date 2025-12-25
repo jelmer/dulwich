@@ -933,12 +933,18 @@ class TestSSHVendor:
         self.protocol_version = protocol_version
 
         class Subprocess:
-            pass
+            def read(self, *args):
+                return None
 
-        Subprocess.read = lambda: None
-        Subprocess.write = lambda: None
-        Subprocess.close = lambda: None
-        Subprocess.can_read = lambda: None
+            def write(self, *args):
+                return None
+
+            def close(self):
+                pass
+
+            def can_read(self):
+                return None
+
         return Subprocess()
 
 
@@ -996,13 +1002,19 @@ class SSHGitClientTests(TestCase):
         client.username = b"username"
         client.port = 1337
 
-        client._connect(b"command", b"/path/to/repo")
-        self.assertEqual(b"username", server.username)
-        self.assertEqual(1337, server.port)
-        self.assertEqual(b"git-command '/path/to/repo'", server.command)
+        proto, _, _ = client._connect(b"command", b"/path/to/repo")
+        try:
+            self.assertEqual(b"username", server.username)
+            self.assertEqual(1337, server.port)
+            self.assertEqual(b"git-command '/path/to/repo'", server.command)
+        finally:
+            proto.close()
 
-        client._connect(b"relative-command", b"/~/path/to/repo")
-        self.assertEqual(b"git-relative-command '~/path/to/repo'", server.command)
+        proto, _, _ = client._connect(b"relative-command", b"/~/path/to/repo")
+        try:
+            self.assertEqual(b"git-relative-command '~/path/to/repo'", server.command)
+        finally:
+            proto.close()
 
     def test_ssh_command_precedence(self) -> None:
         self.overrideEnv("GIT_SSH", "/path/to/ssh")
@@ -1053,7 +1065,8 @@ class SSHGitClientTests(TestCase):
         client.key_filename = "/path/to/key"
 
         # Connect and verify all kwargs are passed through
-        client._connect(b"upload-pack", b"/path/to/repo")
+        proto, _, _ = client._connect(b"upload-pack", b"/path/to/repo")
+        self.addCleanup(proto.close)
 
         self.assertEqual(server.ssh_command, "custom-ssh-wrapper.sh -o Option=Value")
         self.assertEqual(server.password, "test-password")

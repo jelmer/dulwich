@@ -228,9 +228,11 @@ class ServerTests:
         )
 
         # compare the two clones; they should be equal
-        self.assertReposEqual(
-            Repo(self._stub_repo_git.path), Repo(self._stub_repo_dw.path)
-        )
+        repo_git = Repo(self._stub_repo_git.path)
+        self.addCleanup(repo_git.close)
+        repo_dw = Repo(self._stub_repo_dw.path)
+        self.addCleanup(repo_dw.close)
+        self.assertReposEqual(repo_git, repo_dw)
 
     def test_fetch_same_depth_into_shallow_clone_from_dulwich(self) -> None:
         require_git_version(self.min_single_branch_version)

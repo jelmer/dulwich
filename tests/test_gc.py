@@ -447,6 +447,7 @@ class AutoGCTestCase(TestCase):
     def test_should_run_gc_disabled(self):
         """Test that auto GC doesn't run when gc.auto is 0."""
         r = MemoryRepo()
+        self.addCleanup(r.close)
         config = ConfigDict()
         config.set(b"gc", b"auto", b"0")
 
@@ -455,6 +456,7 @@ class AutoGCTestCase(TestCase):
     def test_should_run_gc_disabled_by_env_var(self):
         """Test that auto GC doesn't run when GIT_AUTO_GC environment variable is 0."""
         r = MemoryRepo()
+        self.addCleanup(r.close)
         config = ConfigDict()
         config.set(b"gc", b"auto", b"10")  # Should normally run
 
@@ -464,6 +466,7 @@ class AutoGCTestCase(TestCase):
     def test_should_run_gc_disabled_programmatically(self):
         """Test that auto GC doesn't run when disabled via _autogc_disabled attribute."""
         r = MemoryRepo()
+        self.addCleanup(r.close)
         config = ConfigDict()
         config.set(b"gc", b"auto", b"10")  # Should normally run
 
@@ -479,6 +482,7 @@ class AutoGCTestCase(TestCase):
     def test_should_run_gc_default_values(self):
         """Test auto GC with default configuration values."""
         r = MemoryRepo()
+        self.addCleanup(r.close)
         config = ConfigDict()
 
         # Should not run with empty repo
@@ -579,6 +583,7 @@ class AutoGCTestCase(TestCase):
     def test_maybe_auto_gc_skips_when_not_needed(self):
         """Test that auto GC doesn't run when thresholds are not exceeded."""
         r = MemoryRepo()
+        self.addCleanup(r.close)
         config = ConfigDict()
 
         with patch("dulwich.gc.garbage_collect") as mock_gc:
@@ -735,6 +740,7 @@ class AutoGCTestCase(TestCase):
     def test_maybe_auto_gc_non_disk_repo(self):
         """Test auto GC on non-disk repository (MemoryRepo)."""
         r = MemoryRepo()
+        self.addCleanup(r.close)
         config = ConfigDict()
         config.set(b"gc", b"auto", b"1")  # Would trigger if it were disk-based
 

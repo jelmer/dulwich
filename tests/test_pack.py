@@ -1548,6 +1548,7 @@ class DeltaChainIteratorTests(TestCase):
             thin = bool(list(self.store))
         resolve_ext_ref = (thin and self.get_raw_no_repeat) or None
         data = PackData("test.pack", file=f, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(data.close)
         return TestPackIterator.for_pack_data(data, resolve_ext_ref=resolve_ext_ref)
 
     def make_pack_iter_subset(self, f, subset, thin=None):
@@ -1558,6 +1559,7 @@ class DeltaChainIteratorTests(TestCase):
         assert data
         index = MemoryPackIndex.for_pack(data)
         pack = Pack.from_objects(data, index)
+        self.addCleanup(pack.close)
         return TestPackIterator.for_pack_subset(
             pack, subset, resolve_ext_ref=resolve_ext_ref
         )

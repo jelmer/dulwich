@@ -74,6 +74,7 @@ class BundleTests(TestCase):
         write_pack_objects(b1.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b1.seek(0)
         bundle1.pack_data = PackData.from_file(b1, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(bundle1.pack_data.close)
 
         bundle2 = Bundle()
         bundle2.version = 3
@@ -85,6 +86,7 @@ class BundleTests(TestCase):
         write_pack_objects(b2.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b2.seek(0)
         bundle2.pack_data = PackData.from_file(b2, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(bundle2.pack_data.close)
 
         # Test equality
         self.assertEqual(bundle1, bundle2)
@@ -99,6 +101,7 @@ class BundleTests(TestCase):
         write_pack_objects(b3.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b3.seek(0)
         bundle3.pack_data = PackData.from_file(b3, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(bundle3.pack_data.close)
         self.assertNotEqual(bundle1, bundle3)
 
         bundle4 = Bundle()
@@ -110,6 +113,7 @@ class BundleTests(TestCase):
         write_pack_objects(b4.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b4.seek(0)
         bundle4.pack_data = PackData.from_file(b4, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(bundle4.pack_data.close)
         self.assertNotEqual(bundle1, bundle4)
 
         bundle5 = Bundle()
@@ -121,6 +125,7 @@ class BundleTests(TestCase):
         write_pack_objects(b5.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b5.seek(0)
         bundle5.pack_data = PackData.from_file(b5, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(bundle5.pack_data.close)
         self.assertNotEqual(bundle1, bundle5)
 
         bundle6 = Bundle()
@@ -134,6 +139,7 @@ class BundleTests(TestCase):
         write_pack_objects(b6.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b6.seek(0)
         bundle6.pack_data = PackData.from_file(b6, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(bundle6.pack_data.close)
         self.assertNotEqual(bundle1, bundle6)
 
         # Test inequality with different type

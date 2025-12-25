@@ -2924,7 +2924,10 @@ class BundleClient(GitClient):
 
         pack_io = BytesIO(pack_bytes)
         pack_data = PackData.from_file(pack_io, object_format=DEFAULT_OBJECT_FORMAT)
-        target.object_store.add_pack_data(len(pack_data), pack_data.iter_unpacked())
+        try:
+            target.object_store.add_pack_data(len(pack_data), pack_data.iter_unpacked())
+        finally:
+            pack_data.close()
 
         # Apply ref filtering if specified
         if ref_prefix:

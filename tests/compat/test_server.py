@@ -172,6 +172,7 @@ class GitServerSHA256TestCase(CompatTestCase):
         repo_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_path)
         source_repo = Repo.init(repo_path, mkdir=False, object_format="sha256")
+        self.addCleanup(source_repo.close)
 
         # Create test content
         blob = Blob.from_string(b"Test SHA-256 content from dulwich server")
@@ -222,5 +223,3 @@ class GitServerSHA256TestCase(CompatTestCase):
         # Verify git can read the commit
         log_output = run_git_or_fail(["log", "--format=%s", "-n", "1"], cwd=clone_dir)
         self.assertEqual(log_output.strip(), b"Test SHA-256 commit")
-
-        source_repo.close()

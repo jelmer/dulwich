@@ -478,7 +478,8 @@ class TestPackData(PackTests):
             self.datadir, "pack-{}.pack".format(pack1_sha.decode("ascii"))
         )
         with open(path, "rb") as f:
-            PackData.from_file(f, DEFAULT_OBJECT_FORMAT, os.path.getsize(path))
+            pack_data = PackData.from_file(f, DEFAULT_OBJECT_FORMAT, os.path.getsize(path))
+            pack_data.close()
 
     def test_pack_len(self) -> None:
         with self.get_pack_data(pack1_sha) as p:

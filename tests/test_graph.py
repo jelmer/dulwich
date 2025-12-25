@@ -178,11 +178,13 @@ class FindMergeBaseTests(TestCase):
 class FindMergeBaseFunctionTests(TestCase):
     def test_find_merge_base_empty(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         # Empty list of commits
         self.assertEqual([], find_merge_base(r, []))
 
     def test_find_merge_base_single(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         r.object_store.add_objects([(base, None)])
         # Single commit returns itself
@@ -190,6 +192,7 @@ class FindMergeBaseFunctionTests(TestCase):
 
     def test_find_merge_base_identical(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         r.object_store.add_objects([(base, None)])
         # When the same commit is in both positions
@@ -197,6 +200,7 @@ class FindMergeBaseFunctionTests(TestCase):
 
     def test_find_merge_base_linear(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         c1 = make_commit(parents=[base.id])
         c2 = make_commit(parents=[c1.id])
@@ -208,6 +212,7 @@ class FindMergeBaseFunctionTests(TestCase):
 
     def test_find_merge_base_diverged(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         c1 = make_commit(parents=[base.id])
         c2a = make_commit(parents=[c1.id], message=b"2a")
@@ -218,6 +223,7 @@ class FindMergeBaseFunctionTests(TestCase):
 
     def test_find_merge_base_with_min_stamp(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit(commit_time=100)
         c1 = make_commit(parents=[base.id], commit_time=200)
         c2 = make_commit(parents=[c1.id], commit_time=300)
@@ -228,6 +234,7 @@ class FindMergeBaseFunctionTests(TestCase):
 
     def test_find_merge_base_multiple_common_ancestors(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit(commit_time=100)
         c1a = make_commit(parents=[base.id], commit_time=200, message=b"c1a")
         c1b = make_commit(parents=[base.id], commit_time=201, message=b"c1b")
@@ -247,11 +254,13 @@ class FindMergeBaseFunctionTests(TestCase):
 class FindOctopusBaseTests(TestCase):
     def test_find_octopus_base_empty(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         # Empty list of commits
         self.assertEqual([], find_octopus_base(r, []))
 
     def test_find_octopus_base_single(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         r.object_store.add_objects([(base, None)])
         # Single commit returns itself
@@ -259,6 +268,7 @@ class FindOctopusBaseTests(TestCase):
 
     def test_find_octopus_base_two_commits(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         c1 = make_commit(parents=[base.id])
         c2 = make_commit(parents=[c1.id])
@@ -268,6 +278,7 @@ class FindOctopusBaseTests(TestCase):
 
     def test_find_octopus_base_multiple(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         c1 = make_commit(parents=[base.id])
         c2a = make_commit(parents=[c1.id], message=b"2a")
@@ -283,6 +294,7 @@ class FindOctopusBaseTests(TestCase):
 class CanFastForwardTests(TestCase):
     def test_ff(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         c1 = make_commit(parents=[base.id])
         c2 = make_commit(parents=[c1.id])
@@ -294,6 +306,7 @@ class CanFastForwardTests(TestCase):
 
     def test_diverged(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         c1 = make_commit(parents=[base.id])
         c2a = make_commit(parents=[c1.id], message=b"2a")
@@ -306,6 +319,7 @@ class CanFastForwardTests(TestCase):
 
     def test_shallow_repository(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         # Create a shallow repository structure:
         # base (missing) -> c1 -> c2
         # We only have c1 and c2, base is missing (shallow boundary at c1)
@@ -552,11 +566,13 @@ class WorkListTest(TestCase):
 class IndependentTests(TestCase):
     def test_independent_empty(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         # Empty list of commits
         self.assertEqual([], independent(r, []))
 
     def test_independent_single(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         r.object_store.add_objects([(base, None)])
         # Single commit is independent
@@ -564,6 +580,7 @@ class IndependentTests(TestCase):
 
     def test_independent_linear(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         c1 = make_commit(parents=[base.id])
         c2 = make_commit(parents=[c1.id])
@@ -573,6 +590,7 @@ class IndependentTests(TestCase):
 
     def test_independent_diverged(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         c1 = make_commit(parents=[base.id])
         c2a = make_commit(parents=[c1.id], message=b"2a")
@@ -586,6 +604,7 @@ class IndependentTests(TestCase):
 
     def test_independent_mixed(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         base = make_commit()
         c1 = make_commit(parents=[base.id])
         c2a = make_commit(parents=[c1.id], message=b"2a")

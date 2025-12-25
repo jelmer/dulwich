@@ -1453,6 +1453,7 @@ class BundleClientTests(TestCase):
 
         client = BundleClient()
         target_repo = MemoryRepo()
+        self.addCleanup(target_repo.close)
 
         result = client.fetch(bundle_path, target_repo)
 

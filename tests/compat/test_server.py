@@ -59,13 +59,17 @@ class GitServerTestCase(ServerTests, CompatTestCase):
 
         receive_pack_handler_cls = dul_server.handlers[b"git-receive-pack"]
         # Create a handler instance to check capabilities
-        handler = receive_pack_handler_cls(
-            dul_server.backend,
-            [b"/"],
-            Protocol(lambda x: b"", lambda x: None),
-        )
-        caps = handler.capabilities()
-        self.assertNotIn(b"side-band-64k", caps)
+        proto = Protocol(lambda x: b"", lambda x: None)
+        try:
+            handler = receive_pack_handler_cls(
+                dul_server.backend,
+                [b"/"],
+                proto,
+            )
+            caps = handler.capabilities()
+            self.assertNotIn(b"side-band-64k", caps)
+        finally:
+            proto.close()
 
     def _start_server(self, repo):
         backend = DictBackend({b"/": repo})
@@ -113,13 +117,17 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
 
         receive_pack_handler_cls = server.handlers[b"git-receive-pack"]
         # Create a handler instance to check capabilities
-        handler = receive_pack_handler_cls(
-            server.backend,
-            [b"/"],
-            Protocol(lambda x: b"", lambda x: None),
-        )
-        caps = handler.capabilities()
-        self.assertIn(b"side-band-64k", caps)
+        proto = Protocol(lambda x: b"", lambda x: None)
+        try:
+            handler = receive_pack_handler_cls(
+                server.backend,
+                [b"/"],
+                proto,
+            )
+            caps = handler.capabilities()
+            self.assertIn(b"side-band-64k", caps)
+        finally:
+            proto.close()
 
 
 @skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")

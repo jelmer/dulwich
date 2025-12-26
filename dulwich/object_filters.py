@@ -1,4 +1,4 @@
-# partial_clone.py -- Partial clone filter specification handling
+# object_filters.py -- Object filtering for partial clone and similar operations
 # Copyright (C) 2024 Jelmer Vernooij <jelmer@jelmer.uk>
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
@@ -19,10 +19,14 @@
 # License, Version 2.0.
 #
 
-"""Partial clone filter specification parsing and handling.
+"""Object filtering for Git partial clone and pack generation.
 
-This module implements Git's partial clone filter specifications as documented in:
+This module implements Git's object filter specifications for partial clone,
+as documented in:
 https://git-scm.com/docs/rev-list-options#Documentation/rev-list-options.txt---filterltfilter-specgt
+
+Filter specifications control which objects are included when generating packs,
+enabling partial clone (downloading only needed objects) and similar operations.
 
 Supported filter specs:
 - blob:none - Exclude all blobs

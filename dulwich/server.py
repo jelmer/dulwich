@@ -126,6 +126,7 @@ from .protocol import (
     CAPABILITY_THIN_PACK,
     COMMAND_DEEPEN,
     COMMAND_DONE,
+    COMMAND_FILTER,
     COMMAND_HAVE,
     COMMAND_SHALLOW,
     COMMAND_UNSHALLOW,
@@ -494,9 +495,12 @@ class UploadPackHandler(PackHandler):
             caps: List of capability strings from the client
         """
         super().set_client_capabilities(caps)
-        # Parse filter specification if present
+        # Parse filter specification if present in capabilities
+        # In protocol v1, filter can be sent as "filter=<spec>" capability
+        # In protocol v2, filter is sent as a separate "filter <spec>" command
         filter_spec_bytes = find_capability(caps, CAPABILITY_FILTER)
-        if filter_spec_bytes:
+        if filter_spec_bytes and filter_spec_bytes != CAPABILITY_FILTER:
+            # Only parse if there's an actual spec (not just the capability name)
             try:
                 self.filter_spec = parse_filter_spec(
                     filter_spec_bytes, object_store=self.repo.object_store
@@ -636,16 +640,24 @@ class UploadPackHandler(PackHandler):
                 return False
 
             if needs_path_tracking(self.filter_spec):
-                object_ids = filter_pack_objects_with_paths(
+                # Path-aware filtering returns list of OIDs, convert to tuples for pack generation
+                filtered_oids = filter_pack_objects_with_paths(
                     self.repo.object_store,
                     wants,
                     self.filter_spec,
                     progress=self.progress,
                 )
+                object_ids = [(oid, None) for oid in filtered_oids]
             else:
-                object_ids = filter_pack_objects(
-                    self.repo.object_store, object_ids, self.filter_spec
+                # Extract just the object IDs (filter_pack_objects expects list of OIDs)
+                # object_ids is a list of tuples (oid, (depth, path))
+                oid_list = [oid for oid, _hint in object_ids]
+                filtered_oids = filter_pack_objects(
+                    self.repo.object_store, oid_list, self.filter_spec
                 )
+                # Reconstruct tuples with hints for pack generation
+                filtered_oid_set = set(filtered_oids)
+                object_ids = [(oid, hint) for oid, hint in object_ids if oid in filtered_oid_set]
 
             filtered_count = original_count - len(object_ids)
             if filtered_count > 0:
@@ -707,6 +719,10 @@ def _split_proto_line(
         elif command == COMMAND_DEEPEN:
             assert fields[1] is not None
             return command, int(fields[1])
+        elif command == COMMAND_FILTER:
+            # Filter specification (e.g., "filter blob:none")
+            assert fields[1] is not None
+            return (command, fields[1])
     raise GitProtocolError(f"Received invalid line from client: {line!r}")
 
 
@@ -900,7 +916,7 @@ class _ProtocolGraphWalker:
         line, caps = extract_want_line_capabilities(want)
         self.handler.set_client_capabilities(caps)
         self.set_ack_type(ack_type(caps))
-        allowed = (COMMAND_WANT, COMMAND_SHALLOW, COMMAND_DEEPEN, None)
+        allowed = (COMMAND_WANT, COMMAND_SHALLOW, COMMAND_DEEPEN, COMMAND_FILTER, None)
         command, sha_result = _split_proto_line(line, allowed)
 
         want_revs: list[ObjectID] = []
@@ -912,6 +928,19 @@ class _ProtocolGraphWalker:
             command, sha_result = self.read_proto_line(allowed)
 
         self.set_wants(want_revs)
+
+        # Handle filter command if present (protocol v2)
+        if command == COMMAND_FILTER:
+            assert isinstance(sha_result, bytes)
+            try:
+                self.handler.filter_spec = parse_filter_spec(
+                    sha_result, object_store=self.handler.repo.object_store
+                )
+            except ValueError as e:
+                raise GitProtocolError(f"Invalid filter specification: {e}")
+            # Read next command after processing filter
+            command, sha_result = self.read_proto_line(allowed)
+
         if command in (COMMAND_SHALLOW, COMMAND_DEEPEN):
             assert sha_result is not None
             self.unread_proto_line(command, sha_result)

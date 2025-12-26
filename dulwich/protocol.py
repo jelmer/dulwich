@@ -52,6 +52,7 @@ __all__ = [
     "COMMAND_DEEPEN_NOT",
     "COMMAND_DEEPEN_SINCE",
     "COMMAND_DONE",
+    "COMMAND_FILTER",
     "COMMAND_HAVE",
     "COMMAND_SHALLOW",
     "COMMAND_UNSHALLOW",
@@ -310,6 +311,7 @@ COMMAND_UNSHALLOW = b"unshallow"
 COMMAND_DONE = b"done"
 COMMAND_WANT = b"want"
 COMMAND_HAVE = b"have"
+COMMAND_FILTER = b"filter"
 
 
 def format_cmd_pkt(cmd: bytes, *args: bytes) -> bytes:

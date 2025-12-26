@@ -107,7 +107,7 @@ class PartialCloneServerTestCase(CompatTestCase):
         clone_dir = os.path.join(clone_path, "cloned_repo")
 
         run_git_or_fail(
-            ["clone", "--filter=blob:none", self.url(port), clone_dir],
+            ["clone", "--filter=blob:none", "--no-checkout", self.url(port), clone_dir],
             cwd=clone_path,
         )
 
@@ -165,7 +165,7 @@ class PartialCloneServerTestCase(CompatTestCase):
         clone_dir = os.path.join(clone_path, "cloned_repo")
 
         run_git_or_fail(
-            ["clone", "--filter=blob:limit=100", self.url(port), clone_dir],
+            ["clone", "--filter=blob:limit=100", "--no-checkout", self.url(port), clone_dir],
             cwd=clone_path,
         )
 
@@ -216,7 +216,7 @@ class PartialCloneServerTestCase(CompatTestCase):
         clone_dir = os.path.join(clone_path, "cloned_repo")
 
         run_git_or_fail(
-            ["clone", "--filter=tree:0", self.url(port), clone_dir],
+            ["clone", "--filter=tree:0", "--no-checkout", self.url(port), clone_dir],
             cwd=clone_path,
         )
 

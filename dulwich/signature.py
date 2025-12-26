@@ -913,22 +913,29 @@ def get_signature_vendor(
 
     if format_lower == SIGNATURE_FORMAT_OPENPGP:
         # Try to use GPG package vendor first, fall back to CLI
-        try:
-            import gpg  # noqa: F401
-
+        if GPGSignatureVendor.available():
             return GPGSignatureVendor(config=config)
-        except ImportError:
+        elif GPGCliSignatureVendor.available():
             return GPGCliSignatureVendor(config=config)
+        else:
+            raise ValueError(
+                "No GPG vendor available (neither gpg package nor gpg command)"
+            )
     elif format_lower == SIGNATURE_FORMAT_X509:
-        return X509SignatureVendor(config=config)
+        if X509SignatureVendor.available():
+            return X509SignatureVendor(config=config)
+        else:
+            raise ValueError("gpgsm command not available for X.509 signatures")
     elif format_lower == SIGNATURE_FORMAT_SSH:
         # Try to use sshsig package vendor first (verify-only), fall back to CLI
-        try:
-            import sshsig  # noqa: F401
-
+        if SSHSigSignatureVendor.available():
             return SSHSigSignatureVendor(config=config)
-        except ImportError:
+        elif SSHCliSignatureVendor.available():
             return SSHCliSignatureVendor(config=config)
+        else:
+            raise ValueError(
+                "No SSH vendor available (neither sshsig package nor ssh-keygen command)"
+            )
     else:
         raise ValueError(f"Unsupported signature format: {format}")
 

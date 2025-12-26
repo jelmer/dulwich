@@ -97,10 +97,7 @@ from .errors import (
     ObjectFormatException,
     UnexpectedCommandError,
 )
-from .object_store import MissingObjectFinder, PackBasedObjectStore, find_shallow
-from .objects import Commit, ObjectID, Tree, valid_hexsha
-from .pack import ObjectContainer, write_pack_from_container
-from .partial_clone import (
+from .object_filters import (
     CombineFilter,
     SparseOidFilter,
     TreeDepthFilter,
@@ -108,6 +105,9 @@ from .partial_clone import (
     filter_pack_objects_with_paths,
     parse_filter_spec,
 )
+from .object_store import MissingObjectFinder, PackBasedObjectStore, find_shallow
+from .objects import Commit, ObjectID, Tree, valid_hexsha
+from .pack import ObjectContainer, write_pack_from_container
 from .protocol import (
     CAPABILITIES_REF,
     CAPABILITY_AGENT,

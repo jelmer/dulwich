@@ -187,7 +187,7 @@ class UploadPackHandlerTestCase(TestCase):
 
     def test_filter_spec_parsed(self) -> None:
         """Test that filter specification is parsed from client capabilities."""
-        from dulwich.partial_clone import BlobNoneFilter
+        from dulwich.object_filters import BlobNoneFilter
 
         caps = [b"filter=blob:none", *list(self._handler.required_capabilities())]
         self._handler.set_client_capabilities(caps)

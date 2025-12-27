@@ -169,6 +169,7 @@ def self_test_suite() -> unittest.TestSuite:
         "notes",
         "objects",
         "objectspec",
+        "object_filters",
         "object_store",
         "pack",
         "patch",

@@ -37,6 +37,7 @@ def test_suite() -> unittest.TestSuite:
         "lfs",
         "midx",
         "pack",
+        "partial_clone",
         "patch",
         "porcelain",
         "reftable",

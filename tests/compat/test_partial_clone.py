@@ -165,7 +165,13 @@ class PartialCloneServerTestCase(CompatTestCase):
         clone_dir = os.path.join(clone_path, "cloned_repo")
 
         run_git_or_fail(
-            ["clone", "--filter=blob:limit=100", "--no-checkout", self.url(port), clone_dir],
+            [
+                "clone",
+                "--filter=blob:limit=100",
+                "--no-checkout",
+                self.url(port),
+                clone_dir,
+            ],
             cwd=clone_path,
         )
 
@@ -228,6 +234,102 @@ class PartialCloneServerTestCase(CompatTestCase):
             ["config", "--get", "remote.origin.promisor"], cwd=clone_dir
         )
         self.assertEqual(config_output.strip(), b"true")
+
+        source_repo.close()
+
+    def test_clone_with_filter_protocol_v0(self) -> None:
+        """Test that git client can clone with filter using protocol v0."""
+        # Create repository with dulwich
+        repo_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_path)
+        source_repo = Repo.init(repo_path, mkdir=False)
+
+        # Create test content
+        blob = Blob.from_string(b"test content")
+        tree = Tree()
+        tree.add(b"file.txt", 0o100644, blob.id)
+
+        source_repo.object_store.add_object(blob)
+        source_repo.object_store.add_object(tree)
+
+        commit = make_commit(tree=tree.id, message=b"Test commit")
+        source_repo.object_store.add_object(commit)
+        source_repo.refs[b"refs/heads/master"] = commit.id
+
+        # Start server
+        port = self._start_server(source_repo)
+
+        # Clone with protocol v0 and blob:none filter
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        clone_dir = os.path.join(clone_path, "cloned_repo")
+
+        run_git_or_fail(
+            [
+                "-c",
+                "protocol.version=0",
+                "clone",
+                "--filter=blob:none",
+                "--no-checkout",
+                self.url(port),
+                clone_dir,
+            ],
+            cwd=clone_path,
+        )
+
+        # Verify partial clone
+        cloned_repo = Repo(clone_dir)
+        self.addCleanup(cloned_repo.close)
+        self.assertIn(commit.id, cloned_repo.object_store)
+        self.assertIn(tree.id, cloned_repo.object_store)
+
+        source_repo.close()
+
+    def test_clone_with_filter_protocol_v2(self) -> None:
+        """Test that git client can clone with filter using protocol v2."""
+        # Create repository with dulwich
+        repo_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_path)
+        source_repo = Repo.init(repo_path, mkdir=False)
+
+        # Create test content
+        blob = Blob.from_string(b"test content")
+        tree = Tree()
+        tree.add(b"file.txt", 0o100644, blob.id)
+
+        source_repo.object_store.add_object(blob)
+        source_repo.object_store.add_object(tree)
+
+        commit = make_commit(tree=tree.id, message=b"Test commit")
+        source_repo.object_store.add_object(commit)
+        source_repo.refs[b"refs/heads/master"] = commit.id
+
+        # Start server
+        port = self._start_server(source_repo)
+
+        # Clone with protocol v2 and blob:none filter
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        clone_dir = os.path.join(clone_path, "cloned_repo")
+
+        run_git_or_fail(
+            [
+                "-c",
+                "protocol.version=2",
+                "clone",
+                "--filter=blob:none",
+                "--no-checkout",
+                self.url(port),
+                clone_dir,
+            ],
+            cwd=clone_path,
+        )
+
+        # Verify partial clone
+        cloned_repo = Repo(clone_dir)
+        self.addCleanup(cloned_repo.close)
+        self.assertIn(commit.id, cloned_repo.object_store)
+        self.assertIn(tree.id, cloned_repo.object_store)
 
         source_repo.close()
 

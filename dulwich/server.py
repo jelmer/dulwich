@@ -657,7 +657,9 @@ class UploadPackHandler(PackHandler):
                 )
                 # Reconstruct tuples with hints for pack generation
                 filtered_oid_set = set(filtered_oids)
-                object_ids = [(oid, hint) for oid, hint in object_ids if oid in filtered_oid_set]
+                object_ids = [
+                    (oid, hint) for oid, hint in object_ids if oid in filtered_oid_set
+                ]
 
             filtered_count = original_count - len(object_ids)
             if filtered_count > 0:

@@ -725,7 +725,9 @@ def ack_type(capabilities: Iterable[bytes]) -> int:
     return SINGLE_ACK
 
 
-def find_capability(capabilities: Iterable[bytes], *capability_names: bytes) -> bytes | None:
+def find_capability(
+    capabilities: Iterable[bytes], *capability_names: bytes
+) -> bytes | None:
     """Find a capability value in a list of capabilities.
 
     This function looks for capabilities that may include arguments after an equals sign
@@ -753,7 +755,7 @@ def find_capability(capabilities: Iterable[bytes], *capability_names: bytes) -> 
             if cap == name:
                 return cap
             elif cap.startswith(name + b"="):
-                return cap[len(name) + 1:]
+                return cap[len(name) + 1 :]
     return None
 
 

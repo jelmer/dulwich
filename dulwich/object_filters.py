@@ -90,7 +90,7 @@ class FilterSpec(ABC):
         """Convert filter spec back to string format.
 
         Returns:
-            Filter specification string (e.g., 'blob:none', 'blob:limit=1m')
+            Filter specification string (e.g., ``blob:none``, ``blob:limit=1m``)
         """
         ...
 
@@ -111,6 +111,7 @@ class BlobNoneFilter(FilterSpec):
         return "blob:none"
 
     def __repr__(self) -> str:
+        """Return string representation of the filter."""
         return "BlobNoneFilter()"
 
 
@@ -146,6 +147,7 @@ class BlobLimitFilter(FilterSpec):
             return f"blob:limit={size}"
 
     def __repr__(self) -> str:
+        """Return string representation of the filter."""
         return f"BlobLimitFilter(limit={self.limit})"
 
 
@@ -173,6 +175,7 @@ class TreeDepthFilter(FilterSpec):
         return f"tree:{self.max_depth}"
 
     def __repr__(self) -> str:
+        """Return string representation of the filter."""
         return f"TreeDepthFilter(max_depth={self.max_depth})"
 
 
@@ -254,6 +257,7 @@ class SparseOidFilter(FilterSpec):
         return f"sparse:oid={self.oid.decode('ascii') if isinstance(self.oid, bytes) else self.oid}"
 
     def __repr__(self) -> str:
+        """Return string representation of the filter."""
         oid_str = self.oid.decode("ascii") if isinstance(self.oid, bytes) else self.oid
         return f"SparseOidFilter(oid={oid_str!r})"
 
@@ -282,6 +286,7 @@ class CombineFilter(FilterSpec):
         return "combine:" + "+".join(f.to_spec_string() for f in self.filters)
 
     def __repr__(self) -> str:
+        """Return string representation of the filter."""
         return f"CombineFilter(filters={self.filters!r})"
 
 

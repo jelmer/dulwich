@@ -145,7 +145,7 @@ class FileLocked(Exception):
 
     def __init__(
         self,
-        filename: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        filename: str | bytes,
         lockfilename: str | bytes,
     ) -> None:
         """Initialize FileLocked.
@@ -224,7 +224,7 @@ class _GitFile(IO[bytes]):
                 mask,
             )
         except FileExistsError as exc:
-            raise FileLocked(filename, self._lockfilename) from exc
+            raise FileLocked(self._filename, self._lockfilename) from exc
         self._file = os.fdopen(fd, mode, bufsize)
         self._closed = False
 

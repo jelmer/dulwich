@@ -97,6 +97,15 @@ from .errors import (
     ObjectFormatException,
     UnexpectedCommandError,
 )
+from .object_filters import (
+    CombineFilter,
+    FilterSpec,
+    SparseOidFilter,
+    TreeDepthFilter,
+    filter_pack_objects,
+    filter_pack_objects_with_paths,
+    parse_filter_spec,
+)
 from .object_store import MissingObjectFinder, PackBasedObjectStore, find_shallow
 from .objects import Commit, ObjectID, Tree, valid_hexsha
 from .pack import ObjectContainer, write_pack_from_container
@@ -104,6 +113,7 @@ from .protocol import (
     CAPABILITIES_REF,
     CAPABILITY_AGENT,
     CAPABILITY_DELETE_REFS,
+    CAPABILITY_FILTER,
     CAPABILITY_INCLUDE_TAG,
     CAPABILITY_MULTI_ACK,
     CAPABILITY_MULTI_ACK_DETAILED,
@@ -117,6 +127,7 @@ from .protocol import (
     CAPABILITY_THIN_PACK,
     COMMAND_DEEPEN,
     COMMAND_DONE,
+    COMMAND_FILTER,
     COMMAND_HAVE,
     COMMAND_SHALLOW,
     COMMAND_UNSHALLOW,
@@ -138,6 +149,7 @@ from .protocol import (
     capability_object_format,
     extract_capabilities,
     extract_want_line_capabilities,
+    find_capability,
     format_ack_line,
     format_ref_line,
     format_shallow_line,
@@ -378,6 +390,13 @@ class PackHandler(Handler):
         for cap in caps:
             if cap.startswith(CAPABILITY_AGENT + b"="):
                 continue
+            if cap.startswith(CAPABILITY_FILTER + b"="):
+                # Filter capability can have a value (e.g., filter=blob:none)
+                if CAPABILITY_FILTER not in allowable_caps:
+                    raise GitProtocolError(
+                        f"Client asked for capability {cap!r} that was not advertised."
+                    )
+                continue
             if cap not in allowable_caps:
                 raise GitProtocolError(
                     f"Client asked for capability {cap!r} that was not advertised."
@@ -438,6 +457,8 @@ class UploadPackHandler(PackHandler):
         # being processed, and the client is not accepting any other
         # data (such as side-band, see the progress method here).
         self._processing_have_lines = False
+        # Filter specification for partial clone support
+        self.filter_spec: FilterSpec | None = None
 
     def capabilities(self) -> list[bytes]:
         """Return the list of capabilities supported by upload-pack.
@@ -455,6 +476,7 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_INCLUDE_TAG,
             CAPABILITY_SHALLOW,
             CAPABILITY_NO_DONE,
+            CAPABILITY_FILTER,
             capability_object_format(self.repo.object_format.name),
         ]
 
@@ -466,6 +488,26 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_THIN_PACK,
             CAPABILITY_OFS_DELTA,
         )
+
+    def set_client_capabilities(self, caps: Iterable[bytes]) -> None:
+        """Set client capabilities and parse filter specification if present.
+
+        Args:
+            caps: List of capability strings from the client
+        """
+        super().set_client_capabilities(caps)
+        # Parse filter specification if present in capabilities
+        # In protocol v1, filter can be sent as "filter=<spec>" capability
+        # In protocol v2, filter is sent as a separate "filter <spec>" command
+        filter_spec_bytes = find_capability(caps, CAPABILITY_FILTER)
+        if filter_spec_bytes and filter_spec_bytes != CAPABILITY_FILTER:
+            # Only parse if there's an actual spec (not just the capability name)
+            try:
+                self.filter_spec = parse_filter_spec(
+                    filter_spec_bytes, object_store=self.repo.object_store
+                )
+            except ValueError as e:
+                raise GitProtocolError(f"Invalid filter specification: {e}")
 
     def progress(self, message: bytes) -> None:
         """Send a progress message to the client.
@@ -584,6 +626,46 @@ class UploadPackHandler(PackHandler):
             return
 
         self._start_pack_send_phase()
+
+        # Apply filter if specified (partial clone support)
+        if self.filter_spec is not None:
+            original_count = len(object_ids)
+
+            # Use path-aware filtering for tree depth and sparse:oid filters
+            # Check if filter requires path tracking
+            def needs_path_tracking(filter_spec: FilterSpec) -> bool:
+                if isinstance(filter_spec, (TreeDepthFilter, SparseOidFilter)):
+                    return True
+                if isinstance(filter_spec, CombineFilter):
+                    return any(needs_path_tracking(f) for f in filter_spec.filters)
+                return False
+
+            if needs_path_tracking(self.filter_spec):
+                # Path-aware filtering returns list of OIDs, convert to tuples for pack generation
+                filtered_oids = filter_pack_objects_with_paths(
+                    self.repo.object_store,
+                    wants,
+                    self.filter_spec,
+                    progress=self.progress,
+                )
+                object_ids = [(oid, None) for oid in filtered_oids]
+            else:
+                # Extract just the object IDs (filter_pack_objects expects list of OIDs)
+                # object_ids is a list of tuples (oid, (depth, path))
+                oid_list = [oid for oid, _hint in object_ids]
+                filtered_oids = filter_pack_objects(
+                    self.repo.object_store, oid_list, self.filter_spec
+                )
+                # Reconstruct tuples with hints for pack generation
+                filtered_oid_set = set(filtered_oids)
+                object_ids = [
+                    (oid, hint) for oid, hint in object_ids if oid in filtered_oid_set
+                ]
+
+            filtered_count = original_count - len(object_ids)
+            if filtered_count > 0:
+                self.progress((f"filtered {filtered_count} objects.\n").encode("ascii"))
+
         self.progress((f"counting objects: {len(object_ids)}, done.\n").encode("ascii"))
 
         write_pack_from_container(
@@ -640,6 +722,10 @@ def _split_proto_line(
         elif command == COMMAND_DEEPEN:
             assert fields[1] is not None
             return command, int(fields[1])
+        elif command == COMMAND_FILTER:
+            # Filter specification (e.g., "filter blob:none")
+            assert fields[1] is not None
+            return (command, fields[1])
     raise GitProtocolError(f"Received invalid line from client: {line!r}")
 
 
@@ -742,7 +828,7 @@ class _ProtocolGraphWalker:
 
     def __init__(
         self,
-        handler: PackHandler,
+        handler: "UploadPackHandler",
         object_store: ObjectContainer,
         get_peeled: Callable[[bytes], ObjectID | None],
         get_symrefs: Callable[[], dict[Ref, Ref]],
@@ -833,7 +919,7 @@ class _ProtocolGraphWalker:
         line, caps = extract_want_line_capabilities(want)
         self.handler.set_client_capabilities(caps)
         self.set_ack_type(ack_type(caps))
-        allowed = (COMMAND_WANT, COMMAND_SHALLOW, COMMAND_DEEPEN, None)
+        allowed = (COMMAND_WANT, COMMAND_SHALLOW, COMMAND_DEEPEN, COMMAND_FILTER, None)
         command, sha_result = _split_proto_line(line, allowed)
 
         want_revs: list[ObjectID] = []
@@ -845,6 +931,19 @@ class _ProtocolGraphWalker:
             command, sha_result = self.read_proto_line(allowed)
 
         self.set_wants(want_revs)
+
+        # Handle filter command if present (protocol v2)
+        if command == COMMAND_FILTER:
+            assert isinstance(sha_result, bytes)
+            try:
+                self.handler.filter_spec = parse_filter_spec(
+                    sha_result, object_store=self.handler.repo.object_store
+                )
+            except ValueError as e:
+                raise GitProtocolError(f"Invalid filter specification: {e}")
+            # Read next command after processing filter
+            command, sha_result = self.read_proto_line(allowed)
+
         if command in (COMMAND_SHALLOW, COMMAND_DEEPEN):
             assert sha_result is not None
             self.unread_proto_line(command, sha_result)

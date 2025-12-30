@@ -180,6 +180,34 @@ class UploadPackHandlerTestCase(TestCase):
         self._handler.progress(b"second message")
         self.assertRaises(IndexError, self._handler.proto.get_received_line, 2)
 
+    def test_filter_capability_advertised(self) -> None:
+        """Test that the filter capability is advertised by UploadPackHandler."""
+        caps = self._handler.capabilities()
+        self.assertIn(b"filter", caps)
+
+    def test_filter_spec_parsed(self) -> None:
+        """Test that filter specification is parsed from client capabilities."""
+        from dulwich.object_filters import BlobNoneFilter
+
+        caps = [b"filter=blob:none", *list(self._handler.required_capabilities())]
+        self._handler.set_client_capabilities(caps)
+        self.assertIsNotNone(self._handler.filter_spec)
+        self.assertIsInstance(self._handler.filter_spec, BlobNoneFilter)
+
+    def test_filter_spec_not_present(self) -> None:
+        """Test that filter_spec is None when filter capability is not used."""
+        caps = self._handler.required_capabilities()
+        self._handler.set_client_capabilities(caps)
+        self.assertIsNone(self._handler.filter_spec)
+
+    def test_filter_spec_invalid(self) -> None:
+        """Test that invalid filter spec raises GitProtocolError."""
+        from dulwich.errors import GitProtocolError
+
+        caps = [b"filter=invalid:spec", *list(self._handler.required_capabilities())]
+        with self.assertRaises(GitProtocolError):
+            self._handler.set_client_capabilities(caps)
+
     def test_get_tagged(self) -> None:
         refs = {
             b"refs/tags/tag1": ONE,

@@ -164,7 +164,7 @@ class ParseFilterSpecTests(TestCase):
         """Test that non-hex OID raises ValueError."""
         with self.assertRaises(ValueError) as cm:
             parse_filter_spec("sparse:oid=" + "x" * 40)
-        self.assertIn("hexadecimal", str(cm.exception))
+        self.assertIn("valid object ID", str(cm.exception))
 
     def test_parse_combine_single_filter(self):
         """Test that combine with single filter raises ValueError."""

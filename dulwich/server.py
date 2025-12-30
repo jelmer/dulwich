@@ -99,6 +99,7 @@ from .errors import (
 )
 from .object_filters import (
     CombineFilter,
+    FilterSpec,
     SparseOidFilter,
     TreeDepthFilter,
     filter_pack_objects,
@@ -457,7 +458,7 @@ class UploadPackHandler(PackHandler):
         # data (such as side-band, see the progress method here).
         self._processing_have_lines = False
         # Filter specification for partial clone support
-        self.filter_spec = None
+        self.filter_spec: FilterSpec | None = None
 
     def capabilities(self) -> list[bytes]:
         """Return the list of capabilities supported by upload-pack.
@@ -632,7 +633,7 @@ class UploadPackHandler(PackHandler):
 
             # Use path-aware filtering for tree depth and sparse:oid filters
             # Check if filter requires path tracking
-            def needs_path_tracking(filter_spec):
+            def needs_path_tracking(filter_spec: FilterSpec) -> bool:
                 if isinstance(filter_spec, (TreeDepthFilter, SparseOidFilter)):
                     return True
                 if isinstance(filter_spec, CombineFilter):
@@ -827,7 +828,7 @@ class _ProtocolGraphWalker:
 
     def __init__(
         self,
-        handler: PackHandler,
+        handler: "UploadPackHandler",
         object_store: ObjectContainer,
         get_peeled: Callable[[bytes], ObjectID | None],
         get_symrefs: Callable[[], dict[Ref, Ref]],

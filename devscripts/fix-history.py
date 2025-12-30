@@ -12,6 +12,8 @@ import time
 from dulwich.objects import Commit, Tree
 from dulwich.repo import Repo
 
+BANNED_NAMES = [".git"]
+
 
 def fix_tree(repo, tree_id, seen_trees=None):
     """Recursively fix a tree by removing .git entries."""
@@ -37,8 +39,7 @@ def fix_tree(repo, tree_id, seen_trees=None):
     for item in tree.items():
         name, mode, sha = item
 
-        # Skip .git entries
-        if name == b".git":
+        if name in BANNED_NAMES:
             modified = True
             continue
 
@@ -67,8 +68,6 @@ def fix_tree(repo, tree_id, seen_trees=None):
 
 def fix_commit_dates(commit):
     """Fix commit dates if they're before 1990."""
-    modified = False
-
     # Unix timestamp for 1990-01-01
     min_timestamp = 315532800
     max_timestamp = int(time.time())
@@ -79,7 +78,6 @@ def fix_commit_dates(commit):
         if min_timestamp <= new_time <= max_timestamp:
             print(f"Fixed author date: {commit.author_time} -> {new_time}")
             commit.author_time = new_time
-            modified = True
 
     # Fix committer date
     if commit.commit_time < min_timestamp:
@@ -87,14 +85,17 @@ def fix_commit_dates(commit):
         if min_timestamp <= new_time <= max_timestamp:
             print(f"Fixed committer date: {commit.commit_time} -> {new_time}")
             commit.commit_time = new_time
-            modified = True
-
-    return modified
 
 
 def rewrite_history(repo, source_branch, target_branch):
     """Rewrite history to fix issues."""
     print(f"=== Rewriting history from {source_branch} to {target_branch} ===")
+
+    # Commits to filter out completely
+    filtered_commits = {
+        b"336232af1246017ce037b87e913d23e2c2a3bbbd",
+        b"e673babfc11d0b4001d9d08b9b9cef57c6aa67f5",
+    }
 
     # Get the head commit of the source branch
     try:
@@ -109,9 +110,8 @@ def rewrite_history(repo, source_branch, target_branch):
     tree_map = {}
 
     # Get all commits in topological order
-    walker = repo.get_walker([head_sha])
+    walker = repo.get_walker([head_sha], order="topo", reverse=True)
     commits = list(walker)
-    commits.reverse()  # Process from oldest to newest
 
     print(f"Processing {len(commits)} commits...")
 
@@ -120,6 +120,18 @@ def rewrite_history(repo, source_branch, target_branch):
 
         if i % 100 == 0:
             print(f"Processed {i}/{len(commits)} commits...")
+
+        # Skip filtered commits entirely
+        if old_commit.id in filtered_commits:
+            # Map this commit to its parent (skip it in the history)
+            if old_commit.parents:
+                # If the parent has been remapped, use the remapped version
+                parent_sha = old_commit.parents[0]
+                commit_map[old_commit.id] = commit_map[parent_sha]
+            else:
+                # This is a root commit, skip it by not adding to commit_map
+                pass
+            continue
 
         # Fix the tree
         old_tree_id = old_commit.tree
@@ -141,29 +153,28 @@ def rewrite_history(repo, source_branch, target_branch):
         # note: Drop extra fields
 
         # Fix dates
-        date_modified = fix_commit_dates(new_commit)
+        fix_commit_dates(new_commit)
+
+        if b"jvernooij@evroc.com" in old_commit.author:
+            new_commit.author = "Jelmer Vernooĳ <jelmer@jelmer.uk>".encode()
+
+        if b"jvernooij@evroc.com" in old_commit.committer:
+            new_commit.committer = "Jelmer Vernooĳ <jelmer@jelmer.uk>".encode()
 
         # Map parent commits
         new_parents = []
         for parent_sha in old_commit.parents:
-            if parent_sha in commit_map:
-                new_parents.append(commit_map[parent_sha])
-            else:
-                new_parents.append(parent_sha)
+            parent_sha = commit_map[parent_sha]
+            new_parents.append(parent_sha)
         new_commit.parents = new_parents
 
-        # Check if commit actually changed
-        if (
-            new_tree_id == old_tree_id
-            and not date_modified
-            and new_parents == list(old_commit.parents)
-        ):
-            # No changes needed, reuse old commit
-            commit_map[old_commit.id] = old_commit.id
-        else:
-            # Add new commit to object store
-            repo.object_store.add_object(new_commit)
-            commit_map[old_commit.id] = new_commit.id
+        if old_commit.parents != new_parents:
+            assert old_commit.id != new_commit.id
+
+        # Add new commit to object store
+        repo.object_store.add_object(new_commit)
+        assert old_commit.id not in commit_map
+        commit_map[old_commit.id] = new_commit.id
 
     # Update the target branch
     new_head = commit_map[head_sha]
@@ -229,7 +240,7 @@ def main():
         obj = repo[sha]
         if isinstance(obj, Tree):
             for name, mode, item_sha in obj.items():
-                if name == b".git":
+                if name in BANNED_NAMES:
                     bad_trees.append(sha)
                     break
 

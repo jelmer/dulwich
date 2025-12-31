@@ -69,6 +69,9 @@ class DulwichClientTestBase:
 
     def tearDown(self) -> None:
         rmtree_ro(self.gitroot)
+        # Clear instance variables to break reference cycles
+        self.gitroot = None
+        self.dest = None
 
     def assertDestEqualsSrc(self) -> None:
         repo_dir = os.path.join(self.gitroot, "server_new.export")

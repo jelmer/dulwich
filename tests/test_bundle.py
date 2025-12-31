@@ -43,6 +43,7 @@ class BundleTests(TestCase):
     def test_bundle_repr(self) -> None:
         """Test the Bundle.__repr__ method."""
         bundle = Bundle()
+        self.addCleanup(bundle.close)
         bundle.version = 3
         bundle.capabilities = {"foo": "bar"}
         bundle.prerequisites = [(b"cc" * 20, "comment")]
@@ -66,6 +67,7 @@ class BundleTests(TestCase):
         """Test the Bundle.__eq__ method."""
         # Create two identical bundles
         bundle1 = Bundle()
+        self.addCleanup(bundle1.close)
         bundle1.version = 3
         bundle1.capabilities = {"foo": "bar"}
         bundle1.prerequisites = [(b"cc" * 20, "comment")]
@@ -75,9 +77,9 @@ class BundleTests(TestCase):
         write_pack_objects(b1.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b1.seek(0)
         bundle1.pack_data = PackData.from_file(b1, object_format=DEFAULT_OBJECT_FORMAT)
-        self.addCleanup(bundle1.pack_data.close)
 
         bundle2 = Bundle()
+        self.addCleanup(bundle2.close)
         bundle2.version = 3
         bundle2.capabilities = {"foo": "bar"}
         bundle2.prerequisites = [(b"cc" * 20, "comment")]
@@ -87,13 +89,13 @@ class BundleTests(TestCase):
         write_pack_objects(b2.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b2.seek(0)
         bundle2.pack_data = PackData.from_file(b2, object_format=DEFAULT_OBJECT_FORMAT)
-        self.addCleanup(bundle2.pack_data.close)
 
         # Test equality
         self.assertEqual(bundle1, bundle2)
 
         # Test inequality by changing different attributes
         bundle3 = Bundle()
+        self.addCleanup(bundle3.close)
         bundle3.version = 2  # Different version
         bundle3.capabilities = {"foo": "bar"}
         bundle3.prerequisites = [(b"cc" * 20, "comment")]
@@ -102,10 +104,10 @@ class BundleTests(TestCase):
         write_pack_objects(b3.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b3.seek(0)
         bundle3.pack_data = PackData.from_file(b3, object_format=DEFAULT_OBJECT_FORMAT)
-        self.addCleanup(bundle3.pack_data.close)
         self.assertNotEqual(bundle1, bundle3)
 
         bundle4 = Bundle()
+        self.addCleanup(bundle4.close)
         bundle4.version = 3
         bundle4.capabilities = {"different": "value"}  # Different capabilities
         bundle4.prerequisites = [(b"cc" * 20, "comment")]
@@ -114,10 +116,10 @@ class BundleTests(TestCase):
         write_pack_objects(b4.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b4.seek(0)
         bundle4.pack_data = PackData.from_file(b4, object_format=DEFAULT_OBJECT_FORMAT)
-        self.addCleanup(bundle4.pack_data.close)
         self.assertNotEqual(bundle1, bundle4)
 
         bundle5 = Bundle()
+        self.addCleanup(bundle5.close)
         bundle5.version = 3
         bundle5.capabilities = {"foo": "bar"}
         bundle5.prerequisites = [(b"dd" * 20, "different")]  # Different prerequisites
@@ -126,10 +128,10 @@ class BundleTests(TestCase):
         write_pack_objects(b5.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b5.seek(0)
         bundle5.pack_data = PackData.from_file(b5, object_format=DEFAULT_OBJECT_FORMAT)
-        self.addCleanup(bundle5.pack_data.close)
         self.assertNotEqual(bundle1, bundle5)
 
         bundle6 = Bundle()
+        self.addCleanup(bundle6.close)
         bundle6.version = 3
         bundle6.capabilities = {"foo": "bar"}
         bundle6.prerequisites = [(b"cc" * 20, "comment")]
@@ -140,7 +142,6 @@ class BundleTests(TestCase):
         write_pack_objects(b6.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b6.seek(0)
         bundle6.pack_data = PackData.from_file(b6, object_format=DEFAULT_OBJECT_FORMAT)
-        self.addCleanup(bundle6.pack_data.close)
         self.assertNotEqual(bundle1, bundle6)
 
         # Test inequality with different type
@@ -182,6 +183,7 @@ class BundleTests(TestCase):
         f.seek(0)
 
         bundle = read_bundle(f)
+        self.addCleanup(bundle.close)
         self.assertEqual(3, bundle.version)
         self.assertEqual(
             {"capability1": None, "capability2": "value2"}, bundle.capabilities
@@ -201,6 +203,7 @@ class BundleTests(TestCase):
     def test_write_bundle_v2(self) -> None:
         """Test writing a v2 bundle."""
         bundle = Bundle()
+        self.addCleanup(bundle.close)
         bundle.version = 2
         bundle.capabilities = {}
         bundle.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
@@ -227,6 +230,7 @@ class BundleTests(TestCase):
     def test_write_bundle_v3(self) -> None:
         """Test writing a v3 bundle with capabilities."""
         bundle = Bundle()
+        self.addCleanup(bundle.close)
         bundle.version = 3
         bundle.capabilities = {"capability1": None, "capability2": "value2"}
         bundle.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
@@ -256,6 +260,7 @@ class BundleTests(TestCase):
         """Test writing a bundle with auto-detected version."""
         # Create a bundle with no explicit version but capabilities
         bundle1 = Bundle()
+        self.addCleanup(bundle1.close)
         bundle1.version = None
         bundle1.capabilities = {"capability1": "value1"}
         bundle1.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
@@ -274,6 +279,7 @@ class BundleTests(TestCase):
 
         # Create a bundle with no explicit version and no capabilities
         bundle2 = Bundle()
+        self.addCleanup(bundle2.close)
         bundle2.version = None
         bundle2.capabilities = {}
         bundle2.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
@@ -293,6 +299,7 @@ class BundleTests(TestCase):
     def test_write_bundle_invalid_version(self) -> None:
         """Test writing a bundle with an invalid version."""
         bundle = Bundle()
+        self.addCleanup(bundle.close)
         bundle.version = 4  # Invalid version
         bundle.capabilities = {}
         bundle.prerequisites = []

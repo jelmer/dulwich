@@ -329,8 +329,7 @@ class PackBasedObjectStoreTests(ObjectStoreTests):
 
     def tearDown(self) -> None:
         """Clean up by closing all packs."""
-        for pack in self.store.packs:
-            pack.close()
+        self.store.close()
 
     def test_empty_packs(self) -> None:
         """Test that new store has no packs."""

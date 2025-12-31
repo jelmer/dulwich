@@ -790,6 +790,7 @@ class TestPack(PackTests):
         with self.get_pack_data(pack1_sha) as data:
             index = self.get_pack_index(pack1_sha)
             pack = Pack.from_objects(data, index)
+            self.addCleanup(pack.close)
             pack.check_length_and_checksum()
 
             data._file.seek(12)
@@ -798,7 +799,9 @@ class TestPack(PackTests):
             bad_file.write(data._file.read())
             bad_file = BytesIO(bad_file.getvalue())
             bad_data = PackData("", file=bad_file, object_format=DEFAULT_OBJECT_FORMAT)
+            self.addCleanup(bad_data.close)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
+            self.addCleanup(bad_pack.close)
             self.assertRaises(AssertionError, lambda: bad_pack.data)
             self.assertRaises(AssertionError, bad_pack.check_length_and_checksum)
 
@@ -806,12 +809,15 @@ class TestPack(PackTests):
         with self.get_pack_data(pack1_sha) as data:
             index = self.get_pack_index(pack1_sha)
             pack = Pack.from_objects(data, index)
+            self.addCleanup(pack.close)
             pack.check_length_and_checksum()
 
             data._file.seek(0)
             bad_file = BytesIO(data._file.read()[:-20] + (b"\xff" * 20))
             bad_data = PackData("", file=bad_file, object_format=DEFAULT_OBJECT_FORMAT)
+            self.addCleanup(bad_data.close)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
+            self.addCleanup(bad_pack.close)
             self.assertRaises(ChecksumMismatch, lambda: bad_pack.data)
             self.assertRaises(ChecksumMismatch, bad_pack.check_length_and_checksum)
 

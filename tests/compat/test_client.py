@@ -214,6 +214,7 @@ class DulwichClientTestBase:
     def disable_ff_and_make_dummy_commit(self):
         # disable non-fast-forward pushes to the server
         dest = repo.Repo(os.path.join(self.gitroot, "dest"))
+        self.addCleanup(dest.close)
         run_git_or_fail(
             ["config", "receive.denyNonFastForwards", "true"], cwd=dest.path
         )
@@ -296,6 +297,7 @@ class DulwichClientTestBase:
     def test_fetch_pack_with_nondefault_symref(self) -> None:
         c = self._client()
         src = repo.Repo(os.path.join(self.gitroot, "server_new.export"))
+        self.addCleanup(src.close)
         src.refs.add_if_new(b"refs/heads/main", src.refs[b"refs/heads/master"])
         src.refs.set_symbolic_ref(b"HEAD", b"refs/heads/main")
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:

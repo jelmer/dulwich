@@ -203,6 +203,7 @@ class RepoReflogTests(TestCase):
         TestCase.tearDown(self)
         import shutil
 
+        self.repo.close()
         shutil.rmtree(self.test_dir)
 
     def test_read_reflog_nonexistent(self) -> None:

@@ -53,6 +53,7 @@ class BundleTests(TestCase):
         write_pack_objects(b.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b.seek(0)
         bundle.pack_data = PackData.from_file(b, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(bundle.pack_data.close)
 
         # Check the repr output
         rep = repr(bundle)
@@ -159,6 +160,7 @@ class BundleTests(TestCase):
         f.seek(0)
 
         bundle = read_bundle(f)
+        self.addCleanup(bundle.close)
         self.assertEqual(2, bundle.version)
         self.assertEqual({}, bundle.capabilities)
         self.assertEqual([(b"cc" * 20, b"prerequisite comment")], bundle.prerequisites)
@@ -307,6 +309,7 @@ class BundleTests(TestCase):
 
     def test_roundtrip_bundle(self) -> None:
         origbundle = Bundle()
+        self.addCleanup(origbundle.close)
         origbundle.version = 3
         origbundle.capabilities = {"foo": None}
         origbundle.references = {b"refs/heads/master": b"ab" * 20}
@@ -323,6 +326,7 @@ class BundleTests(TestCase):
 
             with open(os.path.join(td, "foo"), "rb") as f:
                 newbundle = read_bundle(f)
+                self.addCleanup(newbundle.close)
 
                 self.assertEqual(origbundle, newbundle)
 
@@ -355,6 +359,7 @@ class BundleTests(TestCase):
 
         # Create bundle from repository
         bundle = create_bundle_from_repo(repo)
+        self.addCleanup(bundle.close)
 
         # Verify bundle contents
         self.assertEqual(bundle.references, {b"refs/heads/master": commit.id})
@@ -394,6 +399,7 @@ class BundleTests(TestCase):
         # Create bundle with prerequisites
         prereq_id = b"aa" * 20  # hex string like other object ids
         bundle = create_bundle_from_repo(repo, prerequisites=[prereq_id])
+        self.addCleanup(bundle.close)
 
         # Verify prerequisites are included
         self.assertEqual(len(bundle.prerequisites), 1)
@@ -426,6 +432,7 @@ class BundleTests(TestCase):
         from dulwich.refs import Ref
 
         bundle = create_bundle_from_repo(repo, refs=[Ref(b"refs/heads/master")])
+        self.addCleanup(bundle.close)
 
         # Verify only master ref is included
         self.assertEqual(len(bundle.references), 1)
@@ -457,6 +464,7 @@ class BundleTests(TestCase):
         # Create bundle with capabilities
         capabilities = {"object-format": "sha1"}
         bundle = create_bundle_from_repo(repo, capabilities=capabilities, version=3)
+        self.addCleanup(bundle.close)
 
         # Verify capabilities are included
         self.assertEqual(bundle.capabilities, capabilities)
@@ -489,6 +497,7 @@ class BundleTests(TestCase):
 
         # Use blob.id directly (40-byte hex bytestring)
         bundle = create_bundle_from_repo(repo, prerequisites=[prereq_blob.id])
+        self.addCleanup(bundle.close)
 
         # Verify the prerequisite was added correctly
         self.assertEqual(len(bundle.prerequisites), 1)
@@ -520,6 +529,7 @@ class BundleTests(TestCase):
         prereq_hex = b"aa" * 20
 
         bundle = create_bundle_from_repo(repo, prerequisites=[prereq_hex])
+        self.addCleanup(bundle.close)
 
         # Verify the prerequisite was added correctly
         self.assertEqual(len(bundle.prerequisites), 1)

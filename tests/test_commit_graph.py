@@ -522,6 +522,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
         object_store_path = os.path.join(self.tempdir, "objects")
         os.makedirs(object_store_path, exist_ok=True)
         object_store = DiskObjectStore(object_store_path)
+        self.addCleanup(object_store.close)
 
         # Create a tree and commit
         tree = Tree()
@@ -643,6 +644,7 @@ class CommitGraphGenerationTests(unittest.TestCase):
         object_store_no_graph_path = os.path.join(self.tempdir, "objects2")
         os.makedirs(object_store_no_graph_path, exist_ok=True)
         object_store_no_graph = DiskObjectStore(object_store_no_graph_path)
+        self.addCleanup(object_store_no_graph.close)
         object_store_no_graph.add_object(tree)
         object_store_no_graph.add_object(commit1)
         object_store_no_graph.add_object(commit2)

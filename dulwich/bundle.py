@@ -101,6 +101,31 @@ class Bundle:
             return False
         return True
 
+    def close(self) -> None:
+        """Close any open resources in this bundle."""
+        if self.pack_data is not None:
+            self.pack_data.close()
+            self.pack_data = None
+
+    def __enter__(self) -> "Bundle":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit context manager and close bundle."""
+        self.close()
+
+    def __del__(self) -> None:
+        """Warn if bundle was not explicitly closed."""
+        if self.pack_data is not None:
+            import warnings
+            warnings.warn(
+                f"Bundle {self!r} was not explicitly closed. "
+                "Please use bundle.close() or a context manager.",
+                ResourceWarning,
+                stacklevel=2,
+            )
+
     def store_objects(
         self,
         object_store: "BaseObjectStore",
@@ -331,6 +356,10 @@ def create_bundle_from_repo(
 
         def iter_unpacked(self) -> Iterator[UnpackedObject]:
             return iter(self._objects)
+
+        def close(self) -> None:
+            """Close pack data (no-op for in-memory pack data)."""
+            pass
 
     pack_data = _BundlePackData(pack_count, pack_objects, repo.object_format)
 

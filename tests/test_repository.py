@@ -1729,6 +1729,8 @@ class BuildRepoRootTests(TestCase):
         porcelain.add(self._repo, paths=[full_path])
         self._repo.get_worktree().unstage([file])
         status = list(porcelain.status(self._repo))
+        # Convert bytes to strings for comparison
+        status[2] = [f.decode() if isinstance(f, bytes) else f for f in status[2]]
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
 
     def test_unstage_add_file(self) -> None:
@@ -1745,6 +1747,8 @@ class BuildRepoRootTests(TestCase):
         porcelain.add(self._repo, paths=[full_path])
         self._repo.get_worktree().unstage([file])
         status = list(porcelain.status(self._repo))
+        # Convert bytes to strings for comparison
+        status[2] = [f.decode() if isinstance(f, bytes) else f for f in status[2]]
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
 
     def test_unstage_modify_file(self) -> None:
@@ -1801,6 +1805,8 @@ class BuildRepoRootTests(TestCase):
         )
         r.get_worktree().reset_index()
         status = list(porcelain.status(self._repo))
+        # Convert bytes to strings for comparison
+        status[2] = [f.decode() if isinstance(f, bytes) else f for f in status[2]]
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["b"]], status)
 
     @skipIf(

@@ -1386,6 +1386,7 @@ class BundleClientTests(TestCase):
 
         # Create bundle
         bundle = create_bundle_from_repo(repo)
+        self.addCleanup(bundle.close)
 
         # Write bundle to file
         bundle_path = os.path.join(self.tempdir, "test.bundle")

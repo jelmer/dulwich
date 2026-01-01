@@ -15,4 +15,4 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6.0.1
-      - uses: jelmer/action-disperse-validate@v2.0.0
+      - uses: jelmer/action-disperse-validate@v2.0.1

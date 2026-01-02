@@ -89,4 +89,7 @@ importing the received pack file into the local repository::
 
 Let's shut down the server now that all tests have been run::
 
+   >>> client.close()
    >>> dul_server.shutdown()
+   >>> dul_server.server_close()
+   >>> repo.close()

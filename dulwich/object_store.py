@@ -1675,15 +1675,16 @@ class DiskObjectStore(PackBasedObjectStore):
                 # fully written)
                 idx_name = os.path.splitext(name)[0] + ".idx"
                 if idx_name in pack_dir_contents:
-                    pack_name = name[: -len(".pack")]
-                    pack_files.add(pack_name)
+                    # Extract just the hash (remove "pack-" prefix and ".pack" suffix)
+                    pack_hash = name[len("pack-"): -len(".pack")]
+                    pack_files.add(pack_hash)
 
         # Open newly appeared pack files
         new_packs = []
-        for f in pack_files:
-            if f not in self._pack_cache:
+        for pack_hash in pack_files:
+            if pack_hash not in self._pack_cache:
                 pack = Pack(
-                    os.path.join(self.pack_dir, f),
+                    os.path.join(self.pack_dir, "pack-" + pack_hash),
                     object_format=self.object_format,
                     delta_window_size=self.pack_delta_window_size,
                     window_memory=self.pack_window_memory,
@@ -1693,7 +1694,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     big_file_threshold=self.pack_big_file_threshold,
                 )
                 new_packs.append(pack)
-                self._pack_cache[f] = pack
+                self._pack_cache[pack_hash] = pack
         # Remove disappeared pack files
         for f in set(self._pack_cache) - pack_files:
             self._pack_cache.pop(f).close()
@@ -1940,7 +1941,9 @@ class DiskObjectStore(PackBasedObjectStore):
             big_file_threshold=self.pack_big_file_threshold,
         )
         final_pack.check_length_and_checksum()
-        self._add_cached_pack(pack_base_name, final_pack)
+        # Extract just the hash from pack_base_name (/path/to/pack-HASH -> HASH)
+        pack_hash = os.path.basename(pack_base_name)[len("pack-"):]
+        self._add_cached_pack(pack_hash, final_pack)
         return final_pack
 
     def add_thin_pack(

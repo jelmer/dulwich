@@ -847,6 +847,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """
         super().__init__(object_format=object_format)
         self._pack_cache: dict[str, Pack] = {}
+        self._closed = False
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
         self.pack_delta_window_size = pack_delta_window_size
@@ -1011,11 +1012,14 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
         This method closes all cached pack files and frees associated resources.
         """
+        self._closed = True
         self._clear_cached_packs()
 
     @property
     def packs(self) -> list[Pack]:
         """List with pack objects."""
+        if self._closed:
+            raise ValueError("Cannot access packs on a closed object store")
         return list(self._iter_cached_packs()) + list(self._update_pack_cache())
 
     def count_pack_files(self) -> int:
@@ -1663,7 +1667,6 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             pack_dir_contents = os.listdir(self.pack_dir)
         except FileNotFoundError:
-            self.close()
             return []
         pack_files = set()
         for name in pack_dir_contents:

@@ -1676,7 +1676,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 idx_name = os.path.splitext(name)[0] + ".idx"
                 if idx_name in pack_dir_contents:
                     # Extract just the hash (remove "pack-" prefix and ".pack" suffix)
-                    pack_hash = name[len("pack-"): -len(".pack")]
+                    pack_hash = name[len("pack-") : -len(".pack")]
                     pack_files.add(pack_hash)
 
         # Open newly appeared pack files
@@ -1942,7 +1942,7 @@ class DiskObjectStore(PackBasedObjectStore):
         )
         final_pack.check_length_and_checksum()
         # Extract just the hash from pack_base_name (/path/to/pack-HASH -> HASH)
-        pack_hash = os.path.basename(pack_base_name)[len("pack-"):]
+        pack_hash = os.path.basename(pack_base_name)[len("pack-") :]
         self._add_cached_pack(pack_hash, final_pack)
         return final_pack
 

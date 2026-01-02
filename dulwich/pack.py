@@ -4085,10 +4085,10 @@ class Pack:
         """Close the pack file and index."""
         if self._data is not None:
             self._data.close()
-            self._data = None  # type: ignore
+            self._data = None
         if self._idx is not None:
             self._idx.close()
-            self._idx = None  # type: ignore
+            self._idx = None
 
     def __del__(self) -> None:
         """Ensure pack file is closed when Pack is garbage collected."""

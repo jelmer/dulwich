@@ -29,6 +29,7 @@ __all__ = [
     "write_bundle",
 ]
 
+import types
 from collections.abc import Callable, Iterator, Sequence
 from typing import (
     TYPE_CHECKING,
@@ -58,6 +59,10 @@ class PackDataLike(Protocol):
 
     def iter_unpacked(self) -> Iterator[UnpackedObject]:
         """Iterate over unpacked objects in the pack."""
+        ...
+
+    def close(self) -> None:
+        """Close any open resources."""
         ...
 
 
@@ -111,7 +116,12 @@ class Bundle:
         """Enter context manager."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Exit context manager and close bundle."""
         self.close()
 
@@ -119,6 +129,7 @@ class Bundle:
         """Warn if bundle was not explicitly closed."""
         if self.pack_data is not None:
             import warnings
+
             warnings.warn(
                 f"Bundle {self!r} was not explicitly closed. "
                 "Please use bundle.close() or a context manager.",
@@ -359,7 +370,6 @@ def create_bundle_from_repo(
 
         def close(self) -> None:
             """Close pack data (no-op for in-memory pack data)."""
-            pass
 
     pack_data = _BundlePackData(pack_count, pack_objects, repo.object_format)
 

@@ -30,6 +30,7 @@ from aiohttp import web
 
 from .. import log_utils
 from ..errors import HangupException
+from ..objects import ObjectID
 from ..protocol import ReceivableProtocol
 from ..repo import Repo
 from ..server import (
@@ -85,7 +86,9 @@ async def get_loose_object(request: web.Request) -> web.Response:
       request: aiohttp request object
     Returns: Response with the loose object data
     """
-    sha = (request.match_info["dir"] + request.match_info["file"]).encode("ascii")
+    sha = ObjectID(
+        (request.match_info["dir"] + request.match_info["file"]).encode("ascii")
+    )
     logger.info("Sending loose object %s", sha)
     object_store = request.app[REPO_KEY].object_store
     if not object_store.contains_loose(sha):

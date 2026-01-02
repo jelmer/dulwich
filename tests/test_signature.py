@@ -47,6 +47,57 @@ except ImportError:
     gpg = None
 
 
+def get_valid_gpg_key() -> str | None:
+    """Get a valid (non-revoked, non-expired, can-sign) GPG key from the keyring.
+
+    Returns:
+      A key fingerprint string that can be used for signing, or None if no valid key found.
+
+    Raises:
+      unittest.SkipTest: if gpg module is not available
+    """
+    if gpg is None:
+        raise unittest.SkipTest("gpg module not available")
+
+    with gpg.Context() as ctx:
+        keys = list(ctx.keylist(secret=True))
+        if not keys:
+            return None
+
+        # Find a non-revoked, non-expired key that can sign
+        for key in keys:
+            if not key.revoked and not key.expired and key.can_sign:
+                return str(key.fpr)
+
+    return None
+
+
+def get_valid_gpg_key_cli() -> str | None:
+    """Get a valid (non-revoked, non-expired) GPG key fingerprint using CLI.
+
+    Returns:
+      A key fingerprint string, or None if no valid key found.
+    """
+    result = subprocess.run(
+        ["gpg", "--list-secret-keys", "--with-colons"],
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+
+    # Find a valid key (field 2 should be '-' for valid, 'e' for expired, 'r' for revoked)
+    current_key_valid = False
+    for line in result.stdout.split("\n"):
+        if line.startswith("sec:"):
+            fields = line.split(":")
+            # Only accept valid keys (field 2 is '-')
+            current_key_valid = fields[1] == "-"
+        elif line.startswith("fpr:") and current_key_valid:
+            return line.split(":")[9]
+
+    return None
+
+
 class SignatureVendorTests(unittest.TestCase):
     """Tests for SignatureVendor base class."""
 
@@ -125,19 +176,16 @@ class GPGSignatureVendorTests(unittest.TestCase):
         test_data = b"test data to sign"
 
         try:
-            # Try to get a key from the keyring
-            with gpg.Context() as ctx:
-                keys = list(ctx.keylist(secret=True))
-                if not keys:
-                    self.skipTest("No GPG keys available for testing")
+            key = get_valid_gpg_key()
+            if not key:
+                self.skipTest("No valid GPG keys available for testing")
 
-                key = keys[0]
-                signature = vendor.sign(test_data, keyid=key.fpr)
-                self.assertIsInstance(signature, bytes)
-                self.assertGreater(len(signature), 0)
+            signature = vendor.sign(test_data, keyid=key)
+            self.assertIsInstance(signature, bytes)
+            self.assertGreater(len(signature), 0)
 
-                # Verify the signature
-                vendor.verify(test_data, signature)
+            # Verify the signature
+            vendor.verify(test_data, signature)
         except gpg.errors.GPGMEError as e:
             self.skipTest(f"GPG key not available: {e}")
 
@@ -170,11 +218,13 @@ class GPGCliSignatureVendorTests(unittest.TestCase):
 
     def test_verify_invalid_signature(self) -> None:
         """Test that verify raises an error for invalid signatures."""
+        from dulwich.signature import BadSignature
+
         vendor = GPGCliSignatureVendor()
         test_data = b"test data"
         invalid_signature = b"this is not a valid signature"
 
-        with self.assertRaises(subprocess.CalledProcessError):
+        with self.assertRaises(BadSignature):
             vendor.verify(test_data, invalid_signature)
 
     def test_sign_with_keyid(self) -> None:
@@ -212,37 +262,25 @@ class GPGCliSignatureVendorTests(unittest.TestCase):
 
     def test_verify_with_keyids(self) -> None:
         """Test verifying with specific trusted key IDs."""
+        from dulwich.signature import UntrustedSignature
+
         vendor = GPGCliSignatureVendor()
         test_data = b"test data to sign"
 
         try:
-            # Sign without specifying a key (use default)
-            signature = vendor.sign(test_data)
+            valid_keyid = get_valid_gpg_key_cli()
+            if not valid_keyid:
+                self.skipTest("No valid GPG keys available for testing")
 
-            # Get the primary key fingerprint from the keyring
-            result = subprocess.run(
-                ["gpg", "--list-secret-keys", "--with-colons"],
-                capture_output=True,
-                check=True,
-                text=True,
-            )
+            # Sign with the specific key
+            signature = vendor.sign(test_data, keyid=valid_keyid)
 
-            primary_keyid = None
-            for line in result.stdout.split("\n"):
-                if line.startswith("fpr:"):
-                    primary_keyid = line.split(":")[9]
-                    break
-
-            if not primary_keyid:
-                self.skipTest("No GPG keys available for testing")
-
-            # Verify with the correct primary keyid - should succeed
-            # (GPG shows primary key fingerprint even if signed by subkey)
-            vendor.verify(test_data, signature, keyids=[primary_keyid])
+            # Verify with the correct keyid - should succeed
+            vendor.verify(test_data, signature, keyids=[valid_keyid])
 
             # Verify with a different keyid - should fail
             fake_keyid = "0" * 40  # Fake 40-character fingerprint
-            with self.assertRaises(ValueError):
+            with self.assertRaises(UntrustedSignature):
                 vendor.verify(test_data, signature, keyids=[fake_keyid])
 
         except subprocess.CalledProcessError as e:
@@ -429,9 +467,11 @@ class SSHSigSignatureVendorTests(unittest.TestCase):
         self.assertIn("SSHCliSignatureVendor", str(cm.exception))
 
     def test_verify_without_config_raises(self) -> None:
-        """Test that verify without config or keyids raises ValueError."""
+        """Test that verify without config or keyids raises UntrustedSignature."""
+        from dulwich.signature import UntrustedSignature
+
         vendor = SSHSigSignatureVendor()
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(UntrustedSignature) as cm:
             vendor.verify(b"test data", b"fake signature")
         self.assertIn("allowedSignersFile", str(cm.exception))
 
@@ -553,9 +593,11 @@ class SSHCliSignatureVendorTests(unittest.TestCase):
         self.assertIn("key", str(cm.exception).lower())
 
     def test_verify_without_allowed_signers_raises(self) -> None:
-        """Test that verify without allowedSignersFile raises ValueError."""
+        """Test that verify without allowedSignersFile raises UntrustedSignature."""
+        from dulwich.signature import UntrustedSignature
+
         vendor = SSHCliSignatureVendor()
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(UntrustedSignature) as cm:
             vendor.verify(b"test data", b"fake signature")
         self.assertIn("allowedSignersFile", str(cm.exception))
 

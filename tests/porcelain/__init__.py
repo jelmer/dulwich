@@ -633,21 +633,37 @@ class CommitSignTests(PorcelainGpgTestCase):
         commit = self.repo.get_object(sha)
         assert isinstance(commit, Commit)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
-        commit.verify()
-        commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+        from dulwich.signature import (
+            BadSignature,
+            UntrustedSignature,
+            get_signature_vendor_for_signature,
+        )
+
+        self.assertIsNotNone(commit.gpgsig)
+        vendor = get_signature_vendor_for_signature(commit.gpgsig)
+        vendor.verify(commit.raw_without_sig(), commit.gpgsig)
+        vendor.verify(
+            commit.raw_without_sig(),
+            commit.gpgsig,
+            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        )
 
         self.import_non_default_key()
         self.assertRaises(
-            gpg.errors.MissingSignatures,
-            commit.verify,
+            UntrustedSignature,
+            vendor.verify,
+            commit.raw_without_sig(),
+            commit.gpgsig,
             keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
         )
 
         assert isinstance(commit, Commit)
         commit.committer = b"Alice <alice@example.com>"
         self.assertRaises(
-            gpg.errors.BadSignatures,
-            commit.verify,
+            BadSignature,
+            vendor.verify,
+            commit.raw_without_sig(),
+            commit.gpgsig,
         )
 
     def test_non_default_key(self) -> None:
@@ -664,7 +680,7 @@ class CommitSignTests(PorcelainGpgTestCase):
             message="Some message",
             author="Joe <joe@example.com>",
             committer="Bob <bob@example.com>",
-            signoff=PorcelainGpgTestCase.NON_DEFAULT_KEY_ID,
+            sign=PorcelainGpgTestCase.NON_DEFAULT_KEY_ID,
         )
         self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
@@ -672,7 +688,11 @@ class CommitSignTests(PorcelainGpgTestCase):
         commit = self.repo.get_object(sha)
         assert isinstance(commit, Commit)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
-        commit.verify()
+        from dulwich.signature import get_signature_vendor_for_signature
+
+        self.assertIsNotNone(commit.gpgsig)
+        vendor = get_signature_vendor_for_signature(commit.gpgsig)
+        vendor.verify(commit.raw_without_sig(), commit.gpgsig)
 
     def test_sign_uses_config_signingkey(self) -> None:
         """Test that sign=True uses user.signingKey from config."""
@@ -703,8 +723,16 @@ class CommitSignTests(PorcelainGpgTestCase):
         commit = self.repo.get_object(sha)
         assert isinstance(commit, Commit)
         # Verify the commit is signed with the configured key
-        commit.verify()
-        commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+        from dulwich.signature import get_signature_vendor_for_signature
+
+        self.assertIsNotNone(commit.gpgsig)
+        vendor = get_signature_vendor_for_signature(commit.gpgsig)
+        vendor.verify(commit.raw_without_sig(), commit.gpgsig)
+        vendor.verify(
+            commit.raw_without_sig(),
+            commit.gpgsig,
+            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        )
 
     def test_commit_gpg_sign_config_enabled(self) -> None:
         """Test that commit.gpgSign=true automatically signs commits."""
@@ -736,8 +764,16 @@ class CommitSignTests(PorcelainGpgTestCase):
         commit = self.repo.get_object(sha)
         assert isinstance(commit, Commit)
         # Verify the commit is signed due to config
-        commit.verify()
-        commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+        from dulwich.signature import get_signature_vendor_for_signature
+
+        self.assertIsNotNone(commit.gpgsig)
+        vendor = get_signature_vendor_for_signature(commit.gpgsig)
+        vendor.verify(commit.raw_without_sig(), commit.gpgsig)
+        vendor.verify(
+            commit.raw_without_sig(),
+            commit.gpgsig,
+            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        )
 
     def test_commit_gpg_sign_config_disabled(self) -> None:
         """Test that commit.gpgSign=false does not sign commits."""
@@ -800,7 +836,11 @@ class CommitSignTests(PorcelainGpgTestCase):
         commit = self.repo.get_object(sha)
         assert isinstance(commit, Commit)
         # Verify the commit is signed with default key
-        commit.verify()
+        from dulwich.signature import get_signature_vendor_for_signature
+
+        self.assertIsNotNone(commit.gpgsig)
+        vendor = get_signature_vendor_for_signature(commit.gpgsig)
+        vendor.verify(commit.raw_without_sig(), commit.gpgsig)
 
     def test_explicit_signoff_overrides_config(self) -> None:
         """Test that explicit signoff parameter overrides commit.gpgSign config."""
@@ -832,8 +872,16 @@ class CommitSignTests(PorcelainGpgTestCase):
         commit = self.repo.get_object(sha)
         assert isinstance(commit, Commit)
         # Verify the commit is signed despite config=false
-        commit.verify()
-        commit.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+        from dulwich.signature import get_signature_vendor_for_signature
+
+        self.assertIsNotNone(commit.gpgsig)
+        vendor = get_signature_vendor_for_signature(commit.gpgsig)
+        vendor.verify(commit.raw_without_sig(), commit.gpgsig)
+        vendor.verify(
+            commit.raw_without_sig(),
+            commit.gpgsig,
+            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        )
 
     def test_explicit_false_disables_signing(self) -> None:
         """Test that explicit signoff=False disables signing even with config=true."""
@@ -900,7 +948,9 @@ class VerifyCommitTests(PorcelainGpgTestCase):
         )
 
     def test_verify_commit_with_wrong_key(self) -> None:
-        """Test that verifying with wrong keyid raises MissingSignatures."""
+        """Test that verifying with wrong keyid raises UntrustedSignature."""
+        from dulwich.signature import UntrustedSignature
+
         _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
@@ -920,7 +970,7 @@ class VerifyCommitTests(PorcelainGpgTestCase):
 
         self.import_non_default_key()
         self.assertRaises(
-            gpg.errors.MissingSignatures,
+            UntrustedSignature,
             porcelain.verify_commit,
             self.repo.path,
             sha,
@@ -979,7 +1029,9 @@ class VerifyTagTests(PorcelainGpgTestCase):
         )
 
     def test_verify_tag_with_wrong_key(self) -> None:
-        """Test that verifying with wrong keyid raises MissingSignatures."""
+        """Test that verifying with wrong keyid raises UntrustedSignature."""
+        from dulwich.signature import UntrustedSignature
+
         _c1, _c2, c3 = build_commit_graph(
             self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
         )
@@ -1000,7 +1052,7 @@ class VerifyTagTests(PorcelainGpgTestCase):
 
         self.import_non_default_key()
         self.assertRaises(
-            gpg.errors.MissingSignatures,
+            UntrustedSignature,
             porcelain.verify_tag,
             self.repo.path,
             b"signed-tag",
@@ -3246,21 +3298,37 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         tag = self.repo[b"refs/tags/tryme"]
         assert isinstance(tag, Tag)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
-        tag.verify()
-        tag.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+        from dulwich.signature import (
+            BadSignature,
+            UntrustedSignature,
+            get_signature_vendor_for_signature,
+        )
+
+        self.assertIsNotNone(tag.signature)
+        vendor = get_signature_vendor_for_signature(tag.signature)
+        vendor.verify(tag.raw_without_sig(), tag.signature)
+        vendor.verify(
+            tag.raw_without_sig(),
+            tag.signature,
+            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        )
 
         self.import_non_default_key()
         self.assertRaises(
-            gpg.errors.MissingSignatures,
-            tag.verify,
+            UntrustedSignature,
+            vendor.verify,
+            tag.raw_without_sig(),
+            tag.signature,
             keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
         )
 
         assert tag.signature is not None
         tag._chunked_text = [b"bad data", tag.signature]
         self.assertRaises(
-            gpg.errors.BadSignatures,
-            tag.verify,
+            BadSignature,
+            vendor.verify,
+            tag.raw_without_sig(),
+            tag.signature,
         )
 
     def test_non_default_key(self) -> None:
@@ -3291,7 +3359,11 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         tag = self.repo[b"refs/tags/tryme"]
         assert isinstance(tag, Tag)
         # GPG Signatures aren't deterministic, so we can't do a static assertion.
-        tag.verify()
+        from dulwich.signature import get_signature_vendor_for_signature
+
+        self.assertIsNotNone(tag.signature)
+        vendor = get_signature_vendor_for_signature(tag.signature)
+        vendor.verify(tag.raw_without_sig(), tag.signature)
 
     def test_sign_uses_config_signingkey(self) -> None:
         """Test that sign=True uses user.signingKey from config."""
@@ -3323,8 +3395,16 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsInstance(tag, Tag)
 
         # Verify the tag is signed with the configured key
-        tag.verify()
-        tag.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+        from dulwich.signature import get_signature_vendor_for_signature
+
+        self.assertIsNotNone(tag.signature)
+        vendor = get_signature_vendor_for_signature(tag.signature)
+        vendor.verify(tag.raw_without_sig(), tag.signature)
+        vendor.verify(
+            tag.raw_without_sig(),
+            tag.signature,
+            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        )
 
     def test_tag_gpg_sign_config_enabled(self) -> None:
         """Test that tag.gpgSign=true automatically signs tags."""
@@ -3357,8 +3437,16 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsInstance(tag, Tag)
 
         # Verify the tag is signed due to config
-        tag.verify()
-        tag.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+        from dulwich.signature import get_signature_vendor_for_signature
+
+        self.assertIsNotNone(tag.signature)
+        vendor = get_signature_vendor_for_signature(tag.signature)
+        vendor.verify(tag.raw_without_sig(), tag.signature)
+        vendor.verify(
+            tag.raw_without_sig(),
+            tag.signature,
+            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        )
 
     def test_tag_gpg_sign_config_disabled(self) -> None:
         """Test that tag.gpgSign=false does not sign tags."""
@@ -3423,7 +3511,11 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsInstance(tag, Tag)
 
         # Verify the tag is signed with default key
-        tag.verify()
+        from dulwich.signature import get_signature_vendor_for_signature
+
+        self.assertIsNotNone(tag.signature)
+        vendor = get_signature_vendor_for_signature(tag.signature)
+        vendor.verify(tag.raw_without_sig(), tag.signature)
 
     def test_explicit_sign_overrides_config(self) -> None:
         """Test that explicit sign parameter overrides tag.gpgSign config."""
@@ -3456,8 +3548,16 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsInstance(tag, Tag)
 
         # Verify the tag is signed despite config=false
-        tag.verify()
-        tag.verify(keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID])
+        from dulwich.signature import get_signature_vendor_for_signature
+
+        self.assertIsNotNone(tag.signature)
+        vendor = get_signature_vendor_for_signature(tag.signature)
+        vendor.verify(tag.raw_without_sig(), tag.signature)
+        vendor.verify(
+            tag.raw_without_sig(),
+            tag.signature,
+            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        )
 
     def test_explicit_false_disables_tag_signing(self) -> None:
         """Test that explicit sign=False disables signing even with config=true."""

@@ -1020,6 +1020,14 @@ class GitClient:
             self._fetch_capabilities.add(CAPABILITY_INCLUDE_TAG)
         self.protocol_version = 0  # will be overridden later
 
+    def close(self) -> None:
+        """Close the client and release any resources.
+
+        Default implementation does nothing as most clients don't maintain
+        persistent connections. Subclasses that hold resources should override
+        this method to properly clean them up.
+        """
+
     def get_url(self, path: str) -> str:
         """Retrieves full url to given path.
 
@@ -4598,9 +4606,9 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             if resp.status != 200:
                 raise GitProtocolError(f"unexpected http resp {resp.status} for {url}")
 
-        resp.content_type = resp.headers.get("Content-Type")  # type: ignore[attr-defined]
+        resp.content_type = resp.headers.get("Content-Type")  # type: ignore[union-attr]
         resp_url = resp.geturl()
-        resp.redirect_location = resp_url if resp_url != url else ""  # type: ignore[attr-defined]
+        resp.redirect_location = resp_url if resp_url != url else ""  # type: ignore[union-attr]
         return resp, _wrap_urllib3_exceptions(resp.read)  # type: ignore[return-value]
 
 

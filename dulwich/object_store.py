@@ -1803,10 +1803,13 @@ class DiskObjectStore(PackBasedObjectStore):
             del self._pack_cache[os.path.basename(pack._basename)]
         except KeyError:
             pass
+        # Store paths before closing to avoid re-opening files on Windows
+        data_path = pack._data_path
+        idx_path = pack._idx_path
         pack.close()
-        os.remove(pack.data.path)
-        if hasattr(pack.index, "path"):
-            os.remove(pack.index.path)
+        os.remove(data_path)
+        if os.path.exists(idx_path):
+            os.remove(idx_path)
 
     def _get_pack_basepath(
         self, entries: Iterable[tuple[bytes, int, int | None]]

@@ -66,12 +66,8 @@ class DulwichClientTestBase:
         self.dest = os.path.join(self.gitroot, "dest")
         file.ensure_dir_exists(self.dest)
         run_git_or_fail(["init", "--quiet", "--bare"], cwd=self.dest)
-
-    def tearDown(self) -> None:
-        rmtree_ro(self.gitroot)
-        # Clear instance variables to break reference cycles
-        self.gitroot = None
-        self.dest = None
+        # Register cleanup to run after test's cleanup handlers
+        self.addCleanup(rmtree_ro, self.gitroot)
 
     def assertDestEqualsSrc(self) -> None:
         repo_dir = os.path.join(self.gitroot, "server_new.export")
@@ -568,7 +564,6 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         self.process.wait()
         self.process.stdout.close()
         self.process.stderr.close()
-        DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
 
     def _client(self):
@@ -640,7 +635,6 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
         client.get_ssh_vendor = TestSSHVendor
 
     def tearDown(self) -> None:
-        DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
         client.get_ssh_vendor = self.real_vendor
 
@@ -662,7 +656,6 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
         DulwichClientTestBase.setUp(self)
 
     def tearDown(self) -> None:
-        DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
 
     def _client(self):
@@ -850,7 +843,6 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
         run_git_or_fail(["config", "http.receivepack", "true"], cwd=self.dest)
 
     def tearDown(self) -> None:
-        DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
         self._httpd.shutdown()
         self._httpd.socket.close()

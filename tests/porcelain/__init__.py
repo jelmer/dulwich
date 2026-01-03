@@ -642,19 +642,22 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertIsNotNone(commit.gpgsig)
         vendor = get_signature_vendor_for_signature(commit.gpgsig)
         vendor.verify(commit.raw_without_sig(), commit.gpgsig)
-        vendor.verify(
-            commit.raw_without_sig(),
-            commit.gpgsig,
-            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        # Verify with specific keyid
+        vendor_with_keyid = get_signature_vendor_for_signature(
+            commit.gpgsig, keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID]
         )
+        vendor_with_keyid.verify(commit.raw_without_sig(), commit.gpgsig)
 
         self.import_non_default_key()
+        # Verify with wrong keyid - should raise UntrustedSignature
+        vendor_wrong_keyid = get_signature_vendor_for_signature(
+            commit.gpgsig, keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID]
+        )
         self.assertRaises(
             UntrustedSignature,
-            vendor.verify,
+            vendor_wrong_keyid.verify,
             commit.raw_without_sig(),
             commit.gpgsig,
-            keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
         )
 
         assert isinstance(commit, Commit)
@@ -728,11 +731,11 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertIsNotNone(commit.gpgsig)
         vendor = get_signature_vendor_for_signature(commit.gpgsig)
         vendor.verify(commit.raw_without_sig(), commit.gpgsig)
-        vendor.verify(
-            commit.raw_without_sig(),
-            commit.gpgsig,
-            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        # Verify with specific keyid
+        vendor_with_keyid = get_signature_vendor_for_signature(
+            commit.gpgsig, keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID]
         )
+        vendor_with_keyid.verify(commit.raw_without_sig(), commit.gpgsig)
 
     def test_commit_gpg_sign_config_enabled(self) -> None:
         """Test that commit.gpgSign=true automatically signs commits."""
@@ -769,11 +772,11 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertIsNotNone(commit.gpgsig)
         vendor = get_signature_vendor_for_signature(commit.gpgsig)
         vendor.verify(commit.raw_without_sig(), commit.gpgsig)
-        vendor.verify(
-            commit.raw_without_sig(),
-            commit.gpgsig,
-            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        # Verify with specific keyid
+        vendor_with_keyid = get_signature_vendor_for_signature(
+            commit.gpgsig, keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID]
         )
+        vendor_with_keyid.verify(commit.raw_without_sig(), commit.gpgsig)
 
     def test_commit_gpg_sign_config_disabled(self) -> None:
         """Test that commit.gpgSign=false does not sign commits."""
@@ -877,11 +880,11 @@ class CommitSignTests(PorcelainGpgTestCase):
         self.assertIsNotNone(commit.gpgsig)
         vendor = get_signature_vendor_for_signature(commit.gpgsig)
         vendor.verify(commit.raw_without_sig(), commit.gpgsig)
-        vendor.verify(
-            commit.raw_without_sig(),
-            commit.gpgsig,
-            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        # Verify with specific keyid
+        vendor_with_keyid = get_signature_vendor_for_signature(
+            commit.gpgsig, keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID]
         )
+        vendor_with_keyid.verify(commit.raw_without_sig(), commit.gpgsig)
 
     def test_explicit_false_disables_signing(self) -> None:
         """Test that explicit signoff=False disables signing even with config=true."""
@@ -3307,19 +3310,22 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsNotNone(tag.signature)
         vendor = get_signature_vendor_for_signature(tag.signature)
         vendor.verify(tag.raw_without_sig(), tag.signature)
-        vendor.verify(
-            tag.raw_without_sig(),
-            tag.signature,
-            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        # Verify with specific keyid
+        vendor_with_keyid = get_signature_vendor_for_signature(
+            tag.signature, keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID]
         )
+        vendor_with_keyid.verify(tag.raw_without_sig(), tag.signature)
 
         self.import_non_default_key()
+        # Verify with wrong keyid - should raise UntrustedSignature
+        vendor_wrong_keyid = get_signature_vendor_for_signature(
+            tag.signature, keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID]
+        )
         self.assertRaises(
             UntrustedSignature,
-            vendor.verify,
+            vendor_wrong_keyid.verify,
             tag.raw_without_sig(),
             tag.signature,
-            keyids=[PorcelainGpgTestCase.NON_DEFAULT_KEY_ID],
         )
 
         assert tag.signature is not None
@@ -3400,11 +3406,11 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsNotNone(tag.signature)
         vendor = get_signature_vendor_for_signature(tag.signature)
         vendor.verify(tag.raw_without_sig(), tag.signature)
-        vendor.verify(
-            tag.raw_without_sig(),
-            tag.signature,
-            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        # Verify with specific keyid
+        vendor_with_keyid = get_signature_vendor_for_signature(
+            tag.signature, keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID]
         )
+        vendor_with_keyid.verify(tag.raw_without_sig(), tag.signature)
 
     def test_tag_gpg_sign_config_enabled(self) -> None:
         """Test that tag.gpgSign=true automatically signs tags."""
@@ -3442,11 +3448,11 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsNotNone(tag.signature)
         vendor = get_signature_vendor_for_signature(tag.signature)
         vendor.verify(tag.raw_without_sig(), tag.signature)
-        vendor.verify(
-            tag.raw_without_sig(),
-            tag.signature,
-            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        # Verify with specific keyid
+        vendor_with_keyid = get_signature_vendor_for_signature(
+            tag.signature, keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID]
         )
+        vendor_with_keyid.verify(tag.raw_without_sig(), tag.signature)
 
     def test_tag_gpg_sign_config_disabled(self) -> None:
         """Test that tag.gpgSign=false does not sign tags."""
@@ -3553,11 +3559,11 @@ class TagCreateSignTests(PorcelainGpgTestCase):
         self.assertIsNotNone(tag.signature)
         vendor = get_signature_vendor_for_signature(tag.signature)
         vendor.verify(tag.raw_without_sig(), tag.signature)
-        vendor.verify(
-            tag.raw_without_sig(),
-            tag.signature,
-            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        # Verify with specific keyid
+        vendor_with_keyid = get_signature_vendor_for_signature(
+            tag.signature, keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID]
         )
+        vendor_with_keyid.verify(tag.raw_without_sig(), tag.signature)
 
     def test_explicit_false_disables_tag_signing(self) -> None:
         """Test that explicit sign=False disables signing even with config=true."""

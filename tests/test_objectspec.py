@@ -45,16 +45,19 @@ class ParseObjectTests(TestCase):
 
     def test_nonexistent(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         self.assertRaises(KeyError, parse_object, r, "thisdoesnotexist")
 
     def test_blob_by_sha(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         b = Blob.from_string(b"Blah")
         r.object_store.add_object(b)
         self.assertEqual(b, parse_object(r, b.id))
 
     def test_parent_caret(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         # c3's parents are [c1, c2]
         self.assertEqual(c1, parse_object(r, c3.id + b"^1"))
@@ -63,6 +66,7 @@ class ParseObjectTests(TestCase):
 
     def test_parent_tilde(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 2]])
         self.assertEqual(c2, parse_object(r, c3.id + b"~"))
         self.assertEqual(c2, parse_object(r, c3.id + b"~1"))
@@ -70,6 +74,7 @@ class ParseObjectTests(TestCase):
 
     def test_combined_operators(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         c1, c2, _c3, c4 = build_commit_graph(
             r.object_store, [[1], [2, 1], [3, 1, 2], [4, 3]]
         )
@@ -80,6 +85,7 @@ class ParseObjectTests(TestCase):
 
     def test_with_ref(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 2]])
         r.refs[b"refs/heads/master"] = c3.id
         self.assertEqual(c2, parse_object(r, b"master~"))
@@ -87,6 +93,7 @@ class ParseObjectTests(TestCase):
 
     def test_caret_zero(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         c1, c2 = build_commit_graph(r.object_store, [[1], [2, 1]])
         # ^0 means the commit itself
         self.assertEqual(c2, parse_object(r, c2.id + b"^0"))
@@ -94,6 +101,7 @@ class ParseObjectTests(TestCase):
 
     def test_missing_parent(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         c1, c2 = build_commit_graph(r.object_store, [[1], [2, 1]])
         # c2 only has 1 parent, so ^2 should fail
         self.assertRaises(ValueError, parse_object, r, c2.id + b"^2")
@@ -102,11 +110,13 @@ class ParseObjectTests(TestCase):
 
     def test_empty_base(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         self.assertRaises(ValueError, parse_object, r, b"~1")
         self.assertRaises(ValueError, parse_object, r, b"^1")
 
     def test_non_commit_with_operators(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         b = Blob.from_string(b"Blah")
         r.object_store.add_object(b)
         # Can't apply ~ or ^ to a blob
@@ -114,6 +124,7 @@ class ParseObjectTests(TestCase):
 
     def test_tag_dereference(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         [c1] = build_commit_graph(r.object_store, [[1]])
         # Create an annotated tag
         tag = Tag()
@@ -129,6 +140,7 @@ class ParseObjectTests(TestCase):
 
     def test_nested_tag_dereference(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         [c1] = build_commit_graph(r.object_store, [[1]])
         # Create a tag pointing to a commit
         tag1 = Tag()
@@ -155,6 +167,7 @@ class ParseObjectTests(TestCase):
 
     def test_path_in_tree(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         # Create a blob
         b = Blob.from_string(b"Test content")
 
@@ -168,6 +181,7 @@ class ParseObjectTests(TestCase):
 
     def test_path_in_tree_nested(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         # Create blobs
         b1 = Blob.from_string(b"Content 1")
         b2 = Blob.from_string(b"Content 2")
@@ -423,15 +437,18 @@ class ParseCommitRangeTests(TestCase):
 
     def test_nonexistent(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         self.assertRaises(KeyError, parse_commit_range, r, "thisdoesnotexist..HEAD")
 
     def test_commit_by_sha(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         c1, _c2, _c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         self.assertIsNone(parse_commit_range(r, c1.id))
 
     def test_commit_range(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         c1, c2, _c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         result = parse_commit_range(r, f"{c1.id.decode()}..{c2.id.decode()}")
         self.assertIsNotNone(result)
@@ -445,20 +462,24 @@ class ParseCommitTests(TestCase):
 
     def test_nonexistent(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         self.assertRaises(KeyError, parse_commit, r, "thisdoesnotexist")
 
     def test_commit_by_sha(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         [c1] = build_commit_graph(r.object_store, [[1]])
         self.assertEqual(c1, parse_commit(r, c1.id))
 
     def test_commit_by_short_sha(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         [c1] = build_commit_graph(r.object_store, [[1]])
         self.assertEqual(c1, parse_commit(r, c1.id[:10]))
 
     def test_annotated_tag(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         [c1] = build_commit_graph(r.object_store, [[1]])
         # Create an annotated tag pointing to the commit
         tag = Tag()
@@ -474,6 +495,7 @@ class ParseCommitTests(TestCase):
 
     def test_nested_tags(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         [c1] = build_commit_graph(r.object_store, [[1]])
         # Create an annotated tag pointing to the commit
         tag1 = Tag()
@@ -516,6 +538,7 @@ class ParseCommitTests(TestCase):
 
     def test_tag_to_blob(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         # Create a blob
         blob = Blob.from_string(b"Test content")
         r.object_store.add_object(blob)
@@ -535,6 +558,7 @@ class ParseCommitTests(TestCase):
 
     def test_commit_object(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         [c1] = build_commit_graph(r.object_store, [[1]])
         # Test that passing a Commit object directly returns the same object
         self.assertEqual(c1, parse_commit(r, c1))
@@ -701,22 +725,26 @@ class ParseTreeTests(TestCase):
 
     def test_nonexistent(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         self.assertRaises(KeyError, parse_tree, r, "thisdoesnotexist")
 
     def test_from_commit(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         c1, _c2, _c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         self.assertEqual(r[c1.tree], parse_tree(r, c1.id))
         self.assertEqual(r[c1.tree], parse_tree(r, c1.tree))
 
     def test_from_ref(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         c1, _c2, _c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 1, 2]])
         r.refs[b"refs/heads/foo"] = c1.id
         self.assertEqual(r[c1.tree], parse_tree(r, b"foo"))
 
     def test_tree_object(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         [c1] = build_commit_graph(r.object_store, [[1]])
         tree = r[c1.tree]
         # Test that passing a Tree object directly returns the same object
@@ -724,12 +752,14 @@ class ParseTreeTests(TestCase):
 
     def test_commit_object(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         [c1] = build_commit_graph(r.object_store, [[1]])
         # Test that passing a Commit object returns its tree
         self.assertEqual(r[c1.tree], parse_tree(r, c1))
 
     def test_tag_object(self) -> None:
         r = MemoryRepo()
+        self.addCleanup(r.close)
         [c1] = build_commit_graph(r.object_store, [[1]])
         # Create an annotated tag pointing to the commit
         tag = Tag()

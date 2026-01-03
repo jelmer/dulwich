@@ -59,13 +59,17 @@ class GitServerTestCase(ServerTests, CompatTestCase):
 
         receive_pack_handler_cls = dul_server.handlers[b"git-receive-pack"]
         # Create a handler instance to check capabilities
-        handler = receive_pack_handler_cls(
-            dul_server.backend,
-            [b"/"],
-            Protocol(lambda x: b"", lambda x: None),
-        )
-        caps = handler.capabilities()
-        self.assertNotIn(b"side-band-64k", caps)
+        proto = Protocol(lambda x: b"", lambda x: None)
+        try:
+            handler = receive_pack_handler_cls(
+                dul_server.backend,
+                [b"/"],
+                proto,
+            )
+            caps = handler.capabilities()
+            self.assertNotIn(b"side-band-64k", caps)
+        finally:
+            proto.close()
 
     def _start_server(self, repo):
         backend = DictBackend({b"/": repo})
@@ -77,12 +81,12 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         server_thread.daemon = True  # Make thread daemon so it dies with main thread
         server_thread.start()
 
-        # Add cleanup in the correct order
+        # Add cleanup in the correct order - shutdown first, then close
         def cleanup_server():
             dul_server.shutdown()
-            dul_server.server_close()
-            # Give thread a moment to exit cleanly
+            # Give thread a moment to exit cleanly before closing socket
             server_thread.join(timeout=1.0)
+            dul_server.server_close()
 
         self.addCleanup(cleanup_server)
         self._server = dul_server
@@ -113,13 +117,17 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
 
         receive_pack_handler_cls = server.handlers[b"git-receive-pack"]
         # Create a handler instance to check capabilities
-        handler = receive_pack_handler_cls(
-            server.backend,
-            [b"/"],
-            Protocol(lambda x: b"", lambda x: None),
-        )
-        caps = handler.capabilities()
-        self.assertIn(b"side-band-64k", caps)
+        proto = Protocol(lambda x: b"", lambda x: None)
+        try:
+            handler = receive_pack_handler_cls(
+                server.backend,
+                [b"/"],
+                proto,
+            )
+            caps = handler.capabilities()
+            self.assertIn(b"side-band-64k", caps)
+        finally:
+            proto.close()
 
 
 @skipIf(sys.platform == "win32", "Broken on windows, with very long fail time.")
@@ -143,11 +151,12 @@ class GitServerSHA256TestCase(CompatTestCase):
         server_thread.daemon = True
         server_thread.start()
 
-        # Add cleanup
+        # Add cleanup - shutdown first, then close
         def cleanup_server():
             dul_server.shutdown()
-            dul_server.server_close()
+            # Give thread a moment to exit cleanly before closing socket
             server_thread.join(timeout=1.0)
+            dul_server.server_close()
 
         self.addCleanup(cleanup_server)
         self._server = dul_server
@@ -163,6 +172,7 @@ class GitServerSHA256TestCase(CompatTestCase):
         repo_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_path)
         source_repo = Repo.init(repo_path, mkdir=False, object_format="sha256")
+        self.addCleanup(source_repo.close)
 
         # Create test content
         blob = Blob.from_string(b"Test SHA-256 content from dulwich server")
@@ -213,5 +223,3 @@ class GitServerSHA256TestCase(CompatTestCase):
         # Verify git can read the commit
         log_output = run_git_or_fail(["log", "--format=%s", "-n", "1"], cwd=clone_dir)
         self.assertEqual(log_output.strip(), b"Test SHA-256 commit")
-
-        source_repo.close()

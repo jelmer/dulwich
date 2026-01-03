@@ -169,6 +169,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)
         alternate_store = DiskObjectStore(alternate_dir, loose_compression_level=6)
+        self.addCleanup(alternate_store.close)
         b2 = make_object(Blob, data=b"yummy data")
         alternate_store.add_object(b2)
 
@@ -176,9 +177,11 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)
         alternate_store = DiskObjectStore(alternate_dir)
+        self.addCleanup(alternate_store.close)
         b2 = make_object(Blob, data=b"yummy data")
         alternate_store.add_object(b2)
         store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
         self.assertRaises(KeyError, store.__getitem__, b2.id)
         store.add_alternate_path(alternate_dir)
         self.assertIn(b2.id, store)
@@ -186,6 +189,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_read_alternate_paths(self) -> None:
         store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
 
         abs_path = os.path.abspath(os.path.normpath("/abspath"))
         # ensures in particular existence of the alternates file
@@ -283,9 +287,11 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)
         alternate_store = DiskObjectStore(alternate_dir)
+        self.addCleanup(alternate_store.close)
         b2 = make_object(Blob, data=b"yummy data")
         alternate_store.add_object(b2)
         store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
         self.assertRaises(KeyError, store.__getitem__, b2.id)
         store.add_alternate_path(os.path.relpath(alternate_dir, self.store_dir))
         self.assertEqual(list(alternate_store), list(store.alternates[0]))

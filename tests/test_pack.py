@@ -478,7 +478,10 @@ class TestPackData(PackTests):
             self.datadir, "pack-{}.pack".format(pack1_sha.decode("ascii"))
         )
         with open(path, "rb") as f:
-            PackData.from_file(f, DEFAULT_OBJECT_FORMAT, os.path.getsize(path))
+            pack_data = PackData.from_file(
+                f, DEFAULT_OBJECT_FORMAT, os.path.getsize(path)
+            )
+            pack_data.close()
 
     def test_pack_len(self) -> None:
         with self.get_pack_data(pack1_sha) as p:
@@ -788,7 +791,9 @@ class TestPack(PackTests):
     def test_length_mismatch(self) -> None:
         with self.get_pack_data(pack1_sha) as data:
             index = self.get_pack_index(pack1_sha)
-            Pack.from_objects(data, index).check_length_and_checksum()
+            pack = Pack.from_objects(data, index)
+            self.addCleanup(pack.close)
+            pack.check_length_and_checksum()
 
             data._file.seek(12)
             bad_file = BytesIO()
@@ -796,19 +801,25 @@ class TestPack(PackTests):
             bad_file.write(data._file.read())
             bad_file = BytesIO(bad_file.getvalue())
             bad_data = PackData("", file=bad_file, object_format=DEFAULT_OBJECT_FORMAT)
+            self.addCleanup(bad_data.close)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
+            self.addCleanup(bad_pack.close)
             self.assertRaises(AssertionError, lambda: bad_pack.data)
             self.assertRaises(AssertionError, bad_pack.check_length_and_checksum)
 
     def test_checksum_mismatch(self) -> None:
         with self.get_pack_data(pack1_sha) as data:
             index = self.get_pack_index(pack1_sha)
-            Pack.from_objects(data, index).check_length_and_checksum()
+            pack = Pack.from_objects(data, index)
+            self.addCleanup(pack.close)
+            pack.check_length_and_checksum()
 
             data._file.seek(0)
             bad_file = BytesIO(data._file.read()[:-20] + (b"\xff" * 20))
             bad_data = PackData("", file=bad_file, object_format=DEFAULT_OBJECT_FORMAT)
+            self.addCleanup(bad_data.close)
             bad_pack = Pack.from_lazy_objects(lambda: bad_data, lambda: index)
+            self.addCleanup(bad_pack.close)
             self.assertRaises(ChecksumMismatch, lambda: bad_pack.data)
             self.assertRaises(ChecksumMismatch, bad_pack.check_length_and_checksum)
 
@@ -1548,6 +1559,7 @@ class DeltaChainIteratorTests(TestCase):
             thin = bool(list(self.store))
         resolve_ext_ref = (thin and self.get_raw_no_repeat) or None
         data = PackData("test.pack", file=f, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(data.close)
         return TestPackIterator.for_pack_data(data, resolve_ext_ref=resolve_ext_ref)
 
     def make_pack_iter_subset(self, f, subset, thin=None):
@@ -1558,6 +1570,7 @@ class DeltaChainIteratorTests(TestCase):
         assert data
         index = MemoryPackIndex.for_pack(data)
         pack = Pack.from_objects(data, index)
+        self.addCleanup(pack.close)
         return TestPackIterator.for_pack_subset(
             pack, subset, resolve_ext_ref=resolve_ext_ref
         )
@@ -1837,6 +1850,9 @@ class DeltaChainIteratorTests(TestCase):
             pack[b1.id]
         except UnresolvedDeltas as e:
             self.assertEqual([b1.id], [sha_to_hex(sha) for sha in e.shas])
+        finally:
+            pack.close()
+            packdata.close()
 
 
 class DeltaEncodeSizeTests(TestCase):

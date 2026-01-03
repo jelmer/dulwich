@@ -193,6 +193,7 @@ class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
     def setUp(self) -> None:
         super().setUp()
         r = self._repo = MemoryRepo()
+        self.addCleanup(r.close)
 
         self._shas = []
 

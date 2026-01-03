@@ -16,6 +16,7 @@ class MergeTests(unittest.TestCase):
 
     def setUp(self):
         self.repo = MemoryRepo()
+        self.addCleanup(self.repo.close)
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:
             raise DependencyMissing("merge3")
@@ -300,6 +301,7 @@ class RecursiveMergeTests(unittest.TestCase):
 
     def setUp(self):
         self.repo = MemoryRepo()
+        self.addCleanup(self.repo.close)
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:
             raise DependencyMissing("merge3")
@@ -738,6 +740,7 @@ class OctopusMergeTests(unittest.TestCase):
 
     def setUp(self):
         self.repo = MemoryRepo()
+        self.addCleanup(self.repo.close)
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:
             raise DependencyMissing("merge3")

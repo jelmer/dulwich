@@ -23,7 +23,7 @@
 """Python implementation of the Git file formats and protocols."""
 
 from collections.abc import Callable
-from typing import Any, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
 __version__ = (0, 25, 0)
 
@@ -33,51 +33,61 @@ P = ParamSpec("P")
 R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Any])
 
-try:
-    from dissolve import replace_me as replace_me
-except ImportError:
-    # if dissolve is not installed, then just provide a basic implementation
-    # of its replace_me decorator
+if TYPE_CHECKING:
+    # For type checking, always use our typed signature
     def replace_me(
         since: tuple[int, ...] | str | None = None,
         remove_in: tuple[int, ...] | str | None = None,
-    ) -> Callable[[F], F]:
-        """Decorator to mark functions as deprecated.
+    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
+        """Decorator to mark functions as deprecated."""
+        ...
 
-        Args:
-            since: Version when the function was deprecated
-            remove_in: Version when the function will be removed
+else:
+    try:
+        from dissolve import replace_me as replace_me
+    except ImportError:
+        # if dissolve is not installed, then just provide a basic implementation
+        # of its replace_me decorator
+        def replace_me(
+            since: tuple[int, ...] | str | None = None,
+            remove_in: tuple[int, ...] | str | None = None,
+        ) -> Callable[[Callable[P, R]], Callable[P, R]]:
+            """Decorator to mark functions as deprecated.
 
-        Returns:
-            Decorator function
-        """
+            Args:
+                since: Version when the function was deprecated
+                remove_in: Version when the function will be removed
 
-        def decorator(func: Callable[P, R]) -> Callable[P, R]:
-            import functools
-            import warnings
+            Returns:
+                Decorator function
+            """
 
-            m = f"{func.__name__} is deprecated"
-            since_str = str(since) if since is not None else None
-            remove_in_str = str(remove_in) if remove_in is not None else None
+            def decorator(func: Callable[P, R]) -> Callable[P, R]:
+                import functools
+                import warnings
 
-            if since_str is not None and remove_in_str is not None:
-                m += f" since {since_str} and will be removed in {remove_in_str}"
-            elif since_str is not None:
-                m += f" since {since_str}"
-            elif remove_in_str is not None:
-                m += f" and will be removed in {remove_in_str}"
-            else:
-                m += " and will be removed in a future version"
+                m = f"{func.__name__} is deprecated"
+                since_str = str(since) if since is not None else None
+                remove_in_str = str(remove_in) if remove_in is not None else None
 
-            @functools.wraps(func)
-            def _wrapped_func(*args: P.args, **kwargs: P.kwargs) -> R:
-                warnings.warn(
-                    m,
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                return func(*args, **kwargs)
+                if since_str is not None and remove_in_str is not None:
+                    m += f" since {since_str} and will be removed in {remove_in_str}"
+                elif since_str is not None:
+                    m += f" since {since_str}"
+                elif remove_in_str is not None:
+                    m += f" and will be removed in {remove_in_str}"
+                else:
+                    m += " and will be removed in a future version"
 
-            return _wrapped_func
+                @functools.wraps(func)
+                def _wrapped_func(*args: P.args, **kwargs: P.kwargs) -> R:
+                    warnings.warn(
+                        m,
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+                    return func(*args, **kwargs)
 
-        return decorator  # type: ignore[return-value]
+                return _wrapped_func
+
+            return decorator

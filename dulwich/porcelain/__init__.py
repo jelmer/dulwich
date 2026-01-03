@@ -2386,9 +2386,9 @@ def verify_commit(
             return
 
         vendor = get_signature_vendor_for_signature(
-            signature, config=r.get_config_stack()
+            signature, config=r.get_config_stack(), keyids=keyids
         )
-        vendor.verify(payload, signature, keyids=keyids)
+        vendor.verify(payload, signature)
 
 
 def replace_list(repo: RepoPath) -> list[tuple[ObjectID, ObjectID]]:

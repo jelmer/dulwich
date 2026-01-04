@@ -847,6 +847,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """
         super().__init__(object_format=object_format)
         self._pack_cache: dict[str, Pack] = {}
+        self._closed = False
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
         self.pack_delta_window_size = pack_delta_window_size
@@ -1011,11 +1012,14 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
         This method closes all cached pack files and frees associated resources.
         """
+        self._closed = True
         self._clear_cached_packs()
 
     @property
     def packs(self) -> list[Pack]:
         """List with pack objects."""
+        if self._closed:
+            raise ValueError("Cannot access packs on a closed object store")
         return list(self._iter_cached_packs()) + list(self._update_pack_cache())
 
     def count_pack_files(self) -> int:
@@ -1663,7 +1667,6 @@ class DiskObjectStore(PackBasedObjectStore):
         try:
             pack_dir_contents = os.listdir(self.pack_dir)
         except FileNotFoundError:
-            self.close()
             return []
         pack_files = set()
         for name in pack_dir_contents:
@@ -1672,15 +1675,16 @@ class DiskObjectStore(PackBasedObjectStore):
                 # fully written)
                 idx_name = os.path.splitext(name)[0] + ".idx"
                 if idx_name in pack_dir_contents:
-                    pack_name = name[: -len(".pack")]
-                    pack_files.add(pack_name)
+                    # Extract just the hash (remove "pack-" prefix and ".pack" suffix)
+                    pack_hash = name[len("pack-") : -len(".pack")]
+                    pack_files.add(pack_hash)
 
         # Open newly appeared pack files
         new_packs = []
-        for f in pack_files:
-            if f not in self._pack_cache:
+        for pack_hash in pack_files:
+            if pack_hash not in self._pack_cache:
                 pack = Pack(
-                    os.path.join(self.pack_dir, f),
+                    os.path.join(self.pack_dir, "pack-" + pack_hash),
                     object_format=self.object_format,
                     delta_window_size=self.pack_delta_window_size,
                     window_memory=self.pack_window_memory,
@@ -1690,7 +1694,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     big_file_threshold=self.pack_big_file_threshold,
                 )
                 new_packs.append(pack)
-                self._pack_cache[f] = pack
+                self._pack_cache[pack_hash] = pack
         # Remove disappeared pack files
         for f in set(self._pack_cache) - pack_files:
             self._pack_cache.pop(f).close()
@@ -1799,10 +1803,13 @@ class DiskObjectStore(PackBasedObjectStore):
             del self._pack_cache[os.path.basename(pack._basename)]
         except KeyError:
             pass
+        # Store paths before closing to avoid re-opening files on Windows
+        data_path = pack._data_path
+        idx_path = pack._idx_path
         pack.close()
-        os.remove(pack.data.path)
-        if hasattr(pack.index, "path"):
-            os.remove(pack.index.path)
+        os.remove(data_path)
+        if os.path.exists(idx_path):
+            os.remove(idx_path)
 
     def _get_pack_basepath(
         self, entries: Iterable[tuple[bytes, int, int | None]]
@@ -1937,7 +1944,9 @@ class DiskObjectStore(PackBasedObjectStore):
             big_file_threshold=self.pack_big_file_threshold,
         )
         final_pack.check_length_and_checksum()
-        self._add_cached_pack(pack_base_name, final_pack)
+        # Extract just the hash from pack_base_name (/path/to/pack-HASH -> HASH)
+        pack_hash = os.path.basename(pack_base_name)[len("pack-") :]
+        self._add_cached_pack(pack_hash, final_pack)
         return final_pack
 
     def add_thin_pack(

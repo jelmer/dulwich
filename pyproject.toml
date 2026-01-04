@@ -104,6 +104,7 @@ warn_return_any = false
 [tool.setuptools]
 packages = [
     "dulwich",
+    "dulwich.aiohttp",
     "dulwich.cloud",
     "dulwich.contrib",
     "dulwich.porcelain",

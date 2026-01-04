@@ -625,13 +625,19 @@ class WorkTree:
         if ref is None:
             # Create a dangling commit
             if should_sign:
-                c.sign(keyid)
+                from dulwich.signature import get_signature_vendor
+
+                vendor = get_signature_vendor(config=config)
+                c.gpgsig = vendor.sign(c.as_raw_string(), keyid=keyid)
             self._repo.object_store.add_object(c)
         else:
             try:
                 old_head = self._repo.refs[ref]
                 if should_sign:
-                    c.sign(keyid)
+                    from dulwich.signature import get_signature_vendor
+
+                    vendor = get_signature_vendor(config=config)
+                    c.gpgsig = vendor.sign(c.as_raw_string(), keyid=keyid)
                 self._repo.object_store.add_object(c)
                 message_bytes = (
                     message.encode() if isinstance(message, str) else message
@@ -650,7 +656,10 @@ class WorkTree:
             except KeyError:
                 c.parents = merge_heads
                 if should_sign:
-                    c.sign(keyid)
+                    from dulwich.signature import get_signature_vendor
+
+                    vendor = get_signature_vendor(config=config)
+                    c.gpgsig = vendor.sign(c.as_raw_string(), keyid=keyid)
                 self._repo.object_store.add_object(c)
                 message_bytes = (
                     message.encode() if isinstance(message, str) else message

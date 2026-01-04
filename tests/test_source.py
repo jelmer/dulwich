@@ -82,7 +82,7 @@ class SourceCodeComplianceTests(unittest.TestCase):
         python_files = []
         for root, dirs, files in os.walk(dulwich_dir):
             # Skip build directories
-            if root.endswith("build") or root.endswith("__pycache__"):
+            if root.endswith(("build", "__pycache__")):
                 continue
 
             for file in files:

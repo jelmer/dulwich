@@ -183,6 +183,7 @@ def self_test_suite() -> unittest.TestSuite:
         "server",
         "sha256",
         "sha256_pack",
+        "signature",
         "source",
         "sparse_patterns",
         "stash",

@@ -1254,28 +1254,6 @@ class Tag(ShaFile):
 
     signature = serializable_property("signature", "Optional detached GPG signature")
 
-    def sign(self, keyid: str | None = None) -> None:
-        """Sign this tag with a GPG key.
-
-        Args:
-          keyid: Optional GPG key ID to use for signing. If not specified,
-                 the default GPG key will be used.
-        """
-        import gpg
-
-        with gpg.Context(armor=True) as c:
-            if keyid is not None:
-                key = c.get_key(keyid)
-                with gpg.Context(armor=True, signers=[key]) as ctx:
-                    self.signature, _unused_result = ctx.sign(
-                        self.as_raw_string(),
-                        mode=gpg.constants.sig.mode.DETACH,
-                    )
-            else:
-                self.signature, _unused_result = c.sign(
-                    self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
-                )
-
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
 
@@ -1313,39 +1291,6 @@ class Tag(ShaFile):
             raise ObjectFormatException("Unknown signature format")
 
         return payload, self._signature, sig_type
-
-    def verify(self, keyids: Iterable[str] | None = None) -> None:
-        """Verify GPG signature for this tag (if it is signed).
-
-        Args:
-          keyids: Optional iterable of trusted keyids for this tag.
-            If this tag is not signed by any key in keyids verification will
-            fail. If not specified, this function only verifies that the tag
-            has a valid signature.
-
-        Raises:
-          gpg.errors.BadSignatures: if GPG signature verification fails
-          gpg.errors.MissingSignatures: if tag was not signed by a key
-            specified in keyids
-        """
-        if self._signature is None:
-            return
-
-        import gpg
-
-        with gpg.Context() as ctx:
-            data, result = ctx.verify(
-                self.raw_without_sig(),
-                signature=self._signature,
-            )
-            if keyids:
-                keys = [ctx.get_key(key) for key in keyids]
-                for key in keys:
-                    for subkey in key.subkeys:
-                        for sig in result.signatures:
-                            if subkey.can_sign and subkey.fpr == sig.fpr:
-                                return
-                raise gpg.errors.MissingSignatures(result, keys, results=(data, result))
 
 
 class TreeEntry(NamedTuple):
@@ -2170,28 +2115,6 @@ class Commit(ShaFile):
 
         # TODO: optionally check for duplicate parents
 
-    def sign(self, keyid: str | None = None) -> None:
-        """Sign this commit with a GPG key.
-
-        Args:
-          keyid: Optional GPG key ID to use for signing. If not specified,
-                 the default GPG key will be used.
-        """
-        import gpg
-
-        with gpg.Context(armor=True) as c:
-            if keyid is not None:
-                key = c.get_key(keyid)
-                with gpg.Context(armor=True, signers=[key]) as ctx:
-                    self.gpgsig, _unused_result = ctx.sign(
-                        self.as_raw_string(),
-                        mode=gpg.constants.sig.mode.DETACH,
-                    )
-            else:
-                self.gpgsig, _unused_result = c.sign(
-                    self.as_raw_string(), mode=gpg.constants.sig.mode.DETACH
-                )
-
     def raw_without_sig(self) -> bytes:
         """Return raw string serialization without the GPG/SSH signature.
 
@@ -2230,39 +2153,6 @@ class Commit(ShaFile):
             raise ObjectFormatException("Unknown signature format")
 
         return payload, self._gpgsig, sig_type
-
-    def verify(self, keyids: Iterable[str] | None = None) -> None:
-        """Verify GPG signature for this commit (if it is signed).
-
-        Args:
-          keyids: Optional iterable of trusted keyids for this commit.
-            If this commit is not signed by any key in keyids verification will
-            fail. If not specified, this function only verifies that the commit
-            has a valid signature.
-
-        Raises:
-          gpg.errors.BadSignatures: if GPG signature verification fails
-          gpg.errors.MissingSignatures: if commit was not signed by a key
-            specified in keyids
-        """
-        if self._gpgsig is None:
-            return
-
-        import gpg
-
-        with gpg.Context() as ctx:
-            data, result = ctx.verify(
-                self.raw_without_sig(),
-                signature=self._gpgsig,
-            )
-            if keyids:
-                keys = [ctx.get_key(key) for key in keyids]
-                for key in keys:
-                    for subkey in key.subkeys:
-                        for sig in result.signatures:
-                            if subkey.can_sign and subkey.fpr == sig.fpr:
-                                return
-                raise gpg.errors.MissingSignatures(result, keys, results=(data, result))
 
     def _serialize(self) -> list[bytes]:
         headers = []

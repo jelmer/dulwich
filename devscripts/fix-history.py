@@ -2,17 +2,18 @@
 
 """Fix dulwich history by removing .git directories and updating old timestamps.
 
-Usage: ./fix-history.py <source-branch> <target-branch>
-Example: ./fix-history.py master main
+Usage: ./fix-history.py <source-branch> <target-branch> [--update-tags]
+Example: ./fix-history.py master main --update-tags
 """
 
+import argparse
 import sys
 import time
 
-from dulwich.objects import Commit, Tree
+from dulwich.objects import Commit, Tag, Tree
 from dulwich.repo import Repo
 
-BANNED_NAMES = [".git"]
+BANNED_NAMES = [b".git"]
 
 
 def fix_tree(repo, tree_id, seen_trees=None):
@@ -184,21 +185,124 @@ def rewrite_history(repo, source_branch, target_branch):
     print(
         f"✓ Created branch '{target_branch}' with {len([k for k, v in commit_map.items() if k != v])} modified commits"
     )
-    return True
+    return commit_map
+
+
+def update_tags(repo, commit_map):
+    """Update tags to point to rewritten commits."""
+    print("")
+    print("=== Updating tags ===")
+
+    updated_tags = []
+    skipped_tags = []
+
+    # Iterate through all refs looking for tags
+    for ref_name, ref_value in list(repo.refs.as_dict().items()):
+        if not ref_name.startswith(b"refs/tags/"):
+            continue
+
+        tag_name = ref_name[len(b"refs/tags/") :].decode()
+
+        # Try to get the tag object
+        try:
+            tag_obj = repo[ref_value]
+        except KeyError:
+            print(f"Warning: Could not find object for tag '{tag_name}'")
+            continue
+
+        # Handle annotated tags (Tag objects)
+        if isinstance(tag_obj, Tag):
+            # Get the commit that the tag points to
+            target_sha = tag_obj.object[1]
+
+            if target_sha in commit_map:
+                new_target_sha = commit_map[target_sha]
+
+                if new_target_sha != target_sha:
+                    # Create a new tag object pointing to the rewritten commit
+                    new_tag = Tag()
+                    new_tag.name = tag_obj.name
+                    new_tag.object = (tag_obj.object[0], new_target_sha)
+                    new_tag.tag_time = tag_obj.tag_time
+                    new_tag.tag_timezone = tag_obj.tag_timezone
+                    new_tag.tagger = tag_obj.tagger
+                    new_tag.message = tag_obj.message
+
+                    # Add the new tag object to the object store
+                    repo.object_store.add_object(new_tag)
+
+                    # Update the ref to point to the new tag object
+                    repo.refs[ref_name] = new_tag.id
+
+                    print(
+                        f"Updated annotated tag '{tag_name}': {target_sha.decode()[:8]} -> {new_target_sha.decode()[:8]}"
+                    )
+                    updated_tags.append(tag_name)
+                else:
+                    skipped_tags.append(tag_name)
+            else:
+                print(
+                    f"Warning: Tag '{tag_name}' points to commit not in history, skipping"
+                )
+                skipped_tags.append(tag_name)
+
+        # Handle lightweight tags (direct references to commits)
+        elif isinstance(tag_obj, Commit):
+            commit_sha = ref_value
+
+            if commit_sha in commit_map:
+                new_commit_sha = commit_map[commit_sha]
+
+                if new_commit_sha != commit_sha:
+                    # Update the ref to point to the new commit
+                    repo.refs[ref_name] = new_commit_sha
+
+                    print(
+                        f"Updated lightweight tag '{tag_name}': {commit_sha.decode()[:8]} -> {new_commit_sha.decode()[:8]}"
+                    )
+                    updated_tags.append(tag_name)
+                else:
+                    skipped_tags.append(tag_name)
+            else:
+                print(
+                    f"Warning: Tag '{tag_name}' points to commit not in history, skipping"
+                )
+                skipped_tags.append(tag_name)
+        else:
+            print(
+                f"Warning: Tag '{tag_name}' points to non-commit/non-tag object, skipping"
+            )
+            skipped_tags.append(tag_name)
+
+    print(f"✓ Updated {len(updated_tags)} tags")
+    if skipped_tags:
+        print(
+            f"  Skipped {len(skipped_tags)} tags (unchanged or not in rewritten history)"
+        )
+
+    return updated_tags
 
 
 def main():
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <source-branch> <target-branch>")
-        print(f"Example: {sys.argv[0]} master main")
-        print("")
-        print(
-            "This will create a new branch <target-branch> with the rewritten history from <source-branch>"
-        )
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Fix dulwich history by removing .git directories and updating old timestamps.",
+        epilog="This will create a new branch <target-branch> with the rewritten history from <source-branch>",
+    )
+    parser.add_argument("source_branch", help="Source branch to rewrite from")
+    parser.add_argument(
+        "target_branch", help="Target branch to create with rewritten history"
+    )
+    parser.add_argument(
+        "--update-tags",
+        action="store_true",
+        help="Update existing tags to point to rewritten commits",
+    )
 
-    source_branch = sys.argv[1]
-    target_branch = sys.argv[2]
+    args = parser.parse_args()
+
+    source_branch = args.source_branch
+    target_branch = args.target_branch
+    update_tags_flag = args.update_tags
 
     print("=== Dulwich History Fix Script ===")
     print("This script will:")
@@ -207,9 +311,13 @@ def main():
     print(
         f"3. Create new branch '{target_branch}' from '{source_branch}' with fixed history"
     )
+    if update_tags_flag:
+        print("4. Update existing tags to point to rewritten commits")
     print("")
     print(f"Source branch: {source_branch}")
     print(f"Target branch: {target_branch}")
+    if update_tags_flag:
+        print("Update tags: Yes")
     print("")
 
     # Open the repository
@@ -260,8 +368,13 @@ def main():
 
     # Rewrite history
     print("")
-    if not rewrite_history(repo, source_branch, target_branch):
+    commit_map = rewrite_history(repo, source_branch, target_branch)
+    if not commit_map:
         sys.exit(1)
+
+    # Update tags if requested
+    if update_tags_flag:
+        update_tags(repo, commit_map)
 
     print("")
     print("=== Complete ===")
@@ -273,18 +386,32 @@ def main():
     print("- Removed .git directories from tree objects")
     print("- Fixed commit timestamps that were before 1990")
     print(f"- Created clean history in branch '{target_branch}'")
+    if update_tags_flag:
+        print("- Updated tags to point to rewritten commits")
     print("")
     print("IMPORTANT NEXT STEPS:")
     print(f"1. Review the changes: git log --oneline {target_branch}")
     print(
         f"2. Compare commit count: git rev-list --count {source_branch} vs git rev-list --count {target_branch}"
     )
-    print("3. If satisfied, you can:")
+    if update_tags_flag:
+        print("3. Review updated tags: git tag -l")
+    print(
+        "3. If satisfied, you can:"
+        if not update_tags_flag
+        else "4. If satisfied, you can:"
+    )
     print(f"   - Push the new branch: git push origin {target_branch}")
+    if update_tags_flag:
+        print("   - Force push updated tags: git push origin --tags --force")
     print("   - Set it as default branch on GitHub/GitLab")
     print(f"   - Update local checkout: git checkout {target_branch}")
     print("")
     print(f"The original branch '{source_branch}' remains unchanged.")
+    if update_tags_flag:
+        print(
+            "WARNING: Tags have been updated. You may need to force push them to remote."
+        )
 
 
 if __name__ == "__main__":

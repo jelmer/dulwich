@@ -638,7 +638,7 @@ class RepositoryRootTests(TestCase):
         self.addCleanup(shutil.rmtree, tmp_dir)
 
         o = Repo.init(os.path.join(tmp_dir, "s"), mkdir=True)
-        o.close()
+        self.addCleanup(o.close)
         os.symlink("foo", os.path.join(tmp_dir, "s", "bar"))
         o.get_worktree().stage("bar")
         o.get_worktree().commit(
@@ -646,10 +646,9 @@ class RepositoryRootTests(TestCase):
         )
 
         t = o.clone(os.path.join(tmp_dir, "t"), symlinks=False)
+        self.addCleanup(t.close)
         with open(os.path.join(tmp_dir, "t", "bar")) as f:
             self.assertEqual("foo", f.read())
-
-        t.close()
 
     def test_reset_index_protect_hfs(self) -> None:
         tmp_dir = self.mkdtemp()

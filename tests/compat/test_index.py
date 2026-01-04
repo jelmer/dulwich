@@ -1063,6 +1063,7 @@ class SparseIndexCompatTestCase(CompatTestCase):
 
         # Create a tree structure using Dulwich
         repo = Repo(repo_path)
+        self.addCleanup(repo.close)
 
         # Create blobs
         blob1 = Blob()
@@ -1171,6 +1172,7 @@ class SparseIndexCompatTestCase(CompatTestCase):
         if idx.is_sparse():
             # Expand the index
             repo = Repo(repo_path)
+            self.addCleanup(repo.close)
             idx.ensure_full_index(repo.object_store)
 
             # Should no longer be sparse

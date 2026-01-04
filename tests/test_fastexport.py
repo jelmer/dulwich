@@ -89,6 +89,7 @@ class GitImportProcessorTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
         self.repo = MemoryRepo()
+        self.addCleanup(self.repo.close)
         try:
             from dulwich.fastexport import GitImportProcessor
         except ImportError as exc:

@@ -62,6 +62,7 @@ class CompatBundleTestCase(CompatTestCase):
 
         # Use create_bundle_from_repo helper
         bundle = create_bundle_from_repo(self.repo)
+        self.addCleanup(bundle.close)
 
         with open(bundle_path, "wb") as f:
             write_bundle(f, bundle)
@@ -94,6 +95,7 @@ class CompatBundleTestCase(CompatTestCase):
         # Read bundle using dulwich
         with open(bundle_path, "rb") as f:
             bundle = read_bundle(f)
+        self.addCleanup(bundle.close)
 
         # Verify bundle contents
         self.assertEqual(2, bundle.version)
@@ -138,6 +140,7 @@ class CompatBundleTestCase(CompatTestCase):
         # Read bundle using dulwich
         with open(bundle_path, "rb") as f:
             bundle = read_bundle(f)
+        self.addCleanup(bundle.close)
 
         # Verify bundle contains all refs
         self.assertIn(b"refs/heads/master", bundle.references)
@@ -185,6 +188,7 @@ class CompatBundleTestCase(CompatTestCase):
         # Read bundle using dulwich
         with open(bundle_path, "rb") as f:
             bundle = read_bundle(f)
+        self.addCleanup(bundle.close)
 
         # Verify bundle has prerequisites
         self.assertGreater(len(bundle.prerequisites), 0)
@@ -234,6 +238,7 @@ class CompatBundleTestCase(CompatTestCase):
         # Read bundle using dulwich
         with open(bundle_path, "rb") as f:
             bundle = read_bundle(f)
+        self.addCleanup(bundle.close)
 
         # Verify bundle contents
         self.assertEqual(2, bundle.version)
@@ -266,6 +271,7 @@ class CompatBundleTestCase(CompatTestCase):
         # Read bundle using dulwich
         with open(bundle_path, "rb") as f:
             bundle = read_bundle(f)
+        self.addCleanup(bundle.close)
 
         # Verify bundle was read correctly
         self.assertEqual(2, bundle.version)
@@ -319,6 +325,7 @@ class CompatBundleTestCase(CompatTestCase):
         # Read the bundle and store objects using dulwich
         with open(bundle_path, "rb") as f:
             bundle = read_bundle(f)
+        self.addCleanup(bundle.close)
 
         # Use the bundle's store_objects method to unbundle
         bundle.store_objects(unbundle_repo.object_store)

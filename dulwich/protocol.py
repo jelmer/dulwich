@@ -401,6 +401,24 @@ class Protocol:
         """Close the underlying transport if a close function was provided."""
         if self._close:
             self._close()
+            self._close = None  # Prevent double-close
+
+    def __del__(self) -> None:
+        """Ensure transport is closed when Protocol is garbage collected."""
+        if self._close is not None:
+            import warnings
+
+            warnings.warn(
+                f"unclosed Protocol {self!r}",
+                ResourceWarning,
+                stacklevel=2,
+                source=self,
+            )
+            try:
+                self.close()
+            except Exception:
+                # Ignore errors during cleanup
+                pass
 
     def __enter__(self) -> "Protocol":
         """Enter context manager."""

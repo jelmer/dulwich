@@ -49,6 +49,7 @@ class RebaserTestCase(TestCase):
         """Set up test repository."""
         super().setUp()
         self.repo = MemoryRepo()
+        self.addCleanup(self.repo.close)
 
     def _setup_initial_commit(self):
         """Set up initial commit for tests."""
@@ -478,6 +479,7 @@ class InteractiveRebaseTestCase(TestCase):
         """Set up test repository."""
         super().setUp()
         self.repo = MemoryRepo()
+        self.addCleanup(self.repo.close)
         self._setup_initial_commit()
 
     def _setup_initial_commit(self):

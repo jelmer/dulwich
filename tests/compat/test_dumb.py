@@ -97,6 +97,7 @@ class DumbHTTPGitServer:
     def stop(self):
         """Stop the HTTP server."""
         self.server.shutdown()
+        self.server.server_close()
         if self.thread:
             self.thread.join()
 
@@ -174,6 +175,7 @@ class DumbHTTPClientNoPackTests(CompatTestCase):
         dest_path = os.path.join(self.temp_dir, "cloned")
         # Use a dummy errstream to suppress progress output
         repo = clone(self.server.url, dest_path, errstream=io.BytesIO())
+        self.addCleanup(repo.close)
         assert b"HEAD" in repo
 
     def test_clone_from_dumb_http(self):

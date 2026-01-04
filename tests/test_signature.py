@@ -438,6 +438,11 @@ class GetSignatureVendorTests(unittest.TestCase):
 class SSHSigSignatureVendorTests(unittest.TestCase):
     """Tests for SSHSigSignatureVendor (sshsig package implementation)."""
 
+    def setUp(self) -> None:
+        """Check if sshsig package is available."""
+        if not SSHSigSignatureVendor.available():
+            self.skipTest("sshsig package not available")
+
     def test_verify_without_config_raises(self) -> None:
         """Test that verify without config or keyids raises UntrustedSignature."""
         from dulwich.signature import UntrustedSignature

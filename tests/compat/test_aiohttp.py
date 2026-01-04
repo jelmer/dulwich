@@ -88,12 +88,14 @@ class AiohttpServerTests(ServerTests):
         # Cleanup function
         def cleanup():
             async def stop():
+                await site.stop()
                 await runner.cleanup()
 
             future = asyncio.run_coroutine_threadsafe(stop(), loop)
             future.result(timeout=5)
             loop.call_soon_threadsafe(loop.stop)
-            thread.join(timeout=1.0)
+            thread.join()
+            loop.close()
 
         self.addCleanup(cleanup)
         self._server = runner

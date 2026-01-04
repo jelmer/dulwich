@@ -43,6 +43,7 @@ class BundleTests(TestCase):
     def test_bundle_repr(self) -> None:
         """Test the Bundle.__repr__ method."""
         bundle = Bundle()
+        self.addCleanup(bundle.close)
         bundle.version = 3
         bundle.capabilities = {"foo": "bar"}
         bundle.prerequisites = [(b"cc" * 20, "comment")]
@@ -53,6 +54,7 @@ class BundleTests(TestCase):
         write_pack_objects(b.write, [], object_format=DEFAULT_OBJECT_FORMAT)
         b.seek(0)
         bundle.pack_data = PackData.from_file(b, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(bundle.pack_data.close)
 
         # Check the repr output
         rep = repr(bundle)
@@ -65,6 +67,7 @@ class BundleTests(TestCase):
         """Test the Bundle.__eq__ method."""
         # Create two identical bundles
         bundle1 = Bundle()
+        self.addCleanup(bundle1.close)
         bundle1.version = 3
         bundle1.capabilities = {"foo": "bar"}
         bundle1.prerequisites = [(b"cc" * 20, "comment")]
@@ -76,6 +79,7 @@ class BundleTests(TestCase):
         bundle1.pack_data = PackData.from_file(b1, object_format=DEFAULT_OBJECT_FORMAT)
 
         bundle2 = Bundle()
+        self.addCleanup(bundle2.close)
         bundle2.version = 3
         bundle2.capabilities = {"foo": "bar"}
         bundle2.prerequisites = [(b"cc" * 20, "comment")]
@@ -91,6 +95,7 @@ class BundleTests(TestCase):
 
         # Test inequality by changing different attributes
         bundle3 = Bundle()
+        self.addCleanup(bundle3.close)
         bundle3.version = 2  # Different version
         bundle3.capabilities = {"foo": "bar"}
         bundle3.prerequisites = [(b"cc" * 20, "comment")]
@@ -102,6 +107,7 @@ class BundleTests(TestCase):
         self.assertNotEqual(bundle1, bundle3)
 
         bundle4 = Bundle()
+        self.addCleanup(bundle4.close)
         bundle4.version = 3
         bundle4.capabilities = {"different": "value"}  # Different capabilities
         bundle4.prerequisites = [(b"cc" * 20, "comment")]
@@ -113,6 +119,7 @@ class BundleTests(TestCase):
         self.assertNotEqual(bundle1, bundle4)
 
         bundle5 = Bundle()
+        self.addCleanup(bundle5.close)
         bundle5.version = 3
         bundle5.capabilities = {"foo": "bar"}
         bundle5.prerequisites = [(b"dd" * 20, "different")]  # Different prerequisites
@@ -124,6 +131,7 @@ class BundleTests(TestCase):
         self.assertNotEqual(bundle1, bundle5)
 
         bundle6 = Bundle()
+        self.addCleanup(bundle6.close)
         bundle6.version = 3
         bundle6.capabilities = {"foo": "bar"}
         bundle6.prerequisites = [(b"cc" * 20, "comment")]
@@ -153,6 +161,7 @@ class BundleTests(TestCase):
         f.seek(0)
 
         bundle = read_bundle(f)
+        self.addCleanup(bundle.close)
         self.assertEqual(2, bundle.version)
         self.assertEqual({}, bundle.capabilities)
         self.assertEqual([(b"cc" * 20, b"prerequisite comment")], bundle.prerequisites)
@@ -174,6 +183,7 @@ class BundleTests(TestCase):
         f.seek(0)
 
         bundle = read_bundle(f)
+        self.addCleanup(bundle.close)
         self.assertEqual(3, bundle.version)
         self.assertEqual(
             {"capability1": None, "capability2": "value2"}, bundle.capabilities
@@ -193,6 +203,7 @@ class BundleTests(TestCase):
     def test_write_bundle_v2(self) -> None:
         """Test writing a v2 bundle."""
         bundle = Bundle()
+        self.addCleanup(bundle.close)
         bundle.version = 2
         bundle.capabilities = {}
         bundle.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
@@ -219,6 +230,7 @@ class BundleTests(TestCase):
     def test_write_bundle_v3(self) -> None:
         """Test writing a v3 bundle with capabilities."""
         bundle = Bundle()
+        self.addCleanup(bundle.close)
         bundle.version = 3
         bundle.capabilities = {"capability1": None, "capability2": "value2"}
         bundle.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
@@ -248,6 +260,7 @@ class BundleTests(TestCase):
         """Test writing a bundle with auto-detected version."""
         # Create a bundle with no explicit version but capabilities
         bundle1 = Bundle()
+        self.addCleanup(bundle1.close)
         bundle1.version = None
         bundle1.capabilities = {"capability1": "value1"}
         bundle1.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
@@ -266,6 +279,7 @@ class BundleTests(TestCase):
 
         # Create a bundle with no explicit version and no capabilities
         bundle2 = Bundle()
+        self.addCleanup(bundle2.close)
         bundle2.version = None
         bundle2.capabilities = {}
         bundle2.prerequisites = [(b"cc" * 20, b"prerequisite comment")]
@@ -285,6 +299,7 @@ class BundleTests(TestCase):
     def test_write_bundle_invalid_version(self) -> None:
         """Test writing a bundle with an invalid version."""
         bundle = Bundle()
+        self.addCleanup(bundle.close)
         bundle.version = 4  # Invalid version
         bundle.capabilities = {}
         bundle.prerequisites = []
@@ -301,6 +316,7 @@ class BundleTests(TestCase):
 
     def test_roundtrip_bundle(self) -> None:
         origbundle = Bundle()
+        self.addCleanup(origbundle.close)
         origbundle.version = 3
         origbundle.capabilities = {"foo": None}
         origbundle.references = {b"refs/heads/master": b"ab" * 20}
@@ -317,6 +333,7 @@ class BundleTests(TestCase):
 
             with open(os.path.join(td, "foo"), "rb") as f:
                 newbundle = read_bundle(f)
+                self.addCleanup(newbundle.close)
 
                 self.assertEqual(origbundle, newbundle)
 
@@ -324,6 +341,7 @@ class BundleTests(TestCase):
         """Test creating a bundle from a repository."""
         # Create a simple repository
         repo = MemoryRepo()
+        self.addCleanup(repo.close)
 
         # Create a blob
         blob = Blob.from_string(b"Hello world")
@@ -348,6 +366,7 @@ class BundleTests(TestCase):
 
         # Create bundle from repository
         bundle = create_bundle_from_repo(repo)
+        self.addCleanup(bundle.close)
 
         # Verify bundle contents
         self.assertEqual(bundle.references, {b"refs/heads/master": commit.id})
@@ -387,6 +406,7 @@ class BundleTests(TestCase):
         # Create bundle with prerequisites
         prereq_id = b"aa" * 20  # hex string like other object ids
         bundle = create_bundle_from_repo(repo, prerequisites=[prereq_id])
+        self.addCleanup(bundle.close)
 
         # Verify prerequisites are included
         self.assertEqual(len(bundle.prerequisites), 1)
@@ -419,6 +439,7 @@ class BundleTests(TestCase):
         from dulwich.refs import Ref
 
         bundle = create_bundle_from_repo(repo, refs=[Ref(b"refs/heads/master")])
+        self.addCleanup(bundle.close)
 
         # Verify only master ref is included
         self.assertEqual(len(bundle.references), 1)
@@ -450,6 +471,7 @@ class BundleTests(TestCase):
         # Create bundle with capabilities
         capabilities = {"object-format": "sha1"}
         bundle = create_bundle_from_repo(repo, capabilities=capabilities, version=3)
+        self.addCleanup(bundle.close)
 
         # Verify capabilities are included
         self.assertEqual(bundle.capabilities, capabilities)
@@ -482,6 +504,7 @@ class BundleTests(TestCase):
 
         # Use blob.id directly (40-byte hex bytestring)
         bundle = create_bundle_from_repo(repo, prerequisites=[prereq_blob.id])
+        self.addCleanup(bundle.close)
 
         # Verify the prerequisite was added correctly
         self.assertEqual(len(bundle.prerequisites), 1)
@@ -513,6 +536,7 @@ class BundleTests(TestCase):
         prereq_hex = b"aa" * 20
 
         bundle = create_bundle_from_repo(repo, prerequisites=[prereq_hex])
+        self.addCleanup(bundle.close)
 
         # Verify the prerequisite was added correctly
         self.assertEqual(len(bundle.prerequisites), 1)

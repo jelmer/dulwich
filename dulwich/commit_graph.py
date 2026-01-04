@@ -324,7 +324,7 @@ class CommitGraph:
         edge_data = self.chunks[CHUNK_EXTRA_EDGE_LIST].data
         parents = []
 
-        while offset < len(edge_data):
+        while offset + 4 <= len(edge_data):
             parent_pos = struct.unpack(">L", edge_data[offset : offset + 4])[0]
             offset += 4
 

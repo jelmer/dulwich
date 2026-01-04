@@ -30,6 +30,7 @@ from aiohttp import web
 
 from .. import log_utils
 from ..errors import HangupException
+from ..objects import ObjectID
 from ..protocol import ReceivableProtocol
 from ..repo import Repo
 from ..server import (
@@ -42,6 +43,11 @@ from ..server import (
 from ..web import NO_CACHE_HEADERS, cache_forever_headers
 
 logger = log_utils.getLogger(__name__)
+
+# Application keys for type-safe access to app state
+REPO_KEY = web.AppKey("repo", Repo)
+HANDLERS_KEY = web.AppKey("handlers", dict)
+DUMB_KEY = web.AppKey("dumb", bool)
 
 
 async def send_file(
@@ -80,9 +86,11 @@ async def get_loose_object(request: web.Request) -> web.Response:
       request: aiohttp request object
     Returns: Response with the loose object data
     """
-    sha = (request.match_info["dir"] + request.match_info["file"]).encode("ascii")
+    sha = ObjectID(
+        (request.match_info["dir"] + request.match_info["file"]).encode("ascii")
+    )
     logger.info("Sending loose object %s", sha)
-    object_store = request.app["repo"].object_store
+    object_store = request.app[REPO_KEY].object_store
     if not object_store.contains_loose(sha):
         raise web.HTTPNotFound(text="Object not found")
     try:
@@ -105,7 +113,7 @@ async def get_text_file(request: web.Request) -> web.StreamResponse:
     headers.update(NO_CACHE_HEADERS)
     path = request.match_info["file"]
     logger.info("Sending plain text file %s", path)
-    repo = request.app["repo"]
+    repo = request.app[REPO_KEY]
     return await send_file(request, repo.get_named_file(path), headers)
 
 
@@ -169,8 +177,8 @@ async def get_info_refs(request: web.Request) -> web.StreamResponse | web.Respon
       request: aiohttp request object
     Returns: Response with refs information
     """
-    repo = request.app["repo"]
-    return await refs_request(repo, request, request.app["handlers"])
+    repo = request.app[REPO_KEY]
+    return await refs_request(repo, request, request.app[HANDLERS_KEY])
 
 
 async def get_info_packs(request: web.Request) -> web.Response:
@@ -184,7 +192,8 @@ async def get_info_packs(request: web.Request) -> web.Response:
     headers.update(NO_CACHE_HEADERS)
     logger.info("Emulating dumb info/packs")
     return web.Response(
-        body=b"".join(generate_objects_info_packs(request.app["repo"])), headers=headers
+        body=b"".join(generate_objects_info_packs(request.app[REPO_KEY])),
+        headers=headers,
     )
 
 
@@ -202,7 +211,7 @@ async def get_pack_file(request: web.Request) -> web.StreamResponse:
     logger.info("Sending pack file %s", path)
     return await send_file(
         request,
-        request.app["repo"].get_named_file(path),
+        request.app[REPO_KEY].get_named_file(path),
         headers=headers,
     )
 
@@ -281,9 +290,9 @@ async def handle_service_request(request: web.Request) -> web.StreamResponse:
       request: aiohttp request object
     Returns: Response with service result
     """
-    repo = request.app["repo"]
+    repo = request.app[REPO_KEY]
 
-    return await service_request(repo, request, request.app["handlers"])
+    return await service_request(repo, request, request.app[HANDLERS_KEY])
 
 
 def create_repo_app(
@@ -298,11 +307,11 @@ def create_repo_app(
     Returns: Configured aiohttp Application
     """
     app = web.Application()
-    app["repo"] = repo
+    app[REPO_KEY] = repo
     if handlers is None:
         handlers = dict(DEFAULT_HANDLERS)
-    app["handlers"] = handlers
-    app["dumb"] = dumb
+    app[HANDLERS_KEY] = handlers
+    app[DUMB_KEY] = dumb
     app.router.add_get("/info/refs", get_info_refs)
     app.router.add_post(
         "/{service:git-upload-pack|git-receive-pack}", handle_service_request

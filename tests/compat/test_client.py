@@ -66,9 +66,8 @@ class DulwichClientTestBase:
         self.dest = os.path.join(self.gitroot, "dest")
         file.ensure_dir_exists(self.dest)
         run_git_or_fail(["init", "--quiet", "--bare"], cwd=self.dest)
-
-    def tearDown(self) -> None:
-        rmtree_ro(self.gitroot)
+        # Register cleanup to run after test's cleanup handlers
+        self.addCleanup(rmtree_ro, self.gitroot)
 
     def assertDestEqualsSrc(self) -> None:
         repo_dir = os.path.join(self.gitroot, "server_new.export")
@@ -211,6 +210,7 @@ class DulwichClientTestBase:
     def disable_ff_and_make_dummy_commit(self):
         # disable non-fast-forward pushes to the server
         dest = repo.Repo(os.path.join(self.gitroot, "dest"))
+        self.addCleanup(dest.close)
         run_git_or_fail(
             ["config", "receive.denyNonFastForwards", "true"], cwd=dest.path
         )
@@ -293,6 +293,7 @@ class DulwichClientTestBase:
     def test_fetch_pack_with_nondefault_symref(self) -> None:
         c = self._client()
         src = repo.Repo(os.path.join(self.gitroot, "server_new.export"))
+        self.addCleanup(src.close)
         src.refs.add_if_new(b"refs/heads/main", src.refs[b"refs/heads/master"])
         src.refs.set_symbolic_ref(b"HEAD", b"refs/heads/main")
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
@@ -405,35 +406,37 @@ class DulwichClientTestBase:
 
     def test_repeat(self) -> None:
         c = self._client()
-        with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
-            result = c.fetch(self._build_path("/server_new.export"), dest)
-            for r in result.refs.items():
-                dest.refs.set_if_equals(r[0], None, r[1])
-            self.assertDestEqualsSrc()
-            result = c.fetch(self._build_path("/server_new.export"), dest)
-            for r in result.refs.items():
-                dest.refs.set_if_equals(r[0], None, r[1])
-            self.assertDestEqualsSrc()
+        dest = repo.Repo(os.path.join(self.gitroot, "dest"))
+        self.addCleanup(dest.close)
+        result = c.fetch(self._build_path("/server_new.export"), dest)
+        for r in result.refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
+        self.assertDestEqualsSrc()
+        result = c.fetch(self._build_path("/server_new.export"), dest)
+        for r in result.refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
+        self.assertDestEqualsSrc()
 
     def test_fetch_empty_pack(self) -> None:
         c = self._client()
-        with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
-            result = c.fetch(self._build_path("/server_new.export"), dest)
-            for r in result.refs.items():
-                dest.refs.set_if_equals(r[0], None, r[1])
-            self.assertDestEqualsSrc()
+        dest = repo.Repo(os.path.join(self.gitroot, "dest"))
+        self.addCleanup(dest.close)
+        result = c.fetch(self._build_path("/server_new.export"), dest)
+        for r in result.refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
+        self.assertDestEqualsSrc()
 
-            def dw(refs, **kwargs):
-                return list(refs.values())
+        def dw(refs, **kwargs):
+            return list(refs.values())
 
-            result = c.fetch(
-                self._build_path("/server_new.export"),
-                dest,
-                determine_wants=dw,
-            )
-            for r in result.refs.items():
-                dest.refs.set_if_equals(r[0], None, r[1])
-            self.assertDestEqualsSrc()
+        result = c.fetch(
+            self._build_path("/server_new.export"),
+            dest,
+            determine_wants=dw,
+        )
+        for r in result.refs.items():
+            dest.refs.set_if_equals(r[0], None, r[1])
+        self.assertDestEqualsSrc()
 
     def test_incremental_fetch_pack(self) -> None:
         self.test_fetch_pack()
@@ -561,7 +564,6 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         self.process.wait()
         self.process.stdout.close()
         self.process.stderr.close()
-        DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
 
     def _client(self):
@@ -633,7 +635,6 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
         client.get_ssh_vendor = TestSSHVendor
 
     def tearDown(self) -> None:
-        DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
         client.get_ssh_vendor = self.real_vendor
 
@@ -655,7 +656,6 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
         DulwichClientTestBase.setUp(self)
 
     def tearDown(self) -> None:
-        DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
 
     def _client(self):
@@ -843,7 +843,6 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
         run_git_or_fail(["config", "http.receivepack", "true"], cwd=self.dest)
 
     def tearDown(self) -> None:
-        DulwichClientTestBase.tearDown(self)
         CompatTestCase.tearDown(self)
         self._httpd.shutdown()
         self._httpd.socket.close()

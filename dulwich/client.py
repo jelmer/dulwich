@@ -1020,6 +1020,14 @@ class GitClient:
             self._fetch_capabilities.add(CAPABILITY_INCLUDE_TAG)
         self.protocol_version = 0  # will be overridden later
 
+    def close(self) -> None:
+        """Close the client and release any resources.
+
+        Default implementation does nothing as most clients don't maintain
+        persistent connections. Subclasses that hold resources should override
+        this method to properly clean them up.
+        """
+
     def get_url(self, path: str) -> str:
         """Retrieves full url to given path.
 
@@ -2924,7 +2932,10 @@ class BundleClient(GitClient):
 
         pack_io = BytesIO(pack_bytes)
         pack_data = PackData.from_file(pack_io, object_format=DEFAULT_OBJECT_FORMAT)
-        target.object_store.add_pack_data(len(pack_data), pack_data.iter_unpacked())
+        try:
+            target.object_store.add_pack_data(len(pack_data), pack_data.iter_unpacked())
+        finally:
+            pack_data.close()
 
         # Apply ref filtering if specified
         if ref_prefix:
@@ -4595,7 +4606,6 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             if resp.status != 200:
                 raise GitProtocolError(f"unexpected http resp {resp.status} for {url}")
 
-        # With urllib3 >= 2.2, geturl() is always available
         resp.content_type = resp.headers.get("Content-Type")  # type: ignore[union-attr]
         resp_url = resp.geturl()
         resp.redirect_location = resp_url if resp_url != url else ""  # type: ignore[union-attr]

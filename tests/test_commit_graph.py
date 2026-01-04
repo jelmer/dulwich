@@ -17,10 +17,13 @@ import unittest
 
 from dulwich.commit_graph import (
     CHUNK_COMMIT_DATA,
+    CHUNK_EXTRA_EDGE_LIST,
     CHUNK_OID_FANOUT,
     CHUNK_OID_LOOKUP,
     COMMIT_GRAPH_SIGNATURE,
     COMMIT_GRAPH_VERSION,
+    GRAPH_EXTRA_EDGES_NEEDED,
+    GRAPH_PARENT_MISSING,
     HASH_VERSION_SHA1,
     CommitGraph,
     CommitGraphChunk,
@@ -299,6 +302,112 @@ class CommitGraphTests(unittest.TestCase):
         self.assertEqual(read_entry.parents, entry.parents)
         self.assertEqual(read_entry.generation, entry.generation)
         self.assertEqual(read_entry.commit_time, entry.commit_time)
+
+    def test_parse_extra_edges_incomplete_data(self) -> None:
+        """Test parsing extra edges with incomplete data at end of chunk.
+
+        This reproduces https://github.com/jelmer/dulwich/issues/2054
+        where parsing commits with 3+ parents fails when the EXTRA_EDGE_LIST
+        chunk has incomplete data (fewer than 4 bytes remaining).
+        """
+        # Create commit graph with 4 commits:
+        # commit0, commit1, commit2, commit3 (with 3 parents: 0, 1, 2)
+
+        # Header
+        header = (
+            COMMIT_GRAPH_SIGNATURE
+            + struct.pack(">B", COMMIT_GRAPH_VERSION)
+            + struct.pack(">B", HASH_VERSION_SHA1)
+            + struct.pack(">B", 4)  # 4 chunks
+            + struct.pack(">B", 0)  # 0 base graphs
+        )
+
+        # Create 4 commit OIDs
+        oids = [b"\x00" + bytes([i]) + b"\x00" * 18 for i in range(4)]
+
+        # OID Fanout chunk
+        # All 4 commits start with 0x00, so fanout is 4 for all indices
+        fanout = b""
+        for i in range(256):
+            fanout += struct.pack(">L", 4)
+
+        # OID Lookup chunk
+        oid_lookup = b"".join(oids)
+
+        # Commit Data chunk - commit3 has 3+ parents
+        commit_data = b""
+        for i in range(3):
+            # Regular commits with no parents
+            tree_oid = b"\xbb" + bytes([i]) + b"\x00" * 18
+            parent1_pos = GRAPH_PARENT_MISSING
+            parent2_pos = GRAPH_PARENT_MISSING
+            generation = 1
+            commit_time = 1234567890 + i
+            gen_and_time = (generation << 2) | (commit_time >> 32)
+            commit_data += (
+                tree_oid
+                + struct.pack(">LL", parent1_pos, parent2_pos)
+                + struct.pack(">LL", gen_and_time, commit_time & 0xFFFFFFFF)
+            )
+
+        # Commit3 with 3 parents (requires EXTRA_EDGE_LIST)
+        tree_oid = b"\xbb\x03" + b"\x00" * 18
+        parent1_pos = 0  # First parent is commit0
+        parent2_pos = (
+            GRAPH_EXTRA_EDGES_NEEDED | 0
+        )  # More parents in EXTRA_EDGE_LIST at offset 0
+        generation = 2
+        commit_time = 1234567893
+        gen_and_time = (generation << 2) | (commit_time >> 32)
+        commit_data += (
+            tree_oid
+            + struct.pack(">LL", parent1_pos, parent2_pos)
+            + struct.pack(">LL", gen_and_time, commit_time & 0xFFFFFFFF)
+        )
+
+        # EXTRA_EDGE_LIST chunk with INCOMPLETE data
+        # Should have: parent at index 1 (4 bytes), then parent at index 2 with LAST_EDGE flag (4 bytes)
+        # But we only include the first parent and 2 bytes of the second (triggers the bug)
+        extra_edges = struct.pack(">L", 1)  # Second parent (commit1)
+        extra_edges += b"\x80"  # Only 1 byte of what should be a 4-byte entry - this triggers the bug
+
+        # Calculate offsets
+        header_size = 8
+        toc_size = 5 * 12  # 5 entries (4 chunks + terminator)
+        chunk1_offset = header_size + toc_size
+        chunk2_offset = chunk1_offset + len(fanout)
+        chunk3_offset = chunk2_offset + len(oid_lookup)
+        chunk4_offset = chunk3_offset + len(commit_data)
+        terminator_offset = chunk4_offset + len(extra_edges)
+
+        # Table of contents
+        toc = (
+            CHUNK_OID_FANOUT
+            + struct.pack(">Q", chunk1_offset)
+            + CHUNK_OID_LOOKUP
+            + struct.pack(">Q", chunk2_offset)
+            + CHUNK_COMMIT_DATA
+            + struct.pack(">Q", chunk3_offset)
+            + CHUNK_EXTRA_EDGE_LIST
+            + struct.pack(">Q", chunk4_offset)
+            + b"\x00\x00\x00\x00"
+            + struct.pack(">Q", terminator_offset)
+        )
+
+        # Build complete file
+        data = header + toc + fanout + oid_lookup + commit_data + extra_edges
+
+        # Before the fix, this should raise struct.error: unpack requires a buffer of 4 bytes
+        # After the fix, it should handle the incomplete data gracefully
+        f = io.BytesIO(data)
+        graph = CommitGraph.from_file(f)
+
+        # Verify we parsed what we could
+        self.assertEqual(len(graph), 4)
+        # Commit3 should have parsed parents (commit0 and commit1)
+        # The incomplete third parent entry should be ignored
+        entry3 = graph.entries[3]
+        self.assertEqual(len(entry3.parents), 2)  # Should have commit0 and commit1
 
 
 class CommitGraphFileOperationsTests(unittest.TestCase):

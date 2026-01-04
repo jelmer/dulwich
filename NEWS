@@ -3,6 +3,10 @@
  * Fix AssertionError when accessing ref names with length matching binary
    hash length (e.g., 32 bytes for SHA-256). (Jelmer Vernooĳ, #2040)
 
+ * Fix commit graph parsing failure when processing commits with 3+ parents
+   (octopus merges) with incomplete EXTRA_EDGE_LIST chunk data.
+   (Jelmer Vernooĳ, #2054)
+
  * Add ``parse_commit_broken`` function to parse broken commits.
    (Valentin Lorentz, Jelmer Vernooĳ)
 

@@ -2,21 +2,72 @@
 
 """Fix dulwich history by removing .git directories and updating old timestamps.
 
-Usage: ./fix-history.py <source-branch> <target-branch> [--update-tags]
-Example: ./fix-history.py master main --update-tags
+Usage: ./fix-history.py <source-branch> <target-branch> [--update-tags] [--rewrite-tag-commits]
+Example: ./fix-history.py master main --update-tags --rewrite-tag-commits
 """
 
 import argparse
 import sys
 import time
+from dataclasses import dataclass
 
-from dulwich.objects import Commit, Tag, Tree
+from dulwich.objects import Commit, ObjectID, Tag, Tree
+from dulwich.refs import Ref
 from dulwich.repo import Repo
 
 BANNED_NAMES = [b".git"]
 
 
-def fix_tree(repo, tree_id, seen_trees=None):
+@dataclass
+class RewriteResult:
+    """Result of rewriting history."""
+
+    commit_map: dict[ObjectID, ObjectID]
+    tree_map: dict[ObjectID, ObjectID]
+    filtered_commits: set[ObjectID]
+
+
+def create_fixed_commit(
+    old_commit: Commit, new_tree_id: ObjectID, new_parents: list[ObjectID]
+) -> Commit:
+    """Create a new commit from an old one with fixes applied.
+
+    Args:
+        old_commit: The original commit
+        new_tree_id: The new tree SHA
+        new_parents: List of parent commit SHAs
+
+    Returns:
+        A new commit with fixes applied
+    """
+    new_commit = Commit()
+    new_commit.tree = new_tree_id
+    new_commit.author = old_commit.author
+    new_commit.committer = old_commit.committer
+    new_commit.author_time = old_commit.author_time
+    new_commit.commit_time = old_commit.commit_time
+    new_commit.author_timezone = old_commit.author_timezone
+    new_commit.commit_timezone = old_commit.commit_timezone
+    new_commit.message = old_commit.message
+    new_commit.encoding = old_commit.encoding
+    new_commit.parents = new_parents
+
+    # Fix dates
+    fix_commit_dates(new_commit)
+
+    # Fix email addresses
+    if b"jvernooij@evroc.com" in old_commit.author:
+        new_commit.author = "Jelmer Vernooĳ <jelmer@jelmer.uk>".encode()
+
+    if b"jvernooij@evroc.com" in old_commit.committer:
+        new_commit.committer = "Jelmer Vernooĳ <jelmer@jelmer.uk>".encode()
+
+    return new_commit
+
+
+def fix_tree(
+    repo: Repo, tree_id: ObjectID, seen_trees: set[ObjectID] | None = None
+) -> ObjectID:
     """Recursively fix a tree by removing .git entries."""
     if seen_trees is None:
         seen_trees = set()
@@ -67,7 +118,7 @@ def fix_tree(repo, tree_id, seen_trees=None):
     return new_tree.id
 
 
-def fix_commit_dates(commit):
+def fix_commit_dates(commit: Commit) -> None:
     """Fix commit dates if they're before 1990."""
     # Unix timestamp for 1990-01-01
     min_timestamp = 315532800
@@ -88,27 +139,112 @@ def fix_commit_dates(commit):
             commit.commit_time = new_time
 
 
-def rewrite_history(repo, source_branch, target_branch):
+def rewrite_commit(
+    repo: Repo,
+    commit_sha: ObjectID,
+    commit_map: dict[ObjectID, ObjectID],
+    tree_map: dict[ObjectID, ObjectID],
+    filtered_commits: set[ObjectID],
+) -> ObjectID | None:
+    """Rewrite a single commit and its ancestors.
+
+    This is used to rewrite commits that weren't part of the main branch
+    but are referenced by tags. Uses dulwich's walker for efficient traversal,
+    stopping at commits that have already been rewritten.
+    """
+    # If already mapped, return the mapped version
+    if commit_sha in commit_map:
+        return commit_map[commit_sha]
+
+    # Use walker to efficiently get commits in topological order
+    # Exclude commits that are already mapped to avoid reprocessing
+    exclude = list(commit_map.keys())
+
+    try:
+        # Get commits in reverse topological order (parents before children)
+        walker = repo.get_walker(
+            include=[commit_sha], exclude=exclude, order="topo", reverse=True
+        )
+        commits_to_process = []
+
+        for entry in walker:
+            commits_to_process.append(entry.commit)
+
+        print(
+            f"  Processing {len(commits_to_process)} unmapped commits for tag target {commit_sha.decode()[:8]}"
+        )
+
+    except Exception as e:
+        print(f"Warning: Could not walk commits from {commit_sha.decode()[:8]}: {e}")
+        return commit_sha
+
+    # Process commits in order (parents before children)
+    for old_commit in commits_to_process:
+        commit_sha_current = old_commit.id
+
+        # Skip if already mapped
+        if commit_sha_current in commit_map:
+            continue
+
+        # Handle filtered commits
+        if commit_sha_current in filtered_commits:
+            if old_commit.parents:
+                parent_sha = old_commit.parents[0]
+                if parent_sha in commit_map:
+                    commit_map[commit_sha_current] = commit_map[parent_sha]
+            continue
+
+        # Map parent commits
+        new_parents = []
+        for parent_sha in old_commit.parents:
+            if parent_sha in commit_map:
+                mapped = commit_map[parent_sha]
+                if mapped is not None:
+                    new_parents.append(mapped)
+            else:
+                # Parent should have been processed already due to topological order
+                # Use original as fallback
+                new_parents.append(parent_sha)
+
+        # Fix the tree
+        old_tree_id = old_commit.tree
+        if old_tree_id not in tree_map:
+            tree_map[old_tree_id] = fix_tree(repo, old_tree_id)
+        new_tree_id = tree_map[old_tree_id]
+
+        # Create new commit with fixes
+        new_commit = create_fixed_commit(old_commit, new_tree_id, new_parents)
+
+        # Add new commit to object store
+        repo.object_store.add_object(new_commit)
+        commit_map[commit_sha_current] = new_commit.id
+
+    return commit_map.get(commit_sha)
+
+
+def rewrite_history(
+    repo: Repo, source_branch: str, target_branch: str
+) -> RewriteResult | None:
     """Rewrite history to fix issues."""
     print(f"=== Rewriting history from {source_branch} to {target_branch} ===")
 
     # Commits to filter out completely
-    filtered_commits = {
-        b"336232af1246017ce037b87e913d23e2c2a3bbbd",
-        b"e673babfc11d0b4001d9d08b9b9cef57c6aa67f5",
+    filtered_commits: set[ObjectID] = {
+        ObjectID(b"336232af1246017ce037b87e913d23e2c2a3bbbd"),
+        ObjectID(b"e673babfc11d0b4001d9d08b9b9cef57c6aa67f5"),
     }
 
     # Get the head commit of the source branch
     try:
-        source_ref = f"refs/heads/{source_branch}".encode()
+        source_ref = Ref(f"refs/heads/{source_branch}".encode())
         head_sha = repo.refs[source_ref]
     except KeyError:
         print(f"Error: Branch '{source_branch}' not found")
-        return False
+        return None
 
     # Map old commit SHAs to new ones
-    commit_map = {}
-    tree_map = {}
+    commit_map: dict[ObjectID, ObjectID] = {}
+    tree_map: dict[ObjectID, ObjectID] = {}
 
     # Get all commits in topological order
     walker = repo.get_walker([head_sha], order="topo", reverse=True)
@@ -140,34 +276,14 @@ def rewrite_history(repo, source_branch, target_branch):
             tree_map[old_tree_id] = fix_tree(repo, old_tree_id)
         new_tree_id = tree_map[old_tree_id]
 
-        # Create new commit
-        new_commit = Commit()
-        new_commit.tree = new_tree_id
-        new_commit.author = old_commit.author
-        new_commit.committer = old_commit.committer
-        new_commit.author_time = old_commit.author_time
-        new_commit.commit_time = old_commit.commit_time
-        new_commit.author_timezone = old_commit.author_timezone
-        new_commit.commit_timezone = old_commit.commit_timezone
-        new_commit.message = old_commit.message
-        new_commit.encoding = old_commit.encoding
-        # note: Drop extra fields
-
-        # Fix dates
-        fix_commit_dates(new_commit)
-
-        if b"jvernooij@evroc.com" in old_commit.author:
-            new_commit.author = "Jelmer Vernooĳ <jelmer@jelmer.uk>".encode()
-
-        if b"jvernooij@evroc.com" in old_commit.committer:
-            new_commit.committer = "Jelmer Vernooĳ <jelmer@jelmer.uk>".encode()
-
         # Map parent commits
         new_parents = []
         for parent_sha in old_commit.parents:
             parent_sha = commit_map[parent_sha]
             new_parents.append(parent_sha)
-        new_commit.parents = new_parents
+
+        # Create new commit with fixes (note: Drop extra fields)
+        new_commit = create_fixed_commit(old_commit, new_tree_id, new_parents)
 
         if old_commit.parents != new_parents:
             assert old_commit.id != new_commit.id
@@ -179,22 +295,41 @@ def rewrite_history(repo, source_branch, target_branch):
 
     # Update the target branch
     new_head = commit_map[head_sha]
-    target_ref = f"refs/heads/{target_branch}".encode()
+    target_ref = Ref(f"refs/heads/{target_branch}".encode())
     repo.refs[target_ref] = new_head
 
     print(
         f"✓ Created branch '{target_branch}' with {len([k for k, v in commit_map.items() if k != v])} modified commits"
     )
-    return commit_map
+    return RewriteResult(
+        commit_map=commit_map, tree_map=tree_map, filtered_commits=filtered_commits
+    )
 
 
-def update_tags(repo, commit_map):
-    """Update tags to point to rewritten commits."""
+def update_tags(
+    repo: Repo, rewrite_result: RewriteResult, rewrite_non_branch_commits: bool = False
+) -> list[str]:
+    """Update tags to point to rewritten commits.
+
+    Args:
+        repo: The repository
+        rewrite_result: RewriteResult containing commit_map, tree_map, and filtered_commits
+        rewrite_non_branch_commits: If True, also rewrite commits that tags point to
+                                     even if they weren't part of the main branch rewrite
+
+    Returns:
+        List of tag names that were updated or rewritten
+    """
     print("")
     print("=== Updating tags ===")
 
+    commit_map = rewrite_result.commit_map
+    tree_map = rewrite_result.tree_map
+    filtered_commits = rewrite_result.filtered_commits
+
     updated_tags = []
     skipped_tags = []
+    rewritten_tags = []
 
     # Iterate through all refs looking for tags
     for ref_name, ref_value in list(repo.refs.as_dict().items()):
@@ -240,6 +375,37 @@ def update_tags(repo, commit_map):
                     updated_tags.append(tag_name)
                 else:
                     skipped_tags.append(tag_name)
+            elif rewrite_non_branch_commits:
+                # Rewrite this commit and its ancestors
+                print(
+                    f"Rewriting history for tag '{tag_name}' (commit {target_sha.decode()[:8]} not in branch)"
+                )
+                rewritten_sha = rewrite_commit(
+                    repo, target_sha, commit_map, tree_map, filtered_commits
+                )
+
+                if rewritten_sha and rewritten_sha != target_sha:
+                    # Create a new tag object pointing to the rewritten commit
+                    new_tag = Tag()
+                    new_tag.name = tag_obj.name
+                    new_tag.object = (tag_obj.object[0], rewritten_sha)
+                    new_tag.tag_time = tag_obj.tag_time
+                    new_tag.tag_timezone = tag_obj.tag_timezone
+                    new_tag.tagger = tag_obj.tagger
+                    new_tag.message = tag_obj.message
+
+                    # Add the new tag object to the object store
+                    repo.object_store.add_object(new_tag)
+
+                    # Update the ref to point to the new tag object
+                    repo.refs[ref_name] = new_tag.id
+
+                    print(
+                        f"Rewrote and updated annotated tag '{tag_name}': {target_sha.decode()[:8]} -> {rewritten_sha.decode()[:8]}"
+                    )
+                    rewritten_tags.append(tag_name)
+                else:
+                    skipped_tags.append(tag_name)
             else:
                 print(
                     f"Warning: Tag '{tag_name}' points to commit not in history, skipping"
@@ -263,6 +429,25 @@ def update_tags(repo, commit_map):
                     updated_tags.append(tag_name)
                 else:
                     skipped_tags.append(tag_name)
+            elif rewrite_non_branch_commits:
+                # Rewrite this commit and its ancestors
+                print(
+                    f"Rewriting history for tag '{tag_name}' (commit {commit_sha.decode()[:8]} not in branch)"
+                )
+                rewritten_sha = rewrite_commit(
+                    repo, commit_sha, commit_map, tree_map, filtered_commits
+                )
+
+                if rewritten_sha and rewritten_sha != commit_sha:
+                    # Update the ref to point to the new commit
+                    repo.refs[ref_name] = rewritten_sha
+
+                    print(
+                        f"Rewrote and updated lightweight tag '{tag_name}': {commit_sha.decode()[:8]} -> {rewritten_sha.decode()[:8]}"
+                    )
+                    rewritten_tags.append(tag_name)
+                else:
+                    skipped_tags.append(tag_name)
             else:
                 print(
                     f"Warning: Tag '{tag_name}' points to commit not in history, skipping"
@@ -275,15 +460,19 @@ def update_tags(repo, commit_map):
             skipped_tags.append(tag_name)
 
     print(f"✓ Updated {len(updated_tags)} tags")
+    if rewritten_tags:
+        print(
+            f"✓ Rewrote and updated {len(rewritten_tags)} tags (commits not in branch)"
+        )
     if skipped_tags:
         print(
             f"  Skipped {len(skipped_tags)} tags (unchanged or not in rewritten history)"
         )
 
-    return updated_tags
+    return updated_tags + rewritten_tags
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Fix dulwich history by removing .git directories and updating old timestamps.",
         epilog="This will create a new branch <target-branch> with the rewritten history from <source-branch>",
@@ -297,12 +486,23 @@ def main():
         action="store_true",
         help="Update existing tags to point to rewritten commits",
     )
+    parser.add_argument(
+        "--rewrite-tag-commits",
+        action="store_true",
+        help="Also rewrite commits that tags point to, even if they aren't in the main branch history",
+    )
 
     args = parser.parse_args()
 
     source_branch = args.source_branch
     target_branch = args.target_branch
     update_tags_flag = args.update_tags
+    rewrite_tag_commits_flag = args.rewrite_tag_commits
+
+    # Validate flags
+    if rewrite_tag_commits_flag and not update_tags_flag:
+        print("Error: --rewrite-tag-commits requires --update-tags")
+        sys.exit(1)
 
     print("=== Dulwich History Fix Script ===")
     print("This script will:")
@@ -313,11 +513,17 @@ def main():
     )
     if update_tags_flag:
         print("4. Update existing tags to point to rewritten commits")
+        if rewrite_tag_commits_flag:
+            print(
+                "   - Including rewriting commits that tags point to outside the branch"
+            )
     print("")
     print(f"Source branch: {source_branch}")
     print(f"Target branch: {target_branch}")
     if update_tags_flag:
         print("Update tags: Yes")
+        if rewrite_tag_commits_flag:
+            print("Rewrite tag commits: Yes")
     print("")
 
     # Open the repository
@@ -328,13 +534,13 @@ def main():
         sys.exit(1)
 
     # Check if source branch exists
-    source_ref = f"refs/heads/{source_branch}".encode()
+    source_ref = Ref(f"refs/heads/{source_branch}".encode())
     if source_ref not in repo.refs:
         print(f"Error: Source branch '{source_branch}' does not exist")
         sys.exit(1)
 
     # Check if target branch already exists
-    target_ref = f"refs/heads/{target_branch}".encode()
+    target_ref = Ref(f"refs/heads/{target_branch}".encode())
     if target_ref in repo.refs:
         print(f"Error: Target branch '{target_branch}' already exists")
         print("Please delete it first or choose a different name")
@@ -368,13 +574,13 @@ def main():
 
     # Rewrite history
     print("")
-    commit_map = rewrite_history(repo, source_branch, target_branch)
-    if not commit_map:
+    rewrite_result = rewrite_history(repo, source_branch, target_branch)
+    if not rewrite_result:
         sys.exit(1)
 
     # Update tags if requested
     if update_tags_flag:
-        update_tags(repo, commit_map)
+        update_tags(repo, rewrite_result, rewrite_tag_commits_flag)
 
     print("")
     print("=== Complete ===")
@@ -387,7 +593,12 @@ def main():
     print("- Fixed commit timestamps that were before 1990")
     print(f"- Created clean history in branch '{target_branch}'")
     if update_tags_flag:
-        print("- Updated tags to point to rewritten commits")
+        if rewrite_tag_commits_flag:
+            print(
+                "- Updated tags to point to rewritten commits (including commits outside branch)"
+            )
+        else:
+            print("- Updated tags to point to rewritten commits")
     print("")
     print("IMPORTANT NEXT STEPS:")
     print(f"1. Review the changes: git log --oneline {target_branch}")
@@ -412,6 +623,10 @@ def main():
         print(
             "WARNING: Tags have been updated. You may need to force push them to remote."
         )
+        if rewrite_tag_commits_flag:
+            print(
+                "WARNING: Tag commits outside the branch were also rewritten. Review carefully."
+            )
 
 
 if __name__ == "__main__":

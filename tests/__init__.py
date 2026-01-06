@@ -202,6 +202,7 @@ def self_test_suite() -> unittest.TestSuite:
     module_names += ["tests.cli.test_" + name for name in cli_names]
     porcelain_names = [
         "annotate",
+        "bisect",
         "cherry_pick",
         "filters",
         "ignore",

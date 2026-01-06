@@ -204,6 +204,7 @@ def self_test_suite() -> unittest.TestSuite:
         "annotate",
         "cherry_pick",
         "filters",
+        "ignore",
         "lfs",
         "merge",
         "notes",

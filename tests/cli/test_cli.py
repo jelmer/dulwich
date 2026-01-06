@@ -47,7 +47,7 @@ from dulwich.tests.utils import (
     build_commit_graph,
 )
 
-from . import TestCase
+from .. import TestCase
 
 
 class DulwichCliTestCase(TestCase):

@@ -293,7 +293,6 @@ class SourceCodeComplianceTests(unittest.TestCase):
             "tests/test_bisect.py",
             "tests/test_filters.py",
             "tests/test_maintenance.py",
-            "tests/test_rebase.py",
             "tests/test_rerere.py",
         }
 

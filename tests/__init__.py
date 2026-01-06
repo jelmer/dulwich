@@ -209,6 +209,7 @@ def self_test_suite() -> unittest.TestSuite:
         "mbox",
         "merge",
         "notes",
+        "rebase",
     ]
     module_names += ["tests.porcelain"] + [
         "tests.porcelain.test_" + name for name in porcelain_names

@@ -21,6 +21,7 @@
 
 """Tests for scanning dulwich source code for compliance."""
 
+import ast
 import os
 import re
 import unittest
@@ -64,6 +65,72 @@ STANDARD_LICENSE_BLOCK = [
 ]
 
 
+def _get_python_files(directory_name):
+    """Get all Python files in a directory.
+
+    Args:
+        directory_name: Name of directory relative to project root (e.g., "dulwich", "tests")
+
+    Returns:
+        List of tuples of (Path object, relative path from project root)
+    """
+    project_root = Path(__file__).parent.parent
+    target_dir = project_root / directory_name
+    if not target_dir.exists():
+        raise RuntimeError(f"{directory_name} directory not found at {target_dir}")
+
+    python_files = []
+    for root, dirs, files in os.walk(target_dir):
+        # Skip build directories
+        if root.endswith(("build", "__pycache__")):
+            continue
+
+        for file in files:
+            if file.endswith(".py"):
+                file_path = Path(root) / file
+                rel_path = file_path.relative_to(project_root)
+                python_files.append((file_path, rel_path))
+
+    return python_files
+
+
+def _imports_module(file_path, module_name):
+    """Check if a Python file imports a specific module or any submodules.
+
+    Args:
+        file_path: Path to the Python file
+        module_name: Module name to check for (e.g., "dulwich.porcelain", "dulwich.cli")
+
+    Returns:
+        bool: True if the file imports the module or any submodule
+    """
+    with open(file_path, encoding="utf-8") as f:
+        tree = ast.parse(f.read(), filename=str(file_path))
+
+    for node in ast.walk(tree):
+        # Check "import dulwich.porcelain" or "import dulwich.porcelain.lfs"
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == module_name or alias.name.startswith(f"{module_name}."):
+                    return True
+
+        # Check "from dulwich.porcelain import ..." or "from dulwich import porcelain"
+        if isinstance(node, ast.ImportFrom):
+            # "from dulwich.porcelain import something"
+            # "from dulwich.porcelain.lfs import something"
+            if node.module == module_name or (node.module and node.module.startswith(f"{module_name}.")):
+                return True
+            # Handle "from dulwich import porcelain"
+            if node.module and module_name.startswith(f"{node.module}."):
+                # e.g., module="dulwich", module_name="dulwich.porcelain"
+                suffix = module_name[len(node.module) + 1:]
+                for alias in node.names:
+                    if alias.name == suffix:
+                        return True
+
+    return False
+
+
 class SourceCodeComplianceTests(unittest.TestCase):
     """Tests to ensure dulwich source code follows project standards."""
 
@@ -74,24 +141,7 @@ class SourceCodeComplianceTests(unittest.TestCase):
         Returns:
             List of tuples of (Path object, relative path from project root)
         """
-        project_root = Path(__file__).parent.parent
-        dulwich_dir = project_root / "dulwich"
-        if not dulwich_dir.exists():
-            raise RuntimeError(f"dulwich directory not found at {dulwich_dir}")
-
-        python_files = []
-        for root, dirs, files in os.walk(dulwich_dir):
-            # Skip build directories
-            if root.endswith(("build", "__pycache__")):
-                continue
-
-            for file in files:
-                if file.endswith(".py"):
-                    file_path = Path(root) / file
-                    rel_path = file_path.relative_to(project_root)
-                    python_files.append((file_path, rel_path))
-
-        return python_files
+        return _get_python_files("dulwich")
 
     @classmethod
     def _has_standard_preamble(cls, file_path: Path) -> tuple[bool, str]:
@@ -225,4 +275,84 @@ class SourceCodeComplianceTests(unittest.TestCase):
                 + "\n".join(f"  - {f}" for f in files_with_violations)
                 + "\n\nFiles allowed to use os.environ:\n"
                 + "\n".join(f"  - {f}" for f in sorted(allowed_files))
+            )
+
+    def test_porcelain_usage_restricted_in_tests(self):
+        """Test that dulwich.porcelain is only used in allowed test directories."""
+        test_files = _get_python_files("tests")
+        self.assertGreater(len(test_files), 0, "No Python files found in tests/")
+
+        # Directories allowed to use porcelain
+        allowed_dirs = {
+            "tests/cli/",
+            "tests/porcelain/",
+            "tests/compat/",
+        }
+        # Individual test files allowed to use porcelain
+        allowed_files = {
+            "tests/test_annotate.py",
+            "tests/test_bisect.py",
+            "tests/test_filters.py",
+            "tests/test_ignore.py",
+            "tests/test_lfs.py",
+            "tests/test_maintenance.py",
+            "tests/test_mbox.py",
+            "tests/test_rebase.py",
+            "tests/test_rerere.py",
+        }
+
+        files_with_violations = []
+
+        for file_path, rel_path in test_files:
+            # Convert to forward slashes for consistency
+            rel_path_str = str(rel_path).replace(os.sep, "/")
+
+            # Skip allowed directories
+            if any(rel_path_str.startswith(d) for d in allowed_dirs):
+                continue
+
+            # Skip allowed files
+            if rel_path_str in allowed_files:
+                continue
+
+            if _imports_module(file_path, "dulwich.porcelain"):
+                files_with_violations.append(rel_path_str)
+
+        if files_with_violations:
+            self.fail(
+                "The following test files use dulwich.porcelain but are not in the allowed list:\n"
+                + "\n".join(f"  - {f}" for f in files_with_violations)
+                + "\n\nLower-level tests should use dulwich APIs directly, not porcelain."
+                + "\n\nAllowed directories:\n"
+                + "\n".join(f"  - {d}" for d in sorted(allowed_dirs))
+                + "\nAllowed files:\n"
+                + "\n".join(f"  - {f}" for f in sorted(allowed_files))
+            )
+
+    def test_cli_usage_restricted_in_tests(self):
+        """Test that dulwich.cli is only used in CLI test directory."""
+        test_files = _get_python_files("tests")
+        self.assertGreater(len(test_files), 0, "No Python files found in tests/")
+
+        # Only CLI tests should import dulwich.cli
+        allowed_dir = "tests/cli/"
+
+        files_with_violations = []
+
+        for file_path, rel_path in test_files:
+            # Convert to forward slashes for consistency
+            rel_path_str = str(rel_path).replace(os.sep, "/")
+
+            # Skip allowed directory
+            if rel_path_str.startswith(allowed_dir):
+                continue
+
+            if _imports_module(file_path, "dulwich.cli"):
+                files_with_violations.append(rel_path_str)
+
+        if files_with_violations:
+            self.fail(
+                "The following test files use dulwich.cli but are not in tests/cli/:\n"
+                + "\n".join(f"  - {f}" for f in files_with_violations)
+                + "\n\nOnly CLI tests in tests/cli/ should import dulwich.cli."
             )

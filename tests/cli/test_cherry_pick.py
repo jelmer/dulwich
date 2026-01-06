@@ -27,7 +27,7 @@ import tempfile
 from dulwich import porcelain
 from dulwich.cli import cmd_cherry_pick
 
-from . import TestCase
+from .. import TestCase
 
 
 class CherryPickCommandTests(TestCase):

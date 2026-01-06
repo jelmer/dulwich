@@ -206,6 +206,7 @@ def self_test_suite() -> unittest.TestSuite:
         "filters",
         "ignore",
         "lfs",
+        "maintenance",
         "mbox",
         "merge",
         "notes",

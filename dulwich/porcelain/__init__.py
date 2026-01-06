@@ -749,6 +749,28 @@ def path_to_tree_path(
         return bytes(relpath)
 
 
+def tree_path_to_fs_path(
+    tree_path: bytes,
+    tree_encoding: str = DEFAULT_ENCODING,
+) -> bytes:
+    """Convert a git tree path to a filesystem path (relative).
+
+    Args:
+      tree_path: Path from git tree (bytes with "/" separators, UTF-8 encoded)
+      tree_encoding: Encoding used for tree paths (default: utf-8)
+    Returns: Filesystem path as bytes (with os.sep, filesystem encoding)
+    """
+    # Decode from tree encoding
+    path_str = tree_path.decode(tree_encoding)
+
+    # Replace / with OS separator if needed
+    if os.sep != "/":
+        path_str = path_str.replace("/", os.sep)
+
+    # Encode for filesystem
+    return os.fsencode(path_str)
+
+
 class DivergedBranches(Error):
     """Branches have diverged and fast-forward is not possible."""
 
@@ -2963,9 +2985,9 @@ def status(
           directories that are entirely untracked without listing all their contents.
 
     Returns: GitStatus tuple,
-        staged -  dict with lists of staged paths (diff index/HEAD)
-        unstaged -  list of unstaged paths (diff index/working-tree)
-        untracked - list of untracked, un-ignored & non-.git paths
+        staged -  dict with lists of staged paths (filesystem paths as bytes)
+        unstaged -  list of unstaged paths (filesystem paths as bytes)
+        untracked - list of untracked paths (filesystem paths as bytes)
     """
     with open_repo_closing(repo) as r:
         # Open the index once and reuse it for both staged and unstaged checks
@@ -2985,7 +3007,7 @@ def status(
         config = r.get_config_stack()
         preload_index = config.get_boolean(b"core", b"preloadIndex", False)
 
-        unstaged_changes = list(
+        unstaged_changes_tree = list(
             get_unstaged_changes(index, r.path, filter_callback, preload_index)
         )
 
@@ -2996,14 +3018,23 @@ def status(
             exclude_ignored=not ignored,
             untracked_files=untracked_files,
         )
-        if sys.platform == "win32":
-            untracked_changes = [
-                path.replace(os.path.sep, "/") for path in untracked_paths
-            ]
-        else:
-            untracked_changes = list(untracked_paths)
 
-        return GitStatus(tracked_changes, unstaged_changes, untracked_changes)
+        # Convert all paths to filesystem encoding
+        # Convert staged changes (dict with lists of tree paths)
+        staged_fs = {}
+        for change_type, paths in tracked_changes.items():
+            staged_fs[change_type] = [
+                tree_path_to_fs_path(p) if isinstance(p, bytes) else os.fsencode(p)
+                for p in paths
+            ]
+
+        # Convert unstaged changes (list of tree paths)
+        unstaged_fs = [tree_path_to_fs_path(p) for p in unstaged_changes_tree]
+
+        # Convert untracked changes (list of strings)
+        untracked_fs = [os.fsencode(p) for p in untracked_paths]
+
+        return GitStatus(staged_fs, unstaged_fs, untracked_fs)
 
 
 def shortlog(

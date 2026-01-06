@@ -178,7 +178,12 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         self.worktree.unstage(["new_dir/foo"])
         status = list(porcelain.status(self.repo))
         self.assertEqual(
-            [{"add": [], "delete": [], "modify": []}, [b"new_dir/foo"], []], status
+            [
+                {"add": [], "delete": [], "modify": []},
+                [os.fsencode(os.path.join("new_dir", "foo"))],
+                [],
+            ],
+            status,
         )
 
     def test_unstage_while_no_commit(self):
@@ -190,7 +195,9 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         porcelain.add(self.repo, paths=[full_path])
         self.worktree.unstage([file])
         status = list(porcelain.status(self.repo))
-        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [], [os.fsencode("foo")]], status
+        )
 
     def test_unstage_add_file(self):
         """Test unstaging a newly added file."""
@@ -207,7 +214,9 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         porcelain.add(self.repo, paths=[full_path])
         self.worktree.unstage([file])
         status = list(porcelain.status(self.repo))
-        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [], [os.fsencode("foo")]], status
+        )
 
     def test_unstage_modify_file(self):
         """Test unstaging a modified file."""
@@ -229,7 +238,7 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         status = list(porcelain.status(self.repo))
 
         self.assertEqual(
-            [{"add": [], "delete": [], "modify": []}, [b"foo"], []], status
+            [{"add": [], "delete": [], "modify": []}, [os.fsencode("foo")], []], status
         )
 
     def test_unstage_remove_file(self):
@@ -249,7 +258,7 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         self.worktree.unstage([file])
         status = list(porcelain.status(self.repo))
         self.assertEqual(
-            [{"add": [], "delete": [], "modify": []}, [b"foo"], []], status
+            [{"add": [], "delete": [], "modify": []}, [os.fsencode("foo")], []], status
         )
 
 
@@ -1000,4 +1009,4 @@ class TemporaryWorktreeTests(TestCase):
 
             # Changes should be visible in status
             status = porcelain.status(worktree)
-            self.assertIn(b"test.txt", status.unstaged)
+            self.assertIn(os.fsencode("test.txt"), status.unstaged)

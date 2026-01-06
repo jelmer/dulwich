@@ -27,7 +27,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from dulwich import porcelain
+from dulwich.client import LocalGitClient
 from dulwich.lfs import LFSFilterDriver, LFSPointer, LFSStore
 from dulwich.repo import Repo
 
@@ -362,13 +362,23 @@ class LFSIntegrationTests(TestCase):
             f.write(pointer.to_bytes())
 
         # Commit files
-        porcelain.add(source_repo, paths=[".gitattributes", "test.bin"])
-        porcelain.commit(source_repo, message=b"Add LFS tracked file")
+        source_worktree = source_repo.get_worktree()
+        source_worktree.stage([b".gitattributes", b"test.bin"])
+        source_worktree.commit(
+            message=b"Add LFS tracked file",
+            committer=b"Test <test@example.com>",
+            author=b"Test <test@example.com>",
+            commit_timestamp=1000000000,
+            author_timestamp=1000000000,
+            commit_timezone=0,
+            author_timezone=0,
+        )
         source_repo.close()
 
         # Clone the repository
         target_dir = os.path.join(self.test_dir, "target")
-        target_repo = porcelain.clone(source_dir, target_dir)
+        client = LocalGitClient()
+        target_repo = client.clone(source_dir, target_dir)
 
         # Verify no LFS commands in config
         target_config = target_repo.get_config_stack()
@@ -410,8 +420,17 @@ class LFSIntegrationTests(TestCase):
             f.write(pointer.to_bytes())
 
         # Commit
-        porcelain.add(self.repo, paths=[".gitattributes", "data.dat"])
-        porcelain.commit(self.repo, message=b"Add LFS file")
+        worktree = self.repo.get_worktree()
+        worktree.stage([b".gitattributes", b"data.dat"])
+        worktree.commit(
+            message=b"Add LFS file",
+            committer=b"Test <test@example.com>",
+            author=b"Test <test@example.com>",
+            commit_timestamp=1000000000,
+            author_timestamp=1000000000,
+            commit_timezone=0,
+            author_timezone=0,
+        )
 
         # Reset index to trigger checkout with filter
         self.repo.get_worktree().reset_index()

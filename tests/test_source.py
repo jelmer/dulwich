@@ -292,7 +292,6 @@ class SourceCodeComplianceTests(unittest.TestCase):
         allowed_files = {
             "tests/test_bisect.py",
             "tests/test_filters.py",
-            "tests/test_lfs.py",
             "tests/test_maintenance.py",
             "tests/test_mbox.py",
             "tests/test_rebase.py",

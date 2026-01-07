@@ -29,7 +29,6 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from dulwich import porcelain
 from dulwich.filters import (
     FilterContext,
     FilterError,
@@ -70,8 +69,17 @@ class GitAttributesFilterIntegrationTests(TestCase):
             f.write(b"*.bin -text\n")
 
         # Add .gitattributes
-        porcelain.add(self.repo, paths=[".gitattributes"])
-        porcelain.commit(self.repo, message=b"Add gitattributes")
+        worktree = self.repo.get_worktree()
+        worktree.stage([".gitattributes"])
+        worktree.commit(
+            message=b"Add gitattributes",
+            committer=b"Test <test@example.com>",
+            author=b"Test <test@example.com>",
+            commit_timestamp=1000000000,
+            author_timestamp=1000000000,
+            commit_timezone=0,
+            author_timezone=0,
+        )
 
         # Create text file with CRLF
         text_file = os.path.join(self.test_dir, "test.txt")
@@ -84,7 +92,7 @@ class GitAttributesFilterIntegrationTests(TestCase):
             f.write(b"binary\r\ndata\r\n")
 
         # Add files
-        porcelain.add(self.repo, paths=["test.txt", "test.bin"])
+        worktree.stage(["test.txt", "test.bin"])
 
         # Check that text file was normalized
         index = self.repo.open_index()
@@ -136,7 +144,8 @@ sys.stdout.buffer.write(result)
         config.write_to_path()
 
         # Add .gitattributes
-        porcelain.add(self.repo, paths=[".gitattributes"])
+        worktree = self.repo.get_worktree()
+        worktree.stage([".gitattributes"])
 
         # Create file with sensitive content
         secret_file = os.path.join(self.test_dir, "password.secret")
@@ -144,7 +153,7 @@ sys.stdout.buffer.write(result)
             f.write(b"password123\ntoken456\n")
 
         # Add file
-        porcelain.add(self.repo, paths=["password.secret"])
+        worktree.stage(["password.secret"])
 
         # Check that content was filtered
         index = self.repo.open_index()
@@ -160,8 +169,17 @@ sys.stdout.buffer.write(result)
             f.write(b"*.txt text\n")
 
         # Add and commit .gitattributes
-        porcelain.add(self.repo, paths=[".gitattributes"])
-        porcelain.commit(self.repo, message=b"Add gitattributes")
+        worktree = self.repo.get_worktree()
+        worktree.stage([".gitattributes"])
+        worktree.commit(
+            message=b"Add gitattributes",
+            committer=b"Test <test@example.com>",
+            author=b"Test <test@example.com>",
+            commit_timestamp=1000000000,
+            author_timestamp=1000000000,
+            commit_timezone=0,
+            author_timezone=0,
+        )
 
         # Remove .gitattributes from working tree
         os.remove(gitattributes_path)
@@ -221,7 +239,8 @@ sys.stdout.buffer.write(result)
         config.write_to_path()
 
         # Add .gitattributes
-        porcelain.add(self.repo, paths=[".gitattributes"])
+        worktree = self.repo.get_worktree()
+        worktree.stage([".gitattributes"])
 
         # Create text file with lowercase and CRLF
         text_file = os.path.join(self.test_dir, "test.txt")
@@ -229,7 +248,7 @@ sys.stdout.buffer.write(result)
             f.write(b"hello\r\nworld\r\n")
 
         # Add file
-        porcelain.add(self.repo, paths=["test.txt"])
+        worktree.stage(["test.txt"])
 
         # Check that custom filter was applied (not just line ending conversion)
         index = self.repo.open_index()
@@ -264,7 +283,8 @@ sys.stdout.buffer.write(result)
         config.write_to_path()
 
         # Add .gitattributes
-        porcelain.add(self.repo, paths=[".gitattributes"])
+        worktree = self.repo.get_worktree()
+        worktree.stage([".gitattributes"])
 
         # Create file that would use the filter
         secret_file = os.path.join(self.test_dir, "test.secret")
@@ -273,7 +293,7 @@ sys.stdout.buffer.write(result)
 
         # Adding file should raise error due to missing required filter
         with self.assertRaises(FilterError) as cm:
-            porcelain.add(self.repo, paths=["test.secret"])
+            worktree.stage(["test.secret"])
         self.assertIn(
             "Required filter 'required_filter' is not available", str(cm.exception)
         )
@@ -294,7 +314,8 @@ sys.stdout.buffer.write(result)
         config.write_to_path()
 
         # Add .gitattributes
-        porcelain.add(self.repo, paths=[".gitattributes"])
+        worktree = self.repo.get_worktree()
+        worktree.stage([".gitattributes"])
 
         # Create file that would use the filter
         secret_file = os.path.join(self.test_dir, "test.secret")
@@ -303,7 +324,7 @@ sys.stdout.buffer.write(result)
 
         # Adding file should raise error due to failing required filter
         with self.assertRaises(FilterError) as cm:
-            porcelain.add(self.repo, paths=["test.secret"])
+            worktree.stage(["test.secret"])
         self.assertIn("Required clean filter failed", str(cm.exception))
 
     def test_required_filter_success(self) -> None:
@@ -322,7 +343,8 @@ sys.stdout.buffer.write(result)
         config.write_to_path()
 
         # Add .gitattributes
-        porcelain.add(self.repo, paths=[".gitattributes"])
+        worktree = self.repo.get_worktree()
+        worktree.stage([".gitattributes"])
 
         # Create file that would use the filter
         secret_file = os.path.join(self.test_dir, "test.secret")
@@ -330,7 +352,7 @@ sys.stdout.buffer.write(result)
             f.write(b"hello world\n")
 
         # Adding file should work and apply filter
-        porcelain.add(self.repo, paths=["test.secret"])
+        worktree.stage(["test.secret"])
 
         # Check that content was filtered
         index = self.repo.open_index()
@@ -354,7 +376,8 @@ sys.stdout.buffer.write(result)
         config.write_to_path()
 
         # Add .gitattributes
-        porcelain.add(self.repo, paths=[".gitattributes"])
+        worktree = self.repo.get_worktree()
+        worktree.stage([".gitattributes"])
 
         # Create file that would use the filter
         test_file = os.path.join(self.test_dir, "test.txt")
@@ -362,7 +385,7 @@ sys.stdout.buffer.write(result)
             f.write(b"test content\n")
 
         # Adding file should work and fallback to original content
-        porcelain.add(self.repo, paths=["test.txt"])
+        worktree.stage(["test.txt"])
 
         # Check that original content was preserved
         index = self.repo.open_index()

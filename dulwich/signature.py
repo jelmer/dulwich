@@ -1293,12 +1293,13 @@ class SSHCliSignatureVendor(SignatureSigner, SignatureVerifier):
                 args.extend(["-r", self.revocation_file])
 
             try:
-                subprocess.run(
-                    args,
-                    stdin=open(data_filename, "rb"),
-                    capture_output=True,
-                    check=True,
-                )
+                with open(data_filename, "rb") as data_file:
+                    subprocess.run(
+                        args,
+                        stdin=data_file,
+                        capture_output=True,
+                        check=True,
+                    )
             except subprocess.CalledProcessError as e:
                 raise BadSignature(
                     f"SSH signature verification failed: {e.stderr.decode('utf-8', errors='replace')}"

@@ -290,7 +290,6 @@ class SourceCodeComplianceTests(unittest.TestCase):
         }
         # Individual test files allowed to use porcelain
         allowed_files = {
-            "tests/test_filters.py",
             "tests/test_rerere.py",
         }
 

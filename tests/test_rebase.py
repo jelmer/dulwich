@@ -22,8 +22,6 @@
 """Tests for dulwich.rebase."""
 
 import importlib.util
-import os
-import tempfile
 
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.rebase import (
@@ -36,7 +34,7 @@ from dulwich.rebase import (
     rebase,
     start_interactive,
 )
-from dulwich.repo import MemoryRepo, Repo
+from dulwich.repo import MemoryRepo
 from dulwich.tests.utils import make_commit
 
 from . import DependencyMissing, TestCase

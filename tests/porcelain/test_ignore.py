@@ -59,14 +59,10 @@ class CheckIgnoreQuotePathTests(TestCase):
 
         # Test with quote_path=True (default)
         abs_paths = [os.path.join(self.test_dir, f) for f in test_files]
-        ignored_quoted = set(
-            check_ignore(self.test_dir, abs_paths, quote_path=True)
-        )
+        ignored_quoted = set(check_ignore(self.test_dir, abs_paths, quote_path=True))
 
         # Test with quote_path=False
-        ignored_unquoted = set(
-            check_ignore(self.test_dir, abs_paths, quote_path=False)
-        )
+        ignored_unquoted = set(check_ignore(self.test_dir, abs_paths, quote_path=False))
 
         # Verify quoted results
         expected_quoted = {
@@ -100,12 +96,8 @@ class CheckIgnoreQuotePathTests(TestCase):
 
         # Test both settings
         abs_paths = [os.path.join(self.test_dir, f) for f in test_files]
-        ignored_quoted = set(
-            check_ignore(self.test_dir, abs_paths, quote_path=True)
-        )
-        ignored_unquoted = set(
-            check_ignore(self.test_dir, abs_paths, quote_path=False)
-        )
+        ignored_quoted = set(check_ignore(self.test_dir, abs_paths, quote_path=True))
+        ignored_unquoted = set(check_ignore(self.test_dir, abs_paths, quote_path=False))
 
         # Both should return the same results for ASCII filenames
         expected = {"test.txt", "file.tmp"}

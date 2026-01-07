@@ -29,7 +29,6 @@ from unittest import skipIf
 
 from dulwich.errors import CommitError
 from dulwich.index import get_unstaged_changes as _get_unstaged_changes
-from dulwich.objects import Commit
 from dulwich.object_store import tree_lookup_path
 from dulwich.repo import Repo
 from dulwich.worktree import (
@@ -186,7 +185,7 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         self.worktree.unstage(["new_dir/foo"])
 
         unstaged = get_unstaged_changes(self.repo)
-        self.assertEqual([os.fsencode(os.path.join("new_dir", "foo"))], unstaged)
+        self.assertEqual([b"new_dir/foo"], unstaged)
 
     def test_unstage_while_no_commit(self):
         """Test unstaging when there are no commits."""

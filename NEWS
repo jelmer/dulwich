@@ -1,5 +1,8 @@
 0.25.1	UNRELEASED
 
+ * ``dulwich.porcelain.status`` now returns regular strings.
+   (Jelmer Vernooĳ, #889)
+
  * Fix AssertionError when accessing ref names with length matching binary
    hash length (e.g., 32 bytes for SHA-256). (Jelmer Vernooĳ, #2040)
 

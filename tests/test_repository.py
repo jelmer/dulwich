@@ -1717,7 +1717,12 @@ class BuildRepoRootTests(TestCase):
         self._repo.get_worktree().unstage(["new_dir/foo"])
         status = list(porcelain.status(self._repo))
         self.assertEqual(
-            [{"add": [], "delete": [], "modify": []}, [b"new_dir/foo"], []], status
+            [
+                {"add": [], "delete": [], "modify": []},
+                [os.fsencode(os.path.join("new_dir", "foo"))],
+                [],
+            ],
+            status,
         )
 
     def test_unstage_while_no_commit(self) -> None:
@@ -1728,7 +1733,9 @@ class BuildRepoRootTests(TestCase):
         porcelain.add(self._repo, paths=[full_path])
         self._repo.get_worktree().unstage([file])
         status = list(porcelain.status(self._repo))
-        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [], [os.fsencode("foo")]], status
+        )
 
     def test_unstage_add_file(self) -> None:
         file = "foo"
@@ -1744,7 +1751,9 @@ class BuildRepoRootTests(TestCase):
         porcelain.add(self._repo, paths=[full_path])
         self._repo.get_worktree().unstage([file])
         status = list(porcelain.status(self._repo))
-        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["foo"]], status)
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [], [os.fsencode("foo")]], status
+        )
 
     def test_unstage_modify_file(self) -> None:
         file = "foo"
@@ -1765,7 +1774,7 @@ class BuildRepoRootTests(TestCase):
         status = list(porcelain.status(self._repo))
 
         self.assertEqual(
-            [{"add": [], "delete": [], "modify": []}, [b"foo"], []], status
+            [{"add": [], "delete": [], "modify": []}, [os.fsencode("foo")], []], status
         )
 
     def test_unstage_remove_file(self) -> None:
@@ -1784,7 +1793,7 @@ class BuildRepoRootTests(TestCase):
         self._repo.get_worktree().unstage([file])
         status = list(porcelain.status(self._repo))
         self.assertEqual(
-            [{"add": [], "delete": [], "modify": []}, [b"foo"], []], status
+            [{"add": [], "delete": [], "modify": []}, [os.fsencode("foo")], []], status
         )
 
     def test_reset_index(self) -> None:
@@ -1796,11 +1805,18 @@ class BuildRepoRootTests(TestCase):
         r.get_worktree().stage(["a", "b"])
         status = list(porcelain.status(self._repo))
         self.assertEqual(
-            [{"add": [b"b"], "delete": [], "modify": [b"a"]}, [], []], status
+            [
+                {"add": [os.fsencode("b")], "delete": [], "modify": [os.fsencode("a")]},
+                [],
+                [],
+            ],
+            status,
         )
         r.get_worktree().reset_index()
         status = list(porcelain.status(self._repo))
-        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], ["b"]], status)
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [], [os.fsencode("b")]], status
+        )
 
     @skipIf(
         sys.platform in ("win32", "darwin"),

@@ -390,14 +390,15 @@ class PartialCloneClientTestCase(CompatTestCase):
             # Get all refs
             return list(refs.values())
 
-        # Fetch with filter
-        result = client.fetch(
-            path,
-            dest_repo,
-            determine_wants=determine_wants,
-            progress=None,
-            filter_spec=b"blob:none",
-        )
+        # Fetch with filter (may warn if server doesn't support filtering)
+        with self.assertLogs(level="WARNING"):
+            result = client.fetch(
+                path,
+                dest_repo,
+                determine_wants=determine_wants,
+                progress=None,
+                filter_spec=b"blob:none",
+            )
 
         # The fetch should succeed with partial clone
         self.assertIsNotNone(result)
@@ -430,13 +431,14 @@ class PartialCloneClientTestCase(CompatTestCase):
 
         client, path = get_transport_and_path(f"git://localhost:{daemon_port}/")
 
-        # Clone with blob:limit filter
-        cloned_repo = client.clone(
-            path,
-            dest_path,
-            mkdir=False,
-            filter_spec=b"blob:limit=100",
-        )
+        # Clone with blob:limit filter (may warn if server doesn't support filtering)
+        with self.assertLogs(level="WARNING"):
+            cloned_repo = client.clone(
+                path,
+                dest_path,
+                mkdir=False,
+                filter_spec=b"blob:limit=100",
+            )
         self.addCleanup(cloned_repo.close)
 
         # Verify clone succeeded
@@ -483,6 +485,11 @@ class PartialCloneClientTestCase(CompatTestCase):
         def cleanup_daemon():
             daemon_process.terminate()
             daemon_process.wait(timeout=2)
+            # Close pipes to avoid ResourceWarning
+            if daemon_process.stdout:
+                daemon_process.stdout.close()
+            if daemon_process.stderr:
+                daemon_process.stderr.close()
 
         self.addCleanup(cleanup_daemon)
 

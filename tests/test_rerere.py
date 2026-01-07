@@ -594,12 +594,18 @@ class RerereEndToEndTests(unittest.TestCase):
         gitattributes = self.repo.get_gitattributes()
         config = self.repo.get_config()
         merged_tree, conflicts = recursive_merge(
-            self.repo.object_store, merge_bases, head_commit, merge_commit,
-            gitattributes, config
+            self.repo.object_store,
+            merge_bases,
+            head_commit,
+            merge_commit,
+            gitattributes,
+            config,
         )
         self.repo.object_store.add_object(merged_tree)
         changes = tree_changes(self.repo.object_store, head_commit.tree, merged_tree.id)
-        update_working_tree(self.repo, head_commit.tree, merged_tree.id, change_iterator=changes)
+        update_working_tree(
+            self.repo, head_commit.tree, merged_tree.id, change_iterator=changes
+        )
 
         # Should have conflicts
         self.assertEqual([b"file.txt"], conflicts)
@@ -635,14 +641,24 @@ class RerereEndToEndTests(unittest.TestCase):
             f.write(b"line 1\nbranch1 change\nline 3\n")
 
         # Merge again - should create same conflict
-        merge_bases2 = find_merge_base(self.repo, [commit_branch1.id, commit_branch2.id])
+        merge_bases2 = find_merge_base(
+            self.repo, [commit_branch1.id, commit_branch2.id]
+        )
         merged_tree2, conflicts2 = recursive_merge(
-            self.repo.object_store, merge_bases2, commit_branch1, commit_branch2,
-            gitattributes, config
+            self.repo.object_store,
+            merge_bases2,
+            commit_branch1,
+            commit_branch2,
+            gitattributes,
+            config,
         )
         self.repo.object_store.add_object(merged_tree2)
-        changes2 = tree_changes(self.repo.object_store, commit_branch1.tree, merged_tree2.id)
-        update_working_tree(self.repo, commit_branch1.tree, merged_tree2.id, change_iterator=changes2)
+        changes2 = tree_changes(
+            self.repo.object_store, commit_branch1.tree, merged_tree2.id
+        )
+        update_working_tree(
+            self.repo, commit_branch1.tree, merged_tree2.id, change_iterator=changes2
+        )
         self.assertEqual([b"file.txt"], conflicts2)
 
         # Now rerere should recognize the conflict
@@ -718,12 +734,20 @@ class RerereEndToEndTests(unittest.TestCase):
         gitattributes = self.repo.get_gitattributes()
         config = self.repo.get_config()
         merged_tree, conflicts = recursive_merge(
-            self.repo.object_store, merge_bases, commit_branch1, commit_branch2,
-            gitattributes, config
+            self.repo.object_store,
+            merge_bases,
+            commit_branch1,
+            commit_branch2,
+            gitattributes,
+            config,
         )
         self.repo.object_store.add_object(merged_tree)
-        changes = tree_changes(self.repo.object_store, commit_branch1.tree, merged_tree.id)
-        update_working_tree(self.repo, commit_branch1.tree, merged_tree.id, change_iterator=changes)
+        changes = tree_changes(
+            self.repo.object_store, commit_branch1.tree, merged_tree.id
+        )
+        update_working_tree(
+            self.repo, commit_branch1.tree, merged_tree.id, change_iterator=changes
+        )
 
         # Record conflict and resolution
         recorded, _ = rerere_auto(self.repo, self.tempdir, conflicts)
@@ -742,14 +766,24 @@ class RerereEndToEndTests(unittest.TestCase):
             f.write(b"line 1\nbranch1 change\nline 3\n")
 
         # Perform merge again using lower-level APIs
-        merge_bases2 = find_merge_base(self.repo, [commit_branch1.id, commit_branch2.id])
+        merge_bases2 = find_merge_base(
+            self.repo, [commit_branch1.id, commit_branch2.id]
+        )
         merged_tree2, conflicts2 = recursive_merge(
-            self.repo.object_store, merge_bases2, commit_branch1, commit_branch2,
-            gitattributes, config
+            self.repo.object_store,
+            merge_bases2,
+            commit_branch1,
+            commit_branch2,
+            gitattributes,
+            config,
         )
         self.repo.object_store.add_object(merged_tree2)
-        changes2 = tree_changes(self.repo.object_store, commit_branch1.tree, merged_tree2.id)
-        update_working_tree(self.repo, commit_branch1.tree, merged_tree2.id, change_iterator=changes2)
+        changes2 = tree_changes(
+            self.repo.object_store, commit_branch1.tree, merged_tree2.id
+        )
+        update_working_tree(
+            self.repo, commit_branch1.tree, merged_tree2.id, change_iterator=changes2
+        )
 
         # With autoupdate, rerere should auto-apply the resolution
         recorded2, resolved2 = rerere_auto(self.repo, self.tempdir, conflicts2)

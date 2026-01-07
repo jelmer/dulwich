@@ -18,9 +18,7 @@
 
 """Tests for annotate support."""
 
-import os
 import tempfile
-import unittest
 from typing import Any
 from unittest import TestCase
 

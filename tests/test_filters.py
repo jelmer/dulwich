@@ -385,7 +385,8 @@ sys.stdout.buffer.write(result)
             f.write(b"test content\n")
 
         # Adding file should work and fallback to original content
-        worktree.stage(["test.txt"])
+        with self.assertLogs(level="WARNING"):
+            worktree.stage(["test.txt"])
 
         # Check that original content was preserved
         index = self.repo.open_index()
@@ -579,7 +580,8 @@ while True:
         )
 
         test_data = b"hello world\n"
-        result = driver.clean(test_data)
+        with self.assertLogs(level="WARNING"):
+            result = driver.clean(test_data)
 
         # Should fallback to tr command and uppercase
         self.assertEqual(result, b"HELLO WORLD\n")
@@ -1156,7 +1158,8 @@ protocol.write_pkt_line(None)
             )
 
             # Should fallback to clean_cmd when process fails
-            result = driver.clean(b"test data")
+            with self.assertLogs(level="WARNING"):
+                result = driver.clean(b"test data")
             self.assertEqual(result, b"test data")
 
         finally:

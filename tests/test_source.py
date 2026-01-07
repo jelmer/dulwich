@@ -111,19 +111,23 @@ def _imports_module(file_path, module_name):
         # Check "import dulwich.porcelain" or "import dulwich.porcelain.lfs"
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name == module_name or alias.name.startswith(f"{module_name}."):
+                if alias.name == module_name or alias.name.startswith(
+                    f"{module_name}."
+                ):
                     return True
 
         # Check "from dulwich.porcelain import ..." or "from dulwich import porcelain"
         if isinstance(node, ast.ImportFrom):
             # "from dulwich.porcelain import something"
             # "from dulwich.porcelain.lfs import something"
-            if node.module == module_name or (node.module and node.module.startswith(f"{module_name}.")):
+            if node.module == module_name or (
+                node.module and node.module.startswith(f"{module_name}.")
+            ):
                 return True
             # Handle "from dulwich import porcelain"
             if node.module and module_name.startswith(f"{node.module}."):
                 # e.g., module="dulwich", module_name="dulwich.porcelain"
-                suffix = module_name[len(node.module) + 1:]
+                suffix = module_name[len(node.module) + 1 :]
                 for alias in node.names:
                     if alias.name == suffix:
                         return True

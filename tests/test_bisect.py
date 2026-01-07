@@ -26,7 +26,6 @@ import shutil
 import tempfile
 
 from dulwich.bisect import BisectState
-from dulwich.objects import Tree
 from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit
 

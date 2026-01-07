@@ -548,7 +548,8 @@ class RepositoryRootTests(TestCase):
         self.addCleanup(shutil.rmtree, tmp_dir)
         t = Repo.init(tmp_dir)
         self.addCleanup(t.close)
-        r.fetch(t)
+        with self.assertLogs(level="WARNING"):
+            r.fetch(t)
         self.assertIn(b"a90fa2d900a17e99b433217e988c4eb4a2e9a097", t)
         self.assertIn(b"a90fa2d900a17e99b433217e988c4eb4a2e9a097", t)
         self.assertIn(b"a90fa2d900a17e99b433217e988c4eb4a2e9a097", t)
@@ -1726,7 +1727,7 @@ class BuildRepoRootTests(TestCase):
         wt.unstage(["new_dir/foo"])
 
         unstaged = get_unstaged_changes(self._repo)
-        self.assertEqual([os.fsencode(os.path.join("new_dir", "foo"))], unstaged)
+        self.assertEqual([b"new_dir/foo"], unstaged)
 
     def test_unstage_while_no_commit(self) -> None:
         file = "foo"

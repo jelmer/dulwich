@@ -532,8 +532,12 @@ class RerereEndToEndTests(unittest.TestCase):
 
     def test_rerere_full_workflow(self) -> None:
         """Test complete rerere workflow with real merge conflicts."""
+        from dulwich.diff_tree import tree_changes
+        from dulwich.graph import find_merge_base
+        from dulwich.index import update_working_tree
+        from dulwich.merge import recursive_merge
         from dulwich.objects import Blob, Commit, Tree
-        from dulwich.porcelain import merge, rerere
+        from dulwich.rerere import rerere_auto
 
         # Create branch1: change "original line" to "branch1 change"
         blob_branch1 = Blob.from_string(b"line 1\nbranch1 change\nline 3\n")
@@ -583,10 +587,21 @@ class RerereEndToEndTests(unittest.TestCase):
             f.write(b"line 1\nbranch1 change\nline 3\n")
 
         # Merge branch2 into branch1 - should create conflict
-        merge_result, conflicts = merge(self.repo, b"branch2", no_commit=True)
+        # Using lower-level merge APIs
+        head_commit = commit_branch1
+        merge_commit = commit_branch2
+        merge_bases = find_merge_base(self.repo, [head_commit.id, merge_commit.id])
+        gitattributes = self.repo.get_gitattributes()
+        config = self.repo.get_config()
+        merged_tree, conflicts = recursive_merge(
+            self.repo.object_store, merge_bases, head_commit, merge_commit,
+            gitattributes, config
+        )
+        self.repo.object_store.add_object(merged_tree)
+        changes = tree_changes(self.repo.object_store, head_commit.tree, merged_tree.id)
+        update_working_tree(self.repo, head_commit.tree, merged_tree.id, change_iterator=changes)
 
         # Should have conflicts
-        self.assertIsNone(merge_result)  # No commit created due to conflicts
         self.assertEqual([b"file.txt"], conflicts)
 
         # File should have conflict markers
@@ -597,7 +612,7 @@ class RerereEndToEndTests(unittest.TestCase):
         self.assertIn(b"branch2 change", content)
 
         # Record the conflict with rerere
-        recorded, resolved = rerere(self.repo)
+        recorded, resolved = rerere_auto(self.repo, self.tempdir, conflicts)
         self.assertEqual(1, len(recorded))
         self.assertEqual(0, len(resolved))  # No resolution yet
 
@@ -620,11 +635,18 @@ class RerereEndToEndTests(unittest.TestCase):
             f.write(b"line 1\nbranch1 change\nline 3\n")
 
         # Merge again - should create same conflict
-        _merge_result2, conflicts2 = merge(self.repo, b"branch2", no_commit=True)
+        merge_bases2 = find_merge_base(self.repo, [commit_branch1.id, commit_branch2.id])
+        merged_tree2, conflicts2 = recursive_merge(
+            self.repo.object_store, merge_bases2, commit_branch1, commit_branch2,
+            gitattributes, config
+        )
+        self.repo.object_store.add_object(merged_tree2)
+        changes2 = tree_changes(self.repo.object_store, commit_branch1.tree, merged_tree2.id)
+        update_working_tree(self.repo, commit_branch1.tree, merged_tree2.id, change_iterator=changes2)
         self.assertEqual([b"file.txt"], conflicts2)
 
         # Now rerere should recognize the conflict
-        recorded2, resolved2 = rerere(self.repo)
+        recorded2, resolved2 = rerere_auto(self.repo, self.tempdir, conflicts2)
         self.assertEqual(1, len(recorded2))
 
         # With autoupdate disabled, it shouldn't auto-apply
@@ -632,9 +654,12 @@ class RerereEndToEndTests(unittest.TestCase):
 
     def test_rerere_with_autoupdate(self) -> None:
         """Test rerere with autoupdate enabled."""
+        from dulwich.diff_tree import tree_changes
+        from dulwich.graph import find_merge_base
+        from dulwich.index import update_working_tree
+        from dulwich.merge import recursive_merge
         from dulwich.objects import Blob, Commit, Tree
-        from dulwich.porcelain import merge, rerere
-        from dulwich.rerere import RerereCache
+        from dulwich.rerere import RerereCache, rerere_auto
 
         # Enable autoupdate
         config = self.repo.get_config()
@@ -688,10 +713,20 @@ class RerereEndToEndTests(unittest.TestCase):
         with open(os.path.join(self.tempdir, "file.txt"), "wb") as f:
             f.write(b"line 1\nbranch1 change\nline 3\n")
 
-        merge(self.repo, b"branch2", no_commit=True)
+        # Perform merge using lower-level APIs
+        merge_bases = find_merge_base(self.repo, [commit_branch1.id, commit_branch2.id])
+        gitattributes = self.repo.get_gitattributes()
+        config = self.repo.get_config()
+        merged_tree, conflicts = recursive_merge(
+            self.repo.object_store, merge_bases, commit_branch1, commit_branch2,
+            gitattributes, config
+        )
+        self.repo.object_store.add_object(merged_tree)
+        changes = tree_changes(self.repo.object_store, commit_branch1.tree, merged_tree.id)
+        update_working_tree(self.repo, commit_branch1.tree, merged_tree.id, change_iterator=changes)
 
         # Record conflict and resolution
-        recorded, _ = rerere(self.repo)
+        recorded, _ = rerere_auto(self.repo, self.tempdir, conflicts)
         conflict_id = recorded[0][1]
 
         resolved_content = b"line 1\nmerged change\nline 3\n"
@@ -706,10 +741,18 @@ class RerereEndToEndTests(unittest.TestCase):
         with open(os.path.join(self.tempdir, "file.txt"), "wb") as f:
             f.write(b"line 1\nbranch1 change\nline 3\n")
 
-        merge(self.repo, b"branch2", no_commit=True)
+        # Perform merge again using lower-level APIs
+        merge_bases2 = find_merge_base(self.repo, [commit_branch1.id, commit_branch2.id])
+        merged_tree2, conflicts2 = recursive_merge(
+            self.repo.object_store, merge_bases2, commit_branch1, commit_branch2,
+            gitattributes, config
+        )
+        self.repo.object_store.add_object(merged_tree2)
+        changes2 = tree_changes(self.repo.object_store, commit_branch1.tree, merged_tree2.id)
+        update_working_tree(self.repo, commit_branch1.tree, merged_tree2.id, change_iterator=changes2)
 
         # With autoupdate, rerere should auto-apply the resolution
-        recorded2, resolved2 = rerere(self.repo)
+        recorded2, resolved2 = rerere_auto(self.repo, self.tempdir, conflicts2)
         self.assertEqual(1, len(recorded2))
         self.assertEqual(1, len(resolved2))
         self.assertEqual(b"file.txt", resolved2[0])

@@ -1,4 +1,4 @@
-0.25.1	UNRELEASED
+0.25.1	2026-01-08
 
  * Add signature vendor system for signing and verifying Git objects.
    Supports GPG, SSH signatures, and X.509 certificates. (Jelmer Vernooĳ)

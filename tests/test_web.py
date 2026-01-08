@@ -22,6 +22,7 @@
 """Tests for the Git HTTP server."""
 
 import gzip
+import logging
 import os
 import re
 from io import BytesIO
@@ -101,6 +102,11 @@ class WebTestCase(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
+        # Suppress expected error logging during web tests
+        web_logger = logging.getLogger("dulwich.web")
+        original_level = web_logger.level
+        web_logger.setLevel(logging.CRITICAL)
+        self.addCleanup(web_logger.setLevel, original_level)
         self._environ = {}
         self._req = self._req_class(
             self._environ, self._start_response, handlers=self._handlers()

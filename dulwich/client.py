@@ -1478,12 +1478,7 @@ class GitClient:
 
     @staticmethod
     def _warn_filter_objects() -> None:
-        import warnings
-
-        warnings.warn(
-            "object filtering not recognized by server, ignoring",
-            UserWarning,
-        )
+        logging.warning("object filtering not recognized by server, ignoring")
 
 
 def check_wants(wants: Set[bytes], refs: Mapping[bytes, bytes]) -> None:

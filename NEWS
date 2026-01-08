@@ -1,5 +1,12 @@
 0.25.1	UNRELEASED
 
+ * Add signature vendor system for signing and verifying Git objects.
+   Supports GPG, SSH signatures, and X.509 certificates. (Jelmer Vernooĳ)
+
+ * Add support for partial clone with object filtering. (Jelmer Vernooĳ)
+
+ * Fix sparse pattern matching in worktree operations. (Jelmer Vernooĳ)
+
  * ``dulwich.porcelain.status`` now returns regular strings.
    (Jelmer Vernooĳ, #889)
 

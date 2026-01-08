@@ -41,6 +41,8 @@ from urllib.parse import unquote
 
 from dulwich import client, file, index, objects, protocol, repo
 from dulwich.porcelain import tag_create
+from dulwich.protocol import DEPTH_INFINITE
+from dulwich.refs import _import_remote_refs
 
 from .. import SkipTest, expectedFailure
 from .utils import (
@@ -193,6 +195,52 @@ class DulwichClientTestBase:
                 generate_pack_data_wrapper,
             )
             self.assertDestEqualsSrc()
+
+    def test_fetch_into_shallow_clone(self) -> None:
+        c = self._client()
+        server_new_path = os.path.join(self.gitroot, "server_new.export")
+        run_git_or_fail(["config", "http.uploadpack", "true"], cwd=server_new_path)
+        run_git_or_fail(["config", "http.receivepack", "true"], cwd=server_new_path)
+        remote_path = self._build_path("/server_new.export")
+        with repo.Repo(self.dest) as local:
+            result = c.fetch(remote_path, local, depth=1)
+            self.assertEqual(
+                local.get_shallow(),
+                {
+                    b"35e0b59e187dd72a0af294aedffc213eaa4d03ff",
+                    b"514dc6d3fbfe77361bcaef320c4d21b72bc10be9",
+                },
+            )
+            for r in result.refs.items():
+                local.refs.set_if_equals(r[0], None, r[1])
+        with repo.Repo(os.path.join(self.gitroot, "server_new.export")) as src:
+            tree_id = src[src.head()].tree
+            for filename, contents in [
+                ("bar", "bar contents"),
+                ("zop", "zop contents"),
+            ]:
+                tree_id = self._add_file(src, tree_id, filename, contents)
+                src.do_commit(
+                    message=b"add " + filename.encode("utf-8"),
+                    committer=b"Joe Example <joe@example.com>",
+                    tree=tree_id,
+                )
+        # Create a new client for the second fetch operation
+        # TCP connections are single-use for git protocol operations
+        c2 = self._client()
+        with repo.Repo(self.dest) as local:
+            result = c2.fetch(remote_path, local, depth=DEPTH_INFINITE)
+            _import_remote_refs(
+                local.refs,
+                "origin",
+                result.refs,
+                f"fetch: from {remote_path}".encode("ascii"),
+            )
+            self.assertEqual(local.get_shallow(), set())
+        with repo.Repo(self.dest) as local:
+            tree = local[b"HEAD"].tree
+            tree = local[b"refs/remotes/origin/master"].tree
+            local.reset_index(tree=tree)
 
     def make_dummy_commit(self, dest):
         b = objects.Blob.from_string(b"hi")

@@ -29,7 +29,7 @@ import unittest
 from dulwich import porcelain
 from dulwich.cli import main
 
-from . import DependencyMissing, TestCase
+from .. import DependencyMissing, TestCase
 
 
 class CLIMergeTests(TestCase):

@@ -27,8 +27,8 @@ import stat
 import tempfile
 from unittest import skipIf
 
-from dulwich import porcelain
 from dulwich.errors import CommitError
+from dulwich.index import get_unstaged_changes as _get_unstaged_changes
 from dulwich.object_store import tree_lookup_path
 from dulwich.repo import Repo
 from dulwich.worktree import (
@@ -45,6 +45,14 @@ from dulwich.worktree import (
 )
 
 from . import TestCase
+
+
+def get_unstaged_changes(repo):
+    """Helper to get unstaged changes for a repo."""
+    index = repo.open_index()
+    normalizer = repo.get_blob_normalizer()
+    filter_callback = normalizer.checkin_normalize if normalizer else None
+    return list(_get_unstaged_changes(index, repo.path, filter_callback, False))
 
 
 class WorkTreeTestCase(TestCase):
@@ -166,9 +174,8 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
 
         with open(full_path, "w") as f:
             f.write("hello")
-        porcelain.add(self.repo, paths=[full_path])
-        porcelain.commit(
-            self.repo,
+        self.worktree.stage(["new_dir/foo"])
+        self.worktree.commit(
             message=b"unittest",
             committer=b"Jane <jane@example.com>",
             author=b"John <john@example.com>",
@@ -176,15 +183,9 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         with open(full_path, "a") as f:
             f.write("something new")
         self.worktree.unstage(["new_dir/foo"])
-        status = list(porcelain.status(self.repo))
-        self.assertEqual(
-            [
-                {"add": [], "delete": [], "modify": []},
-                [os.fsencode(os.path.join("new_dir", "foo"))],
-                [],
-            ],
-            status,
-        )
+
+        unstaged = get_unstaged_changes(self.repo)
+        self.assertEqual([b"new_dir/foo"], unstaged)
 
     def test_unstage_while_no_commit(self):
         """Test unstaging when there are no commits."""
@@ -192,31 +193,30 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         full_path = os.path.join(self.repo.path, file)
         with open(full_path, "w") as f:
             f.write("hello")
-        porcelain.add(self.repo, paths=[full_path])
+        self.worktree.stage([file])
         self.worktree.unstage([file])
-        status = list(porcelain.status(self.repo))
-        self.assertEqual(
-            [{"add": [], "delete": [], "modify": []}, [], [os.fsencode("foo")]], status
-        )
+
+        # Check that file is no longer in index
+        index = self.repo.open_index()
+        self.assertNotIn(b"foo", index)
 
     def test_unstage_add_file(self):
         """Test unstaging a newly added file."""
         file = "foo"
         full_path = os.path.join(self.repo.path, file)
-        porcelain.commit(
-            self.repo,
+        self.worktree.commit(
             message=b"unittest",
             committer=b"Jane <jane@example.com>",
             author=b"John <john@example.com>",
         )
         with open(full_path, "w") as f:
             f.write("hello")
-        porcelain.add(self.repo, paths=[full_path])
+        self.worktree.stage([file])
         self.worktree.unstage([file])
-        status = list(porcelain.status(self.repo))
-        self.assertEqual(
-            [{"add": [], "delete": [], "modify": []}, [], [os.fsencode("foo")]], status
-        )
+
+        # Check that file is no longer in index
+        index = self.repo.open_index()
+        self.assertNotIn(b"foo", index)
 
     def test_unstage_modify_file(self):
         """Test unstaging a modified file."""
@@ -224,22 +224,19 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         full_path = os.path.join(self.repo.path, file)
         with open(full_path, "w") as f:
             f.write("hello")
-        porcelain.add(self.repo, paths=[full_path])
-        porcelain.commit(
-            self.repo,
+        self.worktree.stage([file])
+        self.worktree.commit(
             message=b"unittest",
             committer=b"Jane <jane@example.com>",
             author=b"John <john@example.com>",
         )
         with open(full_path, "a") as f:
             f.write("broken")
-        porcelain.add(self.repo, paths=[full_path])
+        self.worktree.stage([file])
         self.worktree.unstage([file])
-        status = list(porcelain.status(self.repo))
 
-        self.assertEqual(
-            [{"add": [], "delete": [], "modify": []}, [os.fsencode("foo")], []], status
-        )
+        unstaged = get_unstaged_changes(self.repo)
+        self.assertEqual([os.fsencode("foo")], unstaged)
 
     def test_unstage_remove_file(self):
         """Test unstaging a removed file."""
@@ -247,19 +244,17 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
         full_path = os.path.join(self.repo.path, file)
         with open(full_path, "w") as f:
             f.write("hello")
-        porcelain.add(self.repo, paths=[full_path])
-        porcelain.commit(
-            self.repo,
+        self.worktree.stage([file])
+        self.worktree.commit(
             message=b"unittest",
             committer=b"Jane <jane@example.com>",
             author=b"John <john@example.com>",
         )
         os.remove(full_path)
         self.worktree.unstage([file])
-        status = list(porcelain.status(self.repo))
-        self.assertEqual(
-            [{"add": [], "delete": [], "modify": []}, [os.fsencode("foo")], []], status
-        )
+
+        unstaged = get_unstaged_changes(self.repo)
+        self.assertEqual([os.fsencode("foo")], unstaged)
 
 
 class WorkTreeCommitTests(WorkTreeTestCase):
@@ -920,8 +915,9 @@ class TemporaryWorktreeTests(TestCase):
         readme_path = os.path.join(self.repo_path, "README.md")
         with open(readme_path, "w") as f:
             f.write("# Test Repository\n")
-        porcelain.add(self.repo, [readme_path])
-        porcelain.commit(self.repo, message=b"Initial commit")
+        wt = self.repo.get_worktree()
+        wt.stage(["README.md"])
+        wt.commit(message=b"Initial commit")
 
     def test_temporary_worktree_creates_and_cleans_up(self) -> None:
         """Test that temporary worktree is created and cleaned up."""
@@ -990,8 +986,9 @@ class TemporaryWorktreeTests(TestCase):
         with open(test_file, "w") as f:
             f.write("Hello, world!")
 
-        porcelain.add(self.repo, [test_file])
-        porcelain.commit(self.repo, message=b"Initial commit")
+        wt = self.repo.get_worktree()
+        wt.stage(["test.txt"])
+        wt.commit(message=b"Initial commit")
 
         with temporary_worktree(self.repo) as worktree:
             # Check that the file exists in the worktree
@@ -1007,6 +1004,6 @@ class TemporaryWorktreeTests(TestCase):
             with open(wt_test_file, "w") as f:
                 f.write("Modified content")
 
-            # Changes should be visible in status
-            status = porcelain.status(worktree)
-            self.assertIn(os.fsencode("test.txt"), status.unstaged)
+            # Changes should be visible as unstaged
+            unstaged = get_unstaged_changes(worktree)
+            self.assertIn(os.fsencode("test.txt"), unstaged)

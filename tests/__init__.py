@@ -132,9 +132,6 @@ def self_test_suite() -> unittest.TestSuite:
         "bitmap",
         "blackbox",
         "bundle",
-        "cli",
-        "cli_cherry_pick",
-        "cli_merge",
         "client",
         "cloud_gcs",
         "commit_graph",
@@ -197,12 +194,24 @@ def self_test_suite() -> unittest.TestSuite:
         "worktree",
     ]
     module_names = ["tests.test_" + name for name in names]
+    cli_names = [
+        "cherry_pick",
+        "cli",
+        "merge",
+    ]
+    module_names += ["tests.cli.test_" + name for name in cli_names]
     porcelain_names = [
+        "annotate",
+        "bisect",
         "cherry_pick",
         "filters",
+        "ignore",
         "lfs",
+        "maintenance",
+        "mbox",
         "merge",
         "notes",
+        "rebase",
     ]
     module_names += ["tests.porcelain"] + [
         "tests.porcelain.test_" + name for name in porcelain_names

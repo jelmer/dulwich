@@ -145,5 +145,6 @@ class LFSFilterIntegrationTests(TestCase):
         blob.data = pointer.to_bytes()
 
         # Checkout should return the pointer as-is when object is missing
-        checked_out = self.normalizer.checkout_normalize(blob, b"missing.bin")
+        with self.assertLogs("dulwich.lfs", level="WARNING"):
+            checked_out = self.normalizer.checkout_normalize(blob, b"missing.bin")
         self.assertEqual(checked_out.data, blob.data)

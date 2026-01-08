@@ -276,8 +276,9 @@ class LFSPorcelainTestCase(TestCase):
         with self.assertRaises(KeyError):
             config.get((b"filter", b"lfs"), b"smudge")
 
-        # Clone the repository
-        cloned_repo = porcelain.clone(source_dir, clone_dir)
+        # Clone the repository (may warn about missing LFS objects)
+        with self.assertLogs("dulwich.lfs", level="WARNING"):
+            cloned_repo = porcelain.clone(source_dir, clone_dir)
 
         # Verify that built-in LFS filter was used
         normalizer = cloned_repo.get_blob_normalizer()

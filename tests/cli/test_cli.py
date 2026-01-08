@@ -24,6 +24,7 @@
 """Tests for dulwich.cli."""
 
 import io
+import logging
 import os
 import shutil
 import sys
@@ -47,7 +48,7 @@ from dulwich.tests.utils import (
     build_commit_graph,
 )
 
-from . import TestCase
+from .. import TestCase
 
 
 class DulwichCliTestCase(TestCase):
@@ -55,6 +56,17 @@ class DulwichCliTestCase(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
+        # Suppress expected error logging during CLI tests
+        cli_logger = logging.getLogger("dulwich.cli")
+        original_cli_level = cli_logger.level
+        cli_logger.setLevel(logging.CRITICAL)
+        self.addCleanup(cli_logger.setLevel, original_cli_level)
+
+        root_logger = logging.getLogger()
+        original_root_level = root_logger.level
+        root_logger.setLevel(logging.CRITICAL)
+        self.addCleanup(root_logger.setLevel, original_root_level)
+
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
         self.repo_path = os.path.join(self.test_dir, "repo")

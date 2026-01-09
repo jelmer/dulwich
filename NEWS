@@ -1,3 +1,8 @@
+0.25.2	UNRELEASED
+
+ * Fix test failure when GPG raises ``InvalidSigners`` instead of
+   ``GPGMEError`` on systems without usable secret keys. (#2063)
+
 0.25.1	2026-01-08
 
  * Add signature vendor system for signing and verifying Git objects.

@@ -362,12 +362,31 @@ class DumbHTTPObjectStore(BaseObjectStore):
         """Add a set of objects to this object store."""
         raise NotImplementedError("Cannot add objects to dumb HTTP repository")
 
-    def __del__(self) -> None:
-        """Clean up temporary directory on deletion."""
-        if self._temp_pack_dir and os.path.exists(self._temp_pack_dir):
-            import shutil
+    def close(self) -> None:
+        """Close the object store and release resources.
 
-            shutil.rmtree(self._temp_pack_dir, ignore_errors=True)
+        This method cleans up the temporary pack directory.
+        Can be called multiple times safely.
+        """
+        if self._temp_pack_dir is not None:
+            if os.path.exists(self._temp_pack_dir):
+                import shutil
+
+                shutil.rmtree(self._temp_pack_dir, ignore_errors=True)
+            self._temp_pack_dir = None
+
+    def __del__(self) -> None:
+        """Warn if the object store is being deleted without closing."""
+        if self._temp_pack_dir is not None:
+            import warnings
+
+            warnings.warn(
+                f"DumbHTTPObjectStore {self!r} was destroyed without calling close(). "
+                "Temporary pack directory may not be cleaned up properly.",
+                ResourceWarning,
+                stacklevel=2,
+            )
+            self.close()
 
 
 class DumbRemoteHTTPRepo:

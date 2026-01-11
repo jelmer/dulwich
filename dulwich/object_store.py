@@ -847,7 +847,6 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """
         super().__init__(object_format=object_format)
         self._pack_cache: dict[str, Pack] = {}
-        self._closed = False
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
         self.pack_delta_window_size = pack_delta_window_size
@@ -1011,15 +1010,26 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """Close the object store and release resources.
 
         This method closes all cached pack files and frees associated resources.
+        Can be called multiple times safely.
         """
-        self._closed = True
         self._clear_cached_packs()
+
+    def __del__(self) -> None:
+        """Warn if the object store is being deleted with unclosed packs."""
+        if self._pack_cache:
+            import warnings
+
+            warnings.warn(
+                f"ObjectStore {self!r} was destroyed with {len(self._pack_cache)} "
+                "unclosed pack(s). Please call close() explicitly.",
+                ResourceWarning,
+                stacklevel=2,
+            )
+            self.close()
 
     @property
     def packs(self) -> list[Pack]:
         """List with pack objects."""
-        if self._closed:
-            raise ValueError("Cannot access packs on a closed object store")
         return list(self._iter_cached_packs()) + list(self._update_pack_cache())
 
     def count_pack_files(self) -> int:
@@ -2437,6 +2447,7 @@ class DiskObjectStore(PackBasedObjectStore):
         """Close the object store and release resources.
 
         This method closes all cached pack files, MIDX, and frees associated resources.
+        Can be called multiple times safely.
         """
         # Close MIDX if it's loaded
         if self._midx is not None:

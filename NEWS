@@ -3,6 +3,10 @@
  * Fix test failure when GPG raises ``InvalidSigners`` instead of
    ``GPGMEError`` on systems without usable secret keys. (#2063)
 
+ * Object store ``close()`` methods can now be called multiple times safely.
+   Object stores now raise ``ResourceWarning`` when destroyed with unclosed
+   resources. (Jelmer Vernooĳ)
+
 0.25.1	2026-01-08
 
  * Add signature vendor system for signing and verifying Git objects.

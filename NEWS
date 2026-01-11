@@ -1,4 +1,4 @@
-0.25.2	UNRELEASED
+0.25.2	2026-01-11
 
  * Fix test failure when GPG raises ``InvalidSigners`` instead of
    ``GPGMEError`` on systems without usable secret keys. (#2063)

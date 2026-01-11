@@ -128,17 +128,17 @@ class GPGSignatureVendorTests(unittest.TestCase):
         vendor = GPGSignatureVendor()
         test_data = b"test data to sign"
 
-        try:
-            # Sign the data
-            signature = vendor.sign(test_data)
-            self.assertIsInstance(signature, bytes)
-            self.assertGreater(len(signature), 0)
+        key = get_valid_gpg_key()
+        if not key:
+            self.skipTest("No valid GPG keys available for testing")
 
-            # Verify the signature
-            vendor.verify(test_data, signature)
-        except gpg.errors.GPGMEError as e:
-            # Skip test if no GPG key is available
-            self.skipTest(f"GPG key not available: {e}")
+        # Sign the data
+        signature = vendor.sign(test_data)
+        self.assertIsInstance(signature, bytes)
+        self.assertGreater(len(signature), 0)
+
+        # Verify the signature
+        vendor.verify(test_data, signature)
 
     def test_verify_invalid_signature(self) -> None:
         """Test that verify raises an error for invalid signatures."""
@@ -158,19 +158,16 @@ class GPGSignatureVendorTests(unittest.TestCase):
         vendor = GPGSignatureVendor()
         test_data = b"test data to sign"
 
-        try:
-            key = get_valid_gpg_key()
-            if not key:
-                self.skipTest("No valid GPG keys available for testing")
+        key = get_valid_gpg_key()
+        if not key:
+            self.skipTest("No valid GPG keys available for testing")
 
-            signature = vendor.sign(test_data, keyid=key)
-            self.assertIsInstance(signature, bytes)
-            self.assertGreater(len(signature), 0)
+        signature = vendor.sign(test_data, keyid=key)
+        self.assertIsInstance(signature, bytes)
+        self.assertGreater(len(signature), 0)
 
-            # Verify the signature
-            vendor.verify(test_data, signature)
-        except gpg.errors.GPGMEError as e:
-            self.skipTest(f"GPG key not available: {e}")
+        # Verify the signature
+        vendor.verify(test_data, signature)
 
 
 class GPGCliSignatureVendorTests(unittest.TestCase):

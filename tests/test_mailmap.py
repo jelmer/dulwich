@@ -166,3 +166,79 @@ class MailmapTests(TestCase):
         self.assertEqual(
             b"Other <real@example.com>", m.lookup(b"Other <other@example.com>")
         )
+
+    def test_init_with_iterator(self) -> None:
+        """Test initializing Mailmap with an iterator of entries."""
+        entries = [
+            ((b"Real Name", b"real@example.com"), (b"Alias", b"alias@example.com")),
+            ((b"Another", b"another@example.com"), None),
+        ]
+
+        m = Mailmap(iter(entries))
+
+        # Verify the entries were added
+        self.assertEqual(
+            b"Real Name <real@example.com>", m.lookup(b"Alias <alias@example.com>")
+        )
+        self.assertEqual(
+            b"Another <another@example.com>",
+            m.lookup(b"Another <another@example.com>"),
+        )
+
+    def test_lookup_with_none_name(self) -> None:
+        """Test lookup when canonical name is None (only email is canonical)."""
+        m = Mailmap()
+        # Add entry with canonical email but no canonical name
+        m.add_entry((None, b"real@example.com"), (b"Alias", b"alias@example.com"))
+
+        # When canonical name is None, use original name
+        result = m.lookup(b"Alias <alias@example.com>")
+        self.assertEqual(b"Alias <real@example.com>", result)
+
+        # Test formatting when name becomes empty
+        m2 = Mailmap()
+        m2.add_entry((None, b"real@example.com"), (None, b"alias@example.com"))
+        result2 = m2.lookup(b" <alias@example.com>")
+        # When both names are None/empty, result has empty name
+        self.assertEqual(b" <real@example.com>", result2)
+
+    def test_lookup_with_none_email(self) -> None:
+        """Test lookup when canonical email is None (only name is canonical)."""
+        m = Mailmap()
+        # Add entry with canonical name but no canonical email
+        m.add_entry((b"Real Name", None), (b"Alias", b"alias@example.com"))
+
+        # When canonical email is None, use original email
+        result = m.lookup(b"Alias <alias@example.com>")
+        self.assertEqual(b"Real Name <alias@example.com>", result)
+
+        # Test formatting when email becomes empty
+        m2 = Mailmap()
+        m2.add_entry((b"Real Name", None), (b"Alias", None))
+        result2 = m2.lookup(b"Alias <>")
+        # When both emails are None/empty, result has empty email
+        self.assertEqual(b"Real Name <>", result2)
+
+    def test_from_path(self) -> None:
+        """Test creating Mailmap from a file path."""
+        import os
+        import tempfile
+
+        # Create a temporary mailmap file
+        with tempfile.NamedTemporaryFile(
+            mode="wb", delete=False, suffix=".mailmap"
+        ) as f:
+            f.write(b"Real Name <real@example.com> <alias@example.com>\n")
+            f.write(b"Another Person <another@example.com>\n")
+            mailmap_path = f.name
+
+        try:
+            # Load from path
+            m = Mailmap.from_path(mailmap_path)
+
+            # Verify entries were loaded
+            self.assertEqual(
+                b"Real Name <real@example.com>", m.lookup(b"Alias <alias@example.com>")
+            )
+        finally:
+            os.unlink(mailmap_path)

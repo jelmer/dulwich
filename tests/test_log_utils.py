@@ -246,3 +246,112 @@ class LogUtilsTests(TestCase):
 
         # Check that the level is DEBUG when tracing is enabled
         self.assertEqual(root_logger.level, logging.DEBUG)
+
+    def test_configure_logging_from_trace_file_path(self) -> None:
+        """Test _configure_logging_from_trace with file path."""
+        from dulwich.log_utils import _configure_logging_from_trace
+
+        # Save current root logger state
+        root_logger = logging.getLogger()
+        original_level = root_logger.level
+        original_handlers = list(root_logger.handlers)
+
+        def cleanup() -> None:
+            root_logger.handlers = original_handlers
+            root_logger.level = original_level
+
+        self.addCleanup(cleanup)
+
+        # Reset root logger
+        root_logger.handlers = []
+        root_logger.level = logging.WARNING
+
+        # Create a temporary file for trace output
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            trace_file = f.name
+
+        try:
+            self._set_git_trace(trace_file)
+            result = _configure_logging_from_trace()
+
+            # Should succeed
+            self.assertTrue(result)
+
+            # Check that the root logger has a handler
+            self.assertTrue(root_logger.handlers)
+            self.assertEqual(root_logger.level, logging.DEBUG)
+        finally:
+            # Close all handlers to release file locks (needed on Windows)
+            for handler in root_logger.handlers[:]:
+                handler.close()
+                root_logger.removeHandler(handler)
+            if os.path.exists(trace_file):
+                os.unlink(trace_file)
+
+    def test_configure_logging_from_trace_directory(self) -> None:
+        """Test _configure_logging_from_trace with directory path."""
+        from dulwich.log_utils import _configure_logging_from_trace
+
+        # Save current root logger state
+        root_logger = logging.getLogger()
+        original_level = root_logger.level
+        original_handlers = list(root_logger.handlers)
+
+        def cleanup() -> None:
+            root_logger.handlers = original_handlers
+            root_logger.level = original_level
+
+        self.addCleanup(cleanup)
+
+        # Reset root logger
+        root_logger.handlers = []
+        root_logger.level = logging.WARNING
+
+        # Create a temporary directory for trace output
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self._set_git_trace(tmpdir)
+            result = _configure_logging_from_trace()
+
+            # Should succeed
+            self.assertTrue(result)
+
+            # Check that the root logger has a handler
+            self.assertTrue(root_logger.handlers)
+            self.assertEqual(root_logger.level, logging.DEBUG)
+
+            # Check that a file was created in the directory
+            trace_file = os.path.join(tmpdir, f"trace.{os.getpid()}")
+            # The file should exist after some logging
+            root_logger.debug("Test message")
+            self.assertTrue(os.path.exists(trace_file))
+
+            # Close all handlers to release file locks (needed on Windows)
+            for handler in root_logger.handlers[:]:
+                handler.close()
+                root_logger.removeHandler(handler)
+
+    def test_configure_logging_from_trace_invalid_file(self) -> None:
+        """Test _configure_logging_from_trace with invalid file path."""
+        from dulwich.log_utils import _configure_logging_from_trace
+
+        # Save current root logger state
+        root_logger = logging.getLogger()
+        original_level = root_logger.level
+        original_handlers = list(root_logger.handlers)
+
+        def cleanup() -> None:
+            root_logger.handlers = original_handlers
+            root_logger.level = original_level
+
+        self.addCleanup(cleanup)
+
+        # Reset root logger
+        root_logger.handlers = []
+        root_logger.level = logging.WARNING
+
+        # Use an invalid path (directory that doesn't exist)
+        self._set_git_trace("/nonexistent/path/trace.log")
+        result = _configure_logging_from_trace()
+
+        # Should fail
+        self.assertFalse(result)

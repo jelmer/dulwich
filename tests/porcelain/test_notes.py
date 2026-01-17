@@ -172,3 +172,48 @@ class TestPorcelainNotes(TestCase):
         commit = self.repo[note_commit_id]
         self.assertEqual(b"Custom Author <author@example.com>", commit.author)
         self.assertEqual(b"Custom Committer <committer@example.com>", commit.committer)
+
+    def test_notes_ref_already_qualified(self):
+        """Test using a notes ref that's already fully qualified."""
+        # Add note using fully qualified ref
+        porcelain.notes_add(
+            self.test_dir,
+            self.test_commit_id,
+            b"Note with qualified ref",
+            ref=b"refs/notes/custom",
+        )
+
+        # Show using the same qualified ref
+        note = porcelain.notes_show(
+            self.test_dir, self.test_commit_id, ref=b"refs/notes/custom"
+        )
+        self.assertEqual(b"Note with qualified ref", note)
+
+    def test_notes_remove_with_string_ref(self):
+        """Test removing a note with string ref parameter."""
+        # Add a note to custom ref
+        porcelain.notes_add(
+            self.test_dir, self.test_commit_id, b"Note to remove", ref="custom"
+        )
+
+        # Remove using string ref
+        result = porcelain.notes_remove(
+            self.test_dir, self.test_commit_id, ref="custom"
+        )
+        self.assertIsNotNone(result)
+
+        # Verify it's gone
+        note = porcelain.notes_show(self.test_dir, self.test_commit_id, ref="custom")
+        self.assertIsNone(note)
+
+    def test_notes_list_with_string_ref(self):
+        """Test listing notes with string ref parameter."""
+        # Add notes to custom ref
+        porcelain.notes_add(
+            self.test_dir, self.test_commit_id, b"Custom note", ref="myref"
+        )
+
+        # List using string ref
+        notes = porcelain.notes_list(self.test_dir, ref="myref")
+        self.assertEqual(1, len(notes))
+        self.assertEqual(b"Custom note", notes[0][1])

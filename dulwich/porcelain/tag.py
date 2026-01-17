@@ -157,7 +157,7 @@ def tag_create(
             if tag_timezone is None:
                 tag_timezone = get_user_timezones()[1]
             elif isinstance(tag_timezone, str):
-                tag_timezone = parse_timezone(tag_timezone.encode())
+                tag_timezone, _ = parse_timezone(tag_timezone.encode())
             tag_obj.tag_timezone = tag_timezone
 
             # Check if we should sign the tag

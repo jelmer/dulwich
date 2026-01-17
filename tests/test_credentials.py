@@ -53,6 +53,18 @@ class TestCredentialHelpersUtils(TestCase):
         self.assertFalse(match_partial_url(url, "github.com/jel"))
         self.assertFalse(match_partial_url(url, "github.com/jel/"))
 
+    def test_match_partial_url_with_scheme(self) -> None:
+        """Test match_partial_url with a URL that includes a scheme."""
+        url = urlparse("https://github.com/jelmer/dulwich/")
+
+        # Match with same scheme
+        self.assertTrue(match_partial_url(url, "https://github.com"))
+        self.assertTrue(match_partial_url(url, "https://github.com/jelmer/dulwich"))
+
+        # No match with different scheme
+        self.assertFalse(match_partial_url(url, "http://github.com"))
+        self.assertFalse(match_partial_url(url, "ssh://github.com"))
+
     def test_urlmatch_credential_sections(self) -> None:
         config = ConfigDict()
         config.set((b"credential", "https://github.com"), b"helper", "foo")
@@ -78,4 +90,23 @@ class TestCredentialHelpersUtils(TestCase):
         self.assertEqual(
             list(urlmatch_credential_sections(config, "missing_url")),
             [(b"credential",)],
+        )
+
+    def test_urlmatch_credential_sections_with_other_sections(self) -> None:
+        """Test that non-credential sections are skipped."""
+        config = ConfigDict()
+        config.set((b"credential", "https://github.com"), b"helper", "foo")
+        config.set(b"credential", b"helper", "bar")
+        # Add some non-credential sections
+        config.set(b"user", b"name", "Test User")
+        config.set(b"core", b"editor", "vim")
+
+        # Should only return credential sections
+        result = list(urlmatch_credential_sections(config, "https://github.com"))
+        self.assertEqual(
+            result,
+            [
+                (b"credential", b"https://github.com"),
+                (b"credential",),
+            ],
         )

@@ -51,7 +51,7 @@ def submodule_add(
 
     with open_repo_closing(repo) as r:
         if path is None:
-            path = os.path.relpath(_canonical_part(url), r.path)
+            path = _canonical_part(url)
         if name is None:
             name = os.fsdecode(path) if path is not None else None
 

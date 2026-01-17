@@ -123,6 +123,8 @@ class BlackboxTestCase(TestCase):
 
 def self_test_suite() -> unittest.TestSuite:
     names = [
+        "__init__",
+        "__main__",
         "aiohttp",
         "annotate",
         "approxidate",
@@ -164,10 +166,11 @@ def self_test_suite() -> unittest.TestSuite:
         "midx",
         "missing_obj_finder",
         "notes",
+        "object_filters",
+        "object_format",
+        "object_store",
         "objects",
         "objectspec",
-        "object_filters",
-        "object_store",
         "pack",
         "patch",
         "protocol",
@@ -212,6 +215,9 @@ def self_test_suite() -> unittest.TestSuite:
         "merge",
         "notes",
         "rebase",
+        "submodule",
+        "tag",
+        "worktree",
     ]
     module_names += ["tests.porcelain"] + [
         "tests.porcelain.test_" + name for name in porcelain_names

@@ -390,56 +390,6 @@ class WorkTreeSparseCheckoutTests(WorkTreeTestCase):
 class WorkTreeBackwardCompatibilityTests(WorkTreeTestCase):
     """Tests for backward compatibility of deprecated Repo methods."""
 
-    def test_deprecated_stage_delegates_to_worktree(self):
-        """Test that deprecated Repo.stage delegates to WorkTree."""
-        with open(os.path.join(self.repo.path, "new_file"), "w") as f:
-            f.write("test content")
-
-        # This should show a deprecation warning but still work
-        import warnings
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            self.repo.stage(
-                ["new_file"]
-            )  # Call deprecated method on Repo, not WorkTree
-            self.assertTrue(len(w) > 0)
-            self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-
-    def test_deprecated_unstage_delegates_to_worktree(self):
-        """Test that deprecated Repo.unstage delegates to WorkTree."""
-        # This should show a deprecation warning but still work
-        import warnings
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            self.repo.unstage(["a"])  # Call deprecated method on Repo, not WorkTree
-            self.assertTrue(len(w) > 0)
-            self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-
-    def test_deprecated_sparse_checkout_methods(self):
-        """Test that deprecated sparse checkout methods delegate to WorkTree."""
-        import warnings
-
-        # Test get_sparse_checkout_patterns
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            patterns = (
-                self.repo.get_sparse_checkout_patterns()
-            )  # Call deprecated method on Repo
-            self.assertEqual([], patterns)
-            self.assertTrue(len(w) > 0)
-            self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-
-        # Test set_sparse_checkout_patterns
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            self.repo.set_sparse_checkout_patterns(
-                ["*.py"]
-            )  # Call deprecated method on Repo
-            self.assertTrue(len(w) > 0)
-            self.assertTrue(issubclass(w[0].category, DeprecationWarning))
-
     def test_pre_commit_hook_fail(self):
         """Test that failing pre-commit hook raises CommitError."""
         if os.name != "posix":

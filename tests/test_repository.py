@@ -1682,10 +1682,9 @@ class BuildRepoRootTests(TestCase):
     def test_stage_absolute(self) -> None:
         r = self._repo
         os.remove(os.path.join(r.path, "a"))
-        # Suppress deprecation warning since we're intentionally testing the deprecated method
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            self.assertRaises(ValueError, r.stage, [os.path.join(r.path, "a")])
+        self.assertRaises(
+            ValueError, r.get_worktree().stage, [os.path.join(r.path, "a")]
+        )
 
     def test_stage_deleted(self) -> None:
         r = self._repo

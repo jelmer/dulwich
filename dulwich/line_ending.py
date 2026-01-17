@@ -146,10 +146,6 @@ __all__ = [
     "check_safecrlf",
     "convert_crlf_to_lf",
     "convert_lf_to_crlf",
-    "get_checkin_filter",
-    "get_checkin_filter_autocrlf",
-    "get_checkout_filter",
-    "get_checkout_filter_autocrlf",
     "get_clean_filter",
     "get_clean_filter_autocrlf",
     "get_smudge_filter",
@@ -165,7 +161,6 @@ if TYPE_CHECKING:
     from .config import StackedConfig
     from .object_store import BaseObjectStore
 
-from . import replace_me
 from .attrs import GitAttributes, Pattern
 from .filters import FilterBlobNormalizer, FilterContext, FilterDriver, FilterRegistry
 from .object_store import iter_tree_contents
@@ -440,57 +435,6 @@ def get_clean_filter_autocrlf(
 
     # Checking filter should never be `convert_lf_to_crlf`
     return None
-
-
-# Backwards compatibility wrappers
-@replace_me(since="0.23.1", remove_in="0.25.0")
-def get_checkout_filter(
-    core_eol: str, core_autocrlf: bool | str, git_attributes: Mapping[str, Any]
-) -> Callable[[bytes], bytes] | None:
-    """Deprecated: Use get_smudge_filter instead."""
-    # Convert core_autocrlf to bytes for compatibility
-    if isinstance(core_autocrlf, bool):
-        autocrlf_bytes = b"true" if core_autocrlf else b"false"
-    else:
-        autocrlf_bytes = (
-            core_autocrlf.encode("utf-8")
-            if isinstance(core_autocrlf, str)
-            else core_autocrlf
-        )
-    return get_smudge_filter(core_eol, autocrlf_bytes)
-
-
-@replace_me(since="0.23.1", remove_in="0.25.0")
-def get_checkin_filter(
-    core_eol: str, core_autocrlf: bool | str, git_attributes: Mapping[str, Any]
-) -> Callable[[bytes], bytes] | None:
-    """Deprecated: Use get_clean_filter instead."""
-    # Convert core_autocrlf to bytes for compatibility
-    if isinstance(core_autocrlf, bool):
-        autocrlf_bytes = b"true" if core_autocrlf else b"false"
-    else:
-        autocrlf_bytes = (
-            core_autocrlf.encode("utf-8")
-            if isinstance(core_autocrlf, str)
-            else core_autocrlf
-        )
-    return get_clean_filter(core_eol, autocrlf_bytes)
-
-
-@replace_me(since="0.23.1", remove_in="0.25.0")
-def get_checkout_filter_autocrlf(
-    core_autocrlf: bytes,
-) -> Callable[[bytes], bytes] | None:
-    """Deprecated: Use get_smudge_filter_autocrlf instead."""
-    return get_smudge_filter_autocrlf(core_autocrlf)
-
-
-@replace_me(since="0.23.1", remove_in="0.25.0")
-def get_checkin_filter_autocrlf(
-    core_autocrlf: bytes,
-) -> Callable[[bytes], bytes] | None:
-    """Deprecated: Use get_clean_filter_autocrlf instead."""
-    return get_clean_filter_autocrlf(core_autocrlf)
 
 
 class BlobNormalizer(FilterBlobNormalizer):

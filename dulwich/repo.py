@@ -90,7 +90,7 @@ if TYPE_CHECKING:
     from .walk import Walker
     from .worktree import WorkTree
 
-from . import reflog, replace_me
+from . import reflog
 from .errors import (
     NoIndexPresent,
     NotBlobError,
@@ -1320,70 +1320,6 @@ class BaseRepo:
             "Working tree operations not supported by this repository type"
         )
 
-    @replace_me(remove_in="0.26.0")
-    def do_commit(
-        self,
-        message: bytes | None = None,
-        committer: bytes | None = None,
-        author: bytes | None = None,
-        commit_timestamp: float | None = None,
-        commit_timezone: int | None = None,
-        author_timestamp: float | None = None,
-        author_timezone: int | None = None,
-        tree: ObjectID | None = None,
-        encoding: bytes | None = None,
-        ref: Ref | None = HEADREF,
-        merge_heads: list[ObjectID] | None = None,
-        no_verify: bool = False,
-        sign: bool = False,
-    ) -> bytes:
-        """Create a new commit.
-
-        If not specified, committer and author default to
-        get_user_identity(..., 'COMMITTER')
-        and get_user_identity(..., 'AUTHOR') respectively.
-
-        Args:
-          message: Commit message (bytes or callable that takes (repo, commit)
-            and returns bytes)
-          committer: Committer fullname
-          author: Author fullname
-          commit_timestamp: Commit timestamp (defaults to now)
-          commit_timezone: Commit timestamp timezone (defaults to GMT)
-          author_timestamp: Author timestamp (defaults to commit
-            timestamp)
-          author_timezone: Author timestamp timezone
-            (defaults to commit timestamp timezone)
-          tree: SHA1 of the tree root to use (if not specified the
-            current index will be committed).
-          encoding: Encoding
-          ref: Optional ref to commit to (defaults to current branch).
-            If None, creates a dangling commit without updating any ref.
-          merge_heads: Merge heads (defaults to .git/MERGE_HEAD)
-          no_verify: Skip pre-commit and commit-msg hooks
-          sign: GPG Sign the commit (bool, defaults to False,
-            pass True to use default GPG key,
-            pass a str containing Key ID to use a specific GPG key)
-
-        Returns:
-          New commit SHA1
-        """
-        return self.get_worktree().commit(
-            message=message,
-            committer=committer,
-            author=author,
-            commit_timestamp=commit_timestamp,
-            commit_timezone=commit_timezone,
-            author_timestamp=author_timestamp,
-            author_timezone=author_timezone,
-            tree=tree,
-            encoding=encoding,
-            ref=ref,
-            merge_heads=merge_heads,
-            no_verify=no_verify,
-            sign=sign,
-        )
-
 
 def read_gitfile(f: BinaryIO) -> str:
     """Read a ``.git`` file.
@@ -1876,31 +1812,6 @@ class Repo(BaseRepo):
         # missing index file, which is treated as empty.
         return not self.bare
 
-    @replace_me(remove_in="0.26.0")
-    def stage(
-        self,
-        fs_paths: str
-        | bytes
-        | os.PathLike[str]
-        | Iterable[str | bytes | os.PathLike[str]],
-    ) -> None:
-        """Stage a set of paths.
-
-        Args:
-          fs_paths: List of paths, relative to the repository path
-        """
-        return self.get_worktree().stage(fs_paths)
-
-    @replace_me(remove_in="0.26.0")
-    def unstage(self, fs_paths: Sequence[str]) -> None:
-        """Unstage specific file in the index.
-
-        Args:
-          fs_paths: a list of files to unstage,
-            relative to the repository path.
-        """
-        return self.get_worktree().unstage(fs_paths)
-
     def clone(
         self,
         target_path: str | bytes | os.PathLike[str],
@@ -1997,15 +1908,6 @@ class Repo(BaseRepo):
                 shutil.rmtree(target_path)
             raise
         return target
-
-    @replace_me(remove_in="0.26.0")
-    def reset_index(self, tree: ObjectID | None = None) -> None:
-        """Reset the index back to a specific tree.
-
-        Args:
-          tree: Tree SHA to reset to, None for current HEAD tree.
-        """
-        return self.get_worktree().reset_index(tree)
 
     def _get_config_condition_matchers(self) -> dict[str, "ConditionMatcher"]:
         """Get condition matchers for includeIf conditions.
@@ -2530,51 +2432,6 @@ class Repo(BaseRepo):
                     patterns.append((pattern, attrs))
 
         return GitAttributes(patterns)
-
-    @replace_me(remove_in="0.26.0")
-    def _sparse_checkout_file_path(self) -> str:
-        """Return the path of the sparse-checkout file in this repo's control dir."""
-        return self.get_worktree()._sparse_checkout_file_path()
-
-    @replace_me(remove_in="0.26.0")
-    def configure_for_cone_mode(self) -> None:
-        """Ensure the repository is configured for cone-mode sparse-checkout."""
-        return self.get_worktree().configure_for_cone_mode()
-
-    @replace_me(remove_in="0.26.0")
-    def infer_cone_mode(self) -> bool:
-        """Return True if 'core.sparseCheckoutCone' is set to 'true' in config, else False."""
-        return self.get_worktree().infer_cone_mode()
-
-    @replace_me(remove_in="0.26.0")
-    def get_sparse_checkout_patterns(self) -> list[str]:
-        """Return a list of sparse-checkout patterns from info/sparse-checkout.
-
-        Returns:
-            A list of patterns. Returns an empty list if the file is missing.
-        """
-        return self.get_worktree().get_sparse_checkout_patterns()
-
-    @replace_me(remove_in="0.26.0")
-    def set_sparse_checkout_patterns(self, patterns: Sequence[str]) -> None:
-        """Write the given sparse-checkout patterns into info/sparse-checkout.
-
-        Creates the info/ directory if it does not exist.
-
-        Args:
-            patterns: A list of gitignore-style patterns to store.
-        """
-        return self.get_worktree().set_sparse_checkout_patterns(patterns)
-
-    @replace_me(remove_in="0.26.0")
-    def set_cone_mode_patterns(self, dirs: Sequence[str] | None = None) -> None:
-        """Write the given cone-mode directory patterns into info/sparse-checkout.
-
-        For each directory to include, add an inclusion line that "undoes" the prior
-        ``!/*/`` 'exclude' that re-includes that directory and everything under it.
-        Never add the same line twice.
-        """
-        return self.get_worktree().set_cone_mode_patterns(dirs)
 
 
 class MemoryRepo(BaseRepo):

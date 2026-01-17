@@ -60,7 +60,6 @@ __all__ = [
     "key_entry_name_order",
     "object_class",
     "object_header",
-    "parse_commit",
     "parse_commit_broken",
     "parse_tree",
     "pretty_format_tree_entry",
@@ -95,7 +94,6 @@ else:
 
 from typing import NewType, TypeGuard
 
-from . import replace_me
 from .errors import (
     ChecksumMismatch,
     FileFormatException,
@@ -2217,19 +2215,6 @@ class Commit(ShaFile):
         doc="Parents of this commit, by their SHA1.",
     )
 
-    @replace_me(since="0.21.0", remove_in="0.24.0")
-    def _get_extra(self) -> list[tuple[bytes, bytes]]:
-        """Return extra settings of this commit."""
-        return self._extra
-
-    extra = property(
-        _get_extra,
-        doc="Extra header fields not understood (presumably added in a "
-        "newer version of git). Kept verbatim so the object can "
-        "be correctly reserialized. For private commit metadata, use "
-        "pseudo-headers in Commit.message, rather than this field.",
-    )
-
     author = serializable_property("author", "The name of the author of the commit")
 
     committer = serializable_property(
@@ -2279,30 +2264,6 @@ for cls in OBJECT_CLASSES:
 
 
 # Public API functions
-
-
-@replace_me(since="0.21.0", remove_in="0.24.0")
-def parse_commit(
-    chunks: Iterable[bytes],
-) -> tuple[
-    bytes | None,
-    list[bytes],
-    tuple[bytes | None, int | None, tuple[int | None, bool | None]],
-    tuple[bytes | None, int | None, tuple[int | None, bool | None]],
-    bytes | None,
-    list[Tag],
-    bytes | None,
-    bytes | None,
-    list[tuple[bytes, bytes]],
-]:
-    """Parse a commit object from chunks.
-
-    Args:
-      chunks: Chunks to parse
-    Returns: Tuple of (tree, parents, author_info, commit_info,
-        encoding, mergetag, gpgsig, message, extra)
-    """
-    return _parse_commit(chunks)
 
 
 def parse_commit_broken(data: bytes) -> Commit:

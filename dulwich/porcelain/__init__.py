@@ -113,7 +113,6 @@ __all__ = [
     "check_ignore",
     "check_mailmap",
     "checkout",
-    "checkout_branch",
     "cherry",
     "cherry_pick",
     "clean",
@@ -306,7 +305,6 @@ if TYPE_CHECKING:
     from ..gc import GCStats
     from ..maintenance import MaintenanceResult
 
-from .. import replace_me
 from ..archive import tar_stream
 from ..bisect import BisectState
 from ..client import (
@@ -5427,26 +5425,6 @@ def reset_file(
     assert isinstance(blob, Blob)
     mode = file_entry[0]
     build_file_from_blob(blob, mode, full_path, symlink_fn=symlink_fn)
-
-
-@replace_me(since="0.22.9", remove_in="0.24.0")
-def checkout_branch(
-    repo: str | os.PathLike[str] | Repo,
-    target: bytes | str,
-    force: bool = False,
-) -> None:
-    """Switch branches or restore working tree files.
-
-    This is now a wrapper around the general checkout() function.
-    Preserved for backward compatibility.
-
-    Args:
-      repo: dulwich Repo object
-      target: branch name or commit sha to checkout
-      force: true or not to force checkout
-    """
-    # Simply delegate to the new checkout function
-    return checkout(repo, target, force=force)
 
 
 def sparse_checkout(

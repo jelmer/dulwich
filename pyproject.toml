@@ -10,7 +10,7 @@ authors = [{name = "Jelmer Vernooij", email = "jelmer@jelmer.uk"}]
 license = "Apache-2.0 OR GPL-2.0-or-later"
 keywords = ["vcs", "git"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

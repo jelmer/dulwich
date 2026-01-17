@@ -1,0 +1,481 @@
+.. _c-git-compatibility:
+
+========================
+C Git Compatibility
+========================
+
+This document lists Git functionality and indicates what Dulwich supports.
+Dulwich is a pure Python implementation of Git that provides wire-format
+and repository format compatibility with C Git.
+
+Legend:
+
+* ✓ - Fully supported
+* ◐ - Partially supported
+* ✗ - Not supported
+
+Main Porcelain Commands
+========================
+
+Repository Management
+---------------------
+
+* ✓ ``git init`` - Initialize repository
+* ✓ ``git clone`` - Clone repository
+* ✓ ``git config`` - Read and write configuration
+
+Working with Files
+------------------
+
+* ✓ ``git add`` - Add file contents to the index
+* ✓ ``git rm`` - Remove files from working tree and index
+* ✓ ``git mv`` - Move or rename file, directory, or symlink
+* ✓ ``git restore`` - Restore working tree files
+* ✓ ``git reset`` - Reset current HEAD to specified state
+* ✓ ``git clean`` - Remove untracked files
+
+Commits
+-------
+
+* ✓ ``git commit`` - Record changes to the repository
+* ✓ ``git show`` - Show various types of objects
+* ✓ ``git log`` - Show commit logs
+* ✓ ``git shortlog`` - Summarize git log output
+* ✓ ``git describe`` - Describe a commit using the most recent tag
+* ✓ ``git annotate`` - Annotate file lines with commit information
+* ✓ ``git blame`` - Show what revision and author last modified each line
+* ✗ ``git citool`` - Graphical alternative to git-commit
+* ✗ ``gitk`` - Git repository browser
+
+Branches
+--------
+
+* ✓ ``git branch`` - List, create, or delete branches
+* ✓ ``git checkout`` - Switch branches or restore working tree files
+* ✓ ``git switch`` - Switch branches
+* ✓ ``git show-branch`` - Show branches and their commits
+* ✓ ``git worktree`` - Manage multiple working trees
+
+Tags
+----
+
+* ✓ ``git tag`` - Create, list, delete, or verify tags
+* ✓ ``git verify-tag`` - Check GPG/SSH signature of tags
+* ✓ ``git verify-commit`` - Check GPG/SSH signature of commits
+
+Merging
+-------
+
+* ✓ ``git merge`` - Join two or more development histories
+* ✓ ``git merge-base`` - Find common ancestor for merge
+* ✗ ``git mergetool`` - Run merge conflict resolution tool interactively
+* ✓ ``git rebase`` - Reapply commits on top of another base tip
+* ◐ ``git rebase -i`` - Interactive rebase (limited support)
+* ✓ ``git cherry-pick`` - Apply changes introduced by existing commits
+* ✓ ``git revert`` - Revert existing commits
+* ✓ ``git cherry`` - Find commits not merged upstream
+
+Remotes
+-------
+
+* ✓ ``git fetch`` - Download objects and refs from another repository
+* ✓ ``git pull`` - Fetch from and integrate with another repository
+* ✓ ``git push`` - Update remote refs along with associated objects
+* ✓ ``git remote`` - Manage set of tracked repositories
+* ✓ ``git ls-remote`` - List references in a remote repository
+
+Inspection
+----------
+
+* ✓ ``git status`` - Show the working tree status
+* ✓ ``git diff`` - Show changes between commits, commit and working tree, etc
+* ✓ ``git grep`` - Print lines matching a pattern
+* ✓ ``git bisect`` - Use binary search to find commit that introduced a bug
+
+Patching
+--------
+
+* ✓ ``git format-patch`` - Prepare patches for email submission
+* ✗ ``git am`` - Apply series of patches from mailbox
+* ✗ ``git apply`` - Apply patch to files
+* ✓ ``git mailsplit`` - Simple UNIX mbox splitter program
+* ✓ ``git mailinfo`` - Extracts patch and authorship from a single email
+* ✗ ``git send-email`` - Send collection of patches as emails
+* ✗ ``git request-pull`` - Generate summary of pending changes
+
+Debugging
+---------
+
+* ✓ ``git fsck`` - Verify connectivity and validity of objects
+* ✓ ``git check-ignore`` - Debug gitignore / exclude files
+* ✓ ``git check-mailmap`` - Show canonical names and email addresses
+* ✗ ``git instaweb`` - Instantly browse your working repository
+
+Administration
+--------------
+
+* ✓ ``git gc`` - Cleanup unnecessary files and optimize repository
+* ✓ ``git reflog`` - Manage reflog information
+* ✓ ``git filter-branch`` - Rewrite branches
+* ✓ ``git maintenance`` - Run tasks to optimize Git repository data
+* ✓ ``git prune`` - Prune all unreachable objects
+* ✓ ``git repack`` - Pack unpacked objects in a repository
+* ✓ ``git count-objects`` - Count unpacked number of objects
+
+Server Side
+-----------
+
+* ✓ ``git daemon`` - A really simple server for Git repositories
+* ✓ ``git update-server-info`` - Update auxiliary info file
+* ✓ ``git upload-pack`` - Send objects packed back to git-fetch-pack
+* ✓ ``git receive-pack`` - Receive what is pushed into the repository
+
+Other
+-----
+
+* ✓ ``git archive`` - Create archive of files from named tree
+* ✓ ``git bundle`` - Create, unpack, and manipulate bundle files
+* ✓ ``git stash`` - Stash changes in dirty working directory
+* ✓ ``git submodule`` - Initialize, update or inspect submodules
+* ✓ ``git notes`` - Add or inspect object notes
+* ✓ ``git replace`` - Create, list, delete refs to replace objects
+* ✓ ``git rerere`` - Reuse recorded resolution of conflicted merges
+* ✓ ``git help`` - Display help information
+* ◐ ``git fast-export`` - Export repository data (API only, see fastexport module)
+* ◐ ``git fast-import`` - Import repository data (API only, see fastexport module)
+* ✗ ``git gui`` - Portable graphical interface to Git
+* ✗ ``git web--browse`` - Launch web browser to view HTML documentation
+* ✗ ``git difftool`` - Show changes using external diff tool
+* ✗ ``git range-diff`` - Compare two commit ranges
+* ✗ ``git bugreport`` - Collect information for bug reports
+* ✓ ``git diagnose`` - Display diagnostic information about the environment
+* ✗ ``git fsmonitor--daemon`` - Filesystem monitor daemon
+* ✗ ``git scalar`` - Manage large Git repositories
+
+Plumbing Commands
+=================
+
+Manipulation
+------------
+
+* ✗ ``git apply`` - Apply patch to files
+* ◐ ``git checkout-index`` - Copy files from index to working tree (API only)
+* ✓ ``git commit-tree`` - Create new commit object
+* ◐ ``git hash-object`` - Compute object ID (API only)
+* ◐ ``git index-pack`` - Build pack index file (API only)
+* ◐ ``git merge-file`` - Run three-way file merge (API only)
+* ✓ ``git merge-tree`` - Show three-way merge without touching index
+* ◐ ``git mktag`` - Create tag object (API only)
+* ✓ ``git pack-objects`` - Create packed archive of objects
+* ◐ ``git prune-packed`` - Remove extra objects (API only)
+* ◐ ``git read-tree`` - Read tree information into index (API only)
+* ✓ ``git symbolic-ref`` - Read, modify and delete symbolic refs
+* ✓ ``git unpack-objects`` - Unpack objects from packed archive
+* ◐ ``git update-index`` - Register file contents in working tree to index (API only)
+* ◐ ``git update-ref`` - Update object name stored in a ref (API only)
+* ✓ ``git write-tree`` - Create tree object from current index
+* ✗ ``git mktree`` - Build tree object from ls-tree formatted text
+
+Interrogation
+-------------
+
+* ◐ ``git cat-file`` - Provide content or type and size information (API only)
+* ◐ ``git diff-files`` - Compare files in working tree and index (API only)
+* ◐ ``git diff-index`` - Compare content and mode of blobs (API only)
+* ✓ ``git diff-tree`` - Compare content and mode of trees
+* ✓ ``git for-each-ref`` - Output information on each ref
+* ✓ ``git ls-files`` - Show information about files in index and working tree
+* ✓ ``git ls-remote`` - List references in remote repository
+* ✓ ``git ls-tree`` - List contents of tree object
+* ✓ ``git merge-base`` - Find common ancestor
+* ◐ ``git name-rev`` - Find symbolic names for revisions (API only)
+* ✓ ``git pack-refs`` - Pack heads and tags for efficient repository access
+* ✓ ``git rev-list`` - List commit objects in reverse chronological order
+* ◐ ``git rev-parse`` - Pick out and massage parameters (API only, see objectspec module)
+* ◐ ``git show-index`` - Show packed archive index (API only)
+* ✓ ``git show-ref`` - List references in local repository
+* ✓ ``git var`` - Show Git logical variable
+* ◐ ``git verify-pack`` - Validate packed Git archive files (API only)
+
+Syncing
+-------
+
+* ◐ ``git fetch-pack`` - Receive missing objects from another repository (CLI available)
+* ◐ ``git http-fetch`` - Download from remote Git repository via HTTP (API only)
+* ◐ ``git send-pack`` - Push objects over Git protocol to another repository (API only)
+* ✓ ``git update-server-info`` - Update auxiliary info for dumb servers
+* ✗ ``git http-push`` - Push objects over HTTP to another repository
+* ✗ ``git upload-archive`` - Send archive back to git-archive
+
+Pack Management
+---------------
+
+* ◐ ``git multi-pack-index`` - Manage multi-pack-index (API only, see midx module)
+
+Internal Helpers
+----------------
+
+* ◐ ``git check-attr`` - Display gitattributes information (API only, see attrs module)
+* ✓ ``git check-ignore`` - Debug gitignore / exclude files
+* ✓ ``git check-mailmap`` - Show canonical names and email addresses
+* ✓ ``git column`` - Display data in columns
+* ◐ ``git credential`` - Retrieve and store user credentials (basic support)
+* ✗ ``git fmt-merge-msg`` - Produce merge commit message
+* ✓ ``git interpret-trailers`` - Add or parse structured information in commit messages
+* ✓ ``git mailinfo`` - Extract patch and authorship from single email message
+* ✓ ``git mailsplit`` - Simple UNIX mbox splitter
+* ✗ ``git merge-one-file`` - Standard helper program to use with git-merge-index
+* ◐ ``git patch-id`` - Compute unique ID for patch (API only, see patch module)
+* ✓ ``git stripspace`` - Remove unnecessary whitespace
+* ✗ ``git sh-setup`` - Common Git shell script setup code
+* ✗ ``git sh-i18n`` - Git's i18n setup code for shell scripts
+
+File Formats & Protocols
+=========================
+
+Repository Format
+-----------------
+
+* ✓ Object storage (loose objects)
+* ✓ Pack files (.pack)
+* ✓ Pack indexes (.idx)
+* ✓ Multi-pack index (.midx)
+* ✓ Pack bitmaps
+* ✓ Commit graphs
+* ✓ SHA-1 object format
+* ✓ SHA-256 object format
+* ✓ Reftable format
+
+Configuration Files
+-------------------
+
+* ✓ .git/config
+* ✓ .gitignore
+* ✓ .gitattributes
+* ✓ .mailmap
+* ✓ .git/info/exclude
+* ✓ .git/info/attributes
+* ✓ .gitmodules
+
+Ref Storage
+-----------
+
+* ✓ Loose refs (refs/heads/, refs/tags/, etc.)
+* ✓ Packed refs (packed-refs)
+* ✓ Reflog
+* ✓ Reftable
+
+Network Protocols
+-----------------
+
+* ✓ SSH protocol
+* ✓ Git protocol (git://)
+* ✓ HTTP/HTTPS (smart protocol)
+* ✓ HTTP/HTTPS (dumb protocol)
+* ✓ File protocol (file://)
+* ✓ Local repositories
+* ◐ Protocol v2 (client fetch only, server limited)
+
+Transfer Capabilities
+---------------------
+
+Fetch/Upload-Pack:
+
+* ✓ thin-pack - Server: ✓, Client: ✓
+* ✓ ofs-delta - Server: ✓, Client: ✓
+* ✓ multi_ack - Server: ✓, Client: ✓
+* ✓ multi_ack_detailed - Server: ✓, Client: ✓
+* ✓ side-band-64k - Server: ✓, Client: ✓
+* ✓ shallow - Server: ✓, Client: ✓
+* ✓ deepen-since - Server: ✓, Client: ✓
+* ✓ deepen-not - Server: ✓, Client: ✓
+* ✓ deepen-relative - Server: ✓, Client: ✓
+* ✓ include-tag - Server: ✓, Client: ✓
+* ◐ no-progress - Server: ✓, Client: ✗
+* ✓ symref - Server: ✓, Client: ✓
+* ◐ filter - Server: ✓, Client: ◐ (basic support)
+
+Push/Receive-Pack:
+
+* ✓ report-status - Server: ✓, Client: ✓
+* ✓ delete-refs - Server: ✓, Client: ✓
+* ✓ quiet - Server: ✓, Client: ✓
+* ✓ atomic - Server: ✓, Client: ✓
+* ✓ ofs-delta - Server: ✓, Client: ✓
+* ✓ side-band-64k - Server: ✓, Client: ✓
+
+General:
+
+* ✓ object-format - Server: ✓, Client: ✓
+* ✓ agent - Server: ✓, Client: ✓
+
+Advanced Features
+=================
+
+Signatures
+----------
+
+* ✓ GPG commit signing
+* ✓ GPG tag signing
+* ✓ GPG signature verification (verify-commit, verify-tag)
+* ✓ SSH commit signing
+* ✓ SSH tag signing
+* ✓ SSH signature verification
+
+Filters & Attributes
+--------------------
+
+* ✓ Clean/smudge filters
+* ✓ Text/binary detection
+* ✓ End-of-line conversion (CRLF/LF)
+* ✓ .gitattributes processing
+* ✗ Working tree encoding
+* ✓ Whitespace handling
+
+Hooks
+-----
+
+* ✓ Hook execution
+* ✓ pre-commit
+* ✗ prepare-commit-msg
+* ✓ commit-msg
+* ✓ post-commit
+* ✗ pre-rebase
+* ✗ post-checkout
+* ✗ post-merge
+* ✗ pre-push
+* ✗ pre-receive
+* ✗ update
+* ✓ post-receive
+* ✗ post-update
+* ✗ push-to-checkout
+
+Git LFS
+-------
+
+* ✓ git-lfs init
+* ✓ git-lfs track
+* ✓ git-lfs untrack
+* ✓ git-lfs ls-files
+* ✓ git-lfs fetch
+* ✓ git-lfs pull
+* ✓ git-lfs push
+* ✗ git-lfs checkout
+* ✓ git-lfs clean (filter)
+* ✓ git-lfs smudge (filter)
+* ◐ git-lfs pointer (API only via lfs_pointer_check)
+* ✓ git-lfs migrate
+* ✓ git-lfs status
+* ✓ LFS server implementation
+* ✓ LFS batch API
+
+Sparse Checkout
+---------------
+
+* ✓ Sparse checkout patterns
+* ✓ Cone mode
+* ✓ git sparse-checkout init (cone mode)
+* ✓ git sparse-checkout set
+* ✓ git sparse-checkout add
+* ◐ git sparse-checkout list (via API only)
+* ◐ git sparse-checkout disable (via API only)
+* ✗ git sparse-checkout reapply
+
+Worktrees
+---------
+
+* ✓ git worktree add
+* ✓ git worktree list
+* ✓ git worktree remove
+* ✓ git worktree prune
+* ✓ git worktree lock
+* ✓ git worktree unlock
+* ✓ git worktree move
+* ✓ git worktree repair
+
+Submodules
+----------
+
+* ✓ git submodule add
+* ✓ git submodule init
+* ✓ git submodule update
+* ◐ git submodule status (basic)
+* ✗ git submodule summary
+* ✗ git submodule foreach
+* ✗ git submodule sync
+* ✗ git submodule deinit
+* ✗ git submodule absorbgitdirs
+
+Notes
+-----
+
+* ✓ git notes add
+* ✓ git notes list
+* ✓ git notes show
+* ✓ git notes remove
+* ✗ git notes append
+* ✗ git notes copy
+* ✗ git notes merge
+* ✗ git notes prune
+* ✗ git notes get-ref
+
+Other Advanced Features
+-----------------------
+
+* ✓ Rerere (reuse recorded resolution)
+* ✓ Commit graph
+* ✓ Replace objects
+* ✓ Grafts
+* ✓ Info/alternates (alternate object databases)
+* ✓ Partial clone/fetch
+* ✓ Shallow clone/fetch
+* ✓ Bundle files
+* ✓ Fast-import/fast-export
+* ✗ Scalar
+* ◐ Partial clone with object filters (basic blob:none support)
+
+Web Interface
+=============
+
+* ✓ Gitweb-like interface (dulwich.web)
+* ✓ WSGI application support
+* ✗ cgit
+* ✗ GitWeb (Perl implementation)
+
+Known Limitations
+=================
+
+The following Git features are not currently supported:
+
+* Git GUIs (gitk, git-gui, git-citool)
+* Email workflow tools (git-send-email, git-request-pull)
+* Patch application (git-am, git-apply)
+* Interactive tools (git-difftool, git-mergetool)
+* Newer features (range-diff, scalar, fsmonitor--daemon)
+* Full protocol v2 server support (client is fully supported for fetch)
+* Some plumbing commands (mktree, http-push, upload-archive, fmt-merge-msg, merge-one-file)
+* Full submodule feature parity
+* Some advanced object filtering options
+* Most git hooks (only pre-commit, commit-msg, post-commit, post-receive)
+* Working tree encoding attribute
+
+Compatibility Notes
+===================
+
+Repository Compatibility
+------------------------
+
+Dulwich maintains full wire-format and on-disk repository format compatibility
+with C Git. This means:
+
+* Dulwich can read and write repositories created by C Git
+* C Git can read and write repositories created by Dulwich
+* Dulwich and C Git can be used interchangeably on the same repository
+* Network protocols are fully compatible
+
+See Also
+========
+
+* :ref:`tutorial-index` - Tutorial for using Dulwich
+* :ref:`protocol` - Git protocol documentation
+* :mod:`dulwich.porcelain` - High-level API reference

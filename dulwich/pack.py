@@ -147,7 +147,6 @@ if TYPE_CHECKING:
 if sys.platform == "Plan9":
     has_mmap = False
 
-from . import replace_me
 from .errors import ApplyDeltaError, ChecksumMismatch
 from .file import GitFile, _GitFile
 from .lru_cache import LRUSizeCache
@@ -687,18 +686,6 @@ class PackIndex:
         Returns: 20-byte binary digest, or None if not available
         """
         raise NotImplementedError(self.get_pack_checksum)
-
-    @replace_me(since="0.21.0", remove_in="0.23.0")
-    def object_index(self, sha: ObjectID | RawObjectID) -> int:
-        """Return the index for the given SHA.
-
-        Args:
-            sha: SHA-1 hash
-
-        Returns:
-            Index position
-        """
-        return self.object_offset(sha)
 
     def object_offset(self, sha: ObjectID | RawObjectID) -> int:
         """Return the offset in to the corresponding packfile for the object.
@@ -2200,7 +2187,9 @@ class DeltaChainIterator(Generic[T]):
             elif unpacked.pack_type_num == REF_DELTA:
                 with suppress(KeyError):
                     assert isinstance(unpacked.delta_base, bytes)
-                    base_ofs = pack.index.object_index(RawObjectID(unpacked.delta_base))
+                    base_ofs = pack.index.object_offset(
+                        RawObjectID(unpacked.delta_base)
+                    )
             if base_ofs is not None and base_ofs not in done:
                 todo.add(base_ofs)
         return walker

@@ -281,6 +281,10 @@ class LogUtilsTests(TestCase):
             self.assertTrue(root_logger.handlers)
             self.assertEqual(root_logger.level, logging.DEBUG)
         finally:
+            # Close all handlers to release file locks (needed on Windows)
+            for handler in root_logger.handlers[:]:
+                handler.close()
+                root_logger.removeHandler(handler)
             if os.path.exists(trace_file):
                 os.unlink(trace_file)
 
@@ -320,6 +324,11 @@ class LogUtilsTests(TestCase):
             # The file should exist after some logging
             root_logger.debug("Test message")
             self.assertTrue(os.path.exists(trace_file))
+
+            # Close all handlers to release file locks (needed on Windows)
+            for handler in root_logger.handlers[:]:
+                handler.close()
+                root_logger.removeHandler(handler)
 
     def test_configure_logging_from_trace_invalid_file(self) -> None:
         """Test _configure_logging_from_trace with invalid file path."""

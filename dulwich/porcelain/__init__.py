@@ -251,6 +251,7 @@ __all__ = [
     "tag_list",
     "unpack_objects",
     "update_head",
+    "update_ref",
     "update_server_info",
     "upload_pack",
     "var",
@@ -5758,6 +5759,68 @@ def rev_parse(repo: str | os.PathLike[str] | Repo, rev: str | bytes) -> bytes:
     with open_repo_closing(repo) as r:
         obj = parse_object(r, rev)
         return obj.id
+
+
+def update_ref(
+    repo: str | os.PathLike[str] | Repo,
+    ref: str | bytes,
+    new_value: str | bytes | None,
+    old_value: str | bytes | None = None,
+    message: str | bytes | None = None,
+) -> None:
+    """Update the object name stored in a ref safely.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      ref: Name of the ref to update (e.g., 'refs/heads/main', 'HEAD')
+      new_value: New object SHA to set the ref to (None to delete)
+      old_value: Optional old value to verify before updating (for atomic updates)
+      message: Optional message for the reflog
+
+    Raises:
+      ValueError: If the old value doesn't match
+    """
+    from ..objectspec import parse_object
+    from ..refs import Ref
+
+    ref_name = Ref(ref.encode("utf-8") if isinstance(ref, str) else ref)
+
+    with open_repo_closing(repo) as r:
+        # Parse new and old values to object IDs
+        new_sha: bytes | None
+        if new_value is None:
+            new_sha = None
+        else:
+            new_obj = parse_object(r, new_value)
+            new_sha = new_obj.id
+
+        old_sha: bytes | None
+        if old_value is not None:
+            old_obj = parse_object(r, old_value)
+            old_sha = old_obj.id
+        else:
+            old_sha = None
+
+        message_bytes = message.encode("utf-8") if isinstance(message, str) else message
+
+        # Handle deletion
+        if new_sha is None:
+            if old_sha is not None:
+                # Verify old value before deleting
+                current = r.refs.read_ref(ref_name)
+                if current != old_sha:
+                    raise ValueError(
+                        f"Ref {ref_name.decode('utf-8')} does not match expected value"
+                    )
+            r.refs.remove_if_equals(ref_name, old_sha, message=message_bytes)
+        else:
+            # Update or create ref
+            if not r.refs.set_if_equals(
+                ref_name, old_sha, new_sha, message=message_bytes
+            ):
+                raise ValueError(
+                    f"Ref {ref_name.decode('utf-8')} does not match expected value"
+                )
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

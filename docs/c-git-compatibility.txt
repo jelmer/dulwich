@@ -161,25 +161,25 @@ Manipulation
 * ✗ ``git apply`` - Apply patch to files
 * ◐ ``git checkout-index`` - Copy files from index to working tree (API only)
 * ✓ ``git commit-tree`` - Create new commit object
-* ◐ ``git hash-object`` - Compute object ID (API only)
+* ✓ ``git hash-object`` - Compute object ID
 * ◐ ``git index-pack`` - Build pack index file (API only)
 * ◐ ``git merge-file`` - Run three-way file merge (API only)
 * ✓ ``git merge-tree`` - Show three-way merge without touching index
-* ◐ ``git mktag`` - Create tag object (API only)
+* ✓ ``git mktag`` - Create tag object
 * ✓ ``git pack-objects`` - Create packed archive of objects
 * ◐ ``git prune-packed`` - Remove extra objects (API only)
 * ◐ ``git read-tree`` - Read tree information into index (API only)
 * ✓ ``git symbolic-ref`` - Read, modify and delete symbolic refs
 * ✓ ``git unpack-objects`` - Unpack objects from packed archive
 * ◐ ``git update-index`` - Register file contents in working tree to index (API only)
-* ◐ ``git update-ref`` - Update object name stored in a ref (API only)
+* ✓ ``git update-ref`` - Update object name stored in a ref
 * ✓ ``git write-tree`` - Create tree object from current index
 * ✗ ``git mktree`` - Build tree object from ls-tree formatted text
 
 Interrogation
 -------------
 
-* ◐ ``git cat-file`` - Provide content or type and size information (API only)
+* ✓ ``git cat-file`` - Provide content or type and size information
 * ◐ ``git diff-files`` - Compare files in working tree and index (API only)
 * ◐ ``git diff-index`` - Compare content and mode of blobs (API only)
 * ✓ ``git diff-tree`` - Compare content and mode of trees
@@ -191,8 +191,8 @@ Interrogation
 * ◐ ``git name-rev`` - Find symbolic names for revisions (API only)
 * ✓ ``git pack-refs`` - Pack heads and tags for efficient repository access
 * ✓ ``git rev-list`` - List commit objects in reverse chronological order
-* ◐ ``git rev-parse`` - Pick out and massage parameters (API only, see objectspec module)
-* ◐ ``git show-index`` - Show packed archive index (API only)
+* ✓ ``git rev-parse`` - Pick out and massage parameters (see also objectspec module)
+* ✓ ``git show-index`` - Show packed archive index
 * ✓ ``git show-ref`` - List references in local repository
 * ✓ ``git var`` - Show Git logical variable
 * ◐ ``git verify-pack`` - Validate packed Git archive files (API only)
@@ -363,7 +363,7 @@ Git LFS
 * ✗ git-lfs checkout
 * ✓ git-lfs clean (filter)
 * ✓ git-lfs smudge (filter)
-* ◐ git-lfs pointer (API only via lfs_pointer_check)
+* ✓ git-lfs pointer - Check LFS pointers
 * ✓ git-lfs migrate
 * ✓ git-lfs status
 * ✓ LFS server implementation
@@ -374,11 +374,11 @@ Sparse Checkout
 
 * ✓ Sparse checkout patterns
 * ✓ Cone mode
-* ✓ git sparse-checkout init (cone mode)
-* ✓ git sparse-checkout set
-* ✓ git sparse-checkout add
-* ◐ git sparse-checkout list (via API only)
-* ◐ git sparse-checkout disable (via API only)
+* ✓ git sparse-checkout init - Cone mode
+* ✓ git sparse-checkout set - Cone mode
+* ✓ git sparse-checkout add - Cone mode
+* ✓ git sparse-checkout list - List current patterns
+* ✓ git sparse-checkout disable - Disable sparse checkout
 * ✗ git sparse-checkout reapply
 
 Worktrees

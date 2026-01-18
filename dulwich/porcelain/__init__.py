@@ -109,6 +109,9 @@ __all__ = [
     "branch_list",
     "branch_remotes_list",
     "branches_containing",
+    "cat_file_content",
+    "cat_file_size",
+    "cat_file_type",
     "check_diverged",
     "check_ignore",
     "check_mailmap",
@@ -122,7 +125,9 @@ __all__ = [
     "commit_encode",
     "commit_tree",
     "cone_mode_add",
+    "cone_mode_disable",
     "cone_mode_init",
+    "cone_mode_list",
     "cone_mode_set",
     "count_objects",
     "daemon",
@@ -145,6 +150,7 @@ __all__ = [
     "get_untracked_paths",
     "get_user_timezones",
     "grep",
+    "hash_object",
     "independent_commits",
     "init",
     "interpret_trailers",
@@ -175,6 +181,7 @@ __all__ = [
     "merge_base",
     "merge_tree",
     "merged_branches",
+    "mktag",
     "mv",
     "no_merged_branches",
     "notes_add",
@@ -215,6 +222,7 @@ __all__ = [
     "reset_file",
     "restore",
     "rev_list",
+    "rev_parse",
     "revert",
     "set_branch_tracking",
     "shortlog",
@@ -222,6 +230,7 @@ __all__ = [
     "show_blob",
     "show_branch",
     "show_commit",
+    "show_index",
     "show_object",
     "show_ref",
     "show_tag",
@@ -244,6 +253,7 @@ __all__ = [
     "tag_list",
     "unpack_objects",
     "update_head",
+    "update_ref",
     "update_server_info",
     "upload_pack",
     "var",
@@ -304,6 +314,7 @@ if TYPE_CHECKING:
     from ..filter_branch import CommitData
     from ..gc import GCStats
     from ..maintenance import MaintenanceResult
+    from ..objects import RawObjectID
 
 from ..archive import tar_stream
 from ..bisect import BisectState
@@ -5562,6 +5573,305 @@ def cone_mode_add(
         repo_obj.get_worktree().set_cone_mode_patterns(dirs=added_dirs)
         new_patterns = repo_obj.get_worktree().get_sparse_checkout_patterns()
         sparse_checkout(repo_obj, patterns=new_patterns, force=force, cone=True)
+
+
+def cone_mode_list(repo: str | os.PathLike[str] | Repo) -> list[str]:
+    """List current sparse-checkout patterns.
+
+    Args:
+      repo: Path to the repository or a Repo object.
+
+    Returns:
+      List of sparse-checkout patterns
+    """
+    with open_repo_closing(repo) as repo_obj:
+        return repo_obj.get_worktree().get_sparse_checkout_patterns()
+
+
+def cone_mode_disable(repo: str | os.PathLike[str] | Repo, force: bool = False) -> None:
+    """Disable sparse checkout and restore all files.
+
+    This function:
+    1. Unsets core.sparseCheckout and core.sparseCheckoutCone config
+    2. Removes the .git/info/sparse-checkout file
+    3. Restores all files to the working tree
+
+    Args:
+      repo: Path to the repository or a Repo object.
+      force: Whether to forcibly discard local modifications (default False).
+
+    Returns:
+      None
+    """
+    with open_repo_closing(repo) as repo_obj:
+        # Unset sparse checkout config
+        config = repo_obj.get_config()
+        try:
+            del config[(b"core", b"sparseCheckout")]
+        except KeyError:
+            pass
+        try:
+            del config[(b"core", b"sparseCheckoutCone")]
+        except KeyError:
+            pass
+        config.write_to_path()
+
+        # Remove sparse-checkout file
+        sparse_file = repo_obj.get_worktree()._sparse_checkout_file_path()
+        try:
+            os.remove(sparse_file)
+        except FileNotFoundError:
+            pass
+
+        # Restore all files by doing a full checkout
+        # Clear all skip-worktree bits and restore all files from HEAD
+        from ..objects import Commit
+
+        commit = repo_obj[repo_obj.head()]
+        assert isinstance(commit, Commit)
+
+        from ..index import build_index_from_tree
+
+        build_index_from_tree(
+            repo_obj.path,
+            repo_obj.index_path(),
+            repo_obj.object_store,
+            commit.tree,
+        )
+
+
+def cat_file_type(repo: str | os.PathLike[str] | Repo, objectish: str | bytes) -> bytes:
+    """Get the type of a Git object.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      objectish: Object SHA, reference, or objectish (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Object type as bytes (b'blob', b'tree', b'commit', or b'tag')
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, objectish)
+        return obj.type_name
+
+
+def cat_file_size(repo: str | os.PathLike[str] | Repo, objectish: str | bytes) -> int:
+    """Get the size of a Git object.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      objectish: Object SHA, reference, or objectish (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Object size in bytes
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, objectish)
+        return len(obj.as_raw_string())
+
+
+def cat_file_content(
+    repo: str | os.PathLike[str] | Repo, objectish: str | bytes
+) -> bytes:
+    """Get the raw content of a Git object.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      objectish: Object SHA, reference, or objectish (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Raw object content as bytes
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, objectish)
+        return obj.as_raw_string()
+
+
+def hash_object(
+    repo: str | os.PathLike[str] | Repo | None,
+    path: str | os.PathLike[str] | None = None,
+    data: bytes | None = None,
+    object_type: bytes = b"blob",
+    write: bool = False,
+) -> bytes:
+    """Compute object ID and optionally write to object store.
+
+    Args:
+      repo: Path to the repository or a Repo object (required if write=True)
+      path: Path to file to hash (mutually exclusive with data)
+      data: Data to hash (mutually exclusive with path)
+      object_type: Type of object (default: b'blob')
+      write: Whether to write the object to the object store (default: False)
+
+    Returns:
+      Object SHA as bytes
+
+    Raises:
+      ValueError: If neither path nor data is provided, or both are provided
+      ValueError: If write=True but repo is None
+    """
+    from ..objects import Blob
+
+    if (path is None and data is None) or (path is not None and data is not None):
+        raise ValueError("Exactly one of 'path' or 'data' must be provided")
+
+    if write and repo is None:
+        raise ValueError("repo is required when write=True")
+
+    # Only blob type is supported for now
+    if object_type != b"blob":
+        raise NotImplementedError(
+            f"Object type {object_type.decode('utf-8')} not yet supported"
+        )
+
+    # Create blob object
+    blob = Blob()
+    if path is not None:
+        with open(path, "rb") as f:
+            blob.data = f.read()
+    else:
+        blob.data = data
+
+    # Write to object store if requested
+    if write:
+        assert repo is not None  # Already checked above
+        with open_repo_closing(repo) as r:
+            r.object_store.add_object(blob)
+
+    return blob.id
+
+
+def rev_parse(repo: str | os.PathLike[str] | Repo, rev: str | bytes) -> bytes:
+    """Parse a revision string and return the object SHA.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      rev: Revision string (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Object SHA as bytes
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, rev)
+        return obj.id
+
+
+def update_ref(
+    repo: str | os.PathLike[str] | Repo,
+    ref: str | bytes,
+    new_value: str | bytes | None,
+    old_value: str | bytes | None = None,
+    message: str | bytes | None = None,
+) -> None:
+    """Update the object name stored in a ref safely.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      ref: Name of the ref to update (e.g., 'refs/heads/main', 'HEAD')
+      new_value: New object SHA to set the ref to (None to delete)
+      old_value: Optional old value to verify before updating (for atomic updates)
+      message: Optional message for the reflog
+
+    Raises:
+      ValueError: If the old value doesn't match
+    """
+    from ..objectspec import parse_object
+    from ..refs import Ref
+
+    ref_name = Ref(ref.encode("utf-8") if isinstance(ref, str) else ref)
+
+    with open_repo_closing(repo) as r:
+        # Parse new and old values to object IDs
+        new_sha: bytes | None
+        if new_value is None:
+            new_sha = None
+        else:
+            new_obj = parse_object(r, new_value)
+            new_sha = new_obj.id
+
+        old_sha: bytes | None
+        if old_value is not None:
+            old_obj = parse_object(r, old_value)
+            old_sha = old_obj.id
+        else:
+            old_sha = None
+
+        message_bytes = message.encode("utf-8") if isinstance(message, str) else message
+
+        # Handle deletion
+        if new_sha is None:
+            if old_sha is not None:
+                # Verify old value before deleting
+                current = r.refs.read_ref(ref_name)
+                if current != old_sha:
+                    raise ValueError(
+                        f"Ref {ref_name.decode('utf-8')} does not match expected value"
+                    )
+            r.refs.remove_if_equals(ref_name, old_sha, message=message_bytes)
+        else:
+            # Update or create ref
+            if not r.refs.set_if_equals(
+                ref_name, old_sha, new_sha, message=message_bytes
+            ):
+                raise ValueError(
+                    f"Ref {ref_name.decode('utf-8')} does not match expected value"
+                )
+
+
+def mktag(repo: str | os.PathLike[str] | Repo, tag_data: bytes) -> bytes:
+    """Create a tag object from raw tag data.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      tag_data: Raw tag data in git tag format
+
+    Returns:
+      Object SHA of the created tag as bytes
+
+    Raises:
+      ObjectFormatException: If the tag data is invalid
+    """
+    from ..objects import Tag
+
+    # Parse the tag data
+    tag = Tag()
+    tag.set_raw_string(tag_data)
+
+    # Write to object store
+    with open_repo_closing(repo) as r:
+        r.object_store.add_object(tag)
+
+    return tag.id
+
+
+def show_index(
+    index_path: str | os.PathLike[str], repo: str | os.PathLike[str] | Repo = "."
+) -> "list[tuple[int, RawObjectID, int | None]]":
+    """Show the contents of a pack index file.
+
+    Args:
+      index_path: Path to the pack index file
+      repo: Path to the repository or a Repo object (for object format)
+
+    Returns:
+      List of tuples (offset, sha, crc32) for each entry
+
+    Raises:
+      FileNotFoundError: If the index file doesn't exist
+    """
+    from ..pack import load_pack_index
+
+    with open_repo_closing(repo) as r:
+        idx = load_pack_index(index_path, r.object_format)
+        return [(offset, sha, crc32) for sha, offset, crc32 in idx.iterentries()]
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

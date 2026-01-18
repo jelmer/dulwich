@@ -2476,6 +2476,342 @@ class CheckIgnoreCommandTest(DulwichCliTestCase):
             self.assertNotIn("test.txt", log_output)
 
 
+class CatFileCommandTest(DulwichCliTestCase):
+    """Tests for cat-file command."""
+
+    def test_cat_file_type(self):
+        """Test cat-file -t to show object type."""
+        # Create and commit a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Test commit")
+
+        # Get the commit SHA
+        head_sha = self.repo.head().decode("utf-8")
+
+        # Test showing commit type
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("cat-file", "-t", head_sha)
+            self.assertEqual(result, 0)
+            self.assertIn("commit", "\n".join(cm.output))
+
+        # Test showing type using HEAD reference
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("cat-file", "-t", "HEAD")
+            self.assertEqual(result, 0)
+            self.assertIn("commit", "\n".join(cm.output))
+
+    def test_cat_file_size(self):
+        """Test cat-file -s to show object size."""
+        # Create and commit a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Test commit")
+
+        # Test showing size
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("cat-file", "-s", "HEAD")
+            self.assertEqual(result, 0)
+            # Size should be a number
+            log_output = "\n".join(cm.output)
+            self.assertTrue(any(char.isdigit() for char in log_output))
+
+    def test_cat_file_content(self):
+        """Test cat-file -p to show object content."""
+        # Create and commit a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        test_content = b"test content\n"
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Test commit")
+
+        # Test showing content
+        result, stdout, _stderr = self._run_cli("cat-file", "-p", "HEAD")
+        self.assertEqual(result, 0)
+        # stdout should contain commit info
+        self.assertIn("Test commit", stdout)
+
+
+class HashObjectCommandTest(DulwichCliTestCase):
+    """Tests for hash-object command."""
+
+    def test_hash_object_from_file(self):
+        """Test hash-object with file input."""
+        # Create a test file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        test_content = b"test content\n"
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+
+        # Hash the file without writing
+        result, stdout, _stderr = self._run_cli("hash-object", test_file)
+        self.assertEqual(result, 0)
+        # stdout should contain the SHA (40 hex chars + newline)
+        sha = stdout.strip()
+        self.assertEqual(len(sha), 40)
+        self.assertTrue(all(c in "0123456789abcdef" for c in sha.lower()))
+
+    def test_hash_object_with_write(self):
+        """Test hash-object with -w flag to write to database."""
+        # Create a test file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        test_content = b"test content for writing\n"
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+
+        # Hash and write the file
+        result, stdout, _stderr = self._run_cli("hash-object", "-w", test_file)
+        self.assertEqual(result, 0)
+        # stdout should contain the SHA
+        sha = stdout.strip()
+        self.assertEqual(len(sha), 40)
+        self.assertTrue(all(c in "0123456789abcdef" for c in sha.lower()))
+
+        # Verify object exists in database
+        from dulwich.objects import Blob
+
+        obj = self.repo.object_store[sha.encode("utf-8")]
+        self.assertIsInstance(obj, Blob)
+        self.assertEqual(obj.data, test_content)
+
+
+class RevParseCommandTest(DulwichCliTestCase):
+    """Tests for rev-parse command."""
+
+    def test_rev_parse_head(self):
+        """Test rev-parse with HEAD."""
+        # Create a commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Test commit")
+
+        # Parse HEAD
+        result, stdout, _stderr = self._run_cli("rev-parse", "HEAD")
+        self.assertEqual(result, 0)
+        sha = stdout.strip()
+        self.assertEqual(len(sha), 40)
+        self.assertTrue(all(c in "0123456789abcdef" for c in sha.lower()))
+
+        # Verify it matches the actual HEAD
+        from dulwich.porcelain import rev_parse
+
+        expected_sha = rev_parse(self.repo_path, b"HEAD")
+        self.assertEqual(sha, expected_sha.decode("utf-8"))
+
+    def test_rev_parse_verify(self):
+        """Test rev-parse with --verify flag."""
+        # Create a commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Test commit")
+
+        # Test --verify with valid ref
+        result, stdout, _stderr = self._run_cli("rev-parse", "--verify", "HEAD")
+        self.assertEqual(result, 0)
+        sha = stdout.strip()
+        self.assertEqual(len(sha), 40)
+
+        # Test --verify with invalid ref (should fail gracefully)
+        result, _stdout, _stderr = self._run_cli("rev-parse", "--verify", "nonexistent")
+        self.assertEqual(result, 1)
+
+
+class UpdateRefCommandTest(DulwichCliTestCase):
+    """Tests for update-ref command."""
+
+    def test_update_ref_create(self):
+        """Test creating a new ref."""
+        # Create a commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Test commit")
+
+        # Get the current HEAD SHA
+        from dulwich.porcelain import rev_parse
+
+        head_sha = rev_parse(self.repo_path, b"HEAD")
+
+        # Create a new ref pointing to HEAD
+        result, _stdout, _stderr = self._run_cli(
+            "update-ref", "refs/heads/newbranch", head_sha.decode("utf-8")
+        )
+        self.assertEqual(result, 0)
+
+        # Verify the ref was created
+        new_ref_sha = rev_parse(self.repo_path, b"refs/heads/newbranch")
+        self.assertEqual(head_sha, new_ref_sha)
+
+    def test_update_ref_with_old_value(self):
+        """Test updating a ref with old value verification."""
+        # Create a commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "First commit")
+
+        from dulwich.porcelain import rev_parse
+
+        first_sha = rev_parse(self.repo_path, b"HEAD")
+
+        # Create another commit
+        with open(test_file, "ab") as f:
+            f.write(b"more content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Second commit")
+
+        second_sha = rev_parse(self.repo_path, b"HEAD")
+
+        # Update HEAD back to first commit, verifying it's currently at second
+        result, _stdout, _stderr = self._run_cli(
+            "update-ref",
+            "HEAD",
+            first_sha.decode("utf-8"),
+            second_sha.decode("utf-8"),
+        )
+        self.assertEqual(result, 0)
+
+        # Verify HEAD is now at first commit
+        current_sha = rev_parse(self.repo_path, b"HEAD")
+        self.assertEqual(first_sha, current_sha)
+
+    def test_update_ref_delete(self):
+        """Test deleting a ref."""
+        # Create a commit and a ref
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Test commit")
+
+        from dulwich.porcelain import rev_parse
+
+        head_sha = rev_parse(self.repo_path, b"HEAD")
+
+        # Create a ref
+        self._run_cli("update-ref", "refs/heads/deleteme", head_sha.decode("utf-8"))
+
+        # Verify it exists
+        ref_sha = rev_parse(self.repo_path, b"refs/heads/deleteme")
+        self.assertEqual(head_sha, ref_sha)
+
+        # Delete the ref
+        result, _stdout, _stderr = self._run_cli(
+            "update-ref", "-d", "refs/heads/deleteme"
+        )
+        self.assertEqual(result, 0)
+
+        # Verify it's gone by checking refs directly
+        self.assertNotIn(b"refs/heads/deleteme", self.repo.refs.allkeys())
+
+
+class MktagCommandTest(DulwichCliTestCase):
+    """Tests for mktag command."""
+
+    def test_mktag_create(self):
+        """Test creating a tag object from stdin."""
+        # Create a commit to tag
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Test commit")
+
+        from dulwich.porcelain import rev_parse
+
+        commit_sha = rev_parse(self.repo_path, b"HEAD")
+
+        # Create tag data
+        tag_data = (
+            b"object " + commit_sha + b"\n"
+            b"type commit\n"
+            b"tag v1.0\n"
+            b"tagger Test User <test@example.com> 1234567890 +0000\n"
+            b"\n"
+            b"Test tag message\n"
+        )
+
+        # Run mktag with tag data via stdin
+        import io
+        import sys
+
+        old_stdin = sys.stdin
+        try:
+            sys.stdin = io.TextIOWrapper(io.BytesIO(tag_data))
+            result, stdout, _stderr = self._run_cli("mktag")
+        finally:
+            sys.stdin = old_stdin
+
+        self.assertEqual(result, 0)
+
+        # Verify tag object was created
+        tag_sha = stdout.strip()
+        self.assertEqual(len(tag_sha), 40)
+
+        # Verify the tag object exists and has correct content
+        from dulwich.objects import Tag
+
+        tag_obj = self.repo.object_store[tag_sha]
+        self.assertIsInstance(tag_obj, Tag)
+        self.assertEqual(tag_obj.object[1], commit_sha)
+        self.assertEqual(tag_obj.name, b"v1.0")
+
+
+class ShowIndexCommandTest(DulwichCliTestCase):
+    """Tests for show-index command."""
+
+    def test_show_index(self):
+        """Test showing pack index contents."""
+        # Create some commits to pack
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "First commit")
+
+        with open(test_file, "ab") as f:
+            f.write(b"more content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Second commit")
+
+        # Run gc to create pack files
+        from dulwich.porcelain import gc
+
+        gc(self.repo_path)
+
+        # Find the pack index file
+        import glob
+
+        pack_dir = os.path.join(self.repo_path, ".git", "objects", "pack")
+        index_files = glob.glob(os.path.join(pack_dir, "*.idx"))
+        self.assertTrue(len(index_files) > 0, "No pack index files found")
+
+        # Run show-index
+        result, stdout, _stderr = self._run_cli("show-index", index_files[0])
+        self.assertEqual(result, 0)
+
+        # Verify output format: offset sha (crc32)
+        import re
+
+        lines = stdout.strip().split("\n")
+        self.assertTrue(len(lines) > 0)
+        for line in lines:
+            # Match: <offset> <40-hex-sha> (<crc32>)
+            match = re.match(r"^(\d+) ([0-9a-f]{40}) \((\d+)\)$", line)
+            self.assertIsNotNone(match, f"Line doesn't match expected format: {line}")
+
+
 class LsFilesCommandTest(DulwichCliTestCase):
     """Tests for ls-files command."""
 
@@ -4405,6 +4741,194 @@ Body
         with open(msg_file) as f:
             msg_content = f.read()
             self.assertIn("Body", msg_content)
+
+
+class CleanCommandTest(DulwichCliTestCase):
+    """Tests for clean command."""
+
+    def test_clean_basic(self):
+        """Test basic clean command removes untracked files."""
+        # Create a tracked file and commit it
+        tracked_file = os.path.join(self.repo_path, "tracked.txt")
+        with open(tracked_file, "w") as f:
+            f.write("tracked content")
+        self._run_cli("add", "tracked.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Create an untracked file
+        untracked_file = os.path.join(self.repo_path, "untracked.txt")
+        with open(untracked_file, "w") as f:
+            f.write("untracked content")
+
+        self.assertTrue(os.path.exists(untracked_file))
+
+        # Run clean
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("clean")
+            self.assertEqual(result, 0)
+            self.assertIn("Cleaned untracked files", "\n".join(cm.output))
+
+        # Verify untracked file was removed
+        self.assertFalse(os.path.exists(untracked_file))
+        # Verify tracked file still exists
+        self.assertTrue(os.path.exists(tracked_file))
+
+    def test_clean_with_directory(self):
+        """Test clean command removes untracked directories."""
+        # Create a tracked file and commit it
+        tracked_file = os.path.join(self.repo_path, "tracked.txt")
+        with open(tracked_file, "w") as f:
+            f.write("tracked content")
+        self._run_cli("add", "tracked.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Create an untracked directory with a file
+        untracked_dir = os.path.join(self.repo_path, "untracked_dir")
+        os.mkdir(untracked_dir)
+        untracked_file = os.path.join(untracked_dir, "file.txt")
+        with open(untracked_file, "w") as f:
+            f.write("untracked content")
+
+        self.assertTrue(os.path.exists(untracked_dir))
+
+        # Run clean
+        with self.assertLogs("dulwich.cli", level="INFO"):
+            result, _stdout, _stderr = self._run_cli("clean", "-d")
+            self.assertEqual(result, 0)
+
+        # Verify untracked directory was removed
+        self.assertFalse(os.path.exists(untracked_dir))
+
+
+class SparseCheckoutCommandTest(DulwichCliTestCase):
+    """Tests for sparse-checkout commands."""
+
+    def test_sparse_checkout_init(self):
+        """Test sparse-checkout init command."""
+        # Create and commit some files
+        file1 = os.path.join(self.repo_path, "file1.txt")
+        with open(file1, "w") as f:
+            f.write("content1")
+        self._run_cli("add", "file1.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Run sparse-checkout init
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("sparse-checkout", "init")
+            self.assertEqual(result, 0)
+            self.assertIn(
+                "Initialized sparse checkout in cone mode", "\n".join(cm.output)
+            )
+
+    def test_sparse_checkout_set(self):
+        """Test sparse-checkout set command."""
+        # Create directory structure and commit
+        os.makedirs(os.path.join(self.repo_path, "dir1"))
+        os.makedirs(os.path.join(self.repo_path, "dir2"))
+        file1 = os.path.join(self.repo_path, "dir1", "file1.txt")
+        file2 = os.path.join(self.repo_path, "dir2", "file2.txt")
+
+        with open(file1, "w") as f:
+            f.write("content1")
+        with open(file2, "w") as f:
+            f.write("content2")
+
+        self._run_cli("add", "dir1/file1.txt", "dir2/file2.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Initialize sparse checkout
+        self._run_cli("sparse-checkout", "init")
+
+        # Run sparse-checkout set
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("sparse-checkout", "set", "dir1")
+            self.assertEqual(result, 0)
+            self.assertIn("Sparse checkout set to: dir1", "\n".join(cm.output))
+
+    def test_sparse_checkout_add(self):
+        """Test sparse-checkout add command."""
+        # Create directory structure and commit
+        os.makedirs(os.path.join(self.repo_path, "dir1"))
+        os.makedirs(os.path.join(self.repo_path, "dir2"))
+        file1 = os.path.join(self.repo_path, "dir1", "file1.txt")
+        file2 = os.path.join(self.repo_path, "dir2", "file2.txt")
+
+        with open(file1, "w") as f:
+            f.write("content1")
+        with open(file2, "w") as f:
+            f.write("content2")
+
+        self._run_cli("add", "dir1/file1.txt", "dir2/file2.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Initialize sparse checkout and set to dir1
+        self._run_cli("sparse-checkout", "init")
+        self._run_cli("sparse-checkout", "set", "dir1")
+
+        # Run sparse-checkout add
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("sparse-checkout", "add", "dir2")
+            self.assertEqual(result, 0)
+            self.assertIn("Added to sparse checkout: dir2", "\n".join(cm.output))
+
+    def test_sparse_checkout_list(self):
+        """Test sparse-checkout list command."""
+        # Create directory structure and commit
+        os.makedirs(os.path.join(self.repo_path, "dir1"))
+        file1 = os.path.join(self.repo_path, "dir1", "file1.txt")
+
+        with open(file1, "w") as f:
+            f.write("content1")
+
+        self._run_cli("add", "dir1/file1.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Initialize sparse checkout and set to dir1
+        self._run_cli("sparse-checkout", "init")
+        self._run_cli("sparse-checkout", "set", "dir1")
+
+        # Run sparse-checkout list
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("sparse-checkout", "list")
+            self.assertEqual(result, 0)
+            log_output = "\n".join(cm.output)
+            # Should contain the cone mode patterns
+            self.assertIn("/*", log_output)
+            self.assertIn("dir1", log_output)
+
+    def test_sparse_checkout_disable(self):
+        """Test sparse-checkout disable command."""
+        # Create directory structure and commit
+        os.makedirs(os.path.join(self.repo_path, "dir1"))
+        os.makedirs(os.path.join(self.repo_path, "dir2"))
+        file1 = os.path.join(self.repo_path, "dir1", "file1.txt")
+        file2 = os.path.join(self.repo_path, "dir2", "file2.txt")
+
+        with open(file1, "w") as f:
+            f.write("content1")
+        with open(file2, "w") as f:
+            f.write("content2")
+
+        self._run_cli("add", "dir1/file1.txt", "dir2/file2.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Initialize sparse checkout and set to only dir1
+        self._run_cli("sparse-checkout", "init")
+        self._run_cli("sparse-checkout", "set", "dir1")
+
+        # Verify dir2/file2.txt is not in working tree
+        self.assertTrue(os.path.exists(file1))
+        self.assertFalse(os.path.exists(file2))
+
+        # Run sparse-checkout disable
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("sparse-checkout", "disable")
+            self.assertEqual(result, 0)
+            self.assertIn("Sparse checkout disabled", "\n".join(cm.output))
+
+        # Verify both files are now in working tree
+        self.assertTrue(os.path.exists(file1))
+        self.assertTrue(os.path.exists(file2))
 
 
 class DiagnoseCommandTest(DulwichCliTestCase):

@@ -150,6 +150,7 @@ __all__ = [
     "get_untracked_paths",
     "get_user_timezones",
     "grep",
+    "hash_object",
     "independent_commits",
     "init",
     "interpret_trailers",
@@ -5683,6 +5684,57 @@ def cat_file_content(
     with open_repo_closing(repo) as r:
         obj = parse_object(r, objectish)
         return obj.as_raw_string()
+
+
+def hash_object(
+    repo: str | os.PathLike[str] | Repo | None,
+    path: str | os.PathLike[str] | None = None,
+    data: bytes | None = None,
+    object_type: bytes = b"blob",
+    write: bool = False,
+) -> bytes:
+    """Compute object ID and optionally write to object store.
+
+    Args:
+      repo: Path to the repository or a Repo object (required if write=True)
+      path: Path to file to hash (mutually exclusive with data)
+      data: Data to hash (mutually exclusive with path)
+      object_type: Type of object (default: b'blob')
+      write: Whether to write the object to the object store (default: False)
+
+    Returns:
+      Object SHA as bytes
+
+    Raises:
+      ValueError: If neither path nor data is provided, or both are provided
+      ValueError: If write=True but repo is None
+    """
+    from ..objects import Blob
+
+    if (path is None and data is None) or (path is not None and data is not None):
+        raise ValueError("Exactly one of 'path' or 'data' must be provided")
+
+    if write and repo is None:
+        raise ValueError("repo is required when write=True")
+
+    # Only blob type is supported for now
+    if object_type != b"blob":
+        raise NotImplementedError(f"Object type {object_type} not yet supported")
+
+    # Create blob object
+    blob = Blob()
+    if path is not None:
+        with open(path, "rb") as f:
+            blob.data = f.read()
+    else:
+        blob.data = data
+
+    # Write to object store if requested
+    if write:
+        with open_repo_closing(repo) as r:
+            r.object_store.add_object(blob)
+
+    return blob.id
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

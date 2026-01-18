@@ -2537,6 +2537,49 @@ class CatFileCommandTest(DulwichCliTestCase):
         self.assertIn("Test commit", stdout)
 
 
+class HashObjectCommandTest(DulwichCliTestCase):
+    """Tests for hash-object command."""
+
+    def test_hash_object_from_file(self):
+        """Test hash-object with file input."""
+        # Create a test file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        test_content = b"test content\n"
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+
+        # Hash the file without writing
+        result, stdout, _stderr = self._run_cli("hash-object", test_file)
+        self.assertEqual(result, 0)
+        # stdout should contain the SHA (40 hex chars + newline)
+        sha = stdout.strip()
+        self.assertEqual(len(sha), 40)
+        self.assertTrue(all(c in "0123456789abcdef" for c in sha.lower()))
+
+    def test_hash_object_with_write(self):
+        """Test hash-object with -w flag to write to database."""
+        # Create a test file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        test_content = b"test content for writing\n"
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+
+        # Hash and write the file
+        result, stdout, _stderr = self._run_cli("hash-object", "-w", test_file)
+        self.assertEqual(result, 0)
+        # stdout should contain the SHA
+        sha = stdout.strip()
+        self.assertEqual(len(sha), 40)
+        self.assertTrue(all(c in "0123456789abcdef" for c in sha.lower()))
+
+        # Verify object exists in database
+        from dulwich.objects import Blob
+
+        obj = self.repo.object_store[sha.encode("utf-8")]
+        self.assertIsInstance(obj, Blob)
+        self.assertEqual(obj.data, test_content)
+
+
 class LsFilesCommandTest(DulwichCliTestCase):
     """Tests for ls-files command."""
 

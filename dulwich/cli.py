@@ -3762,6 +3762,64 @@ class cmd_cat_file(Command):
         return 0
 
 
+class cmd_hash_object(Command):
+    """Compute object ID and optionally store in repository."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the hash-object command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich hash-object")
+        parser.add_argument("-w", action="store_true", help="Write object to database")
+        parser.add_argument(
+            "-t",
+            default="blob",
+            choices=["blob"],
+            help="Object type (only blob supported currently)",
+        )
+        parser.add_argument(
+            "--stdin", action="store_true", help="Read object from stdin"
+        )
+        parser.add_argument(
+            "path", nargs="?", help="Path to file (required unless --stdin)"
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Validate arguments
+        if parsed_args.stdin and parsed_args.path:
+            logger.error("Cannot specify both --stdin and a path")
+            return 1
+        if not parsed_args.stdin and not parsed_args.path:
+            logger.error("Must specify either --stdin or a path")
+            return 1
+
+        # Read data
+        if parsed_args.stdin:
+            data = sys.stdin.buffer.read()
+            sha = porcelain.hash_object(
+                "." if parsed_args.w else None,
+                data=data,
+                object_type=parsed_args.t.encode("utf-8"),
+                write=parsed_args.w,
+            )
+        else:
+            sha = porcelain.hash_object(
+                "." if parsed_args.w else None,
+                path=parsed_args.path,
+                object_type=parsed_args.t.encode("utf-8"),
+                write=parsed_args.w,
+            )
+
+        # Write SHA to stdout (this is the actual output, not a log message)
+        sys.stdout.write(sha.decode("utf-8") + "\n")
+        return 0
+
+
 class cmd_check_ignore(Command):
     """Check whether files are excluded by gitignore."""
 
@@ -6915,6 +6973,7 @@ commands = {
     "fsck": cmd_fsck,
     "gc": cmd_gc,
     "grep": cmd_grep,
+    "hash-object": cmd_hash_object,
     "help": cmd_help,
     "init": cmd_init,
     "interpret-trailers": cmd_interpret_trailers,

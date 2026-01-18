@@ -2476,6 +2476,67 @@ class CheckIgnoreCommandTest(DulwichCliTestCase):
             self.assertNotIn("test.txt", log_output)
 
 
+class CatFileCommandTest(DulwichCliTestCase):
+    """Tests for cat-file command."""
+
+    def test_cat_file_type(self):
+        """Test cat-file -t to show object type."""
+        # Create and commit a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Test commit")
+
+        # Get the commit SHA
+        head_sha = self.repo.head().decode("utf-8")
+
+        # Test showing commit type
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("cat-file", "-t", head_sha)
+            self.assertEqual(result, 0)
+            self.assertIn("commit", "\n".join(cm.output))
+
+        # Test showing type using HEAD reference
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("cat-file", "-t", "HEAD")
+            self.assertEqual(result, 0)
+            self.assertIn("commit", "\n".join(cm.output))
+
+    def test_cat_file_size(self):
+        """Test cat-file -s to show object size."""
+        # Create and commit a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Test commit")
+
+        # Test showing size
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("cat-file", "-s", "HEAD")
+            self.assertEqual(result, 0)
+            # Size should be a number
+            log_output = "\n".join(cm.output)
+            self.assertTrue(any(char.isdigit() for char in log_output))
+
+    def test_cat_file_content(self):
+        """Test cat-file -p to show object content."""
+        # Create and commit a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        test_content = b"test content\n"
+        with open(test_file, "wb") as f:
+            f.write(test_content)
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Test commit")
+
+        # Test showing content
+        result, stdout, _stderr = self._run_cli("cat-file", "-p", "HEAD")
+        self.assertEqual(result, 0)
+        # stdout should contain commit info
+        self.assertIn("Test commit", stdout)
+
+
 class LsFilesCommandTest(DulwichCliTestCase):
     """Tests for ls-files command."""
 

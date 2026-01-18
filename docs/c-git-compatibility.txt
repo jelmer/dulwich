@@ -32,7 +32,7 @@ Working with Files
 * ✓ ``git mv`` - Move or rename file, directory, or symlink
 * ✓ ``git restore`` - Restore working tree files
 * ✓ ``git reset`` - Reset current HEAD to specified state
-* ✓ ``git clean`` - Remove untracked files
+* ◐ ``git clean`` - Remove untracked files (API only, see clean function)
 
 Commits
 -------
@@ -363,7 +363,7 @@ Git LFS
 * ✗ git-lfs checkout
 * ✓ git-lfs clean (filter)
 * ✓ git-lfs smudge (filter)
-* ◐ git-lfs pointer (API only via lfs_pointer_check)
+* ✓ git-lfs pointer - Check LFS pointers
 * ✓ git-lfs migrate
 * ✓ git-lfs status
 * ✓ LFS server implementation
@@ -374,11 +374,11 @@ Sparse Checkout
 
 * ✓ Sparse checkout patterns
 * ✓ Cone mode
-* ✓ git sparse-checkout init (cone mode)
-* ✓ git sparse-checkout set
-* ✓ git sparse-checkout add
-* ◐ git sparse-checkout list (via API only)
-* ◐ git sparse-checkout disable (via API only)
+* ◐ git sparse-checkout init - Cone mode (API only, see cone_mode_init)
+* ◐ git sparse-checkout set - Cone mode (API only, see cone_mode_set)
+* ◐ git sparse-checkout add - Cone mode (API only, see cone_mode_add)
+* ◐ git sparse-checkout list (API only)
+* ◐ git sparse-checkout disable (API only)
 * ✗ git sparse-checkout reapply
 
 Worktrees

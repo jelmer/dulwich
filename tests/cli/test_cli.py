@@ -4560,6 +4560,40 @@ class SparseCheckoutCommandTest(DulwichCliTestCase):
             self.assertIn("/*", log_output)
             self.assertIn("dir1", log_output)
 
+    def test_sparse_checkout_disable(self):
+        """Test sparse-checkout disable command."""
+        # Create directory structure and commit
+        os.makedirs(os.path.join(self.repo_path, "dir1"))
+        os.makedirs(os.path.join(self.repo_path, "dir2"))
+        file1 = os.path.join(self.repo_path, "dir1", "file1.txt")
+        file2 = os.path.join(self.repo_path, "dir2", "file2.txt")
+
+        with open(file1, "w") as f:
+            f.write("content1")
+        with open(file2, "w") as f:
+            f.write("content2")
+
+        self._run_cli("add", "dir1/file1.txt", "dir2/file2.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Initialize sparse checkout and set to only dir1
+        self._run_cli("sparse-checkout", "init")
+        self._run_cli("sparse-checkout", "set", "dir1")
+
+        # Verify dir2/file2.txt is not in working tree
+        self.assertTrue(os.path.exists(file1))
+        self.assertFalse(os.path.exists(file2))
+
+        # Run sparse-checkout disable
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("sparse-checkout", "disable")
+            self.assertEqual(result, 0)
+            self.assertIn("Sparse checkout disabled", "\n".join(cm.output))
+
+        # Verify both files are now in working tree
+        self.assertTrue(os.path.exists(file1))
+        self.assertTrue(os.path.exists(file2))
+
 
 class DiagnoseCommandTest(DulwichCliTestCase):
     """Tests for diagnose command."""

@@ -122,6 +122,7 @@ __all__ = [
     "commit_encode",
     "commit_tree",
     "cone_mode_add",
+    "cone_mode_disable",
     "cone_mode_init",
     "cone_mode_list",
     "cone_mode_set",
@@ -5576,6 +5577,56 @@ def cone_mode_list(repo: str | os.PathLike[str] | Repo) -> list[str]:
     """
     with open_repo_closing(repo) as repo_obj:
         return repo_obj.get_worktree().get_sparse_checkout_patterns()
+
+
+def cone_mode_disable(repo: str | os.PathLike[str] | Repo, force: bool = False) -> None:
+    """Disable sparse checkout and restore all files.
+
+    This function:
+    1. Unsets core.sparseCheckout and core.sparseCheckoutCone config
+    2. Removes the .git/info/sparse-checkout file
+    3. Restores all files to the working tree
+
+    Args:
+      repo: Path to the repository or a Repo object.
+      force: Whether to forcibly discard local modifications (default False).
+
+    Returns:
+      None
+    """
+    with open_repo_closing(repo) as repo_obj:
+        # Unset sparse checkout config
+        config = repo_obj.get_config()
+        try:
+            del config[(b"core", b"sparseCheckout")]
+        except KeyError:
+            pass
+        try:
+            del config[(b"core", b"sparseCheckoutCone")]
+        except KeyError:
+            pass
+        config.write_to_path()
+
+        # Remove sparse-checkout file
+        sparse_file = repo_obj.get_worktree()._sparse_checkout_file_path()
+        try:
+            os.remove(sparse_file)
+        except FileNotFoundError:
+            pass
+
+        # Restore all files by doing a full checkout
+        # Clear all skip-worktree bits and restore all files from HEAD
+        tree = repo_obj[repo_obj.head()]
+
+        from ..index import build_index_from_tree
+
+        build_index_from_tree(
+            repo_obj.path,
+            repo_obj.index_path(),
+            repo_obj.object_store,
+            tree.tree,
+            honor_filemode=None,
+        )
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

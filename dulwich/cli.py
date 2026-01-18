@@ -4057,14 +4057,10 @@ class cmd_clean(Command):
         )
         parsed_args = parser.parse_args(args)
 
-        try:
-            # If no target_dir specified, use current directory
-            target = parsed_args.target_dir if parsed_args.target_dir else "."
-            porcelain.clean(".", target_dir=target)
-            logger.info("Cleaned untracked files")
-        except Exception as e:
-            logger.error("clean failed: %s", e)
-            return 1
+        # If no target_dir specified, use current directory
+        target = parsed_args.target_dir if parsed_args.target_dir else "."
+        porcelain.clean(".", target_dir=target)
+        logger.info("Cleaned untracked files")
         return 0
 
 
@@ -4291,12 +4287,8 @@ class cmd_sparse_checkout_init(Command):
         parser = argparse.ArgumentParser(prog="dulwich sparse-checkout init")
         parser.parse_args(args)
 
-        try:
-            porcelain.cone_mode_init(".")
-            logger.info("Initialized sparse checkout in cone mode")
-        except Exception as e:
-            logger.error("sparse-checkout init failed: %s", e)
-            return 1
+        porcelain.cone_mode_init(".")
+        logger.info("Initialized sparse checkout in cone mode")
         return 0
 
 
@@ -4319,12 +4311,8 @@ class cmd_sparse_checkout_set(Command):
         )
         parsed_args = parser.parse_args(args)
 
-        try:
-            porcelain.cone_mode_set(".", dirs=parsed_args.dirs, force=parsed_args.force)
-            logger.info("Sparse checkout set to: %s", ", ".join(parsed_args.dirs))
-        except Exception as e:
-            logger.error("sparse-checkout set failed: %s", e)
-            return 1
+        porcelain.cone_mode_set(".", dirs=parsed_args.dirs, force=parsed_args.force)
+        logger.info("Sparse checkout set to: %s", ", ".join(parsed_args.dirs))
         return 0
 
 
@@ -4347,12 +4335,8 @@ class cmd_sparse_checkout_add(Command):
         )
         parsed_args = parser.parse_args(args)
 
-        try:
-            porcelain.cone_mode_add(".", dirs=parsed_args.dirs, force=parsed_args.force)
-            logger.info("Added to sparse checkout: %s", ", ".join(parsed_args.dirs))
-        except Exception as e:
-            logger.error("sparse-checkout add failed: %s", e)
-            return 1
+        porcelain.cone_mode_add(".", dirs=parsed_args.dirs, force=parsed_args.force)
+        logger.info("Added to sparse checkout: %s", ", ".join(parsed_args.dirs))
         return 0
 
 
@@ -4371,13 +4355,32 @@ class cmd_sparse_checkout_list(Command):
         parser = argparse.ArgumentParser(prog="dulwich sparse-checkout list")
         parser.parse_args(args)
 
-        try:
-            patterns = porcelain.cone_mode_list(".")
-            for pattern in patterns:
-                logger.info("%s", pattern)
-        except Exception as e:
-            logger.error("sparse-checkout list failed: %s", e)
-            return 1
+        patterns = porcelain.cone_mode_list(".")
+        for pattern in patterns:
+            logger.info("%s", pattern)
+        return 0
+
+
+class cmd_sparse_checkout_disable(Command):
+    """Disable sparse checkout."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the sparse-checkout disable command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich sparse-checkout disable")
+        parser.add_argument(
+            "--force", action="store_true", help="Force discard local modifications"
+        )
+        parsed_args = parser.parse_args(args)
+
+        porcelain.cone_mode_disable(".", force=parsed_args.force)
+        logger.info("Sparse checkout disabled")
         return 0
 
 
@@ -4389,6 +4392,7 @@ class cmd_sparse_checkout(SuperCommand):
         "set": cmd_sparse_checkout_set,
         "add": cmd_sparse_checkout_add,
         "list": cmd_sparse_checkout_list,
+        "disable": cmd_sparse_checkout_disable,
     }
 
 

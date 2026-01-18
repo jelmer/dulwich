@@ -3720,6 +3720,48 @@ class cmd_submodule(SuperCommand):
     default_command = cmd_submodule_list
 
 
+class cmd_cat_file(Command):
+    """Provide content or type and size information for repository objects."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the cat-file command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich cat-file")
+        parser.add_argument("-t", action="store_true", help="Show object type")
+        parser.add_argument("-s", action="store_true", help="Show object size")
+        parser.add_argument(
+            "-p", action="store_true", help="Pretty-print object content"
+        )
+        parser.add_argument("object", help="Object to show (SHA, ref, etc.)")
+        parsed_args = parser.parse_args(args)
+
+        # Exactly one of -t, -s, or -p must be specified (or none for raw content)
+        modes = sum([parsed_args.t, parsed_args.s, parsed_args.p])
+        if modes > 1:
+            logger.error("Only one of -t, -s, or -p can be specified")
+            return 1
+
+        if parsed_args.t:
+            obj_type = porcelain.cat_file_type(".", parsed_args.object)
+            logger.info(obj_type.decode("utf-8"))
+        elif parsed_args.s:
+            size = porcelain.cat_file_size(".", parsed_args.object)
+            logger.info(str(size))
+        else:
+            # -p or default: show content
+            content = porcelain.cat_file_content(".", parsed_args.object)
+            # Write raw bytes to stdout
+            sys.stdout.buffer.write(content)
+
+        return 0
+
+
 class cmd_check_ignore(Command):
     """Check whether files are excluded by gitignore."""
 
@@ -6845,6 +6887,7 @@ commands = {
     "blame": cmd_blame,
     "branch": cmd_branch,
     "bundle": cmd_bundle,
+    "cat-file": cmd_cat_file,
     "check-ignore": cmd_check_ignore,
     "check-mailmap": cmd_check_mailmap,
     "checkout": cmd_checkout,

@@ -179,7 +179,7 @@ Manipulation
 Interrogation
 -------------
 
-* ◐ ``git cat-file`` - Provide content or type and size information (API only)
+* ✓ ``git cat-file`` - Provide content or type and size information
 * ◐ ``git diff-files`` - Compare files in working tree and index (API only)
 * ◐ ``git diff-index`` - Compare content and mode of blobs (API only)
 * ✓ ``git diff-tree`` - Compare content and mode of trees

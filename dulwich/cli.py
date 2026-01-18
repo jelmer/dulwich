@@ -4356,6 +4356,31 @@ class cmd_sparse_checkout_add(Command):
         return 0
 
 
+class cmd_sparse_checkout_list(Command):
+    """List sparse checkout patterns."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the sparse-checkout list command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich sparse-checkout list")
+        parser.parse_args(args)
+
+        try:
+            patterns = porcelain.cone_mode_list(".")
+            for pattern in patterns:
+                logger.info("%s", pattern)
+        except Exception as e:
+            logger.error("sparse-checkout list failed: %s", e)
+            return 1
+        return 0
+
+
 class cmd_sparse_checkout(SuperCommand):
     """Manage sparse checkout."""
 
@@ -4363,6 +4388,7 @@ class cmd_sparse_checkout(SuperCommand):
         "init": cmd_sparse_checkout_init,
         "set": cmd_sparse_checkout_set,
         "add": cmd_sparse_checkout_add,
+        "list": cmd_sparse_checkout_list,
     }
 
 

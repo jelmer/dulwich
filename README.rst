@@ -79,6 +79,17 @@ And to print it using porcelain::
 
     Add note about encoding.
 
+Compatibility with Git
+----------------------
+
+Dulwich aims to provide full wire-format and repository format compatibility
+with C Git, while maintaining a pure Python implementation that doesn't depend
+on git being installed. This means that Dulwich and C Git can be used
+interchangeably on the same repository.
+
+For a detailed list of which Git commands and features are supported by Dulwich,
+see `docs/c-git-compatibility.txt <docs/c-git-compatibility.txt>`_.
+
 Further documentation
 ---------------------
 

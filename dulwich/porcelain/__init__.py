@@ -109,6 +109,9 @@ __all__ = [
     "branch_list",
     "branch_remotes_list",
     "branches_containing",
+    "cat_file_content",
+    "cat_file_size",
+    "cat_file_type",
     "check_diverged",
     "check_ignore",
     "check_mailmap",
@@ -5627,6 +5630,59 @@ def cone_mode_disable(repo: str | os.PathLike[str] | Repo, force: bool = False) 
             tree.tree,
             honor_filemode=None,
         )
+
+
+def cat_file_type(repo: str | os.PathLike[str] | Repo, objectish: str | bytes) -> bytes:
+    """Get the type of a Git object.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      objectish: Object SHA, reference, or objectish (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Object type as bytes (b'blob', b'tree', b'commit', or b'tag')
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, objectish)
+        return obj.type_name
+
+
+def cat_file_size(repo: str | os.PathLike[str] | Repo, objectish: str | bytes) -> int:
+    """Get the size of a Git object.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      objectish: Object SHA, reference, or objectish (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Object size in bytes
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, objectish)
+        return len(obj.as_raw_string())
+
+
+def cat_file_content(
+    repo: str | os.PathLike[str] | Repo, objectish: str | bytes
+) -> bytes:
+    """Get the raw content of a Git object.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      objectish: Object SHA, reference, or objectish (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Raw object content as bytes
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, objectish)
+        return obj.as_raw_string()
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

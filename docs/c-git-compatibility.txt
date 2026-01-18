@@ -161,7 +161,7 @@ Manipulation
 * ✗ ``git apply`` - Apply patch to files
 * ◐ ``git checkout-index`` - Copy files from index to working tree (API only)
 * ✓ ``git commit-tree`` - Create new commit object
-* ◐ ``git hash-object`` - Compute object ID (API only)
+* ✓ ``git hash-object`` - Compute object ID
 * ◐ ``git index-pack`` - Build pack index file (API only)
 * ◐ ``git merge-file`` - Run three-way file merge (API only)
 * ✓ ``git merge-tree`` - Show three-way merge without touching index

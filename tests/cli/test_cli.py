@@ -4535,6 +4535,31 @@ class SparseCheckoutCommandTest(DulwichCliTestCase):
             self.assertEqual(result, 0)
             self.assertIn("Added to sparse checkout: dir2", "\n".join(cm.output))
 
+    def test_sparse_checkout_list(self):
+        """Test sparse-checkout list command."""
+        # Create directory structure and commit
+        os.makedirs(os.path.join(self.repo_path, "dir1"))
+        file1 = os.path.join(self.repo_path, "dir1", "file1.txt")
+
+        with open(file1, "w") as f:
+            f.write("content1")
+
+        self._run_cli("add", "dir1/file1.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Initialize sparse checkout and set to dir1
+        self._run_cli("sparse-checkout", "init")
+        self._run_cli("sparse-checkout", "set", "dir1")
+
+        # Run sparse-checkout list
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("sparse-checkout", "list")
+            self.assertEqual(result, 0)
+            log_output = "\n".join(cm.output)
+            # Should contain the cone mode patterns
+            self.assertIn("/*", log_output)
+            self.assertIn("dir1", log_output)
+
 
 class DiagnoseCommandTest(DulwichCliTestCase):
     """Tests for diagnose command."""

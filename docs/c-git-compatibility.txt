@@ -377,7 +377,7 @@ Sparse Checkout
 * ✓ git sparse-checkout init - Cone mode
 * ✓ git sparse-checkout set - Cone mode
 * ✓ git sparse-checkout add - Cone mode
-* ◐ git sparse-checkout list (API only)
+* ✓ git sparse-checkout list - List current patterns
 * ◐ git sparse-checkout disable (API only)
 * ✗ git sparse-checkout reapply
 

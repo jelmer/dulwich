@@ -123,6 +123,7 @@ __all__ = [
     "commit_tree",
     "cone_mode_add",
     "cone_mode_init",
+    "cone_mode_list",
     "cone_mode_set",
     "count_objects",
     "daemon",
@@ -5562,6 +5563,19 @@ def cone_mode_add(
         repo_obj.get_worktree().set_cone_mode_patterns(dirs=added_dirs)
         new_patterns = repo_obj.get_worktree().get_sparse_checkout_patterns()
         sparse_checkout(repo_obj, patterns=new_patterns, force=force, cone=True)
+
+
+def cone_mode_list(repo: str | os.PathLike[str] | Repo) -> list[str]:
+    """List current sparse-checkout patterns.
+
+    Args:
+      repo: Path to the repository or a Repo object.
+
+    Returns:
+      List of sparse-checkout patterns
+    """
+    with open_repo_closing(repo) as repo_obj:
+        return repo_obj.get_worktree().get_sparse_checkout_patterns()
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

@@ -192,7 +192,7 @@ Interrogation
 * ✓ ``git pack-refs`` - Pack heads and tags for efficient repository access
 * ✓ ``git rev-list`` - List commit objects in reverse chronological order
 * ✓ ``git rev-parse`` - Pick out and massage parameters (see also objectspec module)
-* ◐ ``git show-index`` - Show packed archive index (API only)
+* ✓ ``git show-index`` - Show packed archive index
 * ✓ ``git show-ref`` - List references in local repository
 * ✓ ``git var`` - Show Git logical variable
 * ◐ ``git verify-pack`` - Validate packed Git archive files (API only)

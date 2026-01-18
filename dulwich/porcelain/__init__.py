@@ -230,6 +230,7 @@ __all__ = [
     "show_blob",
     "show_branch",
     "show_commit",
+    "show_index",
     "show_object",
     "show_ref",
     "show_tag",
@@ -313,6 +314,7 @@ if TYPE_CHECKING:
     from ..filter_branch import CommitData
     from ..gc import GCStats
     from ..maintenance import MaintenanceResult
+    from ..objects import RawObjectID
 
 from ..archive import tar_stream
 from ..bisect import BisectState
@@ -5848,6 +5850,28 @@ def mktag(repo: str | os.PathLike[str] | Repo, tag_data: bytes) -> bytes:
         r.object_store.add_object(tag)
 
     return tag.id
+
+
+def show_index(
+    index_path: str | os.PathLike[str], repo: str | os.PathLike[str] | Repo = "."
+) -> "list[tuple[int, RawObjectID, int | None]]":
+    """Show the contents of a pack index file.
+
+    Args:
+      index_path: Path to the pack index file
+      repo: Path to the repository or a Repo object (for object format)
+
+    Returns:
+      List of tuples (offset, sha, crc32) for each entry
+
+    Raises:
+      FileNotFoundError: If the index file doesn't exist
+    """
+    from ..pack import load_pack_index
+
+    with open_repo_closing(repo) as r:
+        idx = load_pack_index(index_path, r.object_format)
+        return [(offset, sha, crc32) for sha, offset, crc32 in idx.iterentries()]
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

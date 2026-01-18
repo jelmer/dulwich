@@ -2768,6 +2768,50 @@ class MktagCommandTest(DulwichCliTestCase):
         self.assertEqual(tag_obj.name, b"v1.0")
 
 
+class ShowIndexCommandTest(DulwichCliTestCase):
+    """Tests for show-index command."""
+
+    def test_show_index(self):
+        """Test showing pack index contents."""
+        # Create some commits to pack
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "First commit")
+
+        with open(test_file, "ab") as f:
+            f.write(b"more content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Second commit")
+
+        # Run gc to create pack files
+        from dulwich.porcelain import gc
+
+        gc(self.repo_path)
+
+        # Find the pack index file
+        import glob
+
+        pack_dir = os.path.join(self.repo_path, ".git", "objects", "pack")
+        index_files = glob.glob(os.path.join(pack_dir, "*.idx"))
+        self.assertTrue(len(index_files) > 0, "No pack index files found")
+
+        # Run show-index
+        result, stdout, _stderr = self._run_cli("show-index", index_files[0])
+        self.assertEqual(result, 0)
+
+        # Verify output format: offset sha (crc32)
+        import re
+
+        lines = stdout.strip().split("\n")
+        self.assertTrue(len(lines) > 0)
+        for line in lines:
+            # Match: <offset> <40-hex-sha> (<crc32>)
+            match = re.match(r"^(\d+) ([0-9a-f]{40}) \((\d+)\)$", line)
+            self.assertIsNotNone(match, f"Line doesn't match expected format: {line}")
+
+
 class LsFilesCommandTest(DulwichCliTestCase):
     """Tests for ls-files command."""
 

@@ -2543,6 +2543,33 @@ class cmd_show(Command):
                 porcelain.show(repo, args.objectish or None, outstream=output_stream)
 
 
+class cmd_show_index(Command):
+    """Show packed archive index."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the show-index command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich show-index")
+        parser.add_argument("index_file", help="Path to pack index file")
+        parsed_args = parser.parse_args(args)
+
+        # Show index entries
+        entries = porcelain.show_index(parsed_args.index_file, ".")
+
+        # Output format matches git show-index:
+        # offset sha1 (crc32)
+        for offset, sha, crc32 in entries:
+            sys.stdout.write(f"{offset} {sha_to_hex(sha).decode('ascii')} ({crc32})\n")
+
+        return 0
+
+
 class cmd_show_ref(Command):
     """List references in a local repository."""
 
@@ -7115,6 +7142,7 @@ commands = {
     "mv": cmd_mv,
     "show": cmd_show,
     "show-branch": cmd_show_branch,
+    "show-index": cmd_show_index,
     "show-ref": cmd_show_ref,
     "sparse-checkout": cmd_sparse_checkout,
     "stash": cmd_stash,

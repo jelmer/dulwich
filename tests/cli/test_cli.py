@@ -4407,6 +4407,135 @@ Body
             self.assertIn("Body", msg_content)
 
 
+class CleanCommandTest(DulwichCliTestCase):
+    """Tests for clean command."""
+
+    def test_clean_basic(self):
+        """Test basic clean command removes untracked files."""
+        # Create a tracked file and commit it
+        tracked_file = os.path.join(self.repo_path, "tracked.txt")
+        with open(tracked_file, "w") as f:
+            f.write("tracked content")
+        self._run_cli("add", "tracked.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Create an untracked file
+        untracked_file = os.path.join(self.repo_path, "untracked.txt")
+        with open(untracked_file, "w") as f:
+            f.write("untracked content")
+
+        self.assertTrue(os.path.exists(untracked_file))
+
+        # Run clean
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("clean")
+            self.assertEqual(result, 0)
+            self.assertIn("Cleaned untracked files", "\n".join(cm.output))
+
+        # Verify untracked file was removed
+        self.assertFalse(os.path.exists(untracked_file))
+        # Verify tracked file still exists
+        self.assertTrue(os.path.exists(tracked_file))
+
+    def test_clean_with_directory(self):
+        """Test clean command removes untracked directories."""
+        # Create a tracked file and commit it
+        tracked_file = os.path.join(self.repo_path, "tracked.txt")
+        with open(tracked_file, "w") as f:
+            f.write("tracked content")
+        self._run_cli("add", "tracked.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Create an untracked directory with a file
+        untracked_dir = os.path.join(self.repo_path, "untracked_dir")
+        os.mkdir(untracked_dir)
+        untracked_file = os.path.join(untracked_dir, "file.txt")
+        with open(untracked_file, "w") as f:
+            f.write("untracked content")
+
+        self.assertTrue(os.path.exists(untracked_dir))
+
+        # Run clean
+        with self.assertLogs("dulwich.cli", level="INFO"):
+            result, _stdout, _stderr = self._run_cli("clean", "-d")
+            self.assertEqual(result, 0)
+
+        # Verify untracked directory was removed
+        self.assertFalse(os.path.exists(untracked_dir))
+
+
+class SparseCheckoutCommandTest(DulwichCliTestCase):
+    """Tests for sparse-checkout commands."""
+
+    def test_sparse_checkout_init(self):
+        """Test sparse-checkout init command."""
+        # Create and commit some files
+        file1 = os.path.join(self.repo_path, "file1.txt")
+        with open(file1, "w") as f:
+            f.write("content1")
+        self._run_cli("add", "file1.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Run sparse-checkout init
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("sparse-checkout", "init")
+            self.assertEqual(result, 0)
+            self.assertIn(
+                "Initialized sparse checkout in cone mode", "\n".join(cm.output)
+            )
+
+    def test_sparse_checkout_set(self):
+        """Test sparse-checkout set command."""
+        # Create directory structure and commit
+        os.makedirs(os.path.join(self.repo_path, "dir1"))
+        os.makedirs(os.path.join(self.repo_path, "dir2"))
+        file1 = os.path.join(self.repo_path, "dir1", "file1.txt")
+        file2 = os.path.join(self.repo_path, "dir2", "file2.txt")
+
+        with open(file1, "w") as f:
+            f.write("content1")
+        with open(file2, "w") as f:
+            f.write("content2")
+
+        self._run_cli("add", "dir1/file1.txt", "dir2/file2.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Initialize sparse checkout
+        self._run_cli("sparse-checkout", "init")
+
+        # Run sparse-checkout set
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("sparse-checkout", "set", "dir1")
+            self.assertEqual(result, 0)
+            self.assertIn("Sparse checkout set to: dir1", "\n".join(cm.output))
+
+    def test_sparse_checkout_add(self):
+        """Test sparse-checkout add command."""
+        # Create directory structure and commit
+        os.makedirs(os.path.join(self.repo_path, "dir1"))
+        os.makedirs(os.path.join(self.repo_path, "dir2"))
+        file1 = os.path.join(self.repo_path, "dir1", "file1.txt")
+        file2 = os.path.join(self.repo_path, "dir2", "file2.txt")
+
+        with open(file1, "w") as f:
+            f.write("content1")
+        with open(file2, "w") as f:
+            f.write("content2")
+
+        self._run_cli("add", "dir1/file1.txt", "dir2/file2.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+        # Initialize sparse checkout and set to dir1
+        self._run_cli("sparse-checkout", "init")
+        self._run_cli("sparse-checkout", "set", "dir1")
+
+        # Run sparse-checkout add
+        with self.assertLogs("dulwich.cli", level="INFO") as cm:
+            result, _stdout, _stderr = self._run_cli("sparse-checkout", "add", "dir2")
+            self.assertEqual(result, 0)
+            self.assertIn("Added to sparse checkout: dir2", "\n".join(cm.output))
+
+
 class DiagnoseCommandTest(DulwichCliTestCase):
     """Tests for diagnose command."""
 

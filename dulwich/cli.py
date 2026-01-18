@@ -4026,6 +4026,48 @@ class cmd_switch(Command):
         return 0
 
 
+class cmd_clean(Command):
+    """Remove untracked files from the working tree."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the clean command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich clean")
+        parser.add_argument(
+            "-d",
+            action="store_true",
+            help="Remove untracked directories (always enabled)",
+        )
+        parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            help="Force removal (always enabled)",
+        )
+        parser.add_argument(
+            "target_dir",
+            nargs="?",
+            help="Directory to clean (default: current directory)",
+        )
+        parsed_args = parser.parse_args(args)
+
+        try:
+            # If no target_dir specified, use current directory
+            target = parsed_args.target_dir if parsed_args.target_dir else "."
+            porcelain.clean(".", target_dir=target)
+            logger.info("Cleaned untracked files")
+        except Exception as e:
+            logger.error("clean failed: %s", e)
+            return 1
+        return 0
+
+
 class cmd_stash_list(Command):
     """List stash entries."""
 
@@ -4231,6 +4273,96 @@ class cmd_stash(SuperCommand):
         "list": cmd_stash_list,
         "pop": cmd_stash_pop,
         "push": cmd_stash_push,
+    }
+
+
+class cmd_sparse_checkout_init(Command):
+    """Initialize sparse checkout in cone mode."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the sparse-checkout init command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich sparse-checkout init")
+        parser.parse_args(args)
+
+        try:
+            porcelain.cone_mode_init(".")
+            logger.info("Initialized sparse checkout in cone mode")
+        except Exception as e:
+            logger.error("sparse-checkout init failed: %s", e)
+            return 1
+        return 0
+
+
+class cmd_sparse_checkout_set(Command):
+    """Set sparse checkout directories."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the sparse-checkout set command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich sparse-checkout set")
+        parser.add_argument("dirs", nargs="+", help="Directories to include")
+        parser.add_argument(
+            "--force", action="store_true", help="Force discard local modifications"
+        )
+        parsed_args = parser.parse_args(args)
+
+        try:
+            porcelain.cone_mode_set(".", dirs=parsed_args.dirs, force=parsed_args.force)
+            logger.info("Sparse checkout set to: %s", ", ".join(parsed_args.dirs))
+        except Exception as e:
+            logger.error("sparse-checkout set failed: %s", e)
+            return 1
+        return 0
+
+
+class cmd_sparse_checkout_add(Command):
+    """Add directories to sparse checkout."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the sparse-checkout add command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich sparse-checkout add")
+        parser.add_argument("dirs", nargs="+", help="Directories to add")
+        parser.add_argument(
+            "--force", action="store_true", help="Force discard local modifications"
+        )
+        parsed_args = parser.parse_args(args)
+
+        try:
+            porcelain.cone_mode_add(".", dirs=parsed_args.dirs, force=parsed_args.force)
+            logger.info("Added to sparse checkout: %s", ", ".join(parsed_args.dirs))
+        except Exception as e:
+            logger.error("sparse-checkout add failed: %s", e)
+            return 1
+        return 0
+
+
+class cmd_sparse_checkout(SuperCommand):
+    """Manage sparse checkout."""
+
+    subcommands: ClassVar[dict[str, type[Command]]] = {
+        "init": cmd_sparse_checkout_init,
+        "set": cmd_sparse_checkout_set,
+        "add": cmd_sparse_checkout_add,
     }
 
 
@@ -6688,6 +6820,7 @@ commands = {
     "checkout": cmd_checkout,
     "cherry": cmd_cherry,
     "cherry-pick": cmd_cherry_pick,
+    "clean": cmd_clean,
     "clone": cmd_clone,
     "column": cmd_column,
     "commit": cmd_commit,
@@ -6745,6 +6878,7 @@ commands = {
     "show": cmd_show,
     "show-branch": cmd_show_branch,
     "show-ref": cmd_show_ref,
+    "sparse-checkout": cmd_sparse_checkout,
     "stash": cmd_stash,
     "status": cmd_status,
     "stripspace": cmd_stripspace,

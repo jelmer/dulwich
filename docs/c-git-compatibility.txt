@@ -32,7 +32,7 @@ Working with Files
 * ✓ ``git mv`` - Move or rename file, directory, or symlink
 * ✓ ``git restore`` - Restore working tree files
 * ✓ ``git reset`` - Reset current HEAD to specified state
-* ◐ ``git clean`` - Remove untracked files (API only, see clean function)
+* ✓ ``git clean`` - Remove untracked files
 
 Commits
 -------
@@ -374,9 +374,9 @@ Sparse Checkout
 
 * ✓ Sparse checkout patterns
 * ✓ Cone mode
-* ◐ git sparse-checkout init - Cone mode (API only, see cone_mode_init)
-* ◐ git sparse-checkout set - Cone mode (API only, see cone_mode_set)
-* ◐ git sparse-checkout add - Cone mode (API only, see cone_mode_add)
+* ✓ git sparse-checkout init - Cone mode
+* ✓ git sparse-checkout set - Cone mode
+* ✓ git sparse-checkout add - Cone mode
 * ◐ git sparse-checkout list (API only)
 * ◐ git sparse-checkout disable (API only)
 * ✗ git sparse-checkout reapply

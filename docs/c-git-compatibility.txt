@@ -165,7 +165,7 @@ Manipulation
 * ◐ ``git index-pack`` - Build pack index file (API only)
 * ◐ ``git merge-file`` - Run three-way file merge (API only)
 * ✓ ``git merge-tree`` - Show three-way merge without touching index
-* ◐ ``git mktag`` - Create tag object (API only)
+* ✓ ``git mktag`` - Create tag object
 * ✓ ``git pack-objects`` - Create packed archive of objects
 * ◐ ``git prune-packed`` - Remove extra objects (API only)
 * ◐ ``git read-tree`` - Read tree information into index (API only)

@@ -3868,6 +3868,32 @@ class cmd_hash_object(Command):
         return 0
 
 
+class cmd_mktag(Command):
+    """Create a tag object from raw tag data."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the mktag command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich mktag")
+        parser.parse_args(args)
+
+        # Read tag data from stdin
+        tag_data = sys.stdin.buffer.read()
+
+        # Create the tag object
+        sha = porcelain.mktag(".", tag_data)
+
+        # Write SHA to stdout
+        sys.stdout.write(sha.decode("utf-8") + "\n")
+        return 0
+
+
 class cmd_rev_parse(Command):
     """Parse revision and other objects."""
 
@@ -7066,6 +7092,7 @@ commands = {
     "merge": cmd_merge,
     "merge-base": cmd_merge_base,
     "merge-tree": cmd_merge_tree,
+    "mktag": cmd_mktag,
     "notes": cmd_notes,
     "pack-objects": cmd_pack_objects,
     "pack-refs": cmd_pack_refs,

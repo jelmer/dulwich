@@ -181,6 +181,7 @@ __all__ = [
     "merge_base",
     "merge_tree",
     "merged_branches",
+    "mktag",
     "mv",
     "no_merged_branches",
     "notes_add",
@@ -5821,6 +5822,32 @@ def update_ref(
                 raise ValueError(
                     f"Ref {ref_name.decode('utf-8')} does not match expected value"
                 )
+
+
+def mktag(repo: str | os.PathLike[str] | Repo, tag_data: bytes) -> bytes:
+    """Create a tag object from raw tag data.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      tag_data: Raw tag data in git tag format
+
+    Returns:
+      Object SHA of the created tag as bytes
+
+    Raises:
+      ObjectFormatException: If the tag data is invalid
+    """
+    from ..objects import Tag
+
+    # Parse the tag data
+    tag = Tag()
+    tag.set_raw_string(tag_data)
+
+    # Write to object store
+    with open_repo_closing(repo) as r:
+        r.object_store.add_object(tag)
+
+    return tag.id
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

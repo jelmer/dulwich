@@ -2716,6 +2716,58 @@ class UpdateRefCommandTest(DulwichCliTestCase):
         self.assertNotIn(b"refs/heads/deleteme", self.repo.refs.allkeys())
 
 
+class MktagCommandTest(DulwichCliTestCase):
+    """Tests for mktag command."""
+
+    def test_mktag_create(self):
+        """Test creating a tag object from stdin."""
+        # Create a commit to tag
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Test commit")
+
+        from dulwich.porcelain import rev_parse
+
+        commit_sha = rev_parse(self.repo_path, b"HEAD")
+
+        # Create tag data
+        tag_data = (
+            b"object " + commit_sha + b"\n"
+            b"type commit\n"
+            b"tag v1.0\n"
+            b"tagger Test User <test@example.com> 1234567890 +0000\n"
+            b"\n"
+            b"Test tag message\n"
+        )
+
+        # Run mktag with tag data via stdin
+        import io
+        import sys
+
+        old_stdin = sys.stdin
+        try:
+            sys.stdin = io.TextIOWrapper(io.BytesIO(tag_data))
+            result, stdout, _stderr = self._run_cli("mktag")
+        finally:
+            sys.stdin = old_stdin
+
+        self.assertEqual(result, 0)
+
+        # Verify tag object was created
+        tag_sha = stdout.strip()
+        self.assertEqual(len(tag_sha), 40)
+
+        # Verify the tag object exists and has correct content
+        from dulwich.objects import Tag
+
+        tag_obj = self.repo.object_store[tag_sha]
+        self.assertIsInstance(tag_obj, Tag)
+        self.assertEqual(tag_obj.object[1], commit_sha)
+        self.assertEqual(tag_obj.name, b"v1.0")
+
+
 class LsFilesCommandTest(DulwichCliTestCase):
     """Tests for ls-files command."""
 

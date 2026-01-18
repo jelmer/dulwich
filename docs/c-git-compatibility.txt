@@ -172,7 +172,7 @@ Manipulation
 * ✓ ``git symbolic-ref`` - Read, modify and delete symbolic refs
 * ✓ ``git unpack-objects`` - Unpack objects from packed archive
 * ◐ ``git update-index`` - Register file contents in working tree to index (API only)
-* ◐ ``git update-ref`` - Update object name stored in a ref (API only)
+* ✓ ``git update-ref`` - Update object name stored in a ref
 * ✓ ``git write-tree`` - Create tree object from current index
 * ✗ ``git mktree`` - Build tree object from ls-tree formatted text
 

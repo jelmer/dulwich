@@ -2372,6 +2372,54 @@ class cmd_symbolic_ref(Command):
                     return 1
 
 
+class cmd_update_ref(Command):
+    """Update the object name stored in a ref safely."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the update-ref command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich update-ref")
+        parser.add_argument("-d", action="store_true", help="Delete the reference")
+        parser.add_argument("-m", dest="message", help="Reflog message")
+        parser.add_argument("ref", help="Reference name")
+        parser.add_argument(
+            "newvalue", nargs="?", help="New value (required unless -d)"
+        )
+        parser.add_argument("oldvalue", nargs="?", help="Old value to verify")
+        parsed_args = parser.parse_args(args)
+
+        # Validate arguments
+        if parsed_args.d:
+            # Delete mode: newvalue is actually oldvalue
+            if parsed_args.newvalue and parsed_args.oldvalue:
+                logger.error("Too many arguments for delete mode")
+                return 1
+            new_value = None
+            old_value = parsed_args.newvalue  # In -d mode, first arg is old value
+        else:
+            # Update mode: require newvalue
+            if not parsed_args.newvalue:
+                logger.error("Missing new value")
+                return 1
+            new_value = parsed_args.newvalue
+            old_value = parsed_args.oldvalue
+
+        porcelain.update_ref(
+            ".",
+            parsed_args.ref,
+            new_value,
+            old_value=old_value,
+            message=parsed_args.message,
+        )
+        return 0
+
+
 class cmd_pack_refs(Command):
     """Pack heads and tags for efficient repository access."""
 
@@ -7051,6 +7099,7 @@ commands = {
     "submodule": cmd_submodule,
     "tag": cmd_tag,
     "unpack-objects": cmd_unpack_objects,
+    "update-ref": cmd_update_ref,
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,
     "var": cmd_var,

@@ -2625,6 +2625,97 @@ class RevParseCommandTest(DulwichCliTestCase):
         self.assertEqual(result, 1)
 
 
+class UpdateRefCommandTest(DulwichCliTestCase):
+    """Tests for update-ref command."""
+
+    def test_update_ref_create(self):
+        """Test creating a new ref."""
+        # Create a commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Test commit")
+
+        # Get the current HEAD SHA
+        from dulwich.porcelain import rev_parse
+
+        head_sha = rev_parse(self.repo_path, b"HEAD")
+
+        # Create a new ref pointing to HEAD
+        result, _stdout, _stderr = self._run_cli(
+            "update-ref", "refs/heads/newbranch", head_sha.decode("utf-8")
+        )
+        self.assertEqual(result, 0)
+
+        # Verify the ref was created
+        new_ref_sha = rev_parse(self.repo_path, b"refs/heads/newbranch")
+        self.assertEqual(head_sha, new_ref_sha)
+
+    def test_update_ref_with_old_value(self):
+        """Test updating a ref with old value verification."""
+        # Create a commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "First commit")
+
+        from dulwich.porcelain import rev_parse
+
+        first_sha = rev_parse(self.repo_path, b"HEAD")
+
+        # Create another commit
+        with open(test_file, "ab") as f:
+            f.write(b"more content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Second commit")
+
+        second_sha = rev_parse(self.repo_path, b"HEAD")
+
+        # Update HEAD back to first commit, verifying it's currently at second
+        result, _stdout, _stderr = self._run_cli(
+            "update-ref",
+            "HEAD",
+            first_sha.decode("utf-8"),
+            second_sha.decode("utf-8"),
+        )
+        self.assertEqual(result, 0)
+
+        # Verify HEAD is now at first commit
+        current_sha = rev_parse(self.repo_path, b"HEAD")
+        self.assertEqual(first_sha, current_sha)
+
+    def test_update_ref_delete(self):
+        """Test deleting a ref."""
+        # Create a commit and a ref
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Test commit")
+
+        from dulwich.porcelain import rev_parse
+
+        head_sha = rev_parse(self.repo_path, b"HEAD")
+
+        # Create a ref
+        self._run_cli("update-ref", "refs/heads/deleteme", head_sha.decode("utf-8"))
+
+        # Verify it exists
+        ref_sha = rev_parse(self.repo_path, b"refs/heads/deleteme")
+        self.assertEqual(head_sha, ref_sha)
+
+        # Delete the ref
+        result, _stdout, _stderr = self._run_cli(
+            "update-ref", "-d", "refs/heads/deleteme"
+        )
+        self.assertEqual(result, 0)
+
+        # Verify it's gone by checking refs directly
+        self.assertNotIn(b"refs/heads/deleteme", self.repo.refs.allkeys())
+
+
 class LsFilesCommandTest(DulwichCliTestCase):
     """Tests for ls-files command."""
 

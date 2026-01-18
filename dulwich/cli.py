@@ -2372,6 +2372,54 @@ class cmd_symbolic_ref(Command):
                     return 1
 
 
+class cmd_update_ref(Command):
+    """Update the object name stored in a ref safely."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the update-ref command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich update-ref")
+        parser.add_argument("-d", action="store_true", help="Delete the reference")
+        parser.add_argument("-m", dest="message", help="Reflog message")
+        parser.add_argument("ref", help="Reference name")
+        parser.add_argument(
+            "newvalue", nargs="?", help="New value (required unless -d)"
+        )
+        parser.add_argument("oldvalue", nargs="?", help="Old value to verify")
+        parsed_args = parser.parse_args(args)
+
+        # Validate arguments
+        if parsed_args.d:
+            # Delete mode: newvalue is actually oldvalue
+            if parsed_args.newvalue and parsed_args.oldvalue:
+                logger.error("Too many arguments for delete mode")
+                return 1
+            new_value = None
+            old_value = parsed_args.newvalue  # In -d mode, first arg is old value
+        else:
+            # Update mode: require newvalue
+            if not parsed_args.newvalue:
+                logger.error("Missing new value")
+                return 1
+            new_value = parsed_args.newvalue
+            old_value = parsed_args.oldvalue
+
+        porcelain.update_ref(
+            ".",
+            parsed_args.ref,
+            new_value,
+            old_value=old_value,
+            message=parsed_args.message,
+        )
+        return 0
+
+
 class cmd_pack_refs(Command):
     """Pack heads and tags for efficient repository access."""
 
@@ -2493,6 +2541,33 @@ class cmd_show(Command):
             with get_pager(config=config, cmd_name="show") as outstream:
                 output_stream = _create_output_stream(outstream)
                 porcelain.show(repo, args.objectish or None, outstream=output_stream)
+
+
+class cmd_show_index(Command):
+    """Show packed archive index."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the show-index command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich show-index")
+        parser.add_argument("index_file", help="Path to pack index file")
+        parsed_args = parser.parse_args(args)
+
+        # Show index entries
+        entries = porcelain.show_index(parsed_args.index_file, ".")
+
+        # Output format matches git show-index:
+        # offset sha1 (crc32)
+        for offset, sha, crc32 in entries:
+            sys.stdout.write(f"{offset} {sha_to_hex(sha).decode('ascii')} ({crc32})\n")
+
+        return 0
 
 
 class cmd_show_ref(Command):
@@ -3720,6 +3795,162 @@ class cmd_submodule(SuperCommand):
     default_command = cmd_submodule_list
 
 
+class cmd_cat_file(Command):
+    """Provide content or type and size information for repository objects."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the cat-file command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich cat-file")
+        parser.add_argument("-t", action="store_true", help="Show object type")
+        parser.add_argument("-s", action="store_true", help="Show object size")
+        parser.add_argument(
+            "-p", action="store_true", help="Pretty-print object content"
+        )
+        parser.add_argument("object", help="Object to show (SHA, ref, etc.)")
+        parsed_args = parser.parse_args(args)
+
+        # Exactly one of -t, -s, or -p must be specified (or none for raw content)
+        modes = sum([parsed_args.t, parsed_args.s, parsed_args.p])
+        if modes > 1:
+            logger.error("Only one of -t, -s, or -p can be specified")
+            return 1
+
+        if parsed_args.t:
+            obj_type = porcelain.cat_file_type(".", parsed_args.object)
+            logger.info(obj_type.decode("utf-8"))
+        elif parsed_args.s:
+            size = porcelain.cat_file_size(".", parsed_args.object)
+            logger.info(str(size))
+        else:
+            # -p or default: show content
+            content = porcelain.cat_file_content(".", parsed_args.object)
+            # Write raw bytes to stdout
+            sys.stdout.buffer.write(content)
+
+        return 0
+
+
+class cmd_hash_object(Command):
+    """Compute object ID and optionally store in repository."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the hash-object command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich hash-object")
+        parser.add_argument("-w", action="store_true", help="Write object to database")
+        parser.add_argument(
+            "-t",
+            default="blob",
+            choices=["blob"],
+            help="Object type (only blob supported currently)",
+        )
+        parser.add_argument(
+            "--stdin", action="store_true", help="Read object from stdin"
+        )
+        parser.add_argument(
+            "path", nargs="?", help="Path to file (required unless --stdin)"
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Validate arguments
+        if parsed_args.stdin and parsed_args.path:
+            logger.error("Cannot specify both --stdin and a path")
+            return 1
+        if not parsed_args.stdin and not parsed_args.path:
+            logger.error("Must specify either --stdin or a path")
+            return 1
+
+        # Read data
+        if parsed_args.stdin:
+            data = sys.stdin.buffer.read()
+            sha = porcelain.hash_object(
+                "." if parsed_args.w else None,
+                data=data,
+                object_type=parsed_args.t.encode("utf-8"),
+                write=parsed_args.w,
+            )
+        else:
+            sha = porcelain.hash_object(
+                "." if parsed_args.w else None,
+                path=parsed_args.path,
+                object_type=parsed_args.t.encode("utf-8"),
+                write=parsed_args.w,
+            )
+
+        # Write SHA to stdout (this is the actual output, not a log message)
+        sys.stdout.write(sha.decode("utf-8") + "\n")
+        return 0
+
+
+class cmd_mktag(Command):
+    """Create a tag object from raw tag data."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the mktag command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich mktag")
+        parser.parse_args(args)
+
+        # Read tag data from stdin
+        tag_data = sys.stdin.buffer.read()
+
+        # Create the tag object
+        sha = porcelain.mktag(".", tag_data)
+
+        # Write SHA to stdout
+        sys.stdout.write(sha.decode("utf-8") + "\n")
+        return 0
+
+
+class cmd_rev_parse(Command):
+    """Parse revision and other objects."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the rev-parse command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich rev-parse")
+        parser.add_argument("--verify", action="store_true", help="Verify the object")
+        parser.add_argument("revs", nargs="+", help="Revisions to parse")
+        parsed_args = parser.parse_args(args)
+
+        for rev in parsed_args.revs:
+            try:
+                sha = porcelain.rev_parse(".", rev)
+                sys.stdout.write(sha.decode("utf-8") + "\n")
+            except Exception as e:
+                if parsed_args.verify:
+                    logger.error(f"fatal: Needed a single revision: {e}")
+                    return 1
+                raise
+
+        return 0
+
+
 class cmd_check_ignore(Command):
     """Check whether files are excluded by gitignore."""
 
@@ -4026,6 +4257,44 @@ class cmd_switch(Command):
         return 0
 
 
+class cmd_clean(Command):
+    """Remove untracked files from the working tree."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the clean command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich clean")
+        parser.add_argument(
+            "-d",
+            action="store_true",
+            help="Remove untracked directories (always enabled)",
+        )
+        parser.add_argument(
+            "-f",
+            "--force",
+            action="store_true",
+            help="Force removal (always enabled)",
+        )
+        parser.add_argument(
+            "target_dir",
+            nargs="?",
+            help="Directory to clean (default: current directory)",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # If no target_dir specified, use current directory
+        target = parsed_args.target_dir if parsed_args.target_dir else "."
+        porcelain.clean(".", target_dir=target)
+        logger.info("Cleaned untracked files")
+        return 0
+
+
 class cmd_stash_list(Command):
     """List stash entries."""
 
@@ -4231,6 +4500,130 @@ class cmd_stash(SuperCommand):
         "list": cmd_stash_list,
         "pop": cmd_stash_pop,
         "push": cmd_stash_push,
+    }
+
+
+class cmd_sparse_checkout_init(Command):
+    """Initialize sparse checkout in cone mode."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the sparse-checkout init command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich sparse-checkout init")
+        parser.parse_args(args)
+
+        porcelain.cone_mode_init(".")
+        logger.info("Initialized sparse checkout in cone mode")
+        return 0
+
+
+class cmd_sparse_checkout_set(Command):
+    """Set sparse checkout directories."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the sparse-checkout set command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich sparse-checkout set")
+        parser.add_argument("dirs", nargs="+", help="Directories to include")
+        parser.add_argument(
+            "--force", action="store_true", help="Force discard local modifications"
+        )
+        parsed_args = parser.parse_args(args)
+
+        porcelain.cone_mode_set(".", dirs=parsed_args.dirs, force=parsed_args.force)
+        logger.info("Sparse checkout set to: %s", ", ".join(parsed_args.dirs))
+        return 0
+
+
+class cmd_sparse_checkout_add(Command):
+    """Add directories to sparse checkout."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the sparse-checkout add command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich sparse-checkout add")
+        parser.add_argument("dirs", nargs="+", help="Directories to add")
+        parser.add_argument(
+            "--force", action="store_true", help="Force discard local modifications"
+        )
+        parsed_args = parser.parse_args(args)
+
+        porcelain.cone_mode_add(".", dirs=parsed_args.dirs, force=parsed_args.force)
+        logger.info("Added to sparse checkout: %s", ", ".join(parsed_args.dirs))
+        return 0
+
+
+class cmd_sparse_checkout_list(Command):
+    """List sparse checkout patterns."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the sparse-checkout list command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich sparse-checkout list")
+        parser.parse_args(args)
+
+        patterns = porcelain.cone_mode_list(".")
+        for pattern in patterns:
+            logger.info("%s", pattern)
+        return 0
+
+
+class cmd_sparse_checkout_disable(Command):
+    """Disable sparse checkout."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the sparse-checkout disable command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich sparse-checkout disable")
+        parser.add_argument(
+            "--force", action="store_true", help="Force discard local modifications"
+        )
+        parsed_args = parser.parse_args(args)
+
+        porcelain.cone_mode_disable(".", force=parsed_args.force)
+        logger.info("Sparse checkout disabled")
+        return 0
+
+
+class cmd_sparse_checkout(SuperCommand):
+    """Manage sparse checkout."""
+
+    subcommands: ClassVar[dict[str, type[Command]]] = {
+        "init": cmd_sparse_checkout_init,
+        "set": cmd_sparse_checkout_set,
+        "add": cmd_sparse_checkout_add,
+        "list": cmd_sparse_checkout_list,
+        "disable": cmd_sparse_checkout_disable,
     }
 
 
@@ -6683,11 +7076,13 @@ commands = {
     "blame": cmd_blame,
     "branch": cmd_branch,
     "bundle": cmd_bundle,
+    "cat-file": cmd_cat_file,
     "check-ignore": cmd_check_ignore,
     "check-mailmap": cmd_check_mailmap,
     "checkout": cmd_checkout,
     "cherry": cmd_cherry,
     "cherry-pick": cmd_cherry_pick,
+    "clean": cmd_clean,
     "clone": cmd_clone,
     "column": cmd_column,
     "commit": cmd_commit,
@@ -6709,6 +7104,7 @@ commands = {
     "fsck": cmd_fsck,
     "gc": cmd_gc,
     "grep": cmd_grep,
+    "hash-object": cmd_hash_object,
     "help": cmd_help,
     "init": cmd_init,
     "interpret-trailers": cmd_interpret_trailers,
@@ -6723,6 +7119,7 @@ commands = {
     "merge": cmd_merge,
     "merge-base": cmd_merge_base,
     "merge-tree": cmd_merge_tree,
+    "mktag": cmd_mktag,
     "notes": cmd_notes,
     "pack-objects": cmd_pack_objects,
     "pack-refs": cmd_pack_refs,
@@ -6740,11 +7137,14 @@ commands = {
     "restore": cmd_restore,
     "revert": cmd_revert,
     "rev-list": cmd_rev_list,
+    "rev-parse": cmd_rev_parse,
     "rm": cmd_rm,
     "mv": cmd_mv,
     "show": cmd_show,
     "show-branch": cmd_show_branch,
+    "show-index": cmd_show_index,
     "show-ref": cmd_show_ref,
+    "sparse-checkout": cmd_sparse_checkout,
     "stash": cmd_stash,
     "status": cmd_status,
     "stripspace": cmd_stripspace,
@@ -6754,6 +7154,7 @@ commands = {
     "submodule": cmd_submodule,
     "tag": cmd_tag,
     "unpack-objects": cmd_unpack_objects,
+    "update-ref": cmd_update_ref,
     "update-server-info": cmd_update_server_info,
     "upload-pack": cmd_upload_pack,
     "var": cmd_var,

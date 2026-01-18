@@ -191,7 +191,7 @@ Interrogation
 * ◐ ``git name-rev`` - Find symbolic names for revisions (API only)
 * ✓ ``git pack-refs`` - Pack heads and tags for efficient repository access
 * ✓ ``git rev-list`` - List commit objects in reverse chronological order
-* ◐ ``git rev-parse`` - Pick out and massage parameters (API only, see objectspec module)
+* ✓ ``git rev-parse`` - Pick out and massage parameters (see also objectspec module)
 * ◐ ``git show-index`` - Show packed archive index (API only)
 * ✓ ``git show-ref`` - List references in local repository
 * ✓ ``git var`` - Show Git logical variable

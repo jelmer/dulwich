@@ -3820,6 +3820,36 @@ class cmd_hash_object(Command):
         return 0
 
 
+class cmd_rev_parse(Command):
+    """Parse revision and other objects."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the rev-parse command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success)
+        """
+        parser = argparse.ArgumentParser(prog="dulwich rev-parse")
+        parser.add_argument("--verify", action="store_true", help="Verify the object")
+        parser.add_argument("revs", nargs="+", help="Revisions to parse")
+        parsed_args = parser.parse_args(args)
+
+        for rev in parsed_args.revs:
+            try:
+                sha = porcelain.rev_parse(".", rev)
+                sys.stdout.write(sha.decode("utf-8") + "\n")
+            except Exception as e:
+                if parsed_args.verify:
+                    logger.error(f"fatal: Needed a single revision: {e}")
+                    return 1
+                raise
+
+        return 0
+
+
 class cmd_check_ignore(Command):
     """Check whether files are excluded by gitignore."""
 
@@ -7005,6 +7035,7 @@ commands = {
     "restore": cmd_restore,
     "revert": cmd_revert,
     "rev-list": cmd_rev_list,
+    "rev-parse": cmd_rev_parse,
     "rm": cmd_rm,
     "mv": cmd_mv,
     "show": cmd_show,

@@ -2580,6 +2580,51 @@ class HashObjectCommandTest(DulwichCliTestCase):
         self.assertEqual(obj.data, test_content)
 
 
+class RevParseCommandTest(DulwichCliTestCase):
+    """Tests for rev-parse command."""
+
+    def test_rev_parse_head(self):
+        """Test rev-parse with HEAD."""
+        # Create a commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Test commit")
+
+        # Parse HEAD
+        result, stdout, _stderr = self._run_cli("rev-parse", "HEAD")
+        self.assertEqual(result, 0)
+        sha = stdout.strip()
+        self.assertEqual(len(sha), 40)
+        self.assertTrue(all(c in "0123456789abcdef" for c in sha.lower()))
+
+        # Verify it matches the actual HEAD
+        from dulwich.porcelain import rev_parse
+
+        expected_sha = rev_parse(self.repo_path, b"HEAD")
+        self.assertEqual(sha, expected_sha.decode("utf-8"))
+
+    def test_rev_parse_verify(self):
+        """Test rev-parse with --verify flag."""
+        # Create a commit
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "wb") as f:
+            f.write(b"test content\n")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "-m", "Test commit")
+
+        # Test --verify with valid ref
+        result, stdout, _stderr = self._run_cli("rev-parse", "--verify", "HEAD")
+        self.assertEqual(result, 0)
+        sha = stdout.strip()
+        self.assertEqual(len(sha), 40)
+
+        # Test --verify with invalid ref (should fail gracefully)
+        result, _stdout, _stderr = self._run_cli("rev-parse", "--verify", "nonexistent")
+        self.assertEqual(result, 1)
+
+
 class LsFilesCommandTest(DulwichCliTestCase):
     """Tests for ls-files command."""
 

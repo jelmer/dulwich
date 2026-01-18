@@ -221,6 +221,7 @@ __all__ = [
     "reset_file",
     "restore",
     "rev_list",
+    "rev_parse",
     "revert",
     "set_branch_tracking",
     "shortlog",
@@ -5620,7 +5621,10 @@ def cone_mode_disable(repo: str | os.PathLike[str] | Repo, force: bool = False) 
 
         # Restore all files by doing a full checkout
         # Clear all skip-worktree bits and restore all files from HEAD
-        tree = repo_obj[repo_obj.head()]
+        from ..objects import Commit
+
+        commit = repo_obj[repo_obj.head()]
+        assert isinstance(commit, Commit)
 
         from ..index import build_index_from_tree
 
@@ -5628,8 +5632,7 @@ def cone_mode_disable(repo: str | os.PathLike[str] | Repo, force: bool = False) 
             repo_obj.path,
             repo_obj.index_path(),
             repo_obj.object_store,
-            tree.tree,
-            honor_filemode=None,
+            commit.tree,
         )
 
 
@@ -5719,7 +5722,9 @@ def hash_object(
 
     # Only blob type is supported for now
     if object_type != b"blob":
-        raise NotImplementedError(f"Object type {object_type} not yet supported")
+        raise NotImplementedError(
+            f"Object type {object_type.decode('utf-8')} not yet supported"
+        )
 
     # Create blob object
     blob = Blob()
@@ -5731,10 +5736,28 @@ def hash_object(
 
     # Write to object store if requested
     if write:
+        assert repo is not None  # Already checked above
         with open_repo_closing(repo) as r:
             r.object_store.add_object(blob)
 
     return blob.id
+
+
+def rev_parse(repo: str | os.PathLike[str] | Repo, rev: str | bytes) -> bytes:
+    """Parse a revision string and return the object SHA.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      rev: Revision string (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Object SHA as bytes
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, rev)
+        return obj.id
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

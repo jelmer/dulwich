@@ -109,6 +109,9 @@ __all__ = [
     "branch_list",
     "branch_remotes_list",
     "branches_containing",
+    "cat_file_content",
+    "cat_file_size",
+    "cat_file_type",
     "check_diverged",
     "check_ignore",
     "check_mailmap",
@@ -122,7 +125,9 @@ __all__ = [
     "commit_encode",
     "commit_tree",
     "cone_mode_add",
+    "cone_mode_disable",
     "cone_mode_init",
+    "cone_mode_list",
     "cone_mode_set",
     "count_objects",
     "daemon",
@@ -145,6 +150,7 @@ __all__ = [
     "get_untracked_paths",
     "get_user_timezones",
     "grep",
+    "hash_object",
     "independent_commits",
     "init",
     "interpret_trailers",
@@ -5562,6 +5568,173 @@ def cone_mode_add(
         repo_obj.get_worktree().set_cone_mode_patterns(dirs=added_dirs)
         new_patterns = repo_obj.get_worktree().get_sparse_checkout_patterns()
         sparse_checkout(repo_obj, patterns=new_patterns, force=force, cone=True)
+
+
+def cone_mode_list(repo: str | os.PathLike[str] | Repo) -> list[str]:
+    """List current sparse-checkout patterns.
+
+    Args:
+      repo: Path to the repository or a Repo object.
+
+    Returns:
+      List of sparse-checkout patterns
+    """
+    with open_repo_closing(repo) as repo_obj:
+        return repo_obj.get_worktree().get_sparse_checkout_patterns()
+
+
+def cone_mode_disable(repo: str | os.PathLike[str] | Repo, force: bool = False) -> None:
+    """Disable sparse checkout and restore all files.
+
+    This function:
+    1. Unsets core.sparseCheckout and core.sparseCheckoutCone config
+    2. Removes the .git/info/sparse-checkout file
+    3. Restores all files to the working tree
+
+    Args:
+      repo: Path to the repository or a Repo object.
+      force: Whether to forcibly discard local modifications (default False).
+
+    Returns:
+      None
+    """
+    with open_repo_closing(repo) as repo_obj:
+        # Unset sparse checkout config
+        config = repo_obj.get_config()
+        try:
+            del config[(b"core", b"sparseCheckout")]
+        except KeyError:
+            pass
+        try:
+            del config[(b"core", b"sparseCheckoutCone")]
+        except KeyError:
+            pass
+        config.write_to_path()
+
+        # Remove sparse-checkout file
+        sparse_file = repo_obj.get_worktree()._sparse_checkout_file_path()
+        try:
+            os.remove(sparse_file)
+        except FileNotFoundError:
+            pass
+
+        # Restore all files by doing a full checkout
+        # Clear all skip-worktree bits and restore all files from HEAD
+        tree = repo_obj[repo_obj.head()]
+
+        from ..index import build_index_from_tree
+
+        build_index_from_tree(
+            repo_obj.path,
+            repo_obj.index_path(),
+            repo_obj.object_store,
+            tree.tree,
+            honor_filemode=None,
+        )
+
+
+def cat_file_type(repo: str | os.PathLike[str] | Repo, objectish: str | bytes) -> bytes:
+    """Get the type of a Git object.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      objectish: Object SHA, reference, or objectish (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Object type as bytes (b'blob', b'tree', b'commit', or b'tag')
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, objectish)
+        return obj.type_name
+
+
+def cat_file_size(repo: str | os.PathLike[str] | Repo, objectish: str | bytes) -> int:
+    """Get the size of a Git object.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      objectish: Object SHA, reference, or objectish (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Object size in bytes
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, objectish)
+        return len(obj.as_raw_string())
+
+
+def cat_file_content(
+    repo: str | os.PathLike[str] | Repo, objectish: str | bytes
+) -> bytes:
+    """Get the raw content of a Git object.
+
+    Args:
+      repo: Path to the repository or a Repo object
+      objectish: Object SHA, reference, or objectish (e.g., 'HEAD', 'main', 'abc123')
+
+    Returns:
+      Raw object content as bytes
+    """
+    from ..objectspec import parse_object
+
+    with open_repo_closing(repo) as r:
+        obj = parse_object(r, objectish)
+        return obj.as_raw_string()
+
+
+def hash_object(
+    repo: str | os.PathLike[str] | Repo | None,
+    path: str | os.PathLike[str] | None = None,
+    data: bytes | None = None,
+    object_type: bytes = b"blob",
+    write: bool = False,
+) -> bytes:
+    """Compute object ID and optionally write to object store.
+
+    Args:
+      repo: Path to the repository or a Repo object (required if write=True)
+      path: Path to file to hash (mutually exclusive with data)
+      data: Data to hash (mutually exclusive with path)
+      object_type: Type of object (default: b'blob')
+      write: Whether to write the object to the object store (default: False)
+
+    Returns:
+      Object SHA as bytes
+
+    Raises:
+      ValueError: If neither path nor data is provided, or both are provided
+      ValueError: If write=True but repo is None
+    """
+    from ..objects import Blob
+
+    if (path is None and data is None) or (path is not None and data is not None):
+        raise ValueError("Exactly one of 'path' or 'data' must be provided")
+
+    if write and repo is None:
+        raise ValueError("repo is required when write=True")
+
+    # Only blob type is supported for now
+    if object_type != b"blob":
+        raise NotImplementedError(f"Object type {object_type} not yet supported")
+
+    # Create blob object
+    blob = Blob()
+    if path is not None:
+        with open(path, "rb") as f:
+            blob.data = f.read()
+    else:
+        blob.data = data
+
+    # Write to object store if requested
+    if write:
+        with open_repo_closing(repo) as r:
+            r.object_store.add_object(blob)
+
+    return blob.id
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

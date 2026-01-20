@@ -22,6 +22,7 @@
 """Tests for the repository."""
 
 import glob
+import importlib
 import locale
 import os
 import shutil
@@ -938,6 +939,10 @@ exit 0
     def test_shell_hook_pre_commit_add_files(self) -> None:
         if os.name != "posix":
             self.skipTest("shell hook tests requires POSIX shell")
+
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
 
         pre_commit_contents = """#!{executable}
 import sys

@@ -3,6 +3,10 @@
  * Support ``GIT_TRACE_PACKET`` in ``dulwich.cli``.
    (Jelmer Vernooĳ)
 
+ * Fix cloning of SHA-256 repositories by including ``object-format`` and
+   ``agent`` capabilities in Git protocol v2 ``ls-refs`` and ``fetch``
+   commands. (Jelmer Vernooĳ)
+
 1.0.0	2026-01-17
 
  * Release of 1.0!

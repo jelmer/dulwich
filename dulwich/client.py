@@ -212,7 +212,6 @@ from .protocol import (
     extract_capability_names,
     parse_capability,
     pkt_line,
-    pkt_seq,
     split_peeled_refs,
 )
 from .refs import (
@@ -415,6 +414,63 @@ def extract_object_format_from_capabilities(
         if k == b"object-format" and v is not None:
             return v.decode("ascii").strip()
     return None
+
+
+def build_ls_refs_request_v2(
+    server_capabilities: set[bytes],
+    object_format: str | None,
+    ref_prefix: Sequence[bytes] | None = None,
+) -> tuple[list[bytes], list[bytes]]:
+    """Build ls-refs command packet lists for protocol v2.
+
+    Args:
+        server_capabilities: Capabilities advertised by the server
+        object_format: Object format to use (e.g., "sha1", "sha256"), or None
+        ref_prefix: List of ref prefixes to request, or None for default
+
+    Returns:
+        Tuple of (command packets before delimiter, argument packets after delimiter)
+    """
+    if ref_prefix is None:
+        ref_prefix = DEFAULT_REF_PREFIX
+
+    # Check if server supports unborn refs
+    supports_unborn = any(
+        b"ls-refs=unborn" in cap or b"ls-refs" in cap for cap in server_capabilities
+    )
+
+    # Command packets (before delimiter)
+    cmd_packets = [b"command=ls-refs\n", b"agent=" + agent_string()]
+    if object_format is not None:
+        cmd_packets.append(f"object-format={object_format}".encode("ascii"))
+
+    # Argument packets (after delimiter)
+    arg_packets = [b"peel", b"symrefs"]
+    if supports_unborn:
+        arg_packets.append(b"unborn")
+    for prefix in ref_prefix:
+        arg_packets.append(b"ref-prefix " + prefix)
+
+    return cmd_packets, arg_packets
+
+
+def build_fetch_request_v2(
+    object_format: str | None,
+) -> list[bytes]:
+    """Build fetch command packet list for protocol v2 (before delimiter).
+
+    Args:
+        object_format: Object format to use (e.g., "sha1", "sha256"), or None
+
+    Returns:
+        List of command packets to send before the delimiter
+    """
+    # Build packet list (before delimiter)
+    packets = [b"command=fetch\n", b"agent=" + agent_string()]
+    if object_format is not None:
+        packets.append(f"object-format={object_format}".encode("ascii"))
+
+    return packets
 
 
 def read_pkt_refs_v2(
@@ -1745,14 +1801,15 @@ class TraditionalGitClient(GitClient):
                     server_capabilities
                 )
 
-                proto.write_pkt_line(b"command=ls-refs\n")
+                # Send ls-refs command with protocol v2 structure
+                cmd_packets, arg_packets = build_ls_refs_request_v2(
+                    server_capabilities, object_format, ref_prefix
+                )
+                for pkt in cmd_packets:
+                    proto.write_pkt_line(pkt)
                 proto.write(b"0001")  # delim-pkt
-                proto.write_pkt_line(b"symrefs")
-                proto.write_pkt_line(b"peel")
-                if ref_prefix is None:
-                    ref_prefix = DEFAULT_REF_PREFIX
-                for prefix in ref_prefix:
-                    proto.write_pkt_line(b"ref-prefix " + prefix)
+                for pkt in arg_packets:
+                    proto.write_pkt_line(pkt)
                 proto.write_pkt_line(None)
                 refs, symrefs, _peeled = read_pkt_refs_v2(proto.read_pkt_seq())
             else:
@@ -1802,7 +1859,10 @@ class TraditionalGitClient(GitClient):
                     refs, symrefs, agent, object_format=object_format
                 )
             if self.protocol_version == 2:
-                proto.write_pkt_line(b"command=fetch\n")
+                # Send fetch command with protocol v2 structure
+                cmd_packets = build_fetch_request_v2(object_format)
+                for pkt in cmd_packets:
+                    proto.write_pkt_line(pkt)
                 proto.write(b"0001")  # delim-pkt
                 if CAPABILITY_THIN_PACK in self._fetch_capabilities:
                     proto.write(pkt_line(b"thin-pack\n"))
@@ -1869,14 +1929,16 @@ class TraditionalGitClient(GitClient):
         if self.protocol_version == 2:
             server_capabilities = read_server_capabilities(proto.read_pkt_seq())
             object_format = extract_object_format_from_capabilities(server_capabilities)
-            proto.write_pkt_line(b"command=ls-refs\n")
+
+            # Send ls-refs command with protocol v2 structure
+            cmd_packets, arg_packets = build_ls_refs_request_v2(
+                server_capabilities, object_format, ref_prefix
+            )
+            for pkt in cmd_packets:
+                proto.write_pkt_line(pkt)
             proto.write(b"0001")  # delim-pkt
-            proto.write_pkt_line(b"symrefs")
-            proto.write_pkt_line(b"peel")
-            if ref_prefix is None:
-                ref_prefix = DEFAULT_REF_PREFIX
-            for prefix in ref_prefix:
-                proto.write_pkt_line(b"ref-prefix " + prefix)
+            for pkt in arg_packets:
+                proto.write_pkt_line(pkt)
             proto.write_pkt_line(None)
             with proto:
                 try:
@@ -3944,15 +4006,21 @@ class AbstractHttpGitClient(GitClient):
                     if ref_prefix is None:
                         ref_prefix = DEFAULT_REF_PREFIX
 
-                    pkts = [
-                        b"symrefs",
-                        b"peel",
-                    ]
-                    for prefix in ref_prefix:
-                        pkts.append(b"ref-prefix " + prefix)
+                    # Extract object format from server capabilities
+                    object_format = extract_object_format_from_capabilities(
+                        server_capabilities
+                    )
+
+                    # Build ls-refs command with protocol v2 structure
+                    cmd_packets, arg_packets = build_ls_refs_request_v2(
+                        server_capabilities, object_format, ref_prefix
+                    )
 
                     body = b"".join(
-                        [pkt_line(b"command=ls-refs\n"), b"0001", pkt_seq(*pkts)]
+                        [pkt_line(pkt) for pkt in cmd_packets]
+                        + [b"0001"]
+                        + [pkt_line(pkt) for pkt in arg_packets]
+                        + [b"0000"]  # flush packet
                     )
 
                     resp, read = self._smart_request(
@@ -4280,7 +4348,14 @@ class AbstractHttpGitClient(GitClient):
             shallow_exclude=shallow_exclude,
         )
         if self.protocol_version == 2:
-            data = pkt_line(b"command=fetch\n") + b"0001"
+            # Build protocol v2 fetch command
+            cmd_packets = build_fetch_request_v2(object_format)
+            data = b"".join(pkt_line(pkt) for pkt in cmd_packets)
+
+            # Delimiter
+            data += b"0001"
+
+            # Command arguments (after delimiter)
             if CAPABILITY_THIN_PACK in self._fetch_capabilities:
                 data += pkt_line(b"thin-pack\n")
             if (

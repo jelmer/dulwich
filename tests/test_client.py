@@ -55,6 +55,8 @@ from dulwich.client import (
     _extract_symrefs_and_agent,
     _remote_error_from_stderr,
     _win32_url_to_path,
+    build_fetch_request_v2,
+    build_ls_refs_request_v2,
     check_wants,
     default_urllib3_manager,
     get_credentials_from_store,
@@ -66,7 +68,12 @@ from dulwich.config import ConfigDict
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.pack import pack_objects_to_data, write_pack_data, write_pack_objects
-from dulwich.protocol import DEFAULT_GIT_PROTOCOL_VERSION_FETCH, TCP_GIT_PORT, Protocol
+from dulwich.protocol import (
+    DEFAULT_GIT_PROTOCOL_VERSION_FETCH,
+    TCP_GIT_PORT,
+    Protocol,
+    agent_string,
+)
 from dulwich.repo import MemoryRepo, Repo
 from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
@@ -3093,3 +3100,108 @@ class TestExtractAgentAndSymrefs(TestCase):
         )
         self.assertEqual(agent, b"git/2.31.1")
         self.assertEqual(symrefs, {b"HEAD": b"refs/heads/master"})
+
+
+class TestBuildLsRefsRequestV2(TestCase):
+    def test_with_sha256_object_format(self) -> None:
+        server_caps = {b"object-format=sha256\n", b"ls-refs=unborn\n"}
+        cmd_packets, arg_packets = build_ls_refs_request_v2(server_caps, "sha256", None)
+
+        # Check exact command packets (before delimiter)
+        self.assertEqual(
+            cmd_packets,
+            [b"command=ls-refs\n", b"agent=" + agent_string(), b"object-format=sha256"],
+        )
+
+        # Check exact argument packets (after delimiter)
+        self.assertEqual(
+            arg_packets,
+            [b"peel", b"symrefs", b"unborn", b"ref-prefix HEAD", b"ref-prefix refs/"],
+        )
+
+    def test_without_object_format(self) -> None:
+        server_caps = {b"ls-refs=unborn\n"}
+        cmd_packets, arg_packets = build_ls_refs_request_v2(server_caps, None, None)
+
+        # Check exact command packets (before delimiter)
+        self.assertEqual(
+            cmd_packets,
+            [b"command=ls-refs\n", b"agent=" + agent_string()],
+        )
+
+        # Check exact argument packets (after delimiter)
+        self.assertEqual(
+            arg_packets,
+            [b"peel", b"symrefs", b"unborn", b"ref-prefix HEAD", b"ref-prefix refs/"],
+        )
+
+    def test_custom_ref_prefix(self) -> None:
+        server_caps = {b"ls-refs\n"}
+        custom_prefixes = [b"refs/heads/main", b"refs/tags/v1.0"]
+        cmd_packets, arg_packets = build_ls_refs_request_v2(
+            server_caps, None, custom_prefixes
+        )
+
+        # Check exact command packets
+        self.assertEqual(
+            cmd_packets,
+            [b"command=ls-refs\n", b"agent=" + agent_string()],
+        )
+
+        # Check exact argument packets include custom prefixes
+        # Note: ls-refs capability triggers unborn support
+        self.assertEqual(
+            arg_packets,
+            [
+                b"peel",
+                b"symrefs",
+                b"unborn",
+                b"ref-prefix refs/heads/main",
+                b"ref-prefix refs/tags/v1.0",
+            ],
+        )
+
+    def test_no_unborn_support(self) -> None:
+        server_caps = {b"fetch=shallow\n"}  # No ls-refs capability
+        cmd_packets, arg_packets = build_ls_refs_request_v2(server_caps, None, None)
+
+        # Check exact command packets
+        self.assertEqual(
+            cmd_packets,
+            [b"command=ls-refs\n", b"agent=" + agent_string()],
+        )
+
+        # Should not include unborn argument
+        self.assertEqual(
+            arg_packets,
+            [b"peel", b"symrefs", b"ref-prefix HEAD", b"ref-prefix refs/"],
+        )
+
+
+class TestBuildFetchRequestV2(TestCase):
+    def test_with_sha256_object_format(self) -> None:
+        cmd_packets = build_fetch_request_v2("sha256")
+
+        # Check exact command packets
+        self.assertEqual(
+            cmd_packets,
+            [b"command=fetch\n", b"agent=" + agent_string(), b"object-format=sha256"],
+        )
+
+    def test_without_object_format(self) -> None:
+        cmd_packets = build_fetch_request_v2(None)
+
+        # Check exact command packets
+        self.assertEqual(
+            cmd_packets,
+            [b"command=fetch\n", b"agent=" + agent_string()],
+        )
+
+    def test_with_sha1_object_format(self) -> None:
+        cmd_packets = build_fetch_request_v2("sha1")
+
+        # Check exact command packets
+        self.assertEqual(
+            cmd_packets,
+            [b"command=fetch\n", b"agent=" + agent_string(), b"object-format=sha1"],
+        )

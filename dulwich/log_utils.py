@@ -105,11 +105,87 @@ def _get_trace_target() -> str | int | None:
     return None
 
 
+def _configure_packet_trace() -> bool:
+    """Configure packet tracing based on GIT_TRACE_PACKET environment variable.
+
+    Returns True if packet trace configuration was successful, False otherwise.
+    """
+    trace_value = os.environ.get("GIT_TRACE_PACKET", "")
+
+    if not trace_value or trace_value.lower() in ("0", "false"):
+        return False
+
+    # GIT_TRACE_PACKET uses similar format to GIT_TRACE
+    if trace_value.lower() in ("1", "2", "true"):
+        trace_target: int | str = 2  # stderr
+    else:
+        # Could be fd or file path, reuse same logic
+        try:
+            fd = int(trace_value)
+            if 3 <= fd <= 9:
+                trace_target = fd
+            else:
+                return False
+        except ValueError:
+            if os.path.isabs(trace_value):
+                trace_target = trace_value
+            else:
+                return False
+
+    # Configure the dulwich.protocol logger specifically
+    protocol_logger = logging.getLogger("dulwich.protocol")
+    protocol_logger.setLevel(logging.DEBUG)
+
+    # Git's packet trace format: "HH:MM:SS.microsec pkt-line.c:line packet: ..."
+    # We'll use a simpler format that's still recognizable
+    trace_format = "%(asctime)s.%(msecs)03d packet: %(message)s"
+    formatter = logging.Formatter(trace_format, datefmt="%H:%M:%S")
+
+    if trace_target == 2:
+        handler: logging.Handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(formatter)
+        protocol_logger.addHandler(handler)
+        return True
+
+    if isinstance(trace_target, int):
+        try:
+            stream = os.fdopen(trace_target, "w", buffering=1)
+            handler = logging.StreamHandler(stream)
+            handler.setFormatter(formatter)
+            protocol_logger.addHandler(handler)
+            return True
+        except OSError as e:
+            sys.stderr.write(
+                f"Warning: Failed to open GIT_TRACE_PACKET fd {trace_target}: {e}\n"
+            )
+            return False
+
+    # File path
+    try:
+        if os.path.isdir(trace_target):
+            filename = os.path.join(trace_target, f"packet_trace.{os.getpid()}")
+        else:
+            filename = trace_target
+
+        handler = logging.FileHandler(filename, mode="a")
+        handler.setFormatter(formatter)
+        protocol_logger.addHandler(handler)
+        return True
+    except OSError as e:
+        sys.stderr.write(
+            f"Warning: Failed to open GIT_TRACE_PACKET file {trace_target}: {e}\n"
+        )
+        return False
+
+
 def _configure_logging_from_trace() -> bool:
     """Configure logging based on GIT_TRACE environment variable.
 
     Returns True if trace configuration was successful, False otherwise.
     """
+    # First configure packet tracing if enabled
+    _configure_packet_trace()
+
     trace_target = _get_trace_target()
     if trace_target is None:
         return False

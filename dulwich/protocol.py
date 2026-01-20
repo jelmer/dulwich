@@ -103,6 +103,7 @@ __all__ = [
     "write_info_refs",
 ]
 
+import logging
 import types
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from io import BytesIO
@@ -113,6 +114,8 @@ import dulwich
 
 from .errors import GitProtocolError, HangupException
 from .objects import ObjectID
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .pack import ObjectContainer
@@ -455,6 +458,7 @@ class Protocol:
             if size == 0 or size == 1:  # flush-pkt or delim-pkt
                 if self.report_activity:
                     self.report_activity(4, "read")
+                logger.debug("git< %s", sizestr.decode("ascii"))
                 return None
             if self.report_activity:
                 self.report_activity(size, "read")
@@ -468,6 +472,13 @@ class Protocol:
                 raise GitProtocolError(
                     f"Length of pkt read {len(pkt_contents) + 4:04x} does not match length prefix {size:04x}"
                 )
+            # Log the packet contents (truncate if too long for readability)
+            if len(pkt_contents) > 80:
+                logger.debug(
+                    "git< %s... (%d bytes)", pkt_contents[:80], len(pkt_contents)
+                )
+            else:
+                logger.debug("git< %s", pkt_contents)
             return pkt_contents
 
     def eof(self) -> bool:
@@ -520,6 +531,14 @@ class Protocol:
             prefix.
         """
         try:
+            # Log before converting to pkt format
+            if line is None:
+                logger.debug("git> 0000")
+            elif len(line) > 80:
+                logger.debug("git> %s... (%d bytes)", line[:80], len(line))
+            else:
+                logger.debug("git> %s", line)
+
             line = pkt_line(line)
             self.write(line)
             if self.report_activity:

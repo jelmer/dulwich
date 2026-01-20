@@ -22,6 +22,7 @@
 """Tests for the repository."""
 
 import glob
+import importlib
 import locale
 import os
 import shutil
@@ -46,7 +47,7 @@ from dulwich.repo import (
 )
 from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
-from . import TestCase, skipIf
+from . import DependencyMissing, TestCase, skipIf
 
 missing_sha = b"b91fa4d900e17e99b433218e988c4eb4a3e9a097"
 
@@ -938,6 +939,10 @@ exit 0
     def test_shell_hook_pre_commit_add_files(self) -> None:
         if os.name != "posix":
             self.skipTest("shell hook tests requires POSIX shell")
+
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
 
         pre_commit_contents = """#!{executable}
 import sys

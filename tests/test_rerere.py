@@ -1,5 +1,6 @@
 """Tests for rerere functionality."""
 
+import importlib
 import os
 import tempfile
 import unittest
@@ -13,6 +14,8 @@ from dulwich.rerere import (
     is_rerere_autoupdate,
     is_rerere_enabled,
 )
+
+from . import DependencyMissing
 
 
 class NormalizeConflictMarkersTests(unittest.TestCase):
@@ -539,6 +542,10 @@ class RerereEndToEndTests(unittest.TestCase):
         from dulwich.objects import Blob, Commit, Tree
         from dulwich.rerere import rerere_auto
 
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         # Create branch1: change "original line" to "branch1 change"
         blob_branch1 = Blob.from_string(b"line 1\nbranch1 change\nline 3\n")
         self.repo.object_store.add_object(blob_branch1)
@@ -676,6 +683,10 @@ class RerereEndToEndTests(unittest.TestCase):
         from dulwich.merge import recursive_merge
         from dulwich.objects import Blob, Commit, Tree
         from dulwich.rerere import RerereCache, rerere_auto
+
+        # Check if merge3 module is available
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
 
         # Enable autoupdate
         config = self.repo.get_config()

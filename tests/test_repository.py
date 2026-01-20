@@ -47,7 +47,7 @@ from dulwich.repo import (
 )
 from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
-from . import TestCase, skipIf, DependencyMissing
+from . import DependencyMissing, TestCase, skipIf
 
 missing_sha = b"b91fa4d900e17e99b433218e988c4eb4a3e9a097"
 

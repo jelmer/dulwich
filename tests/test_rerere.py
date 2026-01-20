@@ -15,6 +15,8 @@ from dulwich.rerere import (
     is_rerere_enabled,
 )
 
+from . import DependencyMissing
+
 
 class NormalizeConflictMarkersTests(unittest.TestCase):
     """Tests for _normalize_conflict_markers function."""

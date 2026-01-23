@@ -166,6 +166,7 @@ from .pack import (
     PACK_SPOOL_FILE_MAX_SIZE,
     PackChunkGenerator,
     PackData,
+    verify_and_read,
     write_pack_from_container,
 )
 from .protocol import (
@@ -179,6 +180,7 @@ from .protocol import (
     CAPABILITY_MULTI_ACK,
     CAPABILITY_MULTI_ACK_DETAILED,
     CAPABILITY_OFS_DELTA,
+    CAPABILITY_PACKFILE_URIS,
     CAPABILITY_QUIET,
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_SHALLOW,
@@ -957,6 +959,58 @@ def _handle_upload_pack_head(
     return (new_shallow, new_unshallow)
 
 
+def _download_packfile_from_uri(
+    uri: str,
+    expected_hash: bytes,
+    hash_algo: str,
+    pack_data: Callable[[bytes], int],
+    progress: Callable[[bytes], None] | None,
+    http_request: Callable[[str], tuple["HTTPResponse", Callable[[int], bytes]]],
+) -> None:
+    """Download a packfile from a URI and verify its hash.
+
+    This function downloads data, verifies the hash matches expected_hash,
+    and only then writes data to the repository. This prevents corrupted
+    or malicious data from being written.
+
+    Args:
+        uri: URI to download packfile from
+        expected_hash: Expected hash of the packfile
+        hash_algo: Hash algorithm to use (e.g., 'sha1', 'sha256')
+        pack_data: Callback to send pack data to
+        progress: Optional progress callback
+        http_request: Function to perform HTTP requests
+
+    Raises:
+        GitProtocolError: If URI scheme is not HTTPS, hash doesn't match,
+            or download fails
+    """
+    if progress:
+        progress(f"Downloading packfile from {uri}\n".encode())
+
+    # Only support HTTPS URIs for security
+    if not uri.startswith("https://"):
+        raise GitProtocolError(f"Only HTTPS URIs are supported, got: {uri}")
+
+    # Download and verify packfile
+    resp, read = http_request(uri)
+    try:
+        # Use verify_and_read to ensure hash verification before writing
+        try:
+            for chunk in verify_and_read(read, expected_hash, hash_algo, progress):
+                pack_data(chunk)
+        except ValueError as e:
+            # Convert pack module ValueError to GitProtocolError
+            raise GitProtocolError(f"Packfile verification failed for {uri}: {e}")
+
+        if progress:
+            progress(
+                f"Successfully downloaded and verified packfile from {uri}\n".encode()
+            )
+    finally:
+        resp.close()
+
+
 def _handle_upload_pack_tail(
     proto: "Protocol",
     capabilities: Set[bytes],
@@ -965,6 +1019,8 @@ def _handle_upload_pack_tail(
     progress: Callable[[bytes], None] | None = None,
     rbufsize: int = _RBUFSIZE,
     protocol_version: int = 0,
+    http_request: Callable[[str], tuple["HTTPResponse", Callable[[int], bytes]]]
+    | None = None,
 ) -> None:
     """Handle the tail of a 'git-upload-pack' request.
 
@@ -976,11 +1032,40 @@ def _handle_upload_pack_tail(
       progress: Optional progress reporting function
       rbufsize: Read buffer size
       protocol_version: Neogiated Git protocol version.
+      http_request: Optional HTTP request function for downloading packfile URIs
     """
     pkt = proto.read_pkt_line()
     while pkt:
         parts = pkt.rstrip(b"\n").split(b" ")
-        if protocol_version == 2 and parts[0] != b"packfile":
+        if protocol_version == 2:
+            # Check for packfile-uris response
+            if parts[0] == b"packfile-uris":
+                if http_request is None:
+                    raise GitProtocolError(
+                        "Server sent packfile-uris but client does not support URI downloads"
+                    )
+
+                # Parse packfile URIs
+                packfile_uris = []
+                pkt = proto.read_pkt_line()
+                while pkt and pkt.rstrip(b"\n") != b"packfile":
+                    uri_parts = pkt.rstrip(b"\n").split(b" ")
+                    if len(uri_parts) >= 3:
+                        uri = uri_parts[0].decode("utf-8")
+                        hash_algo = uri_parts[1].decode("utf-8")
+                        expected_hash = uri_parts[2]
+                        packfile_uris.append((uri, hash_algo, expected_hash))
+                    pkt = proto.read_pkt_line()
+
+                # Download packfiles from URIs
+                # Like Git, we fail completely if any URI download fails
+                for uri, hash_algo, expected_hash in packfile_uris:
+                    _download_packfile_from_uri(
+                        uri, expected_hash, hash_algo, pack_data, progress, http_request
+                    )
+
+            # In protocol v2, break after handling first response packet
+            # (either packfile-uris or packfile)
             break
         else:
             if parts[0] == b"ACK":
@@ -4367,6 +4452,8 @@ class AbstractHttpGitClient(GitClient):
                 data += pkt_line(b"filter %s\n" % filter_spec)
             elif filter_spec:
                 self._warn_filter_objects()
+            if CAPABILITY_PACKFILE_URIS in negotiated_capabilities:
+                data += pkt_line(b"packfile-uris https\n")
             data += req_data.getvalue()
         else:
             if filter_spec:
@@ -4386,6 +4473,7 @@ class AbstractHttpGitClient(GitClient):
                 pack_data,
                 progress,
                 protocol_version=self.protocol_version,
+                http_request=self._http_request,
             )
             return FetchPackResult(
                 refs, symrefs, agent, new_shallow, new_unshallow, object_format

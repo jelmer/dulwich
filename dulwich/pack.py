@@ -88,6 +88,7 @@ __all__ = [
     "sort_objects_for_delta",
     "take_msb_bytes",
     "unpack_object",
+    "verify_and_read",
     "write_pack",
     "write_pack_data",
     "write_pack_from_container",
@@ -179,6 +180,74 @@ OldUnpackedObject = tuple[bytes | int, list[bytes]] | list[bytes]
 ResolveExtRefFn = Callable[[bytes], tuple[int, OldUnpackedObject]]
 ProgressFn = Callable[[int, str], None]
 PackHint = tuple[int, bytes | None]
+
+
+def verify_and_read(
+    read_func: Callable[[int], bytes],
+    expected_hash: bytes,
+    hash_algo: str,
+    progress: Callable[[bytes], None] | None = None,
+) -> Iterator[bytes]:
+    """Read from stream, verify hash, then yield verified chunks.
+
+    This function downloads data to a temporary file (in-memory for small files,
+    on-disk for large ones) while computing its hash. Only after the hash is
+    verified to match expected_hash will it yield any data. This prevents
+    corrupted or malicious data from reaching the caller.
+
+    Args:
+        read_func: Function to read bytes (like file.read or HTTP response reader)
+        expected_hash: Expected hash as hex string bytes (e.g., b'a3b2c1...')
+        hash_algo: Hash algorithm name ('sha1' or 'sha256')
+        progress: Optional progress callback
+
+    Yields:
+        Chunks of verified data (only after hash verification succeeds)
+
+    Raises:
+        ValueError: If hash doesn't match or algorithm unsupported
+    """
+    from tempfile import SpooledTemporaryFile
+
+    from .object_format import OBJECT_FORMATS
+
+    # Get the hash function for this algorithm
+    obj_format = OBJECT_FORMATS.get(hash_algo)
+    if obj_format is None:
+        raise ValueError(f"Unsupported hash algorithm: {hash_algo}")
+
+    hasher = obj_format.new_hash()
+
+    # Download to temporary file (memory or disk) while computing hash
+    with SpooledTemporaryFile(
+        max_size=PACK_SPOOL_FILE_MAX_SIZE, prefix="dulwich-verify-"
+    ) as temp_file:
+        # Read data, hash it, and write to temp file
+        while True:
+            chunk = read_func(65536)  # Read in 64KB chunks
+            if not chunk:
+                break
+            hasher.update(chunk)
+            temp_file.write(chunk)
+
+        # Verify hash BEFORE yielding any data
+        computed_hash = hasher.hexdigest().encode("ascii")
+        if computed_hash != expected_hash:
+            raise ValueError(
+                f"hash mismatch: expected {expected_hash.decode('ascii')}, "
+                f"got {computed_hash.decode('ascii')}"
+            )
+
+        # Hash verified! Now read from temp file and yield chunks
+        if progress:
+            progress(b"Hash verified, processing data\n")
+
+        temp_file.seek(0)
+        while True:
+            chunk = temp_file.read(65536)
+            if not chunk:
+                break
+            yield chunk
 
 
 class UnresolvedDeltas(Exception):

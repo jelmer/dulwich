@@ -1,5 +1,10 @@
 1.0.1	UNRELEASED
 
+ * Add client-side support for Git protocol v2 ``packfile-uris`` capability,
+   allowing servers to offload packfile distribution to CDNs or external
+   storage. Includes hash verification before writing to repository to prevent
+   data corruption. (Jelmer Vernooĳ, #1794)
+
  * Support ``GIT_TRACE_PACKET`` in ``dulwich.cli``.
    (Jelmer Vernooĳ)
 

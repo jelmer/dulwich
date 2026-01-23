@@ -3205,3 +3205,316 @@ class TestBuildFetchRequestV2(TestCase):
             cmd_packets,
             [b"command=fetch\n", b"agent=" + agent_string(), b"object-format=sha1"],
         )
+
+
+class TestPackfileUris(TestCase):
+    def setUp(self) -> None:
+        self.rin = BytesIO()
+        self.rout = BytesIO()
+
+    def test_download_packfile_from_uri_success(self) -> None:
+        from dulwich.client import _download_packfile_from_uri
+
+        # Create a mock packfile content
+        packfile_data = b"PACK\x00\x00\x00\x02\x00\x00\x00\x00" + b"test data" * 100
+        import hashlib
+
+        expected_hash = hashlib.sha1(packfile_data).hexdigest().encode("ascii")
+
+        # Mock HTTP response
+        mock_response = Mock()
+        mock_response.close = Mock()
+
+        def mock_read(size):
+            if mock_read.pos < len(packfile_data):
+                chunk = packfile_data[mock_read.pos : mock_read.pos + size]
+                mock_read.pos += len(chunk)
+                return chunk
+            return b""
+
+        mock_read.pos = 0
+
+        def mock_http_request(url):
+            return mock_response, mock_read
+
+        collected_data = BytesIO()
+
+        def pack_data_callback(data):
+            collected_data.write(data)
+            return len(data)
+
+        # Test successful download
+        _download_packfile_from_uri(
+            "https://example.com/pack.pack",
+            expected_hash,
+            "sha1",
+            pack_data_callback,
+            None,
+            mock_http_request,
+        )
+
+        self.assertEqual(collected_data.getvalue(), packfile_data)
+        mock_response.close.assert_called_once()
+
+    def test_download_packfile_from_uri_hash_mismatch(self) -> None:
+        from dulwich.client import _download_packfile_from_uri
+
+        packfile_data = b"PACK\x00\x00\x00\x02\x00\x00\x00\x00"
+        wrong_hash = b"0000000000000000000000000000000000000000"
+
+        mock_response = Mock()
+        mock_response.close = Mock()
+
+        def mock_read(size):
+            if mock_read.pos < len(packfile_data):
+                chunk = packfile_data[mock_read.pos : mock_read.pos + size]
+                mock_read.pos += len(chunk)
+                return chunk
+            return b""
+
+        mock_read.pos = 0
+
+        def mock_http_request(url):
+            return mock_response, mock_read
+
+        def pack_data_callback(data):
+            return len(data)
+
+        # Test hash mismatch
+        with self.assertRaises(GitProtocolError) as cm:
+            _download_packfile_from_uri(
+                "https://example.com/pack.pack",
+                wrong_hash,
+                "sha1",
+                pack_data_callback,
+                None,
+                mock_http_request,
+            )
+
+        self.assertIn("hash mismatch", str(cm.exception))
+        mock_response.close.assert_called_once()
+
+    def test_download_packfile_from_uri_no_data_written_on_hash_mismatch(
+        self,
+    ) -> None:
+        """Verify that NO data is written when hash verification fails.
+
+        This is the critical security test - we must ensure corrupted data
+        never reaches the repository even if downloaded.
+        """
+        from dulwich.client import _download_packfile_from_uri
+
+        packfile_data = b"MALICIOUS DATA THAT SHOULD NOT BE WRITTEN"
+        wrong_hash = b"0000000000000000000000000000000000000000"
+
+        mock_response = Mock()
+        mock_response.close = Mock()
+
+        def mock_read(size):
+            if mock_read.pos < len(packfile_data):
+                chunk = packfile_data[mock_read.pos : mock_read.pos + size]
+                mock_read.pos += len(chunk)
+                return chunk
+            return b""
+
+        mock_read.pos = 0
+
+        def mock_http_request(url):
+            return mock_response, mock_read
+
+        # Track what gets written
+        written_data = BytesIO()
+        write_count = [0]
+
+        def pack_data_callback(data):
+            write_count[0] += 1
+            written_data.write(data)
+            return len(data)
+
+        # Test hash mismatch - should raise error
+        with self.assertRaises(GitProtocolError):
+            _download_packfile_from_uri(
+                "https://example.com/pack.pack",
+                wrong_hash,
+                "sha1",
+                pack_data_callback,
+                None,
+                mock_http_request,
+            )
+
+        # CRITICAL: Verify NO data was written to pack_data callback
+        self.assertEqual(
+            write_count[0],
+            0,
+            "pack_data callback should NEVER be called when hash verification fails",
+        )
+        self.assertEqual(
+            written_data.getvalue(),
+            b"",
+            "NO data should be written when hash verification fails",
+        )
+
+    def test_download_packfile_from_uri_non_https(self) -> None:
+        from dulwich.client import _download_packfile_from_uri
+
+        def mock_http_request(url):
+            pass
+
+        def pack_data_callback(data):
+            return len(data)
+
+        # Test non-HTTPS URI rejection
+        with self.assertRaises(GitProtocolError) as cm:
+            _download_packfile_from_uri(
+                "http://example.com/pack.pack",
+                b"hash",
+                "sha1",
+                pack_data_callback,
+                None,
+                mock_http_request,
+            )
+
+        self.assertIn("HTTPS", str(cm.exception))
+
+    def test_handle_upload_pack_tail_with_packfile_uris(self) -> None:
+        from dulwich.client import _handle_upload_pack_tail
+        from dulwich.protocol import CAPABILITY_SIDE_BAND_64K, Protocol, pkt_line
+
+        # Create mock packfile data
+        packfile_data = b"PACK\x00\x00\x00\x02\x00\x00\x00\x00"
+        import hashlib
+
+        expected_hash = hashlib.sha1(packfile_data).hexdigest().encode("ascii")
+
+        # Build protocol response with packfile-uris using proper pkt-line format
+        self.rin.write(
+            pkt_line(b"packfile-uris\n")
+            + pkt_line(
+                b"https://cdn.example.com/pack1.pack sha1 " + expected_hash + b"\n"
+            )
+            + pkt_line(b"packfile\n")
+            + b"0000"
+        )
+        self.rin.seek(0)
+
+        proto = Protocol(self.rin.read, self.rout.write)
+
+        # Mock HTTP request
+        mock_response = Mock()
+        mock_response.close = Mock()
+
+        def mock_read(size):
+            if mock_read.pos < len(packfile_data):
+                chunk = packfile_data[mock_read.pos : mock_read.pos + size]
+                mock_read.pos += len(chunk)
+                return chunk
+            return b""
+
+        mock_read.pos = 0
+
+        def mock_http_request(url):
+            return mock_response, mock_read
+
+        class DummyGraphWalker:
+            def ack(self, sha):
+                pass
+
+            def nak(self):
+                pass
+
+        collected_data = BytesIO()
+
+        def pack_data_callback(data):
+            collected_data.write(data)
+            return len(data)
+
+        # Test with packfile-uris
+        _handle_upload_pack_tail(
+            proto,
+            {CAPABILITY_SIDE_BAND_64K},
+            DummyGraphWalker(),
+            pack_data_callback,
+            None,
+            protocol_version=2,
+            http_request=mock_http_request,
+        )
+
+        self.assertEqual(collected_data.getvalue(), packfile_data)
+        mock_response.close.assert_called_once()
+
+    def test_handle_upload_pack_tail_packfile_uris_without_http_request(self) -> None:
+        from dulwich.client import _handle_upload_pack_tail
+        from dulwich.protocol import CAPABILITY_SIDE_BAND_64K, Protocol, pkt_line
+
+        # Build protocol response with packfile-uris using proper pkt-line format
+        self.rin.write(
+            pkt_line(b"packfile-uris\n")
+            + pkt_line(b"https://cdn.example.com/pack1.pack sha1 abc123\n")
+            + pkt_line(b"packfile\n")
+            + b"0000"
+        )
+        self.rin.seek(0)
+
+        proto = Protocol(self.rin.read, self.rout.write)
+
+        class DummyGraphWalker:
+            def ack(self, sha):
+                pass
+
+            def nak(self):
+                pass
+
+        def pack_data_callback(data):
+            return len(data)
+
+        # Test that it raises error when http_request is None
+        with self.assertRaises(GitProtocolError) as cm:
+            _handle_upload_pack_tail(
+                proto,
+                {CAPABILITY_SIDE_BAND_64K},
+                DummyGraphWalker(),
+                pack_data_callback,
+                None,
+                protocol_version=2,
+                http_request=None,
+            )
+
+        self.assertIn("does not support URI downloads", str(cm.exception))
+
+    def test_verify_and_read_sha256(self) -> None:
+        """Test verify_and_read() with SHA-256 hash algorithm."""
+        from dulwich.pack import verify_and_read
+
+        data = b"test data for sha256"
+        import hashlib
+
+        expected_hash = hashlib.sha256(data).hexdigest().encode("ascii")
+
+        # Create a read function
+        pos = [0]
+
+        def read_func(size):
+            if pos[0] < len(data):
+                chunk = data[pos[0] : pos[0] + size]
+                pos[0] += len(chunk)
+                return chunk
+            return b""
+
+        # Verify and read
+        chunks = list(verify_and_read(read_func, expected_hash, "sha256"))
+        result = b"".join(chunks)
+
+        self.assertEqual(result, data)
+
+    def test_verify_and_read_unsupported_algorithm(self) -> None:
+        """Test verify_and_read() with unsupported hash algorithm."""
+        from dulwich.pack import verify_and_read
+
+        def read_func(size):
+            return b"data"
+
+        # Should raise ValueError for unsupported algorithm
+        with self.assertRaises(ValueError) as cm:
+            list(verify_and_read(read_func, b"hash", "md5"))
+
+        self.assertIn("Unsupported hash algorithm", str(cm.exception))

@@ -179,6 +179,7 @@ CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT = b"allow-reachable-sha1-in-want"
 CAPABILITY_FETCH = b"fetch"
 CAPABILITY_FILTER = b"filter"
 CAPABILITY_OBJECT_FORMAT = b"object-format"
+CAPABILITY_PACKFILE_URIS = b"packfile-uris"
 
 # Magic ref that is used to attach capabilities to when
 # there are no refs. Should always be ste to ZERO_SHA.
@@ -207,6 +208,7 @@ KNOWN_UPLOAD_CAPABILITIES = set(
         CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT,
         CAPABILITY_FETCH,
         CAPABILITY_FILTER,
+        CAPABILITY_PACKFILE_URIS,
     ]
 )
 KNOWN_RECEIVE_CAPABILITIES = set(

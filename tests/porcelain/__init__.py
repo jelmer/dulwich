@@ -483,10 +483,10 @@ class CommitTests(PorcelainTestCase):
         self.assertIsInstance(sha, bytes)
         self.assertEqual(len(sha), 40)
 
-        commit = self.repo.get_object(sha)
+        commit = self.repo[sha]
         assert isinstance(commit, Commit)
-        self.assertEqual(commit._author_time, 123456)
-        self.assertEqual(commit._commit_time, 123456)
+        self.assertEqual(commit.author_time, 123456)
+        self.assertEqual(commit.commit_time, 123456)
 
     def test_commit_all(self) -> None:
         # Create initial commit

@@ -1012,8 +1012,10 @@ def commit(
     repo: RepoPath = ".",
     message: str | bytes | Callable[[Any, Commit], bytes] | None = None,
     author: bytes | None = None,
+    author_timestamp: float | None = None,
     author_timezone: int | None = None,
     committer: bytes | None = None,
+    commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
     encoding: bytes | None = None,
     no_verify: bool = False,
@@ -1029,8 +1031,10 @@ def commit(
       message: Optional commit message (string/bytes or callable that takes
         (repo, commit) and returns bytes)
       author: Optional author name and email
+      author_timestamp: Author timestamp (defaults to commit timestamp)
       author_timezone: Author timestamp timezone
       committer: Optional committer name and email
+      commit_timestamp: Commit timestamp (defaults to now)
       commit_timezone: Commit timestamp timezone
       encoding: Encoding to use for commit message
       no_verify: Skip pre-commit and commit-msg hooks
@@ -1106,8 +1110,10 @@ def commit(
             commit_sha = r.get_worktree().commit(
                 message=message,
                 author=author,
+                author_timestamp=author_timestamp,
                 author_timezone=author_timezone,
                 committer=committer,
+                commit_timestamp=commit_timestamp,
                 commit_timezone=commit_timezone,
                 encoding=encoding,
                 no_verify=no_verify,
@@ -1138,8 +1144,10 @@ def commit(
             return r.get_worktree().commit(
                 message=message,
                 author=author,
+                author_timestamp=author_timestamp,
                 author_timezone=author_timezone,
                 committer=committer,
+                commit_timestamp=commit_timestamp,
                 commit_timezone=commit_timezone,
                 encoding=encoding,
                 no_verify=no_verify,

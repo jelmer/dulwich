@@ -467,6 +467,27 @@ class CommitTests(PorcelainTestCase):
         self.assertEqual(commit._author_timezone, local_timezone)
         self.assertEqual(commit._commit_timezone, local_timezone)
 
+    def test_timestamp(self) -> None:
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"refs/heads/foo"] = c3.id
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Some message",
+            author="Joe <joe@example.com>",
+            author_timestamp=123456,
+            committer="Bob <bob@example.com>",
+            commit_timestamp=123456,
+        )
+        self.assertIsInstance(sha, bytes)
+        self.assertEqual(len(sha), 40)
+
+        commit = self.repo[sha]
+        assert isinstance(commit, Commit)
+        self.assertEqual(commit.author_time, 123456)
+        self.assertEqual(commit.commit_time, 123456)
+
     def test_commit_all(self) -> None:
         # Create initial commit
         filename = os.path.join(self.repo.path, "test.txt")

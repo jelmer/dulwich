@@ -179,4 +179,5 @@ skip = """\
     cp311-macosx_x86_64 cp311-macosx_universal2 \
     cp312-macosx_x86_64 cp312-macosx_universal2 \
     cp313-macosx_x86_64 cp313-macosx_universal2 \
+    cp314-macosx_x86_64 cp314-macosx_universal2 \
     """

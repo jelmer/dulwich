@@ -480,7 +480,12 @@ class ParentsProvider:
         # Fallback to reading the commit object
         if commit is None:
             obj = self.store[commit_id]
-            assert isinstance(obj, Commit)
+            if not isinstance(obj, Commit):
+                raise ValueError(
+                    f"Expected Commit object for commit_id {commit_id.decode()}, "
+                    f"got {type(obj).__name__}. This usually means a reference "
+                    f"points to a {type(obj).__name__} object instead of a Commit."
+                )
             commit = obj
         result: list[ObjectID] = commit.parents
         return result
@@ -2391,10 +2396,16 @@ class Repo(BaseRepo):
             try:
                 # Try to get from HEAD
                 head = self[b"HEAD"]
-                if isinstance(head, Tag):
+                # Peel tags to get to the underlying commit
+                while isinstance(head, Tag):
                     _cls, obj = head.object
                     head = self.get_object(obj)
-                assert isinstance(head, Commit)
+                if not isinstance(head, Commit):
+                    raise ValueError(
+                        f"Expected HEAD to point to a Commit, got {type(head).__name__}. "
+                        f"This usually means HEAD points to a {type(head).__name__} object "
+                        f"instead of a Commit."
+                    )
                 tree = head.tree
             except KeyError:
                 # No HEAD, no attributes from tree

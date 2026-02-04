@@ -47,6 +47,8 @@ __all__ = [
     "UPLOAD_CAPABILITIES",
     "AbstractHttpGitClient",
     "BundleClient",
+    "BundleList",
+    "BundleURIError",
     "FetchPackResult",
     "GitClient",
     "HTTPProxyUnauthorized",
@@ -66,16 +68,19 @@ __all__ = [
     "TCPGitClient",
     "TraditionalGitClient",
     "Urllib3HttpGitClient",
+    "apply_bundle_uri",
     "check_for_proxy_bypass",
     "check_wants",
     "default_urllib3_manager",
     "default_user_agent_string",
+    "fetch_bundle_uri",
     "find_capability",
     "find_git_command",
     "get_credentials_from_store",
     "get_transport_and_path",
     "get_transport_and_path_from_url",
     "negotiate_protocol_version",
+    "parse_bundle_list",
     "parse_rsync_url",
     "read_pkt_refs_v1",
     "read_pkt_refs_v2",
@@ -156,6 +161,13 @@ if TYPE_CHECKING:
 
 
 from .bundle import Bundle
+from .bundle_uri import (
+    BundleList,
+    BundleURIError,
+    apply_bundle_uri,
+    fetch_bundle_uri,
+    parse_bundle_list,
+)
 from .config import Config, apply_instead_of, get_xdg_config_home_path
 from .credentials import match_partial_url, match_urls
 from .errors import GitProtocolError, HangupException, NotGitRepository, SendPackError
@@ -1253,17 +1265,40 @@ class GitClient:
         ref_prefix: Sequence[bytes] | None = None,
         filter_spec: bytes | None = None,
         protocol_version: int | None = None,
+        bundle_uri: str | None = None,
     ) -> Repo:
-        """Clone a repository."""
+        """Clone a repository.
+
+        Args:
+          path: Path to clone from
+          target_path: Local path to clone to
+          mkdir: Whether to create the target directory
+          bare: Whether to create a bare repository
+          origin: Name for the origin remote (default: "origin")
+          checkout: Whether to checkout HEAD after cloning
+          branch: Branch to checkout (default: remote HEAD)
+          progress: Optional callback for progress reporting
+          depth: Shallow clone depth
+          ref_prefix: List of ref prefixes to fetch
+          filter_spec: Partial clone filter specification
+          protocol_version: Git protocol version to use
+          bundle_uri: Optional bundle URI to bootstrap the clone from.
+            This can be a URL to a bundle file or a bundle list.
+            Using a bundle URI can speed up the clone by downloading
+            pre-computed pack data.
+
+        Returns:
+          The newly created Repo object
+        """
         if mkdir:
             os.mkdir(target_path)
 
+        target: Repo | None = None
         try:
             # For network clones, create repository with default SHA-1 format initially.
             # If remote uses a different format, fetch() will auto-change the repo's format
             # (since repo is empty at this point).
             # Subclasses (e.g., LocalGitClient) override to detect format first for efficiency.
-            target = None
             if not bare:
                 target = Repo.init(target_path)
                 if checkout is None:
@@ -1291,6 +1326,38 @@ class GitClient:
                     b"+refs/heads/*:refs/remotes/" + origin.encode("utf-8") + b"/*",
                 )
                 target_config.write_to_path()
+
+            # Apply bundle URI if provided (bootstrap before fetch)
+            if bundle_uri is not None:
+                from urllib.parse import urlparse
+
+                parsed = urlparse(bundle_uri)
+                if not parsed.scheme or parsed.scheme not in ("http", "https"):
+                    raise BundleURIError(
+                        f"Invalid bundle URI: {bundle_uri} "
+                        f"(must be http:// or https:// URL)"
+                    )
+
+                try:
+                    filter_str = filter_spec.decode("utf-8") if filter_spec else None
+                    _, bundle_refs = apply_bundle_uri(
+                        target,
+                        bundle_uri,
+                        filter_spec=filter_str,
+                        progress=progress,
+                    )
+                    if progress and bundle_refs:
+                        progress(
+                            f"Bundle URI applied {len(bundle_refs)} refs, "
+                            f"fetching remaining objects...".encode()
+                        )
+                    elif progress:
+                        progress(b"Bundle URI applied, fetching remaining objects...")
+                except BundleURIError as e:
+                    if progress:
+                        progress(
+                            f"Bundle URI failed: {e}, continuing with regular fetch".encode()
+                        )
 
             ref_message = b"clone: from " + encoded_path
             result = self.fetch(
@@ -1452,6 +1519,88 @@ class GitClient:
         target.update_shallow(result.new_shallow, result.new_unshallow)
         return result
 
+    def fetch_with_bundle_uri(
+        self,
+        path: bytes | str,
+        target: "BaseRepo",
+        bundle_uri: str,
+        determine_wants: "DetermineWantsFunc | None" = None,
+        progress: Callable[[bytes], None] | None = None,
+        depth: int | None = None,
+        ref_prefix: Sequence[bytes] | None = None,
+        filter_spec: bytes | None = None,
+        protocol_version: int | None = None,
+        shallow_since: str | None = None,
+        shallow_exclude: list[str] | None = None,
+        stored_creation_token: int | None = None,
+    ) -> tuple[FetchPackResult, int | None]:
+        """Fetch into a target repository, using bundle URIs for bootstrap.
+
+        This method first applies any available bundles from the bundle URI,
+        then fetches remaining objects from the remote server. This can
+        significantly speed up clones and fetches for large repositories.
+
+        If bundle URI fetch fails (e.g., network error, invalid bundle), the
+        error is reported via the progress callback and the method continues
+        with a regular fetch from the remote. The fetch will still succeed
+        as long as the remote fetch completes successfully.
+
+        Args:
+          path: Path to fetch from (as bytestring)
+          target: Target repository to fetch into
+          bundle_uri: Bundle URI to fetch from (URL to bundle or bundle list)
+          determine_wants: Optional function to determine what refs to fetch.
+            Receives dictionary of name->sha, should return
+            list of shas to fetch. Defaults to all shas.
+          progress: Optional progress function
+          depth: Depth to fetch at
+          ref_prefix: List of prefixes of desired references
+          filter_spec: A git-rev-list-style object filter spec
+          protocol_version: Desired Git protocol version
+          shallow_since: Deepen the history to include commits after this date
+          shallow_exclude: Deepen the history to exclude commits reachable from these refs
+          stored_creation_token: Previously stored creation token to skip
+            already-applied bundles (for incremental fetches)
+
+        Returns:
+          A tuple of (FetchPackResult, creation token) where FetchPackResult
+          contains refs and other fetch metadata. The creation token is the
+          highest creation token seen (for storing and skipping in future
+          fetches), or None if not available or if bundle fetch failed
+        """
+        # First, try to apply bundles from the bundle URI
+        latest_token = stored_creation_token
+        try:
+            filter_str = filter_spec.decode("utf-8") if filter_spec else None
+            latest_token, bundle_refs = apply_bundle_uri(
+                target,
+                bundle_uri,
+                filter_spec=filter_str,
+                stored_creation_token=stored_creation_token,
+                progress=progress,
+            )
+            if progress and bundle_refs:
+                progress(f"Applied {len(bundle_refs)} refs from bundle URI".encode())
+        except BundleURIError as e:
+            if progress:
+                progress(f"Bundle URI fetch failed: {e}".encode())
+
+        # Then fetch remaining objects from the remote
+        result = self.fetch(
+            path,
+            target,
+            determine_wants=determine_wants,
+            progress=progress,
+            depth=depth,
+            ref_prefix=ref_prefix,
+            filter_spec=filter_spec,
+            protocol_version=protocol_version,
+            shallow_since=shallow_since,
+            shallow_exclude=shallow_exclude,
+        )
+
+        return result, latest_token
+
     def fetch_pack(
         self,
         path: bytes | str,
@@ -1551,12 +1700,16 @@ class GitClient:
                 def progress(x: bytes) -> None:
                     pass
 
+            pktline_parser: PktLineParser | None
             if CAPABILITY_REPORT_STATUS in capabilities:
                 assert self._report_status_parser is not None
                 pktline_parser = PktLineParser(self._report_status_parser.handle_packet)
+            else:
+                pktline_parser = None
             for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
                 if chan == SIDE_BAND_CHANNEL_DATA:
                     if CAPABILITY_REPORT_STATUS in capabilities:
+                        assert pktline_parser is not None
                         pktline_parser.parse(data)
                 elif chan == SIDE_BAND_CHANNEL_PROGRESS:
                     progress(data)
@@ -2392,7 +2545,7 @@ class SubprocessGitClient(TraditionalGitClient):
             include_tags=include_tags,
         )
 
-    git_command: str | None = None
+    git_command: list[str] | None = None
 
     def _connect(
         self,
@@ -2406,6 +2559,8 @@ class SubprocessGitClient(TraditionalGitClient):
             path = path.decode(self._remote_path_encoding)
         if self.git_command is None:
             git_command = find_git_command()
+        else:
+            git_command = self.git_command
         argv = [*git_command, service.decode("ascii"), path]
         p = subprocess.Popen(
             argv,
@@ -2751,12 +2906,17 @@ class LocalGitClient(GitClient):
         ref_prefix: Sequence[bytes] | None = None,
         filter_spec: bytes | None = None,
         protocol_version: int | None = None,
+        bundle_uri: str | None = None,
     ) -> Repo:
         """Clone a local repository.
 
         For local clones, we can detect the object format before creating
         the target repository.
+
+        Note: bundle_uri is accepted for API compatibility but ignored for
+        local clones since there's no benefit to using bundles for local operations.
         """
+        del bundle_uri  # unused for local clones
         # Detect the object format from the source repository
         with self._open_repo(path) as source_repo:
             object_format_name = source_repo.object_format.name
@@ -2764,9 +2924,9 @@ class LocalGitClient(GitClient):
         if mkdir:
             os.mkdir(target_path)
 
+        target: Repo | None = None
         try:
             # Create repository with the correct object format from the start
-            target = None
             if not bare:
                 target = Repo.init(target_path, object_format=object_format_name)
                 if checkout is None:
@@ -3648,6 +3808,7 @@ class AuthCallbackPoolManager:
         max_attempts = 3
         attempts = self._auth_attempts.get(url, 0)
 
+        response = None  # Will be set in the loop
         while attempts < max_attempts:
             response = self._pool_manager.request(method, url, *args, **kwargs)
 

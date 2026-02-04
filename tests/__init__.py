@@ -134,6 +134,7 @@ def self_test_suite() -> unittest.TestSuite:
         "bitmap",
         "blackbox",
         "bundle",
+        "bundle_uri",
         "client",
         "cloud_gcs",
         "commit_graph",

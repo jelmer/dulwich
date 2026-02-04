@@ -5,6 +5,12 @@
    storage. Includes hash verification before writing to repository to prevent
    data corruption. (Jelmer Vernooĳ, #1794)
 
+ * Add bundle URI support for faster clones and fetches. The new
+   ``dulwich.bundle_uri`` module implements the Git bundle URI specification,
+   allowing clients to download pre-computed bundles from HTTP(S) URLs to
+   bootstrap repository data before fetching remaining objects.
+   (Jelmer Vernooĳ)
+
  * Support ``GIT_TRACE_PACKET`` in ``dulwich.cli``.
    (Jelmer Vernooĳ)
 

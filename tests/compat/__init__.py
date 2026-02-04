@@ -29,6 +29,7 @@ def test_suite() -> unittest.TestSuite:
         "aiohttp",
         "bitmap",
         "bundle",
+        "bundle_uri",
         "check_ignore",
         "client",
         "commit_graph",

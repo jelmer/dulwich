@@ -28,3 +28,7 @@ configuration:
     status: supported
   - key: core.ignorecase
     status: supported
+  - key: core.trustctime
+    status: supported
+  - key: core.symlinks
+    status: supported

@@ -6372,6 +6372,10 @@ class StatusTests(PorcelainTestCase):
         os.utime(file_path, ns=(mtime_nsec, mtime_nsec))
 
         c = self.repo.get_config()
+        # Set trustctime=false because os.utime() updates ctime, which would
+        # break stat matching. This test verifies that stat matching optimization
+        # works with mtime+size matching (ignoring ctime changes from utime).
+        c.set("core", "trustctime", "false")
         c.set("core", "autocrlf", "input")
         c.write_to_path()
 

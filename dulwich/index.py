@@ -2846,7 +2846,9 @@ def update_working_tree(
     index.write()
 
 
-def _stat_matches_entry(st: os.stat_result, entry: IndexEntry) -> bool:
+def _stat_matches_entry(
+    st: os.stat_result, entry: IndexEntry, trust_ctime: bool = True
+) -> bool:
     """Check if filesystem stat matches index entry stat.
 
     This is used to determine if a file might have changed without reading its content.
@@ -2855,8 +2857,30 @@ def _stat_matches_entry(st: os.stat_result, entry: IndexEntry) -> bool:
     Args:
       st: Filesystem stat result
       entry: Index entry to compare against
+      trust_ctime: If True, also check ctime (default: True, matching Git behavior)
     Returns: True if stat matches and file is likely unchanged
     """
+    # Compare change time (ctime) if trust_ctime is enabled
+    if trust_ctime:
+        # Get entry ctime with nanosecond precision if available
+        if isinstance(entry.ctime, tuple):
+            entry_ctime_sec = entry.ctime[0]
+            entry_ctime_nsec = entry.ctime[1]
+        else:
+            entry_ctime_sec = int(entry.ctime)
+            entry_ctime_nsec = 0
+
+        if hasattr(st, "st_ctime_ns"):
+            # Use nanosecond precision when available
+            st_ctime_nsec = st.st_ctime_ns
+            entry_ctime_nsec_total = entry_ctime_sec * 1_000_000_000 + entry_ctime_nsec
+            if st_ctime_nsec != entry_ctime_nsec_total:
+                return False
+        else:
+            # Fall back to second precision
+            if int(st.st_ctime) != entry_ctime_sec:
+                return False
+
     # Get entry mtime with nanosecond precision if available
     if isinstance(entry.mtime, tuple):
         entry_mtime_sec = entry.mtime[0]
@@ -2883,7 +2907,7 @@ def _stat_matches_entry(st: os.stat_result, entry: IndexEntry) -> bool:
     if st.st_size != entry.size:
         return False
 
-    # If both mtime and size match, file is likely unchanged
+    # If all checks pass, file is likely unchanged
     return True
 
 
@@ -2892,6 +2916,7 @@ def _check_entry_for_changes(
     entry: IndexEntry | ConflictedIndexEntry,
     root_path: bytes,
     filter_blob_callback: Callable[[Blob, bytes], Blob] | None = None,
+    trust_ctime: bool = True,
 ) -> bytes | None:
     """Check a single index entry for changes.
 
@@ -2900,6 +2925,7 @@ def _check_entry_for_changes(
       entry: Index entry to check
       root_path: Root filesystem path
       filter_blob_callback: Optional callback to filter blobs
+      trust_ctime: If True, use ctime for change detection (default: True)
     Returns: tree_path if changed, None otherwise
     """
     if isinstance(entry, ConflictedIndexEntry):
@@ -2924,7 +2950,7 @@ def _check_entry_for_changes(
         # the filter output would be the same, so we can safely skip the expensive
         # filter operation. This addresses performance issues with LFS repositories
         # where filter operations can be very slow.
-        if _stat_matches_entry(st, entry):
+        if _stat_matches_entry(st, entry, trust_ctime):
             return None
 
         blob = blob_from_path_and_stat(full_path, st)
@@ -2946,6 +2972,7 @@ def get_unstaged_changes(
     root_path: str | bytes,
     filter_blob_callback: Callable[..., Any] | None = None,
     preload_index: bool = False,
+    trust_ctime: bool = True,
 ) -> Generator[bytes, None, None]:
     """Walk through an index and check for differences against working tree.
 
@@ -2954,6 +2981,7 @@ def get_unstaged_changes(
       root_path: path in which to find files
       filter_blob_callback: Optional callback to filter blobs
       preload_index: If True, use parallel threads to check files (requires threading support)
+      trust_ctime: If True, use ctime for change detection (default: True)
     Returns: iterator over paths with unstaged changes
     """
     # For each entry in the index check the sha1 & ensure not staged
@@ -2985,6 +3013,7 @@ def get_unstaged_changes(
                         entry,
                         root_path,
                         filter_blob_callback,
+                        trust_ctime,
                     )
                     for tree_path, entry in entries
                 ]
@@ -2999,7 +3028,7 @@ def get_unstaged_changes(
         # Serial processing
         for tree_path, entry in index.iteritems():
             result = _check_entry_for_changes(
-                tree_path, entry, root_path, filter_blob_callback
+                tree_path, entry, root_path, filter_blob_callback, trust_ctime
             )
             if result is not None:
                 yield result

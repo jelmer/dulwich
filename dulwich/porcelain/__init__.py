@@ -1102,8 +1102,14 @@ def commit(
             else:
                 filter_callback = None
 
+            # Read config once for filesystem compatibility options
+            config = r.get_config_stack()
+            trust_ctime = config.get_boolean(b"core", b"trustctime", True)
+
             unstaged_changes = list(
-                get_unstaged_changes(index, r.path, filter_callback)
+                get_unstaged_changes(
+                    index, r.path, filter_callback, trust_ctime=trust_ctime
+                )
             )
 
             if unstaged_changes:
@@ -1563,12 +1569,15 @@ def add(
         else:
             filter_callback = None
 
-        # Check if core.preloadIndex is enabled
+        # Read config once for filesystem compatibility options
         config = r.get_config_stack()
         preload_index = config.get_boolean(b"core", b"preloadIndex", False)
+        trust_ctime = config.get_boolean(b"core", b"trustctime", True)
 
         all_unstaged_paths = list(
-            get_unstaged_changes(index, r.path, filter_callback, preload_index)
+            get_unstaged_changes(
+                index, r.path, filter_callback, preload_index, trust_ctime
+            )
         )
 
         if paths is None:
@@ -3032,12 +3041,15 @@ def status(
         else:
             filter_callback = None
 
-        # Check if core.preloadIndex is enabled
+        # Read config once for filesystem compatibility options
         config = r.get_config_stack()
         preload_index = config.get_boolean(b"core", b"preloadIndex", False)
+        trust_ctime = config.get_boolean(b"core", b"trustctime", True)
 
         unstaged_changes_tree = list(
-            get_unstaged_changes(index, r.path, filter_callback, preload_index)
+            get_unstaged_changes(
+                index, r.path, filter_callback, preload_index, trust_ctime
+            )
         )
 
         untracked_paths = get_untracked_paths(

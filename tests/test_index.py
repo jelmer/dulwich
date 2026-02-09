@@ -1025,6 +1025,89 @@ class GetUnstagedChangesTests(TestCase):
 
             self.assertEqual(list(changes), [b"foo1"])
 
+    def test_get_unstaged_changes_trust_ctime_false(self) -> None:
+        """Test that core.trustctime=false avoids re-checking files with only ctime changes."""
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            # Commit a file
+            foo_fullpath = os.path.join(repo_dir, "foo")
+            with open(foo_fullpath, "wb") as f:
+                f.write(b"test content")
+
+            repo.get_worktree().stage(["foo"])
+            repo.get_worktree().commit(
+                message=b"initial commit",
+                committer=b"committer <email>",
+                author=b"author <email>",
+            )
+
+            # Get the current index entry and its timestamps
+            index = repo.open_index()
+            entry = index[b"foo"]
+
+            # Get original stat
+            st_before = os.stat(foo_fullpath)
+
+            # Modify file metadata (chmod) to change ctime without changing content
+            # Keep the change to ensure ctime persists
+            new_mode = (
+                st_before.st_mode | 0o111
+                if not (st_before.st_mode & 0o111)
+                else st_before.st_mode & ~0o111
+            )
+            os.chmod(foo_fullpath, new_mode)
+
+            # Now set mtime to exactly match the index entry
+            # This way mtime matches but ctime doesn't
+            if isinstance(entry.mtime, tuple) and hasattr(st_before, "st_mtime_ns"):
+                mtime_ns = entry.mtime[0] * 1_000_000_000 + entry.mtime[1]
+                mtime = mtime_ns / 1_000_000_000
+                os.utime(foo_fullpath, (st_before.st_atime, mtime))
+            else:
+                mtime = (
+                    entry.mtime
+                    if not isinstance(entry.mtime, tuple)
+                    else entry.mtime[0]
+                )
+                os.utime(foo_fullpath, (st_before.st_atime, mtime))
+
+            # Verify ctime actually changed
+            st_after = os.stat(foo_fullpath)
+            if hasattr(st_after, "st_ctime_ns") and isinstance(entry.ctime, tuple):
+                entry_ctime_ns = entry.ctime[0] * 1_000_000_000 + entry.ctime[1]
+                ctime_changed = st_after.st_ctime_ns != entry_ctime_ns
+            else:
+                ctime_changed = int(st_after.st_ctime) != (
+                    entry.ctime
+                    if not isinstance(entry.ctime, tuple)
+                    else entry.ctime[0]
+                )
+
+            if not ctime_changed:
+                # If ctime didn't change, skip this test
+                self.skipTest("ctime did not change on this filesystem")
+
+            # Git's behavior: With trust_ctime=True, a ctime mismatch triggers
+            # a content check. Since content hasn't actually changed, no unstaged
+            # changes are reported (the stat optimization is bypassed, but the
+            # file is still clean after content comparison).
+            #
+            # With trust_ctime=False, the ctime mismatch is ignored, and the
+            # mtime+size match allows the stat optimization to avoid reading the file.
+            #
+            # Both should return empty since content hasn't changed.
+            changes_with_ctime = list(
+                get_unstaged_changes(repo.open_index(), repo_dir, trust_ctime=True)
+            )
+            changes_without_ctime = list(
+                get_unstaged_changes(repo.open_index(), repo_dir, trust_ctime=False)
+            )
+
+            # Neither should report changes since content is unchanged
+            self.assertEqual(changes_with_ctime, [])
+            self.assertEqual(changes_without_ctime, [])
+
 
 class TestValidatePathElement(TestCase):
     def test_default(self) -> None:

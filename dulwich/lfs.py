@@ -440,6 +440,35 @@ class LFSClient:
         raise NotImplementedError
 
     @classmethod
+    def from_url(cls, url: str, config: "Config | None" = None) -> "LFSClient":
+        """Create appropriate LFS client based on URL scheme.
+
+        Args:
+            url: LFS server URL (http://, https://, or file://)
+            config: Optional git config for authentication/proxy settings
+
+        Returns:
+            HTTPLFSClient for http/https URLs, FileLFSClient for file URLs
+
+        Raises:
+            ValueError: If URL is invalid or has unsupported scheme
+        """
+        if not _is_valid_lfs_url(url):
+            raise ValueError(
+                f"Invalid LFS URL: {url!r}. "
+                "URL must be an absolute URL with scheme http://, https://, or file://."
+            )
+
+        parsed = urlparse(url)
+        if parsed.scheme in ("http", "https"):
+            return HTTPLFSClient(url, config)
+        elif parsed.scheme == "file":
+            return FileLFSClient(url, config)
+        else:
+            # Shouldn't happen if _is_valid_lfs_url works correctly
+            raise ValueError(f"Unsupported LFS URL scheme: {parsed.scheme}")
+
+    @classmethod
     def from_config(cls, config: "Config") -> "LFSClient | None":
         """Create LFS client from git config.
 
@@ -452,22 +481,12 @@ class LFSClient:
         except KeyError:
             pass
         else:
-            # Validate explicitly configured URL - raise error if invalid
-            if not _is_valid_lfs_url(url):
-                raise ValueError(
-                    f"Invalid lfs.url in config: {url!r}. "
-                    "URL must be an absolute URL with scheme http://, https://, or file://."
-                )
-
-            # Return appropriate client based on scheme
-            parsed = urlparse(url)
-            if parsed.scheme in ("http", "https"):
-                return HTTPLFSClient(url, config)
-            elif parsed.scheme == "file":
-                return FileLFSClient(url, config)
-            else:
-                # This shouldn't happen if _is_valid_lfs_url works correctly
-                raise ValueError(f"Unsupported LFS URL scheme: {parsed.scheme}")
+            # from_url will validate and raise ValueError if invalid
+            try:
+                return cls.from_url(url, config)
+            except ValueError as e:
+                # Re-raise with more context about where the URL came from
+                raise ValueError(f"Invalid lfs.url in config: {url!r}. {e!s}") from e
 
         # Fall back to deriving from remote URL (same as git-lfs)
         try:
@@ -484,6 +503,20 @@ class LFSClient:
                         host, path = host_and_path.split(":", 1)
                         remote_url = f"https://{host}/{path}"
 
+            # Convert filesystem paths to file:// URLs
+            parsed = urlparse(remote_url)
+            # Windows drive letters (e.g., C:\) get parsed as single-letter schemes
+            is_windows_path = (
+                len(parsed.scheme) == 1
+                and parsed.scheme.isalpha()
+                and (len(remote_url) < 2 or remote_url[1] == ":")
+            )
+            if not parsed.scheme or is_windows_path:
+                # Filesystem path - convert to file:// URL
+                from urllib.request import pathname2url
+
+                remote_url = f"file://{pathname2url(remote_url)}"
+
             # Ensure URL ends with .git for consistent LFS endpoint
             if not remote_url.endswith(".git"):
                 remote_url = f"{remote_url}.git"
@@ -491,12 +524,8 @@ class LFSClient:
             # Standard LFS endpoint is remote_url + "/info/lfs"
             lfs_url = f"{remote_url}/info/lfs"
 
-            # Return None if derived URL is invalid (LFS is optional)
-            if not _is_valid_lfs_url(lfs_url):
-                return None
-
-            # Derived URLs are always http/https
-            return HTTPLFSClient(lfs_url, config)
+            # Return appropriate client based on derived URL scheme
+            return cls.from_url(lfs_url, config)
 
         return None
 

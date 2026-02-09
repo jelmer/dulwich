@@ -190,6 +190,7 @@ def self_test_suite() -> unittest.TestSuite:
         "stash",
         "stripspace",
         "submodule",
+        "subtree",
         "trailers",
         "utils",
         "walk",
@@ -217,6 +218,7 @@ def self_test_suite() -> unittest.TestSuite:
         "notes",
         "rebase",
         "submodule",
+        "subtree",
         "tag",
         "worktree",
     ]

@@ -1326,3 +1326,105 @@ class FileLFSClientTests(TestCase):
         downloaded = self.client.download(oid, len(content))
 
         self.assertEqual(downloaded, content)
+
+
+class LFSClientFromURLTests(TestCase):
+    """Tests for LFSClient.from_url() method."""
+
+    def test_from_url_http(self) -> None:
+        """Test from_url with http:// URL returns HTTPLFSClient."""
+        from dulwich.lfs import HTTPLFSClient, LFSClient
+
+        client = LFSClient.from_url("http://example.com/lfs")
+        self.assertIsInstance(client, HTTPLFSClient)
+        assert client is not None  # for mypy
+        self.assertEqual(client.url, "http://example.com/lfs")
+
+    def test_from_url_https(self) -> None:
+        """Test from_url with https:// URL returns HTTPLFSClient."""
+        from dulwich.lfs import HTTPLFSClient, LFSClient
+
+        client = LFSClient.from_url("https://example.com/repo.git/info/lfs")
+        self.assertIsInstance(client, HTTPLFSClient)
+        assert client is not None  # for mypy
+        self.assertEqual(client.url, "https://example.com/repo.git/info/lfs")
+
+    def test_from_url_file(self) -> None:
+        """Test from_url with file:// URL returns FileLFSClient."""
+        from dulwich.lfs import FileLFSClient, LFSClient
+
+        client = LFSClient.from_url("file:///path/to/lfs")
+        self.assertIsInstance(client, FileLFSClient)
+        assert client is not None  # for mypy
+        self.assertEqual(client.url, "file:///path/to/lfs")
+
+    def test_from_url_invalid_no_scheme(self) -> None:
+        """Test from_url with URL missing scheme raises ValueError."""
+        from dulwich.lfs import LFSClient
+
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_url("example.com/lfs")
+        self.assertIn("Invalid LFS URL", str(cm.exception))
+        self.assertIn("example.com/lfs", str(cm.exception))
+
+    def test_from_url_invalid_unsupported_scheme(self) -> None:
+        """Test from_url with unsupported scheme raises ValueError."""
+        from dulwich.lfs import LFSClient
+
+        # git:// is not supported for LFS
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_url("git://example.com/repo.git")
+        self.assertIn("Invalid LFS URL", str(cm.exception))
+
+        # ssh:// is not supported for LFS
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_url("ssh://git@example.com/repo.git")
+        self.assertIn("Invalid LFS URL", str(cm.exception))
+
+    def test_from_url_invalid_http_no_host(self) -> None:
+        """Test from_url with http:// but no host raises ValueError."""
+        from dulwich.lfs import LFSClient
+
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_url("http://")
+        self.assertIn("Invalid LFS URL", str(cm.exception))
+
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_url("https://")
+        self.assertIn("Invalid LFS URL", str(cm.exception))
+
+    def test_from_url_invalid_file_no_path(self) -> None:
+        """Test from_url with file:// but no path raises ValueError."""
+        from dulwich.lfs import LFSClient
+
+        with self.assertRaises(ValueError) as cm:
+            LFSClient.from_url("file://")
+        self.assertIn("Invalid LFS URL", str(cm.exception))
+
+    def test_from_url_with_config(self) -> None:
+        """Test from_url passes config to created client."""
+        from dulwich.config import ConfigFile
+        from dulwich.lfs import HTTPLFSClient, LFSClient
+
+        config = ConfigFile()
+        config.set((b"http",), b"useragent", b"test-agent/1.0")
+
+        client = LFSClient.from_url("https://example.com/lfs", config)
+        self.assertIsInstance(client, HTTPLFSClient)
+        assert client is not None  # for mypy
+        self.assertEqual(client.config, config)
+
+    def test_from_config_derives_file_url_from_remote(self) -> None:
+        """Test from_config derives file:// LFS URL from file:// remote URL."""
+        from dulwich.config import ConfigFile
+        from dulwich.lfs import FileLFSClient, LFSClient
+
+        config = ConfigFile()
+        # Remote with file:// URL
+        config.set((b"remote", b"origin"), b"url", b"file:///path/to/repo.git")
+
+        client = LFSClient.from_config(config)
+        self.assertIsInstance(client, FileLFSClient)
+        assert client is not None  # for mypy
+        # Should derive /info/lfs endpoint
+        self.assertEqual(client.url, "file:///path/to/repo.git/info/lfs")

@@ -137,6 +137,7 @@ Other
 * ✓ ``git bundle`` - Create, unpack, and manipulate bundle files
 * ✓ ``git stash`` - Stash changes in dirty working directory
 * ✓ ``git submodule`` - Initialize, update or inspect submodules
+* ✓ ``git subtree`` - Manage subtrees in repository
 * ✓ ``git notes`` - Add or inspect object notes
 * ✓ ``git replace`` - Create, list, delete refs to replace objects
 * ✓ ``git rerere`` - Reuse recorded resolution of conflicted merges
@@ -195,7 +196,7 @@ Interrogation
 * ✓ ``git show-index`` - Show packed archive index
 * ✓ ``git show-ref`` - List references in local repository
 * ✓ ``git var`` - Show Git logical variable
-* ◐ ``git verify-pack`` - Validate packed Git archive files (API only)
+* ◐ ``git verify-pack`` - Validate packed Git archive files (API only, see pack module)
 
 Syncing
 -------
@@ -274,7 +275,7 @@ Network Protocols
 * ✓ HTTP/HTTPS (dumb protocol)
 * ✓ File protocol (file://)
 * ✓ Local repositories
-* ◐ Protocol v2 (client fetch only, server limited)
+* ◐ Protocol v2 (client fully supported, server limited)
 
 Transfer Capabilities
 ---------------------
@@ -309,6 +310,12 @@ General:
 * ✓ object-format - Server: ✓, Client: ✓
 * ✓ agent - Server: ✓, Client: ✓
 
+Protocol v2 Specific:
+
+* ✓ ls-refs - Server: ✗, Client: ✓
+* ✓ packfile-uris - Server: ✗, Client: ✓
+* ✓ bundle-uri - Server: ✗, Client: ✓
+
 Advanced Features
 =================
 
@@ -321,6 +328,9 @@ Signatures
 * ✓ SSH commit signing
 * ✓ SSH tag signing
 * ✓ SSH signature verification
+* ✓ X509 commit signing
+* ✓ X509 tag signing
+* ✓ X509 signature verification
 
 Filters & Attributes
 --------------------
@@ -406,6 +416,15 @@ Submodules
 * ✗ git submodule deinit
 * ✗ git submodule absorbgitdirs
 
+Subtree
+-------
+
+* ✓ git subtree add
+* ✓ git subtree merge
+* ✓ git subtree pull
+* ✓ git subtree push
+* ✓ git subtree split
+
 Notes
 -----
 
@@ -429,7 +448,8 @@ Other Advanced Features
 * ✓ Info/alternates (alternate object databases)
 * ✓ Partial clone/fetch
 * ✓ Shallow clone/fetch
-* ✓ Bundle files
+* ✓ Bundle files (create, read, write, verify)
+* ✓ Bundle URI support (for faster clones and fetches)
 * ✓ Fast-import/fast-export
 * ✗ Scalar
 * ◐ Partial clone with object filters (basic blob:none support)
@@ -452,11 +472,11 @@ The following Git features are not currently supported:
 * Patch application (git-am, git-apply)
 * Interactive tools (git-difftool, git-mergetool)
 * Newer features (range-diff, scalar, fsmonitor--daemon)
-* Full protocol v2 server support (client is fully supported for fetch)
+* Full protocol v2 server support (client is fully supported)
 * Some plumbing commands (mktree, http-push, upload-archive, fmt-merge-msg, merge-one-file)
-* Full submodule feature parity
-* Some advanced object filtering options
-* Most git hooks (only pre-commit, commit-msg, post-commit, post-receive)
+* Full submodule feature parity (basic operations supported)
+* Some advanced object filtering options (basic filters supported)
+* Most git hooks (only pre-commit, commit-msg, post-commit, post-receive supported)
 * Working tree encoding attribute
 
 Compatibility Notes

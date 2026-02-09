@@ -3795,6 +3795,164 @@ class cmd_submodule(SuperCommand):
     default_command = cmd_submodule_list
 
 
+class cmd_subtree_add(Command):
+    """Add a subtree."""
+
+    def run(self, argv: Sequence[str]) -> None:
+        """Execute the subtree-add command.
+
+        Args:
+            argv: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--prefix", required=True, help="Prefix path for subtree")
+        parser.add_argument(
+            "--squash", action="store_true", help="Squash history into single commit"
+        )
+        parser.add_argument("--message", "-m", help="Commit message")
+        parser.add_argument("repository", help="Repository URL or local path")
+        parser.add_argument("ref", help="Ref or commit to add")
+        args = parser.parse_args(argv)
+
+        commit_id = porcelain.subtree_add(
+            ".",
+            prefix=args.prefix,
+            repository=args.repository,
+            ref=args.ref,
+            squash=args.squash,
+            message=args.message.encode("utf-8") if args.message else None,
+        )
+        commit_id_str = commit_id.decode("utf-8", "replace")
+        sys.stdout.write(f"Added dir '{args.prefix}' with commit {commit_id_str}\n")
+
+
+class cmd_subtree_merge(Command):
+    """Merge changes into a subtree."""
+
+    def run(self, argv: Sequence[str]) -> None:
+        """Execute the subtree-merge command.
+
+        Args:
+            argv: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--prefix", required=True, help="Prefix path for subtree")
+        parser.add_argument(
+            "--squash", action="store_true", help="Squash history into single commit"
+        )
+        parser.add_argument("--message", "-m", help="Commit message")
+        parser.add_argument("commit", help="Commit to merge")
+        args = parser.parse_args(argv)
+
+        porcelain.subtree_merge(
+            ".",
+            prefix=args.prefix,
+            commit=args.commit,
+            squash=args.squash,
+            message=args.message.encode("utf-8") if args.message else None,
+        )
+        sys.stdout.write(f"Merged commit {args.commit} into '{args.prefix}'\n")
+
+
+class cmd_subtree_split(Command):
+    """Split a subtree into a separate branch."""
+
+    def run(self, argv: Sequence[str]) -> None:
+        """Execute the subtree-split command.
+
+        Args:
+            argv: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--prefix", required=True, help="Prefix path for subtree")
+        parser.add_argument("--branch", "-b", help="Branch name to create")
+        parser.add_argument(
+            "--rejoin",
+            action="store_true",
+            help="Merge split branch back into HEAD with metadata",
+        )
+        parser.add_argument("--onto", help="Commit to use as initial parent")
+        args = parser.parse_args(argv)
+
+        split_id = porcelain.subtree_split(
+            ".",
+            prefix=args.prefix,
+            branch=args.branch,
+            rejoin=args.rejoin,
+            onto=args.onto,
+        )
+        split_id_str = split_id.decode("utf-8", "replace")
+        sys.stdout.write(f"Split '{args.prefix}' into commit {split_id_str}\n")
+        if args.branch:
+            sys.stdout.write(f"Created branch '{args.branch}'\n")
+
+
+class cmd_subtree_pull(Command):
+    """Pull changes from a remote repository into a subtree."""
+
+    def run(self, argv: Sequence[str]) -> None:
+        """Execute the subtree-pull command.
+
+        Args:
+            argv: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--prefix", required=True, help="Prefix path for subtree")
+        parser.add_argument(
+            "--squash", action="store_true", help="Squash history into single commit"
+        )
+        parser.add_argument("--message", "-m", help="Commit message")
+        parser.add_argument("repository", help="Repository URL")
+        parser.add_argument("ref", help="Ref to pull")
+        args = parser.parse_args(argv)
+
+        porcelain.subtree_pull(
+            ".",
+            prefix=args.prefix,
+            repository=args.repository,
+            ref=args.ref,
+            squash=args.squash,
+            message=args.message.encode("utf-8") if args.message else None,
+        )
+        sys.stdout.write(f"Pulled {args.ref} into '{args.prefix}'\n")
+
+
+class cmd_subtree_push(Command):
+    """Push a subtree to a remote repository."""
+
+    def run(self, argv: Sequence[str]) -> None:
+        """Execute the subtree-push command.
+
+        Args:
+            argv: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--prefix", required=True, help="Prefix path for subtree")
+        parser.add_argument("repository", help="Repository URL")
+        parser.add_argument("ref", help="Ref to push to")
+        args = parser.parse_args(argv)
+
+        porcelain.subtree_push(
+            ".",
+            prefix=args.prefix,
+            repository=args.repository,
+            ref=args.ref,
+        )
+        sys.stdout.write(f"Pushed '{args.prefix}' to {args.repository} ({args.ref})\n")
+
+
+class cmd_subtree(SuperCommand):
+    """Manage subtrees within a repository."""
+
+    subcommands: ClassVar[dict[str, type[Command]]] = {
+        "add": cmd_subtree_add,
+        "merge": cmd_subtree_merge,
+        "split": cmd_subtree_split,
+        "pull": cmd_subtree_pull,
+        "push": cmd_subtree_push,
+    }
+
+
 class cmd_cat_file(Command):
     """Provide content or type and size information for repository objects."""
 
@@ -7152,6 +7310,7 @@ commands = {
     "switch": cmd_switch,
     "symbolic-ref": cmd_symbolic_ref,
     "submodule": cmd_submodule,
+    "subtree": cmd_subtree,
     "tag": cmd_tag,
     "unpack-objects": cmd_unpack_objects,
     "update-ref": cmd_update_ref,

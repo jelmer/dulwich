@@ -246,6 +246,11 @@ __all__ = [
     "submodule_init",
     "submodule_list",
     "submodule_update",
+    "subtree_add",
+    "subtree_merge",
+    "subtree_pull",
+    "subtree_push",
+    "subtree_split",
     "switch",
     "symbolic_ref",
     "tag_create",
@@ -435,6 +440,13 @@ from .submodule import (
     submodule_init,
     submodule_list,
     submodule_update,
+)
+from .subtree import (
+    subtree_add,
+    subtree_merge,
+    subtree_pull,
+    subtree_push,
+    subtree_split,
 )
 from .tag import tag_create, tag_delete, tag_list, verify_tag
 from .worktree import (

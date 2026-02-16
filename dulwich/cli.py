@@ -1318,6 +1318,11 @@ class cmd_fetch(Command):
             action="append",
             help="Deepen or shorten the history of a shallow repository to exclude commits reachable from a specified remote branch or tag",
         )
+        parser.add_argument(
+            "--unshallow",
+            action="store_true",
+            help="Convert a shallow repository to a complete one",
+        )
         parsed_args = parser.parse_args(args)
 
         r = Repo(".")
@@ -1354,6 +1359,7 @@ class cmd_fetch(Command):
                     include_tags=include_tags,
                     shallow_since=parsed_args.shallow_since,
                     shallow_exclude=parsed_args.shallow_exclude,
+                    unshallow=parsed_args.unshallow,
                 )
         else:
             # Fetch from specific location
@@ -1364,6 +1370,7 @@ class cmd_fetch(Command):
                 include_tags=include_tags,
                 shallow_since=parsed_args.shallow_since,
                 shallow_exclude=parsed_args.shallow_exclude,
+                unshallow=parsed_args.unshallow,
             )
 
 

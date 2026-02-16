@@ -16,6 +16,10 @@
    bootstrap repository data before fetching remaining objects.
    (Jelmer Vernooĳ)
 
+ * Add ``--unshallow`` support to ``fetch`` command, allowing conversion of
+   shallow repositories to complete ones by fetching all missing history.
+   (Jelmer Vernooĳ, #1800)
+
  * Support ``GIT_TRACE_PACKET`` in ``dulwich.cli``.
    (Jelmer Vernooĳ)
 

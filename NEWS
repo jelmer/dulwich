@@ -5,6 +5,12 @@
 
  * Add basic support for subtrees. (Jelmer Vernooĳ)
 
+ * Implement server-side Git hooks (pre-receive, update, post-receive) in
+   ``ReceivePackHandler``. Pre-receive hooks can abort entire pushes, update
+   hooks can decline individual ref updates, and post-receive hooks run after
+   successful pushes. Hook output is sent to clients via sideband channels.
+   (Jelmer Vernooĳ, #212)
+
  * Report progress during pack file downloads. Dulwich now displays real-time
    transfer progress (bytes received, transfer speed) when cloning or fetching
    repositories, matching Git's behavior. (Jelmer Vernooĳ, #1121)

@@ -1461,6 +1461,15 @@ class ReceivePackHandler(PackHandler):
 
         for oldsha, sha, ref in refs:
             ref_status = b"ok"
+
+            # Run update hook for this ref
+            hook_error = self._on_update(ref, oldsha, sha)
+            if hook_error:
+                # Update hook declined this ref
+                ref_status = hook_error
+                yield (ref, ref_status)
+                continue
+
             try:
                 if sha == zero_sha:
                     if CAPABILITY_DELETE_REFS not in self.capabilities():
@@ -1511,6 +1520,68 @@ class ReceivePackHandler(PackHandler):
                 write(b"ng " + name + b" " + msg + b"\n")
         write(None)  # type: ignore
         flush()
+
+    def _on_pre_receive(
+        self, client_refs: list[tuple[ObjectID, ObjectID, Ref]]
+    ) -> None:
+        """Run pre-receive hook.
+
+        Args:
+            client_refs: List of (old_sha, new_sha, ref_name) tuples
+
+        Raises:
+            HookError: If hook fails, preventing the push
+        """
+        hook = self.repo.hooks.get("pre-receive", None)  # type: ignore[attr-defined]
+        if not hook:
+            return
+        try:
+            stdout, stderr = hook.execute(client_refs)
+            # Only send output via sideband if capabilities are set
+            if self._client_capabilities is not None:
+                if stdout and self.has_capability(CAPABILITY_SIDE_BAND_64K):
+                    self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, stdout)
+                if stderr and self.has_capability(CAPABILITY_SIDE_BAND_64K):
+                    self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, stderr)
+        except HookError as err:
+            # Send error to client via sideband if available
+            if self._client_capabilities is not None and self.has_capability(
+                CAPABILITY_SIDE_BAND_64K
+            ):
+                self.proto.write_sideband(
+                    SIDE_BAND_CHANNEL_FATAL, str(err).encode("utf-8")
+                )
+            # Re-raise to abort the push
+            raise
+
+    def _on_update(
+        self, ref_name: Ref, old_sha: ObjectID, new_sha: ObjectID
+    ) -> bytes | None:
+        """Run update hook for a single ref.
+
+        Args:
+            ref_name: Name of the reference
+            old_sha: Old SHA of the reference
+            new_sha: New SHA of the reference
+
+        Returns:
+            Error message if hook fails, None otherwise
+        """
+        hook = self.repo.hooks.get("update", None)  # type: ignore[attr-defined]
+        if not hook:
+            return None
+        try:
+            stdout, stderr = hook.execute(ref_name, old_sha, new_sha)
+            # Only send output via sideband if capabilities are set
+            if self._client_capabilities is not None:
+                if stdout and self.has_capability(CAPABILITY_SIDE_BAND_64K):
+                    self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, stdout)
+                if stderr and self.has_capability(CAPABILITY_SIDE_BAND_64K):
+                    self.proto.write_sideband(SIDE_BAND_CHANNEL_PROGRESS, stderr)
+            return None
+        except HookError as err:
+            # Return error message to mark this ref as failed
+            return str(err).encode("utf-8")
 
     def _on_post_receive(self, client_refs: dict[bytes, tuple[bytes, bytes]]) -> None:
         """Run post-receive hook.
@@ -1568,6 +1639,22 @@ class ReceivePackHandler(PackHandler):
             (oldsha, newsha, ref_name) = ref_line.split()
             client_refs.append((ObjectID(oldsha), ObjectID(newsha), Ref(ref_name)))
             ref_line = self.proto.read_pkt_line()
+
+        # Run pre-receive hook before processing the pack
+        # If it fails, we abort the entire push
+        try:
+            self._on_pre_receive(client_refs)
+        except HookError:
+            # Hook failed, report error to client and abort
+            # We still need to consume the pack data to avoid protocol errors
+            if self.has_capability(CAPABILITY_REPORT_STATUS):
+                # Send unpack error status
+                status = [(b"unpack", b"pre-receive hook declined")]
+                # Add 'ng' (not good) status for all refs
+                for _, _, ref_name in client_refs:
+                    status.append((ref_name, b"pre-receive hook declined"))
+                self._report_status(status)
+            return
 
         # backend can now deal with this refs and read a pack using self.read
         status = list(self._apply_pack(client_refs))

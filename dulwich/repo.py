@@ -107,6 +107,8 @@ from .hooks import (
     PostCommitShellHook,
     PostReceiveShellHook,
     PreCommitShellHook,
+    PreReceiveShellHook,
+    UpdateShellHook,
 )
 from .object_store import (
     DiskObjectStore,
@@ -1530,6 +1532,8 @@ class Repo(BaseRepo):
         self.hooks["pre-commit"] = PreCommitShellHook(self.path, self.controldir())
         self.hooks["commit-msg"] = CommitMsgShellHook(self.controldir())
         self.hooks["post-commit"] = PostCommitShellHook(self.controldir())
+        self.hooks["pre-receive"] = PreReceiveShellHook(self.controldir())
+        self.hooks["update"] = UpdateShellHook(self.controldir())
         self.hooks["post-receive"] = PostReceiveShellHook(self.controldir())
 
         # Initialize filter context as None, will be created lazily

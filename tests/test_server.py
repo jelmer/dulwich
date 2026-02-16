@@ -30,6 +30,7 @@ from io import BytesIO
 from dulwich.errors import (
     GitProtocolError,
     HangupException,
+    HookError,
     NotGitRepository,
     UnexpectedCommandError,
 )
@@ -386,6 +387,110 @@ class ReceivePackHandlerTestCase(TestCase):
         self.assertEqual(status[0][1], b"ok")
         self.assertEqual(status[1][0], b"refs/heads/fake-branch")
         self.assertEqual(status[1][1], b"ok")
+
+    def test_pre_receive_hook_success(self) -> None:
+        """Test that pre-receive hook is called and can succeed."""
+
+        def mock_hook_execute(client_refs):
+            # Verify the hook receives the expected refs
+            self.assertEqual(len(client_refs), 1)
+            self.assertEqual(client_refs[0][0], ONE)
+            self.assertEqual(client_refs[0][1], TWO)
+            self.assertEqual(client_refs[0][2], b"refs/heads/master")
+            return (b"", b"")
+
+        # Create a mock hook
+        from unittest.mock import Mock
+
+        mock_hook = Mock()
+        mock_hook.execute = mock_hook_execute
+        self._repo.hooks["pre-receive"] = mock_hook
+
+        # Test that the hook is called
+        client_refs = [(ONE, TWO, b"refs/heads/master")]
+        self._handler._on_pre_receive(client_refs)
+
+    def test_pre_receive_hook_failure(self) -> None:
+        """Test that pre-receive hook can abort a push."""
+
+        def mock_hook_execute(client_refs):
+            raise HookError("pre-receive hook declined")
+
+        # Create a mock hook
+        from unittest.mock import Mock
+
+        mock_hook = Mock()
+        mock_hook.execute = mock_hook_execute
+        self._repo.hooks["pre-receive"] = mock_hook
+
+        # Test that the hook failure raises HookError
+        client_refs = [(ONE, TWO, b"refs/heads/master")]
+        self.assertRaises(HookError, self._handler._on_pre_receive, client_refs)
+
+    def test_update_hook_success(self) -> None:
+        """Test that update hook is called and can succeed."""
+
+        def mock_hook_execute(ref_name, old_sha, new_sha):
+            # Verify the hook receives the expected arguments
+            self.assertEqual(ref_name, b"refs/heads/master")
+            self.assertEqual(old_sha, ONE)
+            self.assertEqual(new_sha, TWO)
+            return (b"", b"")
+
+        # Create a mock hook
+        from unittest.mock import Mock
+
+        mock_hook = Mock()
+        mock_hook.execute = mock_hook_execute
+        self._repo.hooks["update"] = mock_hook
+
+        # Test that the hook is called
+        result = self._handler._on_update(b"refs/heads/master", ONE, TWO)
+        self.assertIsNone(result)
+
+    def test_update_hook_failure(self) -> None:
+        """Test that update hook can decline a ref update."""
+
+        def mock_hook_execute(ref_name, old_sha, new_sha):
+            raise HookError("update hook declined")
+
+        # Create a mock hook
+        from unittest.mock import Mock
+
+        mock_hook = Mock()
+        mock_hook.execute = mock_hook_execute
+        self._repo.hooks["update"] = mock_hook
+
+        # Test that the hook failure returns an error message
+        result = self._handler._on_update(b"refs/heads/master", ONE, TWO)
+        self.assertIsNotNone(result)
+        self.assertIn(b"update hook declined", result)
+
+    def test_update_hook_declines_ref(self) -> None:
+        """Test that update hook can decline a ref during pack application."""
+        refs = {b"refs/heads/master": ONE}
+        self._repo.refs._update(refs)
+
+        # Create a hook that declines the ref
+        def mock_hook_execute(ref_name, old_sha, new_sha):
+            raise HookError("update hook declined this ref")
+
+        # Create a mock hook
+        from unittest.mock import Mock
+
+        mock_hook = Mock()
+        mock_hook.execute = mock_hook_execute
+        self._repo.hooks["update"] = mock_hook
+
+        # Test the ref update part without reading pack data
+        self._handler.set_client_capabilities([b"delete-refs"])
+
+        # The update hook should decline the ref
+        ref_status = self._handler._on_update(b"refs/heads/master", ONE, ZERO_SHA)
+
+        # Verify hook declined the ref
+        self.assertIsNotNone(ref_status)
+        self.assertIn(b"update hook declined", ref_status)
 
 
 class ProtocolGraphWalkerEmptyTestCase(TestCase):

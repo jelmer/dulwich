@@ -8027,6 +8027,68 @@ class FetchTests(PorcelainTestCase):
             self.assertIn(self.repo[b"HEAD"].id, r)
             self.assertNotEqual(self.repo.get_refs(), target_refs)
 
+    def test_unshallow(self) -> None:
+        outstream = BytesIO()
+        errstream = BytesIO()
+
+        # Create three commits in source repo
+        for i in range(3):
+            handle, fullpath = tempfile.mkstemp(dir=self.repo.path)
+            os.close(handle)
+            porcelain.add(repo=self.repo.path, paths=fullpath)
+            porcelain.commit(
+                repo=self.repo.path,
+                message=f"commit {i}".encode(),
+                author=b"test <email>",
+                committer=b"test <email>",
+            )
+
+        # Create a shallow clone with depth=1
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        target_repo = porcelain.clone(
+            self.repo.path, target=target_path, depth=1, errstream=errstream
+        )
+
+        # Verify the clone is shallow
+        shallow = target_repo.get_shallow()
+        self.assertTrue(len(shallow) > 0, "Repository should be shallow")
+
+        target_repo.close()
+
+        # Unshallow the repository
+        porcelain.fetch(
+            target_path,
+            "origin",
+            outstream=outstream,
+            errstream=errstream,
+            unshallow=True,
+        )
+
+        # Verify the repository is no longer shallow
+        with Repo(target_path) as r:
+            shallow_after = r.get_shallow()
+            self.assertEqual(len(shallow_after), 0, "Repository should not be shallow")
+            # Verify all commits are now present
+            self.assertIn(self.repo[b"HEAD"].id, r)
+
+    def test_unshallow_with_depth_raises(self) -> None:
+        # Verify that specifying both unshallow and depth raises an error
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        target_repo = porcelain.clone(
+            self.repo.path, target=target_path, depth=1, errstream=BytesIO()
+        )
+        target_repo.close()
+
+        with self.assertRaises(ValueError):
+            porcelain.fetch(
+                target_path,
+                "origin",
+                depth=2,
+                unshallow=True,
+            )
+
     def assert_correct_remote_refs(
         self, local_refs, remote_refs, remote_name=b"origin"
     ) -> None:

@@ -387,7 +387,7 @@ class CommitCommandTest(DulwichCliTestCase):
 
         # Check that HEAD points to a commit
         commit = self.repo[self.repo.head()]
-        self.assertEqual(commit.message, b"My commit message")
+        self.assertEqual(commit.message, b"My commit message\n")
 
         # Verify editor was called
         mock_editor.assert_called_once()
@@ -426,6 +426,38 @@ class CommitCommandTest(DulwichCliTestCase):
         # Commit without --message flag should fail with exit code 1
         result, _stdout, _stderr = self._run_cli("commit")
         self.assertEqual(result, 1)
+
+    @patch("dulwich.cli.launch_editor")
+    def test_commit_custom_comment_char(self, mock_editor):
+        """Test commit with custom core.commentChar configuration."""
+        # Set custom comment character in config
+        config = self.repo.get_config()
+        config.set((b"core",), b"commentChar", b"@")
+        config.write_to_path()
+
+        # Create and add a file
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        self._run_cli("add", "test.txt")
+
+        # Mock editor to return a message with custom comment character
+        mock_editor.return_value = (
+            b"My commit message\n\n@ This is a comment\n@ Another comment\n"
+        )
+
+        # Commit without --message flag
+        _result, _stdout, _stderr = self._run_cli("commit")
+
+        # Check that HEAD points to a commit with the right message (comments stripped)
+        commit = self.repo[self.repo.head()]
+        self.assertEqual(commit.message, b"My commit message\n")
+
+        # Verify editor was called and the template used the custom comment char
+        mock_editor.assert_called_once()
+        template = mock_editor.call_args[0][0]
+        # Template should start with "@ " not "# "
+        self.assertTrue(template.startswith(b"\n@ Please enter"))
 
 
 class LogCommandTest(DulwichCliTestCase):

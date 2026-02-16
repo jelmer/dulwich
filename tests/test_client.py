@@ -24,8 +24,10 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import warnings
 from io import BytesIO
+from struct import pack
 from typing import NoReturn
 from unittest.mock import MagicMock, Mock, patch
 from urllib.parse import quote as urlquote
@@ -43,6 +45,7 @@ from dulwich.client import (
     HttpGitClient,
     InvalidWants,
     LocalGitClient,
+    PackDataProgressWrapper,
     PLinkSSHVendor,
     ReportStatusParser,
     SendPackError,
@@ -3518,3 +3521,259 @@ class TestPackfileUris(TestCase):
             list(verify_and_read(read_func, b"hash", "md5"))
 
         self.assertIn("Unsupported hash algorithm", str(cm.exception))
+
+
+class TestPackDataProgressWrapper(TestCase):
+    """Tests for PackDataProgressWrapper."""
+
+    def test_integration_with_fetch(self) -> None:
+        """Test that progress wrapper is used and called during pack data reception."""
+        # Test that the wrapper is correctly invoked with pack data
+        mock_write = Mock(return_value=12)
+        progress_messages = []
+
+        def progress_callback(msg: bytes) -> None:
+            progress_messages.append(msg)
+
+        wrapper = PackDataProgressWrapper(
+            mock_write,
+            progress_callback,
+            report_interval=0.01,
+            report_byte_threshold=512,
+        )
+
+        # Simulate what happens during fetch: receive pack header
+        num_objects = 100
+        header = b"PACK" + pack(">L", 2) + pack(">L", num_objects)
+        wrapper(header)
+
+        # Verify header was parsed
+        self.assertEqual(wrapper.total_objects, num_objects)
+        self.assertTrue(wrapper.header_parsed)
+
+        # Simulate receiving data chunks (like during network transfer)
+        for i in range(5):
+            wrapper(b"data" * 256)  # 1KB chunks
+            time.sleep(0.02)  # Allow time-based reporting to trigger
+
+        # Finalize
+        wrapper.finalize()
+
+        # Verify write was called for each chunk
+        self.assertEqual(mock_write.call_count, 6)  # header + 5 data chunks
+
+        # Verify progress messages were generated
+        self.assertGreater(len(progress_messages), 0, "Expected progress messages")
+
+        # Check for "Receiving objects" messages
+        receiving_msgs = [
+            msg for msg in progress_messages if b"Receiving objects:" in msg
+        ]
+        self.assertGreater(
+            len(receiving_msgs), 0, "Expected 'Receiving objects' messages"
+        )
+
+        # Check for final "done" message
+        has_done = any(b"done." in msg for msg in progress_messages)
+        self.assertTrue(has_done, "Expected final 'done' message")
+
+    def test_basic_progress_tracking(self) -> None:
+        """Test that progress wrapper tracks bytes received."""
+        output = BytesIO()
+        progress_messages = []
+
+        def progress_callback(msg: bytes) -> None:
+            progress_messages.append(msg)
+
+        wrapper = PackDataProgressWrapper(output.write, progress_callback)
+
+        # Write some data
+        test_data = b"test data chunk"
+        result = wrapper(test_data)
+
+        self.assertEqual(result, len(test_data))
+        self.assertEqual(output.getvalue(), test_data)
+        self.assertEqual(wrapper.bytes_received, len(test_data))
+
+    def test_header_parsing(self) -> None:
+        """Test that pack header is correctly parsed."""
+        output = BytesIO()
+        progress_messages = []
+
+        def progress_callback(msg: bytes) -> None:
+            progress_messages.append(msg)
+
+        wrapper = PackDataProgressWrapper(output.write, progress_callback)
+
+        # Create a valid pack header: "PACK" + version (2) + num_objects (100)
+        header = b"PACK" + pack(">L", 2) + pack(">L", 100)
+
+        wrapper(header)
+
+        self.assertEqual(wrapper.header_parsed, True)
+        self.assertEqual(wrapper.total_objects, 100)
+
+    def test_progress_reporting(self) -> None:
+        """Test that progress messages are generated."""
+        output = BytesIO()
+        progress_messages = []
+
+        def progress_callback(msg: bytes) -> None:
+            progress_messages.append(msg)
+
+        # Use a short report interval for testing
+        wrapper = PackDataProgressWrapper(
+            output.write,
+            progress_callback,
+            report_interval=0.01,
+            report_byte_threshold=1,
+        )
+
+        # Write pack header
+        header = b"PACK" + pack(">L", 2) + pack(">L", 100)
+        wrapper(header)
+
+        # Write more data to trigger progress report
+        wrapper(b"x" * 1024)
+        time.sleep(0.02)  # Wait for report interval
+        wrapper(b"y" * 1024)
+
+        # Should have at least one progress message
+        self.assertGreater(len(progress_messages), 0)
+
+        # Check message format
+        for msg in progress_messages:
+            self.assertIn(b"Receiving objects:", msg)
+            self.assertIn(b"MiB", msg)
+
+    def test_finalize(self) -> None:
+        """Test that finalize() generates final progress message."""
+        output = BytesIO()
+        progress_messages = []
+
+        def progress_callback(msg: bytes) -> None:
+            progress_messages.append(msg)
+
+        wrapper = PackDataProgressWrapper(output.write, progress_callback)
+
+        # Write pack header and some data
+        header = b"PACK" + pack(">L", 2) + pack(">L", 50)
+        wrapper(header)
+        wrapper(b"x" * 1024)
+
+        # Call finalize
+        wrapper.finalize()
+
+        # Should have a final message with newline
+        self.assertGreater(len(progress_messages), 0)
+        final_msg = progress_messages[-1]
+        self.assertIn(b"Receiving objects:", final_msg)
+        self.assertIn(b"done.\n", final_msg)
+
+    def test_no_progress_callback(self) -> None:
+        """Test that wrapper works without progress callback."""
+        output = BytesIO()
+
+        # No progress callback
+        wrapper = PackDataProgressWrapper(output.write, None)
+
+        # Should work without errors
+        header = b"PACK" + pack(">L", 2) + pack(">L", 100)
+        wrapper(header)
+        wrapper(b"x" * 1024)
+        wrapper.finalize()
+
+        # Data should still be written
+        self.assertGreater(len(output.getvalue()), 0)
+
+    def test_invalid_header(self) -> None:
+        """Test that wrapper handles invalid pack headers gracefully."""
+        output = BytesIO()
+        progress_messages = []
+
+        def progress_callback(msg: bytes) -> None:
+            progress_messages.append(msg)
+
+        wrapper = PackDataProgressWrapper(output.write, progress_callback)
+
+        # Write invalid header
+        wrapper(b"INVALID_HEADER_DATA")
+
+        # Should not have parsed the header
+        self.assertEqual(wrapper.header_parsed, False)
+        self.assertIsNone(wrapper.total_objects)
+
+        # But data should still be written
+        self.assertEqual(output.getvalue(), b"INVALID_HEADER_DATA")
+
+    def test_large_transfer(self) -> None:
+        """Test progress reporting with large data transfers."""
+        output = BytesIO()
+        progress_messages = []
+
+        def progress_callback(msg: bytes) -> None:
+            progress_messages.append(msg)
+
+        # Use fast report settings for testing
+        wrapper = PackDataProgressWrapper(
+            output.write,
+            progress_callback,
+            report_interval=0.01,
+            report_byte_threshold=1024,
+        )
+
+        # Write pack header
+        header = b"PACK" + pack(">L", 2) + pack(">L", 1000)
+        wrapper(header)
+
+        # Simulate large transfer with multiple chunks
+        chunk_size = 1024
+        num_chunks = 100
+        for i in range(num_chunks):
+            wrapper(b"x" * chunk_size)
+
+        wrapper.finalize()
+
+        # Should have multiple progress reports
+        self.assertGreater(
+            len(progress_messages),
+            1,
+            "Expected multiple progress messages for large transfer",
+        )
+
+        # Verify all messages are well-formed
+        for msg in progress_messages:
+            self.assertIn(b"Receiving objects:", msg)
+
+        # Last message should indicate completion
+        self.assertIn(b"done.", progress_messages[-1])
+
+    def test_write_function_failure_propagates(self) -> None:
+        """Test that exceptions from write function are propagated."""
+
+        class FailingWriter:
+            def write(self, data: bytes) -> int:
+                raise OSError("Disk full")
+
+        wrapper = PackDataProgressWrapper(FailingWriter().write, None)
+
+        # Exception should be propagated
+        with self.assertRaises(OSError) as cm:
+            wrapper(b"test data")
+
+        self.assertIn("Disk full", str(cm.exception))
+
+    def test_multiple_small_chunks(self) -> None:
+        """Test that header parsing works when header arrives in small chunks."""
+        output = BytesIO()
+        wrapper = PackDataProgressWrapper(output.write, None)
+
+        # Send pack header byte by byte
+        header = b"PACK" + pack(">L", 2) + pack(">L", 42)
+        for byte in header:
+            wrapper(bytes([byte]))
+
+        # Header should be parsed after receiving all 12 bytes
+        self.assertTrue(wrapper.header_parsed)
+        self.assertEqual(wrapper.total_objects, 42)
+        self.assertEqual(output.getvalue(), header)

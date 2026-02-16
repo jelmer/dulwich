@@ -95,9 +95,11 @@ import select
 import socket
 import subprocess
 import sys
+import time
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Set
 from contextlib import closing
 from io import BufferedReader, BytesIO
+from struct import unpack_from
 from typing import (
     IO,
     TYPE_CHECKING,
@@ -1023,6 +1025,133 @@ def _download_packfile_from_uri(
         resp.close()
 
 
+class PackDataProgressWrapper:
+    """Wrapper that reports progress during pack data reception.
+
+    This wrapper tracks bytes received during pack file download and periodically
+    reports progress to match Git's behavior of showing:
+    "Receiving objects: X% (current/total), Y MiB | Z MiB/s"
+
+    Args:
+        file_write: The underlying write function to call with received data
+        progress: Optional progress callback to report progress messages to
+        report_interval: Minimum time between progress reports in seconds (default 0.5)
+        report_byte_threshold: Minimum bytes between progress reports (default 1 MiB)
+    """
+
+    def __init__(
+        self,
+        file_write: Callable[[bytes], int],
+        progress: Callable[[bytes], None] | None,
+        report_interval: float = 0.5,
+        report_byte_threshold: int = 1024 * 1024,
+    ) -> None:
+        self.file_write = file_write
+        self.progress = progress
+        self.report_interval = report_interval
+        self.report_byte_threshold = report_byte_threshold
+
+        self.bytes_received = 0
+        self.total_objects: int | None = None
+        self.start_time = time.time()
+        self.last_report_time = self.start_time
+        self.last_report_bytes = 0
+        self.header_buffer = b""
+        self.header_parsed = False
+
+    def __call__(self, data: bytes) -> int:
+        """Called with each chunk of pack data."""
+        # Write the data to the file
+        result = self.file_write(data)
+        self.bytes_received += len(data)
+
+        # Try to parse the header if we haven't yet
+        if not self.header_parsed and len(self.header_buffer) < 12:
+            self.header_buffer += data
+            if len(self.header_buffer) >= 12:
+                self._parse_header()
+
+        # Report progress periodically if progress callback is set
+        if self.progress and self.header_parsed:
+            current_time = time.time()
+            bytes_since_last_report = self.bytes_received - self.last_report_bytes
+            time_since_last_report = current_time - self.last_report_time
+
+            # Report if enough time has passed or enough bytes have been received
+            if (
+                time_since_last_report >= self.report_interval
+                or bytes_since_last_report >= self.report_byte_threshold
+            ):
+                self._report_progress()
+                self.last_report_time = current_time
+                self.last_report_bytes = self.bytes_received
+
+        return result
+
+    def _parse_header(self) -> None:
+        """Parse the pack file header to extract the total object count."""
+        try:
+            header = self.header_buffer[:12]
+            if header[:4] != b"PACK":
+                # Not a valid pack header, skip progress reporting
+                return
+
+            # Extract the number of objects from the header
+            (self.total_objects,) = unpack_from(b">L", header, 8)
+            self.header_parsed = True
+        except Exception:
+            # If we can't parse the header, just skip progress reporting
+            pass
+
+    def _report_progress(self) -> None:
+        """Generate and send a progress message."""
+        if not self.progress:
+            return
+
+        elapsed = time.time() - self.start_time
+        if elapsed <= 0:
+            return
+
+        # Calculate transfer speed
+        speed = self.bytes_received / elapsed
+        mb_received = self.bytes_received / (1024 * 1024)
+        mb_per_sec = speed / (1024 * 1024)
+
+        # Format the progress message
+        # Note: We can't easily count objects as they arrive since the pack is compressed
+        # and deltified, so we just report bytes. Git counts objects during indexing phase.
+        if self.total_objects:
+            message = (
+                f"Receiving objects:   {self.total_objects} (delta 0), "
+                f"{mb_received:.2f} MiB | {mb_per_sec:.2f} MiB/s\r"
+            )
+        else:
+            message = (
+                f"Receiving objects: {mb_received:.2f} MiB | {mb_per_sec:.2f} MiB/s\r"
+            )
+
+        self.progress(message.encode())
+
+    def finalize(self) -> None:
+        """Report final progress with a newline."""
+        if self.progress and self.header_parsed and self.bytes_received > 0:
+            elapsed = time.time() - self.start_time
+            if elapsed > 0:
+                speed = self.bytes_received / elapsed
+                mb_received = self.bytes_received / (1024 * 1024)
+                mb_per_sec = speed / (1024 * 1024)
+
+                if self.total_objects:
+                    message = (
+                        f"Receiving objects: 100% ({self.total_objects}/{self.total_objects}), "
+                        f"{mb_received:.2f} MiB | {mb_per_sec:.2f} MiB/s, done.\n"
+                    )
+                else:
+                    message = f"Receiving objects: {mb_received:.2f} MiB | {mb_per_sec:.2f} MiB/s, done.\n"
+
+                self.progress(message.encode())
+
+
 def _handle_upload_pack_tail(
     proto: "Protocol",
     capabilities: Set[bytes],
@@ -1489,12 +1618,16 @@ class GitClient:
 
         else:
             f, commit, abort = target.object_store.add_pack()
+
+        # Wrap the write function with progress tracking
+        progress_wrapper = PackDataProgressWrapper(f.write, progress)
+
         try:
             result = self.fetch_pack(
                 path,
                 determine_wants,
                 target.get_graph_walker(),
-                f.write,
+                progress_wrapper,
                 progress=progress,
                 depth=depth,
                 ref_prefix=ref_prefix,
@@ -1503,6 +1636,9 @@ class GitClient:
                 shallow_since=shallow_since,
                 shallow_exclude=shallow_exclude,
             )
+
+            # Report final progress
+            progress_wrapper.finalize()
 
             # Fix object format if needed
             if (

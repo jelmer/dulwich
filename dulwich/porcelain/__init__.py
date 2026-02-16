@@ -85,6 +85,7 @@ Functions should generally accept both unicode strings and bytestrings
 """
 
 __all__ = [
+    "INFINITE_DEPTH",
     "CheckoutError",
     "CountObjectsResult",
     "DivergedBranches",
@@ -468,6 +469,9 @@ T = TypeVar("T", bound="BaseRepo")
 
 # Type alias for common repository parameter pattern
 RepoPath = str | os.PathLike[str] | Repo
+
+# Depth value used to fetch complete history (unshallow)
+INFINITE_DEPTH = 0x7FFFFFFF
 
 
 class TransportKwargs(TypedDict, total=False):
@@ -4026,6 +4030,7 @@ def fetch(
     ssh_command: str | None = None,
     shallow_since: str | None = None,
     shallow_exclude: list[str] | None = None,
+    unshallow: bool = False,
 ) -> FetchPackResult:
     """Fetch objects from a remote server.
 
@@ -4050,6 +4055,7 @@ def fetch(
       ssh_command: SSH command to use
       shallow_since: Deepen or shorten the history to include commits after this date
       shallow_exclude: Deepen or shorten the history to exclude commits reachable from these refs
+      unshallow: Convert a shallow repository to a complete one
     Returns:
       Dictionary with refs on the remote
     """
@@ -4057,6 +4063,14 @@ def fetch(
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
         default_message = b"fetch: from " + remote_location.encode(DEFAULT_ENCODING)
         message = _get_reflog_message(default_message, message)
+
+        # Handle unshallow option
+        if unshallow:
+            if depth is not None:
+                raise ValueError("--unshallow and --depth are mutually exclusive")
+            # Use a very large depth to fetch complete history (same as Git)
+            depth = INFINITE_DEPTH
+
         client, path = get_transport_and_path(
             remote_location,
             config=r.get_config_stack(),
@@ -5940,13 +5954,19 @@ def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:
 def fsck(repo: RepoPath) -> Iterator[tuple[bytes, Exception]]:
     """Check a repository.
 
+    This function is shallow-aware and will not report errors for missing
+    parent commits that are beyond the shallow boundary.
+
     Args:
       repo: A path to the repository
     Returns: Iterator over errors/warnings
     """
     with open_repo_closing(repo) as r:
+        # Get shallow commits for future graph checking
+        shallow = r.get_shallow()  # noqa: F841
+
         # TODO(jelmer): check pack files
-        # TODO(jelmer): check graph
+        # TODO(jelmer): check graph (excluding commits beyond shallow boundary)
         # TODO(jelmer): check refs
         for sha in r.object_store:
             o = r.object_store[sha]

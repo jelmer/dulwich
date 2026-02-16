@@ -1,5 +1,8 @@
 1.0.1	UNRELEASED
 
+ * Add support for ``core.commentChar`` configuration option in commit message
+   templates. (Jelmer Vernooĳ, #1852)
+
  * Add basic support for subtrees. (Jelmer Vernooĳ)
 
  * Add client-side support for Git protocol v2 ``packfile-uris`` capability,

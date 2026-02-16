@@ -94,6 +94,7 @@ from .objectspec import parse_commit_range
 from .pack import Pack
 from .patch import DiffAlgorithmNotAvailable
 from .repo import Repo
+from .stripspace import stripspace
 
 logger = logging.getLogger(__name__)
 
@@ -1978,15 +1979,34 @@ def _get_commit_message_with_template(
     commit: Commit | None = None,
 ) -> bytes:
     """Get commit message with an initial message template."""
+    # Get the configured comment character (default is '#')
+    comment_char = b"#"
+    if repo:
+        config = repo.get_config_stack()
+        try:
+            configured_char = config.get((b"core",), b"commentChar")
+            if configured_char:
+                comment_char = configured_char[:1]  # Use only the first character
+        except KeyError:
+            pass  # Use default '#'
+
     # Start with the initial message
     template = initial_message or b""
     if template and not template.endswith(b"\n"):
         template += b"\n"
 
     template += b"\n"
-    template += b"# Please enter the commit message for your changes. Lines starting\n"
-    template += b"# with '#' will be ignored, and an empty message aborts the commit.\n"
-    template += b"#\n"
+    template += (
+        comment_char
+        + b" Please enter the commit message for your changes. Lines starting\n"
+    )
+    template += (
+        comment_char
+        + b" with '"
+        + comment_char
+        + b"' will be ignored, and an empty message aborts the commit.\n"
+    )
+    template += comment_char + b"\n"
 
     # Add branch info if repo is provided
     if repo:
@@ -1997,20 +2017,18 @@ def _get_commit_message_with_template(
                 branch = ref_path[11:]  # Remove 'refs/heads/' prefix
             else:
                 branch = ref_path
-            template += b"# On branch %s\n" % branch
+            template += comment_char + b" On branch %s\n" % branch
         except (KeyError, IndexError):
-            template += b"# On branch (unknown)\n"
-        template += b"#\n"
+            template += comment_char + b" On branch (unknown)\n"
+        template += comment_char + b"\n"
 
-    template += b"# Changes to be committed:\n"
+    template += comment_char + b" Changes to be committed:\n"
 
     # Launch editor
     content = launch_editor(template)
 
-    # Remove comment lines and strip
-    lines = content.split(b"\n")
-    message_lines = [line for line in lines if not line.strip().startswith(b"#")]
-    message = b"\n".join(message_lines).strip()
+    # Use stripspace to remove comment lines and clean up whitespace
+    message = stripspace(content, strip_comments=True, comment_char=comment_char)
 
     if not message:
         raise CommitMessageError("Aborting commit due to empty commit message")

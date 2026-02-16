@@ -343,6 +343,9 @@ class LFSStatusCompatTest(LFSCompatTestCase):
         # Disable autocrlf to avoid line ending issues on Windows
         run_git_or_fail(["config", "core.autocrlf", "false"], cwd=repo_dir)
         run_git_or_fail(["lfs", "install", "--local"], cwd=repo_dir)
+        # Disable long-running filter process to avoid cleanup issues on Windows
+        # where lingering git-lfs filter-process daemons prevent directory removal
+        run_git_or_fail(["config", "--unset", "filter.lfs.process"], cwd=repo_dir)
         run_git_or_fail(["lfs", "track", "*.bin"], cwd=repo_dir)
         run_git_or_fail(["add", ".gitattributes"], cwd=repo_dir)
         run_git_or_fail(["commit", "-m", "Track .bin files"], cwd=repo_dir)
@@ -374,6 +377,9 @@ class LFSStatusCompatTest(LFSCompatTestCase):
         # Disable autocrlf to avoid line ending issues on Windows
         run_git_or_fail(["config", "core.autocrlf", "false"], cwd=repo_dir)
         run_git_or_fail(["lfs", "install", "--local"], cwd=repo_dir)
+        # Disable long-running filter process to avoid cleanup issues on Windows
+        # where lingering git-lfs filter-process daemons prevent directory removal
+        run_git_or_fail(["config", "--unset", "filter.lfs.process"], cwd=repo_dir)
         run_git_or_fail(["lfs", "track", "*.bin"], cwd=repo_dir)
         run_git_or_fail(["add", ".gitattributes"], cwd=repo_dir)
         run_git_or_fail(["commit", "-m", "Track .bin files"], cwd=repo_dir)
@@ -402,6 +408,9 @@ class LFSStatusCompatTest(LFSCompatTestCase):
         # Disable autocrlf to avoid line ending issues on Windows
         run_git_or_fail(["config", "core.autocrlf", "false"], cwd=repo_dir)
         run_git_or_fail(["lfs", "install", "--local"], cwd=repo_dir)
+        # Disable long-running filter process to avoid cleanup issues on Windows
+        # where lingering git-lfs filter-process daemons prevent directory removal
+        run_git_or_fail(["config", "--unset", "filter.lfs.process"], cwd=repo_dir)
         run_git_or_fail(["lfs", "track", "*.bin"], cwd=repo_dir)
         run_git_or_fail(["add", ".gitattributes"], cwd=repo_dir)
         run_git_or_fail(["commit", "-m", "Track .bin files"], cwd=repo_dir)

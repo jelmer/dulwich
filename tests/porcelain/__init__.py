@@ -4547,6 +4547,60 @@ class CheckoutTests(PorcelainTestCase):
         porcelain.checkout(self.repo, self._sha)
         self.assertEqual(self._sha, self.repo.head())
 
+        # Working tree and index should be clean after checkout
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], []], status)
+
+    def test_checkout_files_starting_with_dotgit(self) -> None:
+        # Regression test: paths starting with ".git" (like .github/, .gitignore,
+        # .gitattributes) were incorrectly skipped during checkout, leaving the
+        # index out of sync with HEAD.
+        github_dir = os.path.join(self.repo.path, ".github", "workflows")
+        os.makedirs(github_dir)
+
+        github_file = os.path.join(github_dir, "ci.yml")
+        gitignore_file = os.path.join(self.repo.path, ".gitignore")
+
+        with open(github_file, "w") as f:
+            f.write("# version 1\n")
+        with open(gitignore_file, "w") as f:
+            f.write("*.pyc\n")
+
+        porcelain.add(self.repo, paths=[github_file, gitignore_file])
+        sha1 = porcelain.commit(
+            self.repo,
+            message=b"add .github and .gitignore",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Update those files in a second commit
+        with open(github_file, "w") as f:
+            f.write("# version 2\n")
+        with open(gitignore_file, "w") as f:
+            f.write("*.pyc\n*.pyo\n")
+
+        porcelain.add(self.repo, paths=[github_file, gitignore_file])
+        porcelain.commit(
+            self.repo,
+            message=b"update .github and .gitignore",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Checkout the first commit (going back to v1)
+        porcelain.checkout(self.repo, sha1)
+
+        # Working tree and index should be clean (no staged changes)
+        status = list(porcelain.status(self.repo))
+        self.assertEqual([{"add": [], "delete": [], "modify": []}, [], []], status)
+
+        # Working tree files should have v1 content
+        with open(github_file) as f:
+            self.assertEqual("# version 1\n", f.read())
+        with open(gitignore_file) as f:
+            self.assertEqual("*.pyc\n", f.read())
+
     def test_checkout_to_head(self) -> None:
         new_sha = self._commit_something_wrong()
 

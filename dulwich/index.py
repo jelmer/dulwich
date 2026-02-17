@@ -2736,9 +2736,7 @@ def update_working_tree(
             if change.type in (CHANGE_MODIFY, CHANGE_DELETE) and change.old:
                 path = change.old.path
                 assert path is not None
-                if path.startswith(b".git") or not validate_path(
-                    path, validate_path_element
-                ):
+                if not validate_path(path, validate_path_element):
                     continue
 
                 full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
@@ -2779,9 +2777,7 @@ def update_working_tree(
             # Remove file/directory
             assert change.old is not None and change.old.path is not None
             path = change.old.path
-            if path.startswith(b".git") or not validate_path(
-                path, validate_path_element
-            ):
+            if not validate_path(path, validate_path_element):
                 continue
 
             full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
@@ -2810,9 +2806,7 @@ def update_working_tree(
                 and change.new.mode is not None
             )
             path = change.new.path
-            if path.startswith(b".git") or not validate_path(
-                path, validate_path_element
-            ):
+            if not validate_path(path, validate_path_element):
                 continue
 
             full_path = _tree_to_fs_path(repo_path, path, tree_encoding)

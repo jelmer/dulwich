@@ -138,6 +138,7 @@ class GitClientTests(TestCase):
             {
                 b"delete-refs",
                 b"ofs-delta",
+                b"push-options",
                 b"report-status",
                 b"side-band-64k",
                 agent_cap,
@@ -563,6 +564,52 @@ class GitClientTests(TestCase):
             {b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c"},
         )
         self.assertEqual(self.rout.getvalue(), b"0000")
+
+    def test_send_pack_with_push_options(self) -> None:
+        # Server advertises push-options capability
+        self.rin.write(
+            b"0070310ca9477129b8586fa2afc779c1f57cf64bba6c "
+            b"refs/heads/master\x00report-status delete-refs ofs-delta push-options\n"
+            b"0000000eunpack ok\n"
+            b"001aok refs/heads/blah12\n"
+            b"0000"
+        )
+        self.rin.seek(0)
+
+        def update_refs(refs):
+            return {
+                b"refs/heads/blah12": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
+                b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
+            }
+
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
+            return 0, []
+
+        f = BytesIO()
+        write_pack_objects(f.write, [], object_format=DEFAULT_OBJECT_FORMAT)
+        self.client.send_pack(
+            b"/",
+            update_refs,
+            generate_pack_data,
+            push_options=[b"topic=my-feature", b"title=My PR"],
+        )
+        out = self.rout.getvalue()
+        # Expected wire format:
+        # - ref update command with capabilities (including push-options)
+        # - flush-pkt (0000)
+        # - push option pkt-lines (no trailing newline, per git protocol)
+        # - flush-pkt (0000)
+        # - pack data
+        expected = (
+            b"00980000000000000000000000000000000000000000 "
+            b"310ca9477129b8586fa2afc779c1f57cf64bba6c "
+            b"refs/heads/blah12\x00delete-refs ofs-delta push-options report-status"
+            b"0000"
+            b"0014topic=my-feature"
+            b"000ftitle=My PR"
+            b"0000"
+        ) + f.getvalue()
+        self.assertEqual(out, expected)
 
 
 class TestGetTransportAndPath(TestCase):

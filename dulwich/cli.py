@@ -3661,12 +3661,25 @@ class cmd_push(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("-f", "--force", action="store_true", help="Force")
+        parser.add_argument(
+            "-o",
+            "--push-option",
+            action="append",
+            dest="push_options",
+            metavar="OPTION",
+            default=[],
+            help="Push option to transmit to the server (e.g. for AGit flow)",
+        )
         parser.add_argument("to_location", type=str)
         parser.add_argument("refspec", type=str, nargs="*")
         args = parser.parse_args(argv)
         try:
             porcelain.push(
-                ".", args.to_location, args.refspec or None, force=args.force
+                ".",
+                args.to_location,
+                args.refspec or None,
+                force=args.force,
+                push_options=args.push_options or None,
             )
         except porcelain.DivergedBranches:
             sys.stderr.write("Diverged branches; specify --force to override")

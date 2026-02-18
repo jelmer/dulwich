@@ -180,6 +180,7 @@ CAPABILITY_FETCH = b"fetch"
 CAPABILITY_FILTER = b"filter"
 CAPABILITY_OBJECT_FORMAT = b"object-format"
 CAPABILITY_PACKFILE_URIS = b"packfile-uris"
+CAPABILITY_PUSH_OPTIONS = b"push-options"
 
 # Magic ref that is used to attach capabilities to when
 # there are no refs. Should always be ste to ZERO_SHA.
@@ -218,6 +219,7 @@ KNOWN_RECEIVE_CAPABILITIES = set(
         CAPABILITY_DELETE_REFS,
         CAPABILITY_QUIET,
         CAPABILITY_ATOMIC,
+        CAPABILITY_PUSH_OPTIONS,
     ]
 )
 

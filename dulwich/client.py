@@ -195,6 +195,7 @@ from .protocol import (
     CAPABILITY_MULTI_ACK_DETAILED,
     CAPABILITY_OFS_DELTA,
     CAPABILITY_PACKFILE_URIS,
+    CAPABILITY_PUSH_OPTIONS,
     CAPABILITY_QUIET,
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_SHALLOW,
@@ -341,6 +342,7 @@ UPLOAD_CAPABILITIES = [
 RECEIVE_CAPABILITIES = [
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_DELETE_REFS,
+    CAPABILITY_PUSH_OPTIONS,
     *COMMON_CAPABILITIES,
 ]
 
@@ -778,10 +780,13 @@ class _v1ReceivePackHeader:
         capabilities: Sequence[bytes],
         old_refs: Mapping[Ref, ObjectID],
         new_refs: Mapping[Ref, ObjectID],
+        push_options: Sequence[bytes] | None = None,
     ) -> None:
         self.want: set[ObjectID] = set()
         self.have: set[ObjectID] = set()
-        self._it = self._handle_receive_pack_head(capabilities, old_refs, new_refs)
+        self._it = self._handle_receive_pack_head(
+            capabilities, old_refs, new_refs, push_options
+        )
         self.sent_capabilities = False
 
     def __iter__(self) -> Iterator[bytes | None]:
@@ -792,6 +797,7 @@ class _v1ReceivePackHeader:
         capabilities: Sequence[bytes],
         old_refs: Mapping[Ref, ObjectID],
         new_refs: Mapping[Ref, ObjectID],
+        push_options: Sequence[bytes] | None = None,
     ) -> Iterator[bytes | None]:
         """Handle the head of a 'git-receive-pack' request.
 
@@ -799,6 +805,7 @@ class _v1ReceivePackHeader:
           capabilities: List of negotiated capabilities
           old_refs: Old refs, as received from the server
           new_refs: Refs to change
+          push_options: Optional list of push options to send to the server
 
         Returns:
           (have, want) tuple
@@ -838,7 +845,16 @@ class _v1ReceivePackHeader:
                     self.sent_capabilities = True
             if new_sha1 not in self.have and new_sha1 != ZERO_SHA:
                 self.want.add(new_sha1)
+        # flush-pkt after ref commands
         yield None
+        # If push-options capability was negotiated and options were provided,
+        # send each option followed by a flush-pkt.
+        if CAPABILITY_PUSH_OPTIONS in capabilities and push_options:
+            for option in push_options:
+                if isinstance(option, str):
+                    option = option.encode()
+                yield option
+            yield None
 
 
 def _read_side_band64k_data(pkt_seq: Iterable[bytes]) -> Iterator[tuple[int, bytes]]:
@@ -1364,6 +1380,7 @@ class GitClient:
         update_refs: Callable[[dict[Ref, ObjectID]], dict[Ref, ObjectID]],
         generate_pack_data: "GeneratePackDataFunc",
         progress: Callable[[bytes], None] | None = None,
+        push_options: Sequence[bytes] | None = None,
     ) -> SendPackResult:
         """Upload a pack to a remote repository.
 
@@ -1375,6 +1392,7 @@ class GitClient:
           generate_pack_data: Function that can return a tuple
             with number of objects and list of pack data to include
           progress: Optional progress function
+          push_options: Optional list of push options to send to the server
 
         Returns:
           SendPackResult object
@@ -1999,6 +2017,7 @@ class TraditionalGitClient(GitClient):
         update_refs: Callable[[dict[Ref, ObjectID]], dict[Ref, ObjectID]],
         generate_pack_data: "GeneratePackDataFunc",
         progress: Callable[[bytes], None] | None = None,
+        push_options: Sequence[bytes] | None = None,
     ) -> SendPackResult:
         """Upload a pack to a remote repository.
 
@@ -2010,6 +2029,7 @@ class TraditionalGitClient(GitClient):
           generate_pack_data: Function that can return a tuple with
             number of objects and pack data to upload.
           progress: Optional callback called with progress updates
+          push_options: Optional list of push options to send to the server
 
         Returns:
           SendPackResult
@@ -2032,6 +2052,13 @@ class TraditionalGitClient(GitClient):
             if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
                 self._report_status_parser = ReportStatusParser()
             report_status_parser = self._report_status_parser
+
+            # Only advertise push-options if we have options to send and
+            # the server supports them.
+            if push_options and CAPABILITY_PUSH_OPTIONS in negotiated_capabilities:
+                negotiated_capabilities.add(CAPABILITY_PUSH_OPTIONS)
+            else:
+                negotiated_capabilities.discard(CAPABILITY_PUSH_OPTIONS)
 
             try:
                 new_refs = orig_new_refs = update_refs(old_refs)
@@ -2078,6 +2105,7 @@ class TraditionalGitClient(GitClient):
                 list(negotiated_capabilities),
                 old_refs,
                 new_refs,
+                push_options=push_options,
             )
 
             for pkt in header_handler:
@@ -2818,6 +2846,7 @@ class LocalGitClient(GitClient):
         update_refs: Callable[[dict[Ref, ObjectID]], dict[Ref, ObjectID]],
         generate_pack_data: "GeneratePackDataFunc",
         progress: Callable[[bytes], None] | None = None,
+        push_options: Sequence[bytes] | None = None,
     ) -> SendPackResult:
         """Upload a pack to a local on-disk repository.
 
@@ -2830,6 +2859,7 @@ class LocalGitClient(GitClient):
           generate_pack_data: Function that generates pack data given
             have and want object sets
           progress: Optional progress function
+          push_options: Optional list of push options (not used for local repos)
 
         Returns:
           SendPackResult
@@ -3333,6 +3363,7 @@ class BundleClient(GitClient):
         update_refs: Callable[[dict[Ref, ObjectID]], dict[Ref, ObjectID]],
         generate_pack_data: "GeneratePackDataFunc",
         progress: Callable[[bytes], None] | None = None,
+        push_options: Sequence[bytes] | None = None,
     ) -> SendPackResult:
         """Upload is not supported for bundle files."""
         raise NotImplementedError("Bundle files are read-only")
@@ -4533,6 +4564,7 @@ class AbstractHttpGitClient(GitClient):
         update_refs: Callable[[dict[Ref, ObjectID]], dict[Ref, ObjectID]],
         generate_pack_data: "GeneratePackDataFunc",
         progress: Callable[[bytes], None] | None = None,
+        push_options: Sequence[bytes] | None = None,
     ) -> SendPackResult:
         """Upload a pack to a remote repository.
 
@@ -4544,6 +4576,7 @@ class AbstractHttpGitClient(GitClient):
           generate_pack_data: Function that can return a tuple
             with number of elements and pack data to upload.
           progress: Optional progress function
+          push_options: Optional list of push options to send to the server
 
         Returns:
           SendPackResult
@@ -4564,6 +4597,13 @@ class AbstractHttpGitClient(GitClient):
 
         if CAPABILITY_REPORT_STATUS in negotiated_capabilities:
             self._report_status_parser = ReportStatusParser()
+
+        # Only advertise push-options if we have options to send and
+        # the server supports them.
+        if push_options and CAPABILITY_PUSH_OPTIONS in negotiated_capabilities:
+            negotiated_capabilities.add(CAPABILITY_PUSH_OPTIONS)
+        else:
+            negotiated_capabilities.discard(CAPABILITY_PUSH_OPTIONS)
 
         # Assert that old_refs has no None values
         assert all(v is not None for v in old_refs.values()), (
@@ -4587,7 +4627,10 @@ class AbstractHttpGitClient(GitClient):
 
         def body_generator() -> Iterator[bytes]:
             header_handler = _v1ReceivePackHeader(
-                list(negotiated_capabilities), old_refs_typed, new_refs
+                list(negotiated_capabilities),
+                old_refs_typed,
+                new_refs,
+                push_options=push_options,
             )
             for pkt in header_handler:
                 yield pkt_line(pkt)

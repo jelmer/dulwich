@@ -2313,7 +2313,34 @@ class PushCommandTest(DulwichCliTestCase):
     @patch("dulwich.porcelain.push")
     def test_push_force(self, mock_push):
         _result, _stdout, _stderr = self._run_cli("push", "-f", "origin")
-        mock_push.assert_called_with(".", "origin", None, force=True)
+        mock_push.assert_called_with(".", "origin", None, force=True, push_options=None)
+
+    @patch("dulwich.porcelain.push")
+    def test_push_option_single(self, mock_push):
+        _result, _stdout, _stderr = self._run_cli(
+            "push", "-o", "topic=my-feature", "origin"
+        )
+        mock_push.assert_called_with(
+            ".", "origin", None, force=False, push_options=["topic=my-feature"]
+        )
+
+    @patch("dulwich.porcelain.push")
+    def test_push_option_multiple(self, mock_push):
+        _result, _stdout, _stderr = self._run_cli(
+            "push",
+            "-o",
+            "topic=my-feature",
+            "-o",
+            "title=My PR",
+            "origin",
+        )
+        mock_push.assert_called_with(
+            ".",
+            "origin",
+            None,
+            force=False,
+            push_options=["topic=my-feature", "title=My PR"],
+        )
 
 
 class ArchiveCommandTest(DulwichCliTestCase):

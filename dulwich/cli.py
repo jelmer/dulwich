@@ -3662,6 +3662,11 @@ class cmd_push(Command):
         parser = argparse.ArgumentParser()
         parser.add_argument("-f", "--force", action="store_true", help="Force")
         parser.add_argument(
+            "--atomic",
+            action="store_true",
+            help="Request atomic push (all refs update or none do)",
+        )
+        parser.add_argument(
             "-o",
             "--push-option",
             action="append",
@@ -3680,6 +3685,7 @@ class cmd_push(Command):
                 args.refspec or None,
                 force=args.force,
                 push_options=args.push_options or None,
+                atomic=args.atomic,
             )
         except porcelain.DivergedBranches:
             sys.stderr.write("Diverged branches; specify --force to override")

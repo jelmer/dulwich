@@ -2313,7 +2313,9 @@ class PushCommandTest(DulwichCliTestCase):
     @patch("dulwich.porcelain.push")
     def test_push_force(self, mock_push):
         _result, _stdout, _stderr = self._run_cli("push", "-f", "origin")
-        mock_push.assert_called_with(".", "origin", None, force=True, push_options=None)
+        mock_push.assert_called_with(
+            ".", "origin", None, force=True, push_options=None, atomic=False
+        )
 
     @patch("dulwich.porcelain.push")
     def test_push_option_single(self, mock_push):
@@ -2321,7 +2323,12 @@ class PushCommandTest(DulwichCliTestCase):
             "push", "-o", "topic=my-feature", "origin"
         )
         mock_push.assert_called_with(
-            ".", "origin", None, force=False, push_options=["topic=my-feature"]
+            ".",
+            "origin",
+            None,
+            force=False,
+            push_options=["topic=my-feature"],
+            atomic=False,
         )
 
     @patch("dulwich.porcelain.push")
@@ -2340,6 +2347,7 @@ class PushCommandTest(DulwichCliTestCase):
             None,
             force=False,
             push_options=["topic=my-feature", "title=My PR"],
+            atomic=False,
         )
 
 

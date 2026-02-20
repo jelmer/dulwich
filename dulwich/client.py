@@ -187,6 +187,7 @@ from .protocol import (
     _RBUFSIZE,
     CAPABILITIES_REF,
     CAPABILITY_AGENT,
+    CAPABILITY_ATOMIC,
     CAPABILITY_DELETE_REFS,
     CAPABILITY_FETCH,
     CAPABILITY_FILTER,
@@ -342,6 +343,7 @@ UPLOAD_CAPABILITIES = [
 RECEIVE_CAPABILITIES = [
     CAPABILITY_REPORT_STATUS,
     CAPABILITY_DELETE_REFS,
+    CAPABILITY_ATOMIC,
     CAPABILITY_PUSH_OPTIONS,
     *COMMON_CAPABILITIES,
 ]
@@ -1381,6 +1383,7 @@ class GitClient:
         generate_pack_data: "GeneratePackDataFunc",
         progress: Callable[[bytes], None] | None = None,
         push_options: Sequence[bytes] | None = None,
+        atomic: bool = False,
     ) -> SendPackResult:
         """Upload a pack to a remote repository.
 
@@ -1393,12 +1396,15 @@ class GitClient:
             with number of objects and list of pack data to include
           progress: Optional progress function
           push_options: Optional list of push options to send to the server
+          atomic: If True, request atomic push (all refs update or none do)
 
         Returns:
           SendPackResult object
 
         Raises:
           SendPackError: if server rejects the pack data
+          GitProtocolError: if atomic push is requested but server doesn't
+            support it
 
         """
         raise NotImplementedError(self.send_pack)
@@ -2018,6 +2024,7 @@ class TraditionalGitClient(GitClient):
         generate_pack_data: "GeneratePackDataFunc",
         progress: Callable[[bytes], None] | None = None,
         push_options: Sequence[bytes] | None = None,
+        atomic: bool = False,
     ) -> SendPackResult:
         """Upload a pack to a remote repository.
 
@@ -2030,12 +2037,15 @@ class TraditionalGitClient(GitClient):
             number of objects and pack data to upload.
           progress: Optional callback called with progress updates
           push_options: Optional list of push options to send to the server
+          atomic: If True, request atomic push (all refs update or none do)
 
         Returns:
           SendPackResult
 
         Raises:
           SendPackError: if server rejects the pack data
+          GitProtocolError: if atomic push is requested but server doesn't
+            support it
 
         """
         self.protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_SEND
@@ -2059,6 +2069,13 @@ class TraditionalGitClient(GitClient):
                 negotiated_capabilities.add(CAPABILITY_PUSH_OPTIONS)
             else:
                 negotiated_capabilities.discard(CAPABILITY_PUSH_OPTIONS)
+
+            if atomic:
+                if CAPABILITY_ATOMIC not in server_capabilities:
+                    raise GitProtocolError("Server does not support atomic push")
+                negotiated_capabilities.add(CAPABILITY_ATOMIC)
+            else:
+                negotiated_capabilities.discard(CAPABILITY_ATOMIC)
 
             try:
                 new_refs = orig_new_refs = update_refs(old_refs)
@@ -2847,6 +2864,7 @@ class LocalGitClient(GitClient):
         generate_pack_data: "GeneratePackDataFunc",
         progress: Callable[[bytes], None] | None = None,
         push_options: Sequence[bytes] | None = None,
+        atomic: bool = False,
     ) -> SendPackResult:
         """Upload a pack to a local on-disk repository.
 
@@ -2860,6 +2878,7 @@ class LocalGitClient(GitClient):
             have and want object sets
           progress: Optional progress function
           push_options: Optional list of push options (not used for local repos)
+          atomic: If True, use atomic ref updates (all succeed or all fail)
 
         Returns:
           SendPackResult
@@ -2897,6 +2916,29 @@ class LocalGitClient(GitClient):
             )
 
             ref_status: dict[bytes, str | None] = {}
+
+            if atomic:
+                # Validate all ref updates first before applying any
+                for refname, new_sha1 in new_refs.items():
+                    old_sha1 = old_refs.get(refname, ZERO_SHA)
+                    if new_sha1 != ZERO_SHA:
+                        current = target.refs.get_peeled(refname)
+                        if current is not None and current != old_sha1:
+                            ref_status[refname] = (
+                                f"unable to set {refname!r} to {new_sha1!r}"
+                            )
+                    else:
+                        current = target.refs.get_peeled(refname)
+                        if current is not None and current != old_sha1:
+                            ref_status[refname] = "unable to remove"
+                if ref_status:
+                    # Atomic push: if any ref would fail, fail them all
+                    for refname in new_refs:
+                        if refname not in ref_status:
+                            ref_status[refname] = "atomic push failed"
+                    return SendPackResult(
+                        _to_optional_dict(new_refs), ref_status=ref_status
+                    )
 
             for refname, new_sha1 in new_refs.items():
                 old_sha1 = old_refs.get(refname, ZERO_SHA)
@@ -3364,6 +3406,7 @@ class BundleClient(GitClient):
         generate_pack_data: "GeneratePackDataFunc",
         progress: Callable[[bytes], None] | None = None,
         push_options: Sequence[bytes] | None = None,
+        atomic: bool = False,
     ) -> SendPackResult:
         """Upload is not supported for bundle files."""
         raise NotImplementedError("Bundle files are read-only")
@@ -4565,6 +4608,7 @@ class AbstractHttpGitClient(GitClient):
         generate_pack_data: "GeneratePackDataFunc",
         progress: Callable[[bytes], None] | None = None,
         push_options: Sequence[bytes] | None = None,
+        atomic: bool = False,
     ) -> SendPackResult:
         """Upload a pack to a remote repository.
 
@@ -4577,12 +4621,15 @@ class AbstractHttpGitClient(GitClient):
             with number of elements and pack data to upload.
           progress: Optional progress function
           push_options: Optional list of push options to send to the server
+          atomic: If True, request atomic push (all refs update or none do)
 
         Returns:
           SendPackResult
 
         Raises:
           SendPackError: if server rejects the pack data
+          GitProtocolError: if atomic push is requested but server doesn't
+            support it
 
         """
         url = self._get_url(path)
@@ -4604,6 +4651,13 @@ class AbstractHttpGitClient(GitClient):
             negotiated_capabilities.add(CAPABILITY_PUSH_OPTIONS)
         else:
             negotiated_capabilities.discard(CAPABILITY_PUSH_OPTIONS)
+
+        if atomic:
+            if CAPABILITY_ATOMIC not in server_capabilities:
+                raise GitProtocolError("Server does not support atomic push")
+            negotiated_capabilities.add(CAPABILITY_ATOMIC)
+        else:
+            negotiated_capabilities.discard(CAPABILITY_ATOMIC)
 
         # Assert that old_refs has no None values
         assert all(v is not None for v in old_refs.values()), (

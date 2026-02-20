@@ -2689,6 +2689,7 @@ def push(
     errstream: BinaryIO | RawIOBase = default_bytes_err_stream,
     force: bool = False,
     push_options: list[str] | None = None,
+    atomic: bool = False,
     **kwargs: object,
 ) -> SendPackResult:
     """Remote push with dulwich via dulwich.client.
@@ -2702,6 +2703,7 @@ def push(
       force: Force overwriting refs
       push_options: Optional list of push options to send to the server
         (e.g. for AGit flow: ["topic=my-branch", "title=My PR"])
+      atomic: If True, request atomic push (all refs update or none do)
       **kwargs: Additional keyword arguments for the client
     """
     # Open the repo
@@ -2815,6 +2817,7 @@ def push(
                 generate_pack_data=generate_pack_data_wrapper,
                 progress=lambda data: (errstream.write(data), None)[1],
                 push_options=push_options_bytes,
+                atomic=atomic,
             )
         except SendPackError as exc:
             raise Error(

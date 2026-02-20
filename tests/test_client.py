@@ -136,6 +136,7 @@ class GitClientTests(TestCase):
         )
         self.assertEqual(
             {
+                b"atomic",
                 b"delete-refs",
                 b"ofs-delta",
                 b"push-options",
@@ -610,6 +611,64 @@ class GitClientTests(TestCase):
             b"0000"
         ) + f.getvalue()
         self.assertEqual(out, expected)
+
+    def test_send_pack_atomic(self) -> None:
+        # Server advertises atomic capability
+        self.rin.write(
+            b"006a310ca9477129b8586fa2afc779c1f57cf64bba6c "
+            b"refs/heads/master\x00report-status delete-refs ofs-delta atomic\n"
+            b"0000000eunpack ok\n"
+            b"0019ok refs/heads/blah12\n"
+            b"0000"
+        )
+        self.rin.seek(0)
+
+        def update_refs(refs):
+            return {
+                b"refs/heads/blah12": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
+                b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
+            }
+
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
+            return 0, []
+
+        f = BytesIO()
+        write_pack_objects(f.write, [], object_format=DEFAULT_OBJECT_FORMAT)
+        self.client.send_pack(
+            b"/",
+            update_refs,
+            generate_pack_data,
+            atomic=True,
+        )
+        out = self.rout.getvalue()
+        # The capabilities line should include "atomic"
+        self.assertIn(b"atomic", out)
+
+    def test_send_pack_atomic_not_supported(self) -> None:
+        # Server does NOT advertise atomic capability
+        self.rin.write(
+            b"0063310ca9477129b8586fa2afc779c1f57cf64bba6c "
+            b"refs/heads/master\x00report-status delete-refs ofs-delta\n"
+            b"0000"
+        )
+        self.rin.seek(0)
+
+        def update_refs(refs):
+            return {
+                b"refs/heads/master": b"310ca9477129b8586fa2afc779c1f57cf64bba6c",
+            }
+
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
+            return 0, []
+
+        self.assertRaises(
+            GitProtocolError,
+            self.client.send_pack,
+            b"/",
+            update_refs,
+            generate_pack_data,
+            atomic=True,
+        )
 
 
 class TestGetTransportAndPath(TestCase):

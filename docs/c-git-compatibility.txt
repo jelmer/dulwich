@@ -303,6 +303,7 @@ Push/Receive-Pack:
 * ✓ quiet - Server: ✓, Client: ✓
 * ✓ atomic - Server: ✓, Client: ✓
 * ✓ ofs-delta - Server: ✓, Client: ✓
+* ✓ push-options - Server: ✓, Client: ✓
 * ✓ side-band-64k - Server: ✓, Client: ✓
 
 General:
@@ -354,8 +355,8 @@ Hooks
 * ✗ post-checkout
 * ✗ post-merge
 * ✗ pre-push
-* ✗ pre-receive
-* ✗ update
+* ✓ pre-receive
+* ✓ update
 * ✓ post-receive
 * ✗ post-update
 * ✗ push-to-checkout
@@ -476,7 +477,7 @@ The following Git features are not currently supported:
 * Some plumbing commands (mktree, http-push, upload-archive, fmt-merge-msg, merge-one-file)
 * Full submodule feature parity (basic operations supported)
 * Some advanced object filtering options (basic filters supported)
-* Most git hooks (only pre-commit, commit-msg, post-commit, post-receive supported)
+* Most git hooks (only pre-commit, commit-msg, post-commit, pre-receive, update, post-receive supported)
 * Working tree encoding attribute
 
 Compatibility Notes

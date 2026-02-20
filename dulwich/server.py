@@ -112,6 +112,7 @@ from .pack import ObjectContainer, write_pack_from_container
 from .protocol import (
     CAPABILITIES_REF,
     CAPABILITY_AGENT,
+    CAPABILITY_ATOMIC,
     CAPABILITY_DELETE_REFS,
     CAPABILITY_FILTER,
     CAPABILITY_INCLUDE_TAG,
@@ -1409,6 +1410,7 @@ class ReceivePackHandler(PackHandler):
             CAPABILITY_REPORT_STATUS,
             CAPABILITY_DELETE_REFS,
             CAPABILITY_QUIET,
+            CAPABILITY_ATOMIC,
             CAPABILITY_OFS_DELTA,
             CAPABILITY_SIDE_BAND_64K,
             CAPABILITY_NO_DONE,
@@ -1454,40 +1456,97 @@ class ReceivePackHandler(PackHandler):
                 yield (b"unpack", str(e).replace("\n", "").encode("utf-8"))
                 # The pack may still have been moved in, but it may contain
                 # broken objects. We trust a later GC to clean it up.
+                return
         else:
             # The git protocol want to find a status entry related to unpack
             # process even if no pack data has been sent.
             yield (b"unpack", b"ok")
 
-        for oldsha, sha, ref in refs:
-            ref_status = b"ok"
+        atomic = self.has_capability(CAPABILITY_ATOMIC)
 
-            # Run update hook for this ref
-            hook_error = self._on_update(ref, oldsha, sha)
-            if hook_error:
-                # Update hook declined this ref
-                ref_status = hook_error
-                yield (ref, ref_status)
-                continue
+        if atomic:
+            # Atomic push: validate all refs first, then apply all or none
+            ref_results: list[tuple[Ref, bytes]] = []
+            has_failure = False
 
-            try:
-                if sha == zero_sha:
-                    if CAPABILITY_DELETE_REFS not in self.capabilities():
-                        raise GitProtocolError(
-                            "Attempted to delete refs without delete-refs capability."
-                        )
-                    try:
-                        self.repo.refs.remove_if_equals(ref, oldsha)
-                    except all_exceptions:
-                        ref_status = b"failed to delete"
+            for oldsha, sha, ref in refs:
+                ref_status = b"ok"
+
+                hook_error = self._on_update(ref, oldsha, sha)
+                if hook_error:
+                    ref_status = hook_error
+                    has_failure = True
                 else:
                     try:
-                        self.repo.refs.set_if_equals(ref, oldsha, sha)
-                    except all_exceptions:
-                        ref_status = b"failed to write"
-            except KeyError:
-                ref_status = b"bad ref"
-            yield (ref, ref_status)
+                        if sha == zero_sha:
+                            if CAPABILITY_DELETE_REFS not in self.capabilities():
+                                raise GitProtocolError(
+                                    "Attempted to delete refs without "
+                                    "delete-refs capability."
+                                )
+                    except KeyError:
+                        ref_status = b"bad ref"
+                        has_failure = True
+
+                ref_results.append((ref, ref_status))
+
+            if has_failure:
+                # At least one ref failed validation; fail all refs
+                for ref, status in ref_results:
+                    if status == b"ok":
+                        yield (ref, b"atomic push failed")
+                    else:
+                        yield (ref, status)
+                return
+
+            # All validations passed; apply all ref updates
+            for oldsha, sha, ref in refs:
+                ref_status = b"ok"
+                try:
+                    if sha == zero_sha:
+                        try:
+                            self.repo.refs.remove_if_equals(ref, oldsha)
+                        except all_exceptions:
+                            ref_status = b"failed to delete"
+                    else:
+                        try:
+                            self.repo.refs.set_if_equals(ref, oldsha, sha)
+                        except all_exceptions:
+                            ref_status = b"failed to write"
+                except KeyError:
+                    ref_status = b"bad ref"
+                yield (ref, ref_status)
+        else:
+            for oldsha, sha, ref in refs:
+                ref_status = b"ok"
+
+                # Run update hook for this ref
+                hook_error = self._on_update(ref, oldsha, sha)
+                if hook_error:
+                    # Update hook declined this ref
+                    ref_status = hook_error
+                    yield (ref, ref_status)
+                    continue
+
+                try:
+                    if sha == zero_sha:
+                        if CAPABILITY_DELETE_REFS not in self.capabilities():
+                            raise GitProtocolError(
+                                "Attempted to delete refs without "
+                                "delete-refs capability."
+                            )
+                        try:
+                            self.repo.refs.remove_if_equals(ref, oldsha)
+                        except all_exceptions:
+                            ref_status = b"failed to delete"
+                    else:
+                        try:
+                            self.repo.refs.set_if_equals(ref, oldsha, sha)
+                        except all_exceptions:
+                            ref_status = b"failed to write"
+                except KeyError:
+                    ref_status = b"bad ref"
+                yield (ref, ref_status)
 
     def _report_status(self, status: Sequence[tuple[bytes, bytes]]) -> None:
         """Report status to client.

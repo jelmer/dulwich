@@ -4,6 +4,11 @@
    command and ``porcelain.push()``, enabling AGit flow and other server-side
    push option workflows. (Jelmer Vernooĳ)
 
+ * Add support for atomic push operations (``--atomic``). When enabled,
+   either all ref updates succeed or none are applied. Both client and
+   server now negotiate the ``atomic`` capability.
+   (Jelmer Vernooĳ, #1781)
+
 1.1.0	2026-02-17
 
  * Add support for ``core.commentChar`` configuration option in commit message

@@ -883,6 +883,247 @@ def _find_scissors_line(lines: list[bytes]) -> int | None:
     return None
 
 
+@dataclass
+class PatchHunk:
+    """Represents a single hunk in a unified diff.
+
+    Attributes:
+        old_start: Starting line number in old file
+        old_count: Number of lines in old file
+        new_start: Starting line number in new file
+        new_count: Number of lines in new file
+        lines: List of diff lines (prefixed with ' ', '+', or '-')
+    """
+
+    old_start: int
+    old_count: int
+    new_start: int
+    new_count: int
+    lines: list[bytes]
+
+
+@dataclass
+class FilePatch:
+    """Represents a patch for a single file.
+
+    Attributes:
+        old_path: Path to old file (None for new files)
+        new_path: Path to new file (None for deleted files)
+        old_mode: Mode of old file (None for new files)
+        new_mode: Mode of new file (None for deleted files)
+        hunks: List of PatchHunk objects
+        binary: True if this is a binary patch
+    """
+
+    old_path: bytes | None
+    new_path: bytes | None
+    old_mode: int | None
+    new_mode: int | None
+    hunks: list[PatchHunk]
+    binary: bool = False
+
+
+def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
+    """Parse a unified diff into FilePatch objects.
+
+    Args:
+        diff_text: Unified diff content as bytes
+
+    Returns:
+        List of FilePatch objects
+    """
+    patches: list[FilePatch] = []
+    lines = diff_text.split(b"\n")
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+
+        # Look for diff header
+        if line.startswith(b"diff --git "):
+            # Parse file patch
+            old_path = None
+            new_path = None
+            old_mode = None
+            new_mode = None
+            hunks: list[PatchHunk] = []
+            binary = False
+
+            # Parse extended headers
+            i += 1
+            while i < len(lines):
+                line = lines[i]
+
+                if line.startswith(b"old file mode "):
+                    old_mode = int(line.split()[-1], 8)
+                    i += 1
+                elif line.startswith(b"new file mode "):
+                    new_mode = int(line.split()[-1], 8)
+                    i += 1
+                elif line.startswith(b"deleted file mode "):
+                    old_mode = int(line.split()[-1], 8)
+                    i += 1
+                elif line.startswith(b"new mode "):
+                    new_mode = int(line.split()[-1], 8)
+                    i += 1
+                elif line.startswith(b"old mode "):
+                    old_mode = int(line.split()[-1], 8)
+                    i += 1
+                elif line.startswith(b"index "):
+                    i += 1
+                elif line.startswith(b"--- "):
+                    # Parse old file path
+                    path = line[4:].split(b"\t")[0]
+                    if path != b"/dev/null":
+                        old_path = path
+                    i += 1
+                elif line.startswith(b"+++ "):
+                    # Parse new file path
+                    path = line[4:].split(b"\t")[0]
+                    if path != b"/dev/null":
+                        new_path = path
+                    i += 1
+                    break
+                elif line.startswith(b"Binary files"):
+                    binary = True
+                    i += 1
+                    break
+                else:
+                    i += 1
+                    break
+
+            # Parse hunks
+            if not binary:
+                while i < len(lines):
+                    line = lines[i]
+
+                    if line.startswith(b"@@ "):
+                        # Parse hunk header
+                        match = re.match(
+                            rb"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", line
+                        )
+                        if match:
+                            old_start = int(match.group(1))
+                            old_count = int(match.group(2)) if match.group(2) else 1
+                            new_start = int(match.group(3))
+                            new_count = int(match.group(4)) if match.group(4) else 1
+
+                            # Parse hunk lines
+                            hunk_lines: list[bytes] = []
+                            i += 1
+                            while i < len(lines):
+                                line = lines[i]
+                                if line.startswith((b" ", b"+", b"-", b"\\")):
+                                    hunk_lines.append(line)
+                                    i += 1
+                                else:
+                                    break
+
+                            hunks.append(
+                                PatchHunk(
+                                    old_start=old_start,
+                                    old_count=old_count,
+                                    new_start=new_start,
+                                    new_count=new_count,
+                                    lines=hunk_lines,
+                                )
+                            )
+                        else:
+                            i += 1
+                    elif line.startswith(b"diff --git "):
+                        # Next file patch
+                        break
+                    else:
+                        i += 1
+                        if not line.strip():
+                            # Empty line, might be end of patch or separator
+                            break
+
+            patches.append(
+                FilePatch(
+                    old_path=old_path,
+                    new_path=new_path,
+                    old_mode=old_mode,
+                    new_mode=new_mode,
+                    hunks=hunks,
+                    binary=binary,
+                )
+            )
+        else:
+            i += 1
+
+    return patches
+
+
+def apply_patch(
+    patch: FilePatch,
+    original_lines: list[bytes],
+) -> list[bytes] | None:
+    """Apply a patch to file content.
+
+    Args:
+        patch: FilePatch object to apply
+        original_lines: Original file content as list of lines
+
+    Returns:
+        Patched file content as list of lines, or None if patch cannot be applied
+    """
+    result = original_lines[:]
+    offset = 0  # Track line offset as we apply hunks
+
+    for hunk in patch.hunks:
+        # Adjust hunk position by offset
+        # old_start is 1-indexed; 0 means the hunk inserts at the beginning
+        target_line = max(hunk.old_start - 1, 0) + offset
+
+        # Extract old and new content from hunk
+        old_content: list[bytes] = []
+        new_content: list[bytes] = []
+
+        for line in hunk.lines:
+            if line.startswith(b"\\"):
+                # Skip "\ No newline at end of file" markers
+                continue
+            elif line.startswith(b" "):
+                # Context line - add newline if not present
+                content = line[1:]
+                if not content.endswith(b"\n"):
+                    content += b"\n"
+                old_content.append(content)
+                new_content.append(content)
+            elif line.startswith(b"-"):
+                # Deletion - add newline if not present
+                content = line[1:]
+                if not content.endswith(b"\n"):
+                    content += b"\n"
+                old_content.append(content)
+            elif line.startswith(b"+"):
+                # Addition - add newline if not present
+                content = line[1:]
+                if not content.endswith(b"\n"):
+                    content += b"\n"
+                new_content.append(content)
+
+        # Verify context matches
+        if target_line < 0 or target_line + len(old_content) > len(result):
+            # TODO: Implement fuzzy matching
+            return None
+
+        for i, old_line in enumerate(old_content):
+            if result[target_line + i] != old_line:
+                # Context doesn't match
+                # TODO: Implement fuzzy matching
+                return None
+
+        # Apply the patch
+        result[target_line : target_line + len(old_content)] = new_content
+
+        # Update offset for next hunk
+        offset += len(new_content) - len(old_content)
+
+    return result
+
+
 def mailinfo(
     msg: email.message.Message | BinaryIO | TextIO,
     keep_subject: bool = False,

@@ -9,6 +9,9 @@
    server now negotiate the ``atomic`` capability.
    (Jelmer Vernooĳ, #1781)
 
+ * Add ``apply`` command and ``porcelain.apply_patch()`` for applying
+   unified diffs. (Jelmer Vernooĳ, #1784)
+
 1.1.0	2026-02-17
 
  * Add support for ``core.commentChar`` configuration option in commit message

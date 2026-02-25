@@ -7270,8 +7270,67 @@ class cmd_rerere(Command):
             )
 
 
+class cmd_apply(Command):
+    """Apply a patch to files and/or to the index."""
+
+    def run(self, args: Sequence[str]) -> None:
+        """Execute the apply command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "patch",
+            nargs="?",
+            default=None,
+            help="Patch file to apply (reads from stdin if not specified)",
+        )
+        parser.add_argument(
+            "--cached",
+            "--index",
+            action="store_true",
+            dest="cached",
+            help="Apply the patch only to the index",
+        )
+        parser.add_argument(
+            "--reverse",
+            "-R",
+            action="store_true",
+            help="Apply the patch in reverse",
+        )
+        parser.add_argument(
+            "--check",
+            action="store_true",
+            help="Only check if the patches are applicable",
+        )
+        parser.add_argument(
+            "-p",
+            "--strip",
+            type=int,
+            default=1,
+            metavar="NUM",
+            help="Remove NUM leading path components (default: 1)",
+        )
+
+        parsed_args = parser.parse_args(args)
+
+        porcelain.apply_patch(
+            repo=".",
+            patch_file=parsed_args.patch,
+            cached=parsed_args.cached,
+            reverse=parsed_args.reverse,
+            check=parsed_args.check,
+            strip=parsed_args.strip,
+        )
+
+        if parsed_args.check:
+            sys.stdout.write("Patch can be applied cleanly.\n")
+
+
 commands = {
     "add": cmd_add,
+    "apply": cmd_apply,
     "annotate": cmd_annotate,
     "archive": cmd_archive,
     "bisect": cmd_bisect,

@@ -11476,3 +11476,148 @@ Body
             result = porcelain.mailinfo(input_path=email_path)
             self.assertEqual("Test", result.subject)
             self.assertEqual("test@example.com", result.author_email)
+
+
+class ApplyPatchTests(PorcelainTestCase):
+    def test_apply_simple_modification(self) -> None:
+        """Test applying a simple patch to the working tree."""
+        # Create a file and commit it
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline 2\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        # Create a patch
+        patch_content = b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+"""
+        patch_file = os.path.join(self.repo_path, "change.patch")
+        with open(patch_file, "wb") as f:
+            f.write(patch_content)
+
+        porcelain.apply_patch(self.repo_path, patch_file=patch_file)
+
+        with open(file_path, "rb") as f:
+            result = f.read()
+        self.assertEqual(result, b"line 1\nline two\nline 3\n")
+
+    def test_apply_new_file(self) -> None:
+        """Test applying a patch that creates a new file."""
+        # Create an initial commit with a dummy file
+        dummy_path = os.path.join(self.repo_path, "dummy.txt")
+        with open(dummy_path, "wb") as f:
+            f.write(b"dummy\n")
+        porcelain.add(self.repo_path, paths=["dummy.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        patch_content = b"""\
+diff --git a/newfile.txt b/newfile.txt
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/newfile.txt
+@@ -0,0 +1,2 @@
++new line 1
++new line 2
+"""
+        patch_file = os.path.join(self.repo_path, "new.patch")
+        with open(patch_file, "wb") as f:
+            f.write(patch_content)
+
+        porcelain.apply_patch(self.repo_path, patch_file=patch_file)
+
+        new_file_path = os.path.join(self.repo_path, "newfile.txt")
+        self.assertTrue(os.path.exists(new_file_path))
+        with open(new_file_path, "rb") as f:
+            result = f.read()
+        self.assertEqual(result, b"new line 1\nnew line 2\n")
+
+    def test_apply_check_only(self) -> None:
+        """Test checking if a patch can be applied without applying it."""
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline 2\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        patch_content = b"""\
+diff --git a/test.txt b/test.txt
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+"""
+        patch_file = os.path.join(self.repo_path, "change.patch")
+        with open(patch_file, "wb") as f:
+            f.write(patch_content)
+
+        porcelain.apply_patch(self.repo_path, patch_file=patch_file, check=True)
+
+        # File should not be modified
+        with open(file_path, "rb") as f:
+            result = f.read()
+        self.assertEqual(result, b"line 1\nline 2\nline 3\n")
+
+    def test_apply_reverse(self) -> None:
+        """Test applying a patch in reverse."""
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline two\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        # Patch that changes "line 2" to "line two" - apply in reverse
+        patch_content = b"""\
+diff --git a/test.txt b/test.txt
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+"""
+        patch_file = os.path.join(self.repo_path, "change.patch")
+        with open(patch_file, "wb") as f:
+            f.write(patch_content)
+
+        porcelain.apply_patch(self.repo_path, patch_file=patch_file, reverse=True)
+
+        with open(file_path, "rb") as f:
+            result = f.read()
+        self.assertEqual(result, b"line 1\nline 2\nline 3\n")
+
+    def test_apply_from_file_object(self) -> None:
+        """Test applying a patch from a file-like object."""
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"hello\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        patch_content = b"""\
+diff --git a/test.txt b/test.txt
+--- a/test.txt
++++ b/test.txt
+@@ -1 +1 @@
+-hello
++goodbye
+"""
+
+        porcelain.apply_patch(self.repo_path, patch_file=BytesIO(patch_content))
+
+        with open(file_path, "rb") as f:
+            result = f.read()
+        self.assertEqual(result, b"goodbye\n")

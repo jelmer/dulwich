@@ -28,9 +28,13 @@ from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, Commit, Tree
 from dulwich.patch import (
     DiffAlgorithmNotAvailable,
+    FilePatch,
+    PatchHunk,
+    apply_patch,
     commit_patch_id,
     get_summary,
     git_am_patch_split,
+    parse_unified_diff,
     patch_id,
     unified_diff_with_algorithm,
     write_blob_diff,
@@ -1115,3 +1119,285 @@ Body text
         with self.assertRaises(ValueError) as cm:
             mailinfo(BytesIO(email))
         self.assertIn("From", str(cm.exception))
+
+
+class ParseUnifiedDiffTests(TestCase):
+    def test_simple_patch(self) -> None:
+        """Test parsing a simple unified diff."""
+        diff = b"""diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+"""
+        patches = parse_unified_diff(diff)
+        self.assertEqual(len(patches), 1)
+        patch = patches[0]
+        self.assertEqual(patch.old_path, b"a/test.txt")
+        self.assertEqual(patch.new_path, b"b/test.txt")
+        self.assertFalse(patch.binary)
+        self.assertEqual(len(patch.hunks), 1)
+
+        hunk = patch.hunks[0]
+        self.assertEqual(hunk.old_start, 1)
+        self.assertEqual(hunk.old_count, 3)
+        self.assertEqual(hunk.new_start, 1)
+        self.assertEqual(hunk.new_count, 3)
+
+    def test_new_file(self) -> None:
+        """Test parsing a patch for a new file."""
+        diff = b"""diff --git a/newfile.txt b/newfile.txt
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/newfile.txt
+@@ -0,0 +1,2 @@
++new line 1
++new line 2
+"""
+        patches = parse_unified_diff(diff)
+        self.assertEqual(len(patches), 1)
+        patch = patches[0]
+        self.assertIsNone(patch.old_path)
+        self.assertEqual(patch.new_path, b"b/newfile.txt")
+        self.assertEqual(patch.new_mode, 0o100644)
+
+    def test_deleted_file(self) -> None:
+        """Test parsing a patch for a deleted file."""
+        diff = b"""diff --git a/oldfile.txt b/oldfile.txt
+deleted file mode 100644
+index 1234567..0000000
+--- a/oldfile.txt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-old line 1
+-old line 2
+"""
+        patches = parse_unified_diff(diff)
+        self.assertEqual(len(patches), 1)
+        patch = patches[0]
+        self.assertEqual(patch.old_path, b"a/oldfile.txt")
+        self.assertIsNone(patch.new_path)
+        self.assertEqual(patch.old_mode, 0o100644)
+
+    def test_binary_patch(self) -> None:
+        """Test parsing a binary patch."""
+        diff = b"""diff --git a/image.png b/image.png
+index 1234567..abcdefg 100644
+Binary files a/image.png and b/image.png differ
+"""
+        patches = parse_unified_diff(diff)
+        self.assertEqual(len(patches), 1)
+        patch = patches[0]
+        self.assertTrue(patch.binary)
+
+
+class ApplyPatchTests(TestCase):
+    def test_simple_modification(self) -> None:
+        """Test applying a simple modification patch."""
+        original = [b"line 1\n", b"line 2\n", b"line 3\n"]
+        hunk = PatchHunk(
+            old_start=1,
+            old_count=3,
+            new_start=1,
+            new_count=3,
+            lines=[b" line 1\n", b"-line 2\n", b"+line two\n", b" line 3\n"],
+        )
+        patch = FilePatch(
+            old_path=b"test.txt",
+            new_path=b"test.txt",
+            old_mode=0o100644,
+            new_mode=0o100644,
+            hunks=[hunk],
+        )
+
+        result = apply_patch(patch, original)
+        self.assertIsNotNone(result)
+        self.assertEqual(result, [b"line 1\n", b"line two\n", b"line 3\n"])
+
+    def test_add_lines(self) -> None:
+        """Test applying a patch that adds lines."""
+        original = [b"line 1\n", b"line 2\n"]
+        hunk = PatchHunk(
+            old_start=1,
+            old_count=2,
+            new_start=1,
+            new_count=4,
+            lines=[
+                b" line 1\n",
+                b"+inserted 1\n",
+                b"+inserted 2\n",
+                b" line 2\n",
+            ],
+        )
+        patch = FilePatch(
+            old_path=b"test.txt",
+            new_path=b"test.txt",
+            old_mode=0o100644,
+            new_mode=0o100644,
+            hunks=[hunk],
+        )
+
+        result = apply_patch(patch, original)
+        self.assertIsNotNone(result)
+        self.assertEqual(
+            result, [b"line 1\n", b"inserted 1\n", b"inserted 2\n", b"line 2\n"]
+        )
+
+    def test_delete_lines(self) -> None:
+        """Test applying a patch that deletes lines."""
+        original = [b"line 1\n", b"line 2\n", b"line 3\n", b"line 4\n"]
+        hunk = PatchHunk(
+            old_start=1,
+            old_count=4,
+            new_start=1,
+            new_count=2,
+            lines=[b" line 1\n", b"-line 2\n", b"-line 3\n", b" line 4\n"],
+        )
+        patch = FilePatch(
+            old_path=b"test.txt",
+            new_path=b"test.txt",
+            old_mode=0o100644,
+            new_mode=0o100644,
+            hunks=[hunk],
+        )
+
+        result = apply_patch(patch, original)
+        self.assertIsNotNone(result)
+        self.assertEqual(result, [b"line 1\n", b"line 4\n"])
+
+    def test_context_mismatch(self) -> None:
+        """Test that patch returns None when context doesn't match."""
+        original = [b"line 1\n", b"wrong line\n", b"line 3\n"]
+        hunk = PatchHunk(
+            old_start=1,
+            old_count=3,
+            new_start=1,
+            new_count=3,
+            lines=[b" line 1\n", b"-line 2\n", b"+line two\n", b" line 3\n"],
+        )
+        patch = FilePatch(
+            old_path=b"test.txt",
+            new_path=b"test.txt",
+            old_mode=0o100644,
+            new_mode=0o100644,
+            hunks=[hunk],
+        )
+
+        result = apply_patch(patch, original)
+        self.assertIsNone(result)
+
+    def test_multiple_hunks(self) -> None:
+        """Test applying a patch with multiple hunks."""
+        original = [
+            b"line 1\n",
+            b"line 2\n",
+            b"line 3\n",
+            b"line 4\n",
+            b"line 5\n",
+        ]
+        hunk1 = PatchHunk(
+            old_start=1,
+            old_count=2,
+            new_start=1,
+            new_count=2,
+            lines=[b"-line 1\n", b"+LINE 1\n", b" line 2\n"],
+        )
+        hunk2 = PatchHunk(
+            old_start=4,
+            old_count=2,
+            new_start=4,
+            new_count=2,
+            lines=[b" line 4\n", b"-line 5\n", b"+LINE 5\n"],
+        )
+        patch = FilePatch(
+            old_path=b"test.txt",
+            new_path=b"test.txt",
+            old_mode=0o100644,
+            new_mode=0o100644,
+            hunks=[hunk1, hunk2],
+        )
+
+        result = apply_patch(patch, original)
+        self.assertIsNotNone(result)
+        self.assertEqual(
+            result, [b"LINE 1\n", b"line 2\n", b"line 3\n", b"line 4\n", b"LINE 5\n"]
+        )
+
+    def test_new_file(self) -> None:
+        """Test applying a patch that creates a new file."""
+        hunk = PatchHunk(
+            old_start=0,
+            old_count=0,
+            new_start=1,
+            new_count=2,
+            lines=[b"+new line 1\n", b"+new line 2\n"],
+        )
+        patch = FilePatch(
+            old_path=None,
+            new_path=b"newfile.txt",
+            old_mode=None,
+            new_mode=0o100644,
+            hunks=[hunk],
+        )
+
+        result = apply_patch(patch, [])
+        self.assertIsNotNone(result)
+        self.assertEqual(result, [b"new line 1\n", b"new line 2\n"])
+
+    def test_delete_file(self) -> None:
+        """Test applying a patch that deletes an entire file."""
+        original = [b"line 1\n", b"line 2\n"]
+        hunk = PatchHunk(
+            old_start=1,
+            old_count=2,
+            new_start=0,
+            new_count=0,
+            lines=[b"-line 1\n", b"-line 2\n"],
+        )
+        patch = FilePatch(
+            old_path=b"test.txt",
+            new_path=None,
+            old_mode=0o100644,
+            new_mode=None,
+            hunks=[hunk],
+        )
+
+        result = apply_patch(patch, original)
+        self.assertIsNotNone(result)
+        self.assertEqual(result, [])
+
+
+class ParseUnifiedDiffMultiFileTests(TestCase):
+    def test_multiple_files(self) -> None:
+        """Test parsing a diff with multiple files."""
+        diff = b"""diff --git a/file1.txt b/file1.txt
+index 1234567..abcdefg 100644
+--- a/file1.txt
++++ b/file1.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+diff --git a/file2.txt b/file2.txt
+index 1234567..abcdefg 100644
+--- a/file2.txt
++++ b/file2.txt
+@@ -1,2 +1,2 @@
+-hello
++goodbye
+ world
+"""
+        patches = parse_unified_diff(diff)
+        self.assertEqual(len(patches), 2)
+        self.assertEqual(patches[0].old_path, b"a/file1.txt")
+        self.assertEqual(patches[0].new_path, b"b/file1.txt")
+        self.assertEqual(len(patches[0].hunks), 1)
+        self.assertEqual(patches[1].old_path, b"a/file2.txt")
+        self.assertEqual(patches[1].new_path, b"b/file2.txt")
+        self.assertEqual(len(patches[1].hunks), 1)

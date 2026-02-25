@@ -22,6 +22,7 @@
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 
 Currently implemented:
+ * apply_patch
  * archive
  * add
  * bisect{_start,_bad,_good,_skip,_reset,_log,_replay}
@@ -352,6 +353,7 @@ from ..index import (
     blob_from_path_and_stat,
     build_file_from_blob,
     get_unstaged_changes,
+    index_entry_from_stat,
     symlink,
     update_working_tree,
     validate_path_element_default,
@@ -381,9 +383,13 @@ from ..pack import UnpackedObject, write_pack_from_container, write_pack_index
 from ..patch import (
     MailinfoResult,
     get_summary,
+    parse_unified_diff,
     write_commit_patch,
     write_object_diff,
     write_tree_diff,
+)
+from ..patch import (
+    apply_patch as apply_file_patch,
 )
 from ..protocol import ZERO_SHA, Protocol
 from ..refs import (
@@ -8517,3 +8523,196 @@ def rerere_gc(repo: RepoPath = ".", max_age_days: int = 60) -> None:
     with open_repo_closing(repo) as r:
         cache = RerereCache.from_repo(r)
         cache.gc(max_age_days)
+
+
+def apply_patch(
+    repo: RepoPath = ".",
+    patch_file: str | bytes | BinaryIO | None = None,
+    cached: bool = False,
+    reverse: bool = False,
+    check: bool = False,
+    strip: int = 1,
+) -> None:
+    """Apply a patch to the working tree and/or index.
+
+    Args:
+        repo: Path to the repository
+        patch_file: Path to patch file or file-like object (stdin if None)
+        cached: Apply patch to index only, not working tree
+        reverse: Apply patch in reverse
+        check: Only check if patch can be applied, don't apply
+        strip: Number of leading path components to strip (default: 1)
+
+    Raises:
+        ValueError: If patch cannot be applied
+    """
+    with open_repo_closing(repo) as r:
+        # Read patch content
+        if patch_file is None:
+            # Read from stdin
+            import sys
+
+            patch_content = sys.stdin.buffer.read()
+        elif isinstance(patch_file, (str, bytes)):
+            # Path to file
+            if isinstance(patch_file, bytes):
+                path = patch_file.decode("utf-8")
+            else:
+                path = patch_file
+            with open(path, "rb") as f:
+                patch_content = f.read()
+        else:
+            # File-like object
+            patch_content = patch_file.read()
+            if isinstance(patch_content, str):
+                patch_content = patch_content.encode("utf-8")
+
+        # Parse the patch
+        patches = parse_unified_diff(patch_content)
+
+        if not patches:
+            raise ValueError("No patches found in input")
+
+        # Apply each file patch
+        for patch in patches:
+            # Determine the file path
+            if patch.new_path is None and patch.old_path is None:
+                raise ValueError("Patch has no file path")
+
+            # Choose path based on operation
+            file_path: bytes
+            if patch.new_path is None:
+                # Deletion
+                if patch.old_path is None:
+                    raise ValueError("Patch has no file path")
+                file_path = patch.old_path
+            elif patch.old_path is None:
+                # Addition
+                file_path = patch.new_path
+            else:
+                # Modification (use new path)
+                file_path = patch.new_path
+
+            # Strip path components
+            if strip > 0:
+                parts = file_path.split(b"/")
+                if len(parts) > strip:
+                    file_path = b"/".join(parts[strip:])
+
+            # Convert to filesystem path
+            tree_path = file_path
+            fs_path = os.path.join(
+                r.path.encode("utf-8") if isinstance(r.path, str) else r.path, file_path
+            )
+
+            # Handle binary patches
+            if patch.binary:
+                raise NotImplementedError("Binary patches are not yet supported")
+
+            # Read original file content
+            if patch.old_path is None:
+                # New file
+                original_lines = []
+            else:
+                if os.path.exists(fs_path):
+                    with open(fs_path, "rb") as f:
+                        content = f.read()
+                    original_lines = content.splitlines(keepends=True)
+                else:
+                    # File doesn't exist - check if it's in the index
+                    try:
+                        index = r.open_index()
+                        if tree_path in index:
+                            entry = index[tree_path]
+                            if not isinstance(entry, ConflictedIndexEntry):
+                                obj = r.object_store[entry.sha]
+                                if isinstance(obj, Blob):
+                                    original_lines = obj.data.splitlines(keepends=True)
+                                else:
+                                    original_lines = []
+                            else:
+                                original_lines = []
+                        else:
+                            original_lines = []
+                    except (KeyError, FileNotFoundError):
+                        original_lines = []
+
+            # Reverse patch if requested
+            if reverse:
+                # Swap old and new in hunks
+                for hunk in patch.hunks:
+                    hunk.old_start, hunk.new_start = hunk.new_start, hunk.old_start
+                    hunk.old_count, hunk.new_count = hunk.new_count, hunk.old_count
+                    # Swap +/- prefixes
+                    reversed_lines = []
+                    for line in hunk.lines:
+                        if line.startswith(b"+"):
+                            reversed_lines.append(b"-" + line[1:])
+                        elif line.startswith(b"-"):
+                            reversed_lines.append(b"+" + line[1:])
+                        else:
+                            reversed_lines.append(line)
+                    hunk.lines = reversed_lines
+
+            # Apply the patch
+            result = apply_file_patch(patch, original_lines)
+
+            if result is None:
+                raise ValueError(
+                    f"Patch does not apply to {file_path.decode('utf-8', errors='replace')}"
+                )
+
+            if check:
+                # Just checking, don't actually apply
+                continue
+
+            # Write result
+            result_content = b"".join(result)
+
+            if patch.new_path is None:
+                # File deletion
+                if not cached and os.path.exists(fs_path):
+                    os.remove(fs_path)
+                # Remove from index
+                index = r.open_index()
+                if tree_path in index:
+                    del index[tree_path]
+                    index.write()
+            else:
+                # File addition or modification
+                if not cached:
+                    # Write to working tree
+                    os.makedirs(os.path.dirname(fs_path), exist_ok=True)
+                    with open(fs_path, "wb") as f:
+                        f.write(result_content)
+
+                    # Update file mode if specified
+                    if patch.new_mode is not None:
+                        os.chmod(fs_path, patch.new_mode)
+
+                # Update index
+                index = r.open_index()
+                blob = Blob.from_string(result_content)
+                r.object_store.add_object(blob)
+
+                # Get file stat for index entry
+                if not cached and os.path.exists(fs_path):
+                    st = os.stat(fs_path)
+                    entry = index_entry_from_stat(st, blob.id, 0)
+                else:
+                    # Create a minimal index entry for cached-only changes
+                    entry = IndexEntry(
+                        ctime=(0, 0),
+                        mtime=(0, 0),
+                        dev=0,
+                        ino=0,
+                        mode=patch.new_mode or 0o100644,
+                        uid=0,
+                        gid=0,
+                        size=len(result_content),
+                        sha=blob.id,
+                        flags=0,
+                    )
+
+                index[tree_path] = entry
+                index.write()

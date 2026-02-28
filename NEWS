@@ -12,6 +12,11 @@
  * Add ``apply`` command and ``porcelain.apply_patch()`` for applying
    unified diffs. (Jelmer Vernooĳ, #1784)
 
+ * Fix client incorrectly sending ``unborn`` argument in Git protocol v2
+   ``ls-refs`` requests to servers that advertise ``ls-refs`` capability
+   without explicitly advertising ``ls-refs=unborn`` support, preventing
+   clones from older servers like Gerrit 3.12.2. (Jelmer Vernooĳ, #2104)
+
  * Improve error message in ``read_info_refs()`` to show the actual line
    content when parsing fails, making it easier to diagnose issues with
    malformed server responses. (Jelmer Vernooĳ, #2103)

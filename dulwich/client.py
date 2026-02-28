@@ -455,9 +455,7 @@ def build_ls_refs_request_v2(
         ref_prefix = DEFAULT_REF_PREFIX
 
     # Check if server supports unborn refs
-    supports_unborn = any(
-        b"ls-refs=unborn" in cap or b"ls-refs" in cap for cap in server_capabilities
-    )
+    supports_unborn = any(b"ls-refs=unborn" in cap for cap in server_capabilities)
 
     # Command packets (before delimiter)
     cmd_packets = [b"command=ls-refs\n", b"agent=" + agent_string()]

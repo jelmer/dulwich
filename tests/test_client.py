@@ -3258,16 +3258,34 @@ class TestBuildLsRefsRequestV2(TestCase):
         )
 
         # Check exact argument packets include custom prefixes
-        # Note: ls-refs capability triggers unborn support
+        # Note: ls-refs alone does NOT trigger unborn support
         self.assertEqual(
             arg_packets,
             [
                 b"peel",
                 b"symrefs",
-                b"unborn",
                 b"ref-prefix refs/heads/main",
                 b"ref-prefix refs/tags/v1.0",
             ],
+        )
+
+    def test_ls_refs_without_unborn(self) -> None:
+        # Test case for GitHub issue #2104: Gerrit 3.12.2 advertises ls-refs
+        # but not ls-refs=unborn, and should not receive unborn argument
+        server_caps = {b"ls-refs\n", b"fetch=shallow\n", b"server-option\n"}
+        cmd_packets, arg_packets = build_ls_refs_request_v2(server_caps, None, None)
+
+        # Check exact command packets
+        self.assertEqual(
+            cmd_packets,
+            [b"command=ls-refs\n", b"agent=" + agent_string()],
+        )
+
+        # Should not include unborn argument when server only advertises ls-refs
+        # without explicitly advertising ls-refs=unborn
+        self.assertEqual(
+            arg_packets,
+            [b"peel", b"symrefs", b"ref-prefix HEAD", b"ref-prefix refs/"],
         )
 
     def test_no_unborn_support(self) -> None:

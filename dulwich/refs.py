@@ -1437,8 +1437,15 @@ def read_info_refs(f: BinaryIO) -> dict[Ref, ObjectID]:
       Dictionary mapping ref names to SHA1s
     """
     ret: dict[Ref, ObjectID] = {}
-    for line in f.readlines():
-        (sha, name) = line.rstrip(b"\r\n").split(b"\t", 1)
+    for line_no, line in enumerate(f.readlines(), 1):
+        stripped = line.rstrip(b"\r\n")
+        parts = stripped.split(b"\t", 1)
+        if len(parts) != 2:
+            raise ValueError(
+                f"Invalid info/refs format at line {line_no}: "
+                f"expected '<sha>\\t<refname>', got {stripped[:100]!r}"
+            )
+        (sha, name) = parts
         ret[Ref(name)] = ObjectID(sha)
     return ret
 

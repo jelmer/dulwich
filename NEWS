@@ -12,6 +12,10 @@
  * Add ``apply`` command and ``porcelain.apply_patch()`` for applying
    unified diffs. (Jelmer Vernooĳ, #1784)
 
+ * Improve error message in ``read_info_refs()`` to show the actual line
+   content when parsing fails, making it easier to diagnose issues with
+   malformed server responses. (Jelmer Vernooĳ, #2103)
+
 1.1.0	2026-02-17
 
  * Add support for ``core.commentChar`` configuration option in commit message

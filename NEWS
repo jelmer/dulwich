@@ -21,6 +21,10 @@
    content when parsing fails, making it easier to diagnose issues with
    malformed server responses. (Jelmer Vernooĳ, #2103)
 
+ * HTTP client respects ``http.userAgent`` configuration for customizing the
+   User-Agent header. Supports both global and URL-specific settings. The
+   default User-Agent is ``git/dulwich/{version}``. (Jelmer Vernooĳ)
+
 1.1.0	2026-02-17
 
  * Add support for ``core.commentChar`` configuration option in commit message

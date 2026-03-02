@@ -439,6 +439,31 @@ def parse_shared_repository(
     return (None, None)
 
 
+def _enable_relative_worktrees_extension(repo: "Repo") -> None:
+    """Enable the relativeworktrees extension in repository config.
+
+    This sets core.repositoryformatversion to 1 (if not already) and
+    enables the extensions.relativeworktrees extension.
+
+    Args:
+        repo: The repository to configure
+    """
+    config = repo.get_config()
+
+    # Ensure repository format version is at least 1
+    try:
+        version = int(config.get(("core",), "repositoryformatversion"))
+    except KeyError:
+        version = 0
+
+    if version < 1:
+        config.set(("core",), "repositoryformatversion", "1")
+
+    # Enable the relativeworktrees extension
+    config.set(("extensions",), "relativeworktrees", True)
+    config.write_to_path()
+
+
 class ParentsProvider:
     """Provider for commit parent information."""
 
@@ -2200,6 +2225,7 @@ class Repo(BaseRepo):
         main_repo: "Repo",
         identifier: str | None = None,
         mkdir: bool = False,
+        relative_paths: bool = False,
     ) -> "Repo":
         """Create a new working directory linked to a repository.
 
@@ -2208,6 +2234,7 @@ class Repo(BaseRepo):
           main_repo: Main repository to reference
           identifier: Worktree identifier
           mkdir: Whether to create the directory
+          relative_paths: Whether to use relative paths for gitdir references
         Returns: `Repo` instance
         """
         path = os.fspath(path)
@@ -2221,9 +2248,21 @@ class Repo(BaseRepo):
         main_controldir = os.path.abspath(main_repo.controldir())
         main_worktreesdir = os.path.join(main_controldir, WORKTREES)
         worktree_controldir = os.path.join(main_worktreesdir, identifier)
-        gitdirfile = os.path.join(path, CONTROLDIR)
-        with open(gitdirfile, "wb") as f:
-            f.write(b"gitdir: " + os.fsencode(worktree_controldir) + b"\n")
+        gitdirfile_abs = os.path.abspath(os.path.join(path, CONTROLDIR))
+
+        # Write gitdir reference in .git file (can be relative)
+        # Import helper from worktree module to avoid duplication
+        from .worktree import _compute_gitdir_path
+
+        gitdir_ref = _compute_gitdir_path(
+            main_repo,
+            worktree_controldir,
+            os.path.dirname(gitdirfile_abs),
+            relative_paths,
+        )
+
+        with open(gitdirfile_abs, "wb") as f:
+            f.write(b"gitdir: " + os.fsencode(gitdir_ref) + b"\n")
 
         # Get shared repository permissions from main repository
         _, dir_mode = main_repo._get_shared_repository_permissions()
@@ -2241,8 +2280,14 @@ class Repo(BaseRepo):
                 os.chmod(worktree_controldir, dir_mode)
         except FileExistsError:
             pass
+
+        # Write gitdir path in control directory (can be relative)
+        gitdir_path = _compute_gitdir_path(
+            main_repo, gitdirfile_abs, worktree_controldir, relative_paths
+        )
+
         with open(os.path.join(worktree_controldir, GITDIR), "wb") as f:
-            f.write(os.fsencode(gitdirfile) + b"\n")
+            f.write(os.fsencode(gitdir_path) + b"\n")
         with open(os.path.join(worktree_controldir, COMMONDIR), "wb") as f:
             f.write(b"../..\n")
         with open(os.path.join(worktree_controldir, "HEAD"), "wb") as f:

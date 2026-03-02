@@ -850,6 +850,114 @@ class WorkTreeOperationsTests(WorkTreeTestCase):
             repair_worktree(self.repo, paths=[wt_path])
         self.assertIn("Invalid .git file", str(cm.exception))
 
+    def test_add_worktree_with_relative_paths(self) -> None:
+        """Test creating a worktree with relative paths enabled."""
+        wt_path = os.path.join(self.tempdir, "relative-wt")
+        wt_repo = add_worktree(self.repo, wt_path, relative_paths=True)
+        self.addCleanup(wt_repo.close)
+
+        # Verify the extension is set
+        config = self.repo.get_config()
+        self.assertEqual(config.get(("core",), "repositoryformatversion"), b"1")
+        self.assertEqual(config.get(("extensions",), "relativeworktrees"), b"true")
+
+        # Verify paths are relative
+        from dulwich.repo import GITDIR, WORKTREES
+
+        worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
+        for entry in os.listdir(worktrees_dir):
+            gitdir_path_file = os.path.join(worktrees_dir, entry, GITDIR)
+            if os.path.exists(gitdir_path_file):
+                with open(gitdir_path_file, "rb") as f:
+                    content = f.read().strip()
+                    gitdir_location = os.fsdecode(content)
+                    # Should be a relative path
+                    self.assertFalse(os.path.isabs(gitdir_location))
+
+    def test_add_worktree_with_config_relative_paths(self) -> None:
+        """Test that worktree.useRelativePaths config is respected."""
+        # Set the config
+        config = self.repo.get_config()
+        config.set((b"worktree",), b"useRelativePaths", b"true")
+        config.write_to_path()
+
+        wt_path = os.path.join(self.tempdir, "config-relative-wt")
+        wt_repo = add_worktree(self.repo, wt_path)
+        self.addCleanup(wt_repo.close)
+
+        # Verify the extension is set
+        config = self.repo.get_config()
+        self.assertEqual(config.get(("extensions",), "relativeworktrees"), b"true")
+
+        # Verify paths are relative
+        from dulwich.repo import GITDIR, WORKTREES
+
+        worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
+        for entry in os.listdir(worktrees_dir):
+            gitdir_path_file = os.path.join(worktrees_dir, entry, GITDIR)
+            if os.path.exists(gitdir_path_file):
+                with open(gitdir_path_file, "rb") as f:
+                    content = f.read().strip()
+                    gitdir_location = os.fsdecode(content)
+                    # Should be a relative path
+                    self.assertFalse(os.path.isabs(gitdir_location))
+
+    def test_move_worktree_with_relative_paths(self) -> None:
+        """Test moving a worktree with relative paths."""
+        wt_path = os.path.join(self.tempdir, "move-relative-wt")
+        wt_repo = add_worktree(self.repo, wt_path, relative_paths=True)
+        wt_repo.close()
+
+        # Move it
+        new_path = os.path.join(self.tempdir, "moved-relative-wt")
+        move_worktree(self.repo, wt_path, new_path, relative_paths=True)
+
+        # Verify paths are still relative
+        from dulwich.repo import GITDIR, WORKTREES
+
+        worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
+        for entry in os.listdir(worktrees_dir):
+            gitdir_path_file = os.path.join(worktrees_dir, entry, GITDIR)
+            if os.path.exists(gitdir_path_file):
+                with open(gitdir_path_file, "rb") as f:
+                    content = f.read().strip()
+                    gitdir_location = os.fsdecode(content)
+                    # Should be a relative path
+                    self.assertFalse(os.path.isabs(gitdir_location))
+
+    def test_repair_worktree_explicit_relative_paths(self) -> None:
+        """Test repairing a worktree with explicit relative paths."""
+        wt_path = os.path.join(self.tempdir, "repair-relative-wt")
+        wt_repo = add_worktree(self.repo, wt_path)
+        wt_repo.close()
+
+        # Manually move the worktree
+        new_path = os.path.join(self.tempdir, "repair-new-location")
+        shutil.move(wt_path, new_path)
+
+        # Repair with relative paths
+        repaired = repair_worktree(self.repo, paths=[new_path], relative_paths=True)
+
+        # Should have repaired successfully
+        self.assertEqual(len(repaired), 1)
+
+        # Verify the extension is set
+        config = self.repo.get_config()
+        self.assertEqual(config.get(("extensions",), "relativeworktrees"), b"true")
+
+        # Verify paths are relative
+        from dulwich.repo import GITDIR, WORKTREES
+
+        worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
+        for entry in os.listdir(worktrees_dir):
+            gitdir_path_file = os.path.join(worktrees_dir, entry, GITDIR)
+            if os.path.exists(gitdir_path_file):
+                with open(gitdir_path_file, "rb") as f:
+                    content = f.read().strip()
+                    gitdir_location = os.fsdecode(content)
+                    # Should be a relative path
+                    self.assertFalse(os.path.isabs(gitdir_location))
+
 
 class TemporaryWorktreeTests(TestCase):
     """Tests for temporary_worktree context manager."""

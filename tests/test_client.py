@@ -62,6 +62,7 @@ from dulwich.client import (
     build_ls_refs_request_v2,
     check_wants,
     default_urllib3_manager,
+    default_user_agent_string,
     get_credentials_from_store,
     get_transport_and_path,
     get_transport_and_path_from_url,
@@ -2825,6 +2826,45 @@ class DefaultUrllib3ManagerTest(TestCase):
 
         manager = default_urllib3_manager(config=config, timeout=15)
         self.assertEqual(manager.connection_pool_kw["timeout"], 15)
+
+    def test_user_agent_default(self) -> None:
+        """Test that default user agent is used when no config is set."""
+        manager = default_urllib3_manager(config=None)
+        expected_ua = default_user_agent_string()
+
+        self.assertEqual(manager.headers["User-agent"], expected_ua)
+        self.assertTrue(expected_ua.startswith("git/"))
+        self.assertIn("dulwich", expected_ua)
+
+    def test_user_agent_from_config(self) -> None:
+        """Test that http.userAgent config is respected."""
+        config = ConfigDict()
+        config.set((b"http",), b"useragent", b"custom-agent/1.0")
+
+        manager = default_urllib3_manager(config=config)
+        self.assertEqual(manager.headers["User-agent"], "custom-agent/1.0")
+
+    def test_user_agent_url_specific(self) -> None:
+        """Test that URL-specific http.userAgent config is respected."""
+        config = ConfigDict()
+        config.set((b"http",), b"useragent", b"default-agent/1.0")
+        config.set(
+            (b"http", b"https://github.com/"),
+            b"useragent",
+            b"github-specific-agent/2.0",
+        )
+
+        # For github.com URL, should use the more specific config
+        manager = default_urllib3_manager(
+            config=config, base_url="https://github.com/user/repo"
+        )
+        self.assertEqual(manager.headers["User-agent"], "github-specific-agent/2.0")
+
+        # For other URLs, should use the default config
+        manager = default_urllib3_manager(
+            config=config, base_url="https://gitlab.com/user/repo"
+        )
+        self.assertEqual(manager.headers["User-agent"], "default-agent/1.0")
 
 
 class SubprocessSSHVendorTests(TestCase):

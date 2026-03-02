@@ -115,11 +115,10 @@ class WalkEntry:
                 # Use a lambda to adapt the signature
                 changes_func = cast(
                     Any,
-                    lambda store,
-                    parent_trees,
-                    tree_id,
-                    rename_detector=None: tree_changes_for_merge(
-                        store, parent_trees, tree_id, rename_detector
+                    lambda store, parent_trees, tree_id, rename_detector=None: (
+                        tree_changes_for_merge(
+                            store, parent_trees, tree_id, rename_detector
+                        )
                     ),
                 )
                 if path_prefix:

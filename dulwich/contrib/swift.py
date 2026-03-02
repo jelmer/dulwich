@@ -754,8 +754,8 @@ class SwiftPack(Pack):
         super().__init__(*args, **kwargs)  # type: ignore
         self._pack_info_path = self._basename + ".info"
         self._pack_info: dict[str, Any] | None = None
-        self._pack_info_load: Callable[[], dict[str, Any] | None] = (
-            lambda: load_pack_info(self._pack_info_path, self.scon)
+        self._pack_info_load: Callable[[], dict[str, Any] | None] = lambda: (
+            load_pack_info(self._pack_info_path, self.scon)
         )
         self._idx_load = lambda: swift_load_pack_index(
             self.scon, self._idx_path, self.object_format

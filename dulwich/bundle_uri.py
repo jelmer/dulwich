@@ -343,9 +343,9 @@ def apply_bundle_uri(
         try:
             bundle.store_objects(
                 repo.object_store,
-                progress=lambda msg: progress(msg.encode("utf-8"))
-                if progress
-                else None,
+                progress=lambda msg: (
+                    progress(msg.encode("utf-8")) if progress else None
+                ),
             )
             for ref, sha in bundle.references.items():
                 all_refs[ref] = sha
@@ -372,9 +372,9 @@ def apply_bundle_uri(
                     try:
                         entry_bundle.store_objects(
                             repo.object_store,
-                            progress=lambda msg: progress(msg.encode("utf-8"))
-                            if progress
-                            else None,
+                            progress=lambda msg: (
+                                progress(msg.encode("utf-8")) if progress else None
+                            ),
                         )
                         for ref, sha in entry_bundle.references.items():
                             all_refs[ref] = sha
@@ -473,9 +473,9 @@ def apply_bundle_uri(
 
             entry_bundle.store_objects(
                 repo.object_store,
-                progress=lambda msg: progress(msg.encode("utf-8"))
-                if progress
-                else None,
+                progress=lambda msg: (
+                    progress(msg.encode("utf-8")) if progress else None
+                ),
             )
             for ref, sha in entry_bundle.references.items():
                 all_refs[ref] = sha

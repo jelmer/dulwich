@@ -1930,9 +1930,11 @@ class DiskObjectStore(PackBasedObjectStore):
                 pack_checksum=pack_sha,
                 include_hash_cache=self.pack_write_bitmap_hash_cache,
                 include_lookup_table=self.pack_write_bitmap_lookup_table,
-                progress=lambda msg: progress(msg.encode("ascii"))
-                if progress and isinstance(msg, str)
-                else None,
+                progress=lambda msg: (
+                    progress(msg.encode("ascii"))
+                    if progress and isinstance(msg, str)
+                    else None
+                ),
             )
 
             # Write the bitmap

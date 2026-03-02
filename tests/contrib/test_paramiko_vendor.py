@@ -586,8 +586,8 @@ Host testserver
             with patch(
                 "dulwich.contrib.paramiko_vendor.os.path.expanduser"
             ) as mock_expanduser:
-                mock_expanduser.side_effect = (
-                    lambda p: config_path if p == "~/.ssh/config" else p
+                mock_expanduser.side_effect = lambda p: (
+                    config_path if p == "~/.ssh/config" else p
                 )
 
                 vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False)

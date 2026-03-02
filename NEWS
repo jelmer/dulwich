@@ -1,5 +1,9 @@
 1.2.0	UNRELEASED
 
+ * Add support for ``extensions.relativeworktrees`` repository extension,
+   allowing Git worktrees to use relative paths instead of absolute paths
+   when linking worktrees. (Jelmer Vernooĳ, #2112)
+
  * Add support for push options (``-o``/``--push-option``) in the ``push``
    command and ``porcelain.push()``, enabling AGit flow and other server-side
    push option workflows. (Jelmer Vernooĳ)

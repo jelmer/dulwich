@@ -1378,6 +1378,16 @@ class BuildRepoRootTests(TestCase):
         # https://github.com/jelmer/dulwich/issues/1285 was addressed
         Repo(self._repo_dir)
 
+    def test_relativeworktrees_extension(self) -> None:
+        """Test that repositories with relativeworktrees extension can be opened."""
+        r = self._repo
+        c = r.get_config()
+        c.set(("core",), "repositoryformatversion", "1")
+        c.set(("extensions",), "relativeworktrees", True)
+        c.write_to_path()
+        # Should not raise UnsupportedExtension
+        Repo(self._repo_dir)
+
     def test_repositoryformatversion_1_extension(self) -> None:
         r = self._repo
         c = r.get_config()

@@ -1475,7 +1475,11 @@ class Repo(BaseRepo):
                     has_reftable_extension = True
                 else:
                     raise UnsupportedExtension(f"refStorage = {value.decode()}")
-            elif extension.lower() not in (b"worktreeconfig", b"objectformat"):
+            elif extension.lower() not in (
+                b"worktreeconfig",
+                b"objectformat",
+                b"relativeworktrees",
+            ):
                 raise UnsupportedExtension(extension.decode("utf-8"))
 
         if object_store is None:

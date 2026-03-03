@@ -14,7 +14,9 @@
    (Jelmer Vernooĳ, #1781)
 
  * Add ``apply`` command and ``porcelain.apply_patch()`` for applying
-   unified diffs. (Jelmer Vernooĳ, #1784)
+   unified diffs, including support for rename/copy detection, binary patches
+   with Git's base85 encoding, and ``--3way`` merge fallback when patches
+   don't apply cleanly. (Jelmer Vernooĳ, #1784)
 
  * Fix client incorrectly sending ``unborn`` argument in Git protocol v2
    ``ls-refs`` requests to servers that advertise ``ls-refs`` capability

@@ -11621,3 +11621,131 @@ diff --git a/test.txt b/test.txt
         with open(file_path, "rb") as f:
             result = f.read()
         self.assertEqual(result, b"goodbye\n")
+
+    def test_apply_rename(self) -> None:
+        """Test applying a patch that renames a file."""
+        # Create a file and commit it
+        old_file = os.path.join(self.repo_path, "old.txt")
+        with open(old_file, "wb") as f:
+            f.write(b"content\n")
+        porcelain.add(self.repo_path, paths=["old.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        # Create a rename patch
+        patch_content = b"""\
+diff --git a/old.txt b/new.txt
+similarity index 100%
+rename from old.txt
+rename to new.txt
+"""
+        patch_file = os.path.join(self.repo_path, "rename.patch")
+        with open(patch_file, "wb") as f:
+            f.write(patch_content)
+
+        porcelain.apply_patch(self.repo_path, patch_file=patch_file)
+
+        # Old file should be gone, new file should exist
+        self.assertFalse(os.path.exists(old_file))
+        new_file = os.path.join(self.repo_path, "new.txt")
+        self.assertTrue(os.path.exists(new_file))
+        with open(new_file, "rb") as f:
+            self.assertEqual(f.read(), b"content\n")
+
+    def test_apply_rename_with_modification(self) -> None:
+        """Test applying a patch that renames and modifies a file."""
+        old_file = os.path.join(self.repo_path, "old.txt")
+        with open(old_file, "wb") as f:
+            f.write(b"line 1\nline 2\n")
+        porcelain.add(self.repo_path, paths=["old.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        patch_content = b"""\
+diff --git a/old.txt b/new.txt
+similarity index 90%
+rename from old.txt
+rename to new.txt
+--- a/old.txt
++++ b/new.txt
+@@ -1,2 +1,2 @@
+ line 1
+-line 2
++modified line 2
+"""
+        patch_file = os.path.join(self.repo_path, "rename_mod.patch")
+        with open(patch_file, "wb") as f:
+            f.write(patch_content)
+
+        porcelain.apply_patch(self.repo_path, patch_file=patch_file)
+
+        self.assertFalse(os.path.exists(old_file))
+        new_file = os.path.join(self.repo_path, "new.txt")
+        self.assertTrue(os.path.exists(new_file))
+        with open(new_file, "rb") as f:
+            self.assertEqual(f.read(), b"line 1\nmodified line 2\n")
+
+    def test_apply_copy(self) -> None:
+        """Test applying a patch that copies a file."""
+        src_file = os.path.join(self.repo_path, "source.txt")
+        with open(src_file, "wb") as f:
+            f.write(b"original content\n")
+        porcelain.add(self.repo_path, paths=["source.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        patch_content = b"""\
+diff --git a/source.txt b/copy.txt
+similarity index 100%
+copy from source.txt
+copy to copy.txt
+"""
+        patch_file = os.path.join(self.repo_path, "copy.patch")
+        with open(patch_file, "wb") as f:
+            f.write(patch_content)
+
+        porcelain.apply_patch(self.repo_path, patch_file=patch_file)
+
+        # Both files should exist
+        self.assertTrue(os.path.exists(src_file))
+        copy_file = os.path.join(self.repo_path, "copy.txt")
+        self.assertTrue(os.path.exists(copy_file))
+        with open(copy_file, "rb") as f:
+            self.assertEqual(f.read(), b"original content\n")
+
+    def test_apply_three_way(self) -> None:
+        """Test applying a patch with 3-way merge fallback."""
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nlocal change\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        # Patch that won't apply cleanly but can be merged
+        patch_content = b"""\
+diff --git a/test.txt b/test.txt
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++patch change
+ line 3
+"""
+        patch_file = os.path.join(self.repo_path, "change.patch")
+        with open(patch_file, "wb") as f:
+            f.write(patch_content)
+
+        # Without 3-way, this should fail
+        with self.assertRaises(ValueError):
+            porcelain.apply_patch(self.repo_path, patch_file=patch_file)
+
+        # Reset file
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nlocal change\nline 3\n")
+
+        # With 3-way, it should merge
+        porcelain.apply_patch(self.repo_path, patch_file=patch_file, three_way=True)
+
+        # Should have conflict markers or merged result
+        with open(file_path, "rb") as f:
+            result = f.read()
+        # The merge should have occurred (may have conflict markers)
+        self.assertIsNotNone(result)

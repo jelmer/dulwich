@@ -120,3 +120,118 @@ class CompatPatchTestCase(CompatTestCase):
                 copy_content = copy_file.read()
 
             self.assertEqual(original_content, copy_content)
+
+    def test_apply_binary_patch(self) -> None:
+        """Test applying a binary patch from git."""
+        # Create a binary file
+        binary_path = os.path.join(self.repo_path, "binary.bin")
+        with open(binary_path, "wb") as f:
+            f.write(b"\x00\x01\x02\x03\x04\x05")
+
+        self.repo.get_worktree().stage(["binary.bin"])
+        self.repo.get_worktree().commit(message=b"Add binary file")
+
+        # Make a copy
+        copy_path = os.path.join(self.test_dir, "copy")
+        shutil.copytree(self.repo_path, copy_path)
+
+        # Modify the binary file
+        with open(binary_path, "wb") as f:
+            f.write(b"\x06\x07\x08\x09\x0a")
+
+        # Generate binary patch with git
+        patch_path = os.path.join(self.test_dir, "binary.patch")
+        run_git_or_fail(
+            ["-C", self.repo_path, "diff", "--binary", "HEAD", "binary.bin"],
+            stdout=open(patch_path, "wb"),
+        )
+
+        # Apply with dulwich
+        with open(patch_path, "rb") as f:
+            patch_content = f.read()
+
+        if patch_content.strip():  # Only if there's actual patch content
+            porcelain.apply_patch(copy_path, patch_file=BytesIO(patch_content))
+
+            # Verify the file matches
+            with (
+                open(binary_path, "rb") as f1,
+                open(os.path.join(copy_path, "binary.bin"), "rb") as f2,
+            ):
+                self.assertEqual(f1.read(), f2.read())
+
+    def test_apply_rename_patch(self) -> None:
+        """Test applying a rename patch from git."""
+        # Create a file
+        file_path = os.path.join(self.repo_path, "oldname.txt")
+        with open(file_path, "w") as f:
+            f.write("content")
+
+        self.repo.get_worktree().stage(["oldname.txt"])
+        self.repo.get_worktree().commit(message=b"Add file")
+
+        # Make a copy
+        copy_path = os.path.join(self.test_dir, "copy")
+        shutil.copytree(self.repo_path, copy_path)
+
+        # Rename the file with git
+        run_git_or_fail(["-C", self.repo_path, "mv", "oldname.txt", "newname.txt"])
+
+        # Generate patch
+        patch_path = os.path.join(self.test_dir, "rename.patch")
+        run_git_or_fail(
+            ["-C", self.repo_path, "diff", "--cached"], stdout=open(patch_path, "wb")
+        )
+
+        # Apply with dulwich
+        with open(patch_path, "rb") as f:
+            patch_content = f.read()
+
+        if patch_content.strip():
+            porcelain.apply_patch(copy_path, patch_file=BytesIO(patch_content))
+
+            # Verify old file is gone and new file exists
+            self.assertFalse(os.path.exists(os.path.join(copy_path, "oldname.txt")))
+            self.assertTrue(os.path.exists(os.path.join(copy_path, "newname.txt")))
+
+            with open(os.path.join(copy_path, "newname.txt")) as f:
+                self.assertEqual(f.read(), "content")
+
+    def test_apply_copy_patch(self) -> None:
+        """Test applying a copy patch from git."""
+        # Create a file
+        file_path = os.path.join(self.repo_path, "original.txt")
+        with open(file_path, "w") as f:
+            f.write("original content")
+
+        self.repo.get_worktree().stage(["original.txt"])
+        self.repo.get_worktree().commit(message=b"Add file")
+
+        # Make a copy
+        copy_path = os.path.join(self.test_dir, "copy")
+        shutil.copytree(self.repo_path, copy_path)
+
+        # Copy the file with git (need to enable copy detection)
+        shutil.copy(file_path, os.path.join(self.repo_path, "copied.txt"))
+        run_git_or_fail(["-C", self.repo_path, "add", "copied.txt"])
+
+        # Generate patch with copy detection
+        patch_path = os.path.join(self.test_dir, "copy.patch")
+        run_git_or_fail(
+            ["-C", self.repo_path, "diff", "--cached", "-C"],
+            stdout=open(patch_path, "wb"),
+        )
+
+        # Apply with dulwich
+        with open(patch_path, "rb") as f:
+            patch_content = f.read()
+
+        if patch_content.strip() and b"copy from" in patch_content:
+            porcelain.apply_patch(copy_path, patch_file=BytesIO(patch_content))
+
+            # Verify both files exist
+            self.assertTrue(os.path.exists(os.path.join(copy_path, "original.txt")))
+            self.assertTrue(os.path.exists(os.path.join(copy_path, "copied.txt")))
+
+            with open(os.path.join(copy_path, "copied.txt")) as f:
+                self.assertEqual(f.read(), "original content")

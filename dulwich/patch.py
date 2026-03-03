@@ -883,6 +883,73 @@ def _find_scissors_line(lines: list[bytes]) -> int | None:
     return None
 
 
+def git_base85_decode(data: bytes) -> bytes:
+    """Decode Git's base85-encoded binary data.
+
+    Git uses a custom base85 encoding with its own alphabet and line format.
+    Each line starts with a length byte followed by base85-encoded data.
+
+    Args:
+        data: Base85-encoded data as bytes (may contain multiple lines)
+
+    Returns:
+        Decoded binary data
+
+    Raises:
+        ValueError: If the data is invalid
+    """
+    # Git's base85 alphabet (different from RFC 1924)
+    alphabet = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~"
+
+    # Create decode table
+    decode_table = {}
+    for i, c in enumerate(alphabet):
+        decode_table[c] = i
+
+    result = bytearray()
+    lines = data.strip().split(b"\n")
+
+    for line in lines:
+        if not line:
+            continue
+
+        # First character encodes the length of decoded data for this line
+        if line[0] not in decode_table:
+            continue
+
+        encoded_len = decode_table[line[0]]
+        if encoded_len == 0:
+            continue
+
+        # Decode the rest of the line
+        encoded_data = line[1:]
+
+        # Process in groups of 5 characters (which encode 4 bytes)
+        i = 0
+        decoded_this_line = 0
+        while i < len(encoded_data) and decoded_this_line < encoded_len:
+            # Get up to 5 characters
+            group = encoded_data[i : i + 5]
+            if len(group) == 0:
+                break
+
+            # Decode 5 base85 digits to a 32-bit value
+            value = 0
+            for c in group:
+                if c not in decode_table:
+                    raise ValueError(f"Invalid base85 character: {chr(c)}")
+                value = value * 85 + decode_table[c]
+
+            # Convert to 4 bytes (big-endian)
+            bytes_to_add = min(4, encoded_len - decoded_this_line)
+            decoded_bytes = value.to_bytes(4, byteorder="big")
+            result.extend(decoded_bytes[:bytes_to_add])
+            decoded_this_line += bytes_to_add
+            i += 5
+
+    return bytes(result)
+
+
 @dataclass
 class PatchHunk:
     """Represents a single hunk in a unified diff.
@@ -913,6 +980,12 @@ class FilePatch:
         new_mode: Mode of new file (None for deleted files)
         hunks: List of PatchHunk objects
         binary: True if this is a binary patch
+        rename_from: Original path for renames (None if not a rename)
+        rename_to: New path for renames (None if not a rename)
+        copy_from: Source path for copies (None if not a copy)
+        copy_to: Destination path for copies (None if not a copy)
+        binary_old: Old binary content for binary patches (base85 encoded)
+        binary_new: New binary content for binary patches (base85 encoded)
     """
 
     old_path: bytes | None
@@ -921,6 +994,12 @@ class FilePatch:
     new_mode: int | None
     hunks: list[PatchHunk]
     binary: bool = False
+    rename_from: bytes | None = None
+    rename_to: bytes | None = None
+    copy_from: bytes | None = None
+    copy_to: bytes | None = None
+    binary_old: bytes | None = None
+    binary_new: bytes | None = None
 
 
 def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
@@ -948,6 +1027,12 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
             new_mode = None
             hunks: list[PatchHunk] = []
             binary = False
+            rename_from = None
+            rename_to = None
+            copy_from = None
+            copy_to = None
+            binary_old = None
+            binary_new = None
 
             # Parse extended headers
             i += 1
@@ -969,6 +1054,24 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
                 elif line.startswith(b"old mode "):
                     old_mode = int(line.split()[-1], 8)
                     i += 1
+                elif line.startswith(b"rename from "):
+                    rename_from = line[12:].strip()
+                    i += 1
+                elif line.startswith(b"rename to "):
+                    rename_to = line[10:].strip()
+                    i += 1
+                elif line.startswith(b"copy from "):
+                    copy_from = line[10:].strip()
+                    i += 1
+                elif line.startswith(b"copy to "):
+                    copy_to = line[8:].strip()
+                    i += 1
+                elif line.startswith(b"similarity index "):
+                    # Just skip similarity index for now
+                    i += 1
+                elif line.startswith(b"dissimilarity index "):
+                    # Just skip dissimilarity index for now
+                    i += 1
                 elif line.startswith(b"index "):
                     i += 1
                 elif line.startswith(b"--- "):
@@ -987,6 +1090,45 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
                 elif line.startswith(b"Binary files"):
                     binary = True
                     i += 1
+                    break
+                elif line.startswith(b"GIT binary patch"):
+                    binary = True
+                    i += 1
+                    # Parse binary patch data
+                    while i < len(lines):
+                        line = lines[i]
+                        if line.startswith(b"literal "):
+                            # New binary data
+                            # size = int(line[8:].strip())  # Size information, not currently used
+                            i += 1
+                            binary_data = b""
+                            while i < len(lines):
+                                line = lines[i]
+                                if (
+                                    line.startswith(
+                                        (b"literal ", b"delta ", b"diff --git ")
+                                    )
+                                    or not line.strip()
+                                ):
+                                    break
+                                binary_data += line + b"\n"
+                                i += 1
+                            binary_new = binary_data
+                        elif line.startswith(b"delta "):
+                            # Delta patch (not supported yet)
+                            i += 1
+                            while i < len(lines):
+                                line = lines[i]
+                                if (
+                                    line.startswith(
+                                        (b"literal ", b"delta ", b"diff --git ")
+                                    )
+                                    or not line.strip()
+                                ):
+                                    break
+                                i += 1
+                        else:
+                            break
                     break
                 else:
                     i += 1
@@ -1047,6 +1189,12 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
                     new_mode=new_mode,
                     hunks=hunks,
                     binary=binary,
+                    rename_from=rename_from,
+                    rename_to=rename_to,
+                    copy_from=copy_from,
+                    copy_to=copy_to,
+                    binary_old=binary_old,
+                    binary_new=binary_new,
                 )
             )
         else:

@@ -8549,9 +8549,9 @@ def _apply_rename_or_copy(
         check: Check only, don't apply
 
     Returns:
-        Tuple of (original_lines, should_continue) where:
-        - original_lines: Content lines if hunks need to be applied, None otherwise
-        - should_continue: True to skip to next patch, False to continue processing
+        A tuple of (``original_lines``, ``should_continue``) where:
+        - ``original_lines``: Content lines if hunks need to be applied, None otherwise
+        - ``should_continue``: True to skip to next patch, False to continue processing
     """
     # Strip path components
     src_stripped = src_path

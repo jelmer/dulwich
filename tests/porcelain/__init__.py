@@ -22,6 +22,7 @@
 """Tests for dulwich.porcelain."""
 
 import contextlib
+import importlib.util
 import os
 import platform
 import re
@@ -53,7 +54,7 @@ from dulwich.server import DictBackend
 from dulwich.tests.utils import build_commit_graph, make_commit, make_object
 from dulwich.web import make_server, make_wsgi_chain
 
-from .. import TestCase
+from .. import DependencyMissing, TestCase
 
 try:
     import gpg
@@ -11712,6 +11713,9 @@ copy to copy.txt
 
     def test_apply_three_way(self) -> None:
         """Test applying a patch with 3-way merge fallback."""
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
         file_path = os.path.join(self.repo_path, "test.txt")
         with open(file_path, "wb") as f:
             f.write(b"line 1\nlocal change\nline 3\n")

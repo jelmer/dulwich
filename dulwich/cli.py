@@ -7312,6 +7312,13 @@ class cmd_apply(Command):
             metavar="NUM",
             help="Remove NUM leading path components (default: 1)",
         )
+        parser.add_argument(
+            "--3way",
+            "-3",
+            action="store_true",
+            dest="three_way",
+            help="Fall back to 3-way merge if the patch does not apply cleanly",
+        )
 
         parsed_args = parser.parse_args(args)
 
@@ -7322,6 +7329,7 @@ class cmd_apply(Command):
             reverse=parsed_args.reverse,
             check=parsed_args.check,
             strip=parsed_args.strip,
+            three_way=parsed_args.three_way,
         )
 
         if parsed_args.check:

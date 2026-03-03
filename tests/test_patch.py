@@ -34,6 +34,7 @@ from dulwich.patch import (
     commit_patch_id,
     get_summary,
     git_am_patch_split,
+    git_base85_decode,
     parse_unified_diff,
     patch_id,
     unified_diff_with_algorithm,
@@ -1401,3 +1402,89 @@ index 1234567..abcdefg 100644
         self.assertEqual(patches[1].old_path, b"a/file2.txt")
         self.assertEqual(patches[1].new_path, b"b/file2.txt")
         self.assertEqual(len(patches[1].hunks), 1)
+
+
+class GitBase85DecodeTests(TestCase):
+    """Tests for git_base85_decode function."""
+
+    def test_decode_returns_bytes(self):
+        # Test that decoding returns bytes
+        encoded = b"A0"
+        result = git_base85_decode(encoded)
+        self.assertIsInstance(result, bytes)
+
+    def test_empty_decode(self):
+        # Test empty input
+        result = git_base85_decode(b"")
+        self.assertEqual(result, b"")
+
+
+class ParseUnifiedDiffRenameTests(TestCase):
+    """Tests for parse_unified_diff with rename/copy headers."""
+
+    def test_parse_rename(self):
+        diff = b"""diff --git a/old.txt b/new.txt
+similarity index 100%
+rename from old.txt
+rename to new.txt
+"""
+        patches = parse_unified_diff(diff)
+        self.assertEqual(len(patches), 1)
+        self.assertEqual(patches[0].rename_from, b"old.txt")
+        self.assertEqual(patches[0].rename_to, b"new.txt")
+
+    def test_parse_copy(self):
+        diff = b"""diff --git a/original.txt b/copy.txt
+similarity index 100%
+copy from original.txt
+copy to copy.txt
+"""
+        patches = parse_unified_diff(diff)
+        self.assertEqual(len(patches), 1)
+        self.assertEqual(patches[0].copy_from, b"original.txt")
+        self.assertEqual(patches[0].copy_to, b"copy.txt")
+
+    def test_parse_rename_with_modification(self):
+        diff = b"""diff --git a/old.txt b/new.txt
+similarity index 90%
+rename from old.txt
+rename to new.txt
+--- a/old.txt
++++ b/new.txt
+@@ -1,2 +1,2 @@
+ line1
+-line2
++modified line2
+"""
+        patches = parse_unified_diff(diff)
+        self.assertEqual(len(patches), 1)
+        self.assertEqual(patches[0].rename_from, b"old.txt")
+        self.assertEqual(patches[0].rename_to, b"new.txt")
+        self.assertEqual(len(patches[0].hunks), 1)
+
+
+class ParseUnifiedDiffBinaryTests(TestCase):
+    """Tests for parse_unified_diff with binary patches."""
+
+    def test_parse_binary_patch(self):
+        diff = b"""diff --git a/test.bin b/test.bin
+index 1234567..abcdefg 100644
+GIT binary patch
+literal 10
+ATest
+
+"""
+        patches = parse_unified_diff(diff)
+        self.assertEqual(len(patches), 1)
+        self.assertEqual(patches[0].binary, True)
+        self.assertIsNotNone(patches[0].binary_new)
+
+    def test_parse_binary_files_differ(self):
+        diff = b"""diff --git a/test.bin b/test.bin
+index 1234567..abcdefg 100644
+Binary files a/test.bin and b/test.bin differ
+"""
+        patches = parse_unified_diff(diff)
+        self.assertEqual(len(patches), 1)
+        self.assertEqual(patches[0].binary, True)
+        self.assertIsNone(patches[0].binary_new)  # No patch data

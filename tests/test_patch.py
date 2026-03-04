@@ -30,7 +30,7 @@ from dulwich.patch import (
     DiffAlgorithmNotAvailable,
     FilePatch,
     PatchHunk,
-    apply_patch,
+    apply_patch_hunks,
     commit_patch_id,
     get_summary,
     git_am_patch_split,
@@ -1216,7 +1216,7 @@ class ApplyPatchTests(TestCase):
             hunks=[hunk],
         )
 
-        result = apply_patch(patch, original)
+        result = apply_patch_hunks(patch, original)
         self.assertIsNotNone(result)
         self.assertEqual(result, [b"line 1\n", b"line two\n", b"line 3\n"])
 
@@ -1243,7 +1243,7 @@ class ApplyPatchTests(TestCase):
             hunks=[hunk],
         )
 
-        result = apply_patch(patch, original)
+        result = apply_patch_hunks(patch, original)
         self.assertIsNotNone(result)
         self.assertEqual(
             result, [b"line 1\n", b"inserted 1\n", b"inserted 2\n", b"line 2\n"]
@@ -1267,7 +1267,7 @@ class ApplyPatchTests(TestCase):
             hunks=[hunk],
         )
 
-        result = apply_patch(patch, original)
+        result = apply_patch_hunks(patch, original)
         self.assertIsNotNone(result)
         self.assertEqual(result, [b"line 1\n", b"line 4\n"])
 
@@ -1289,7 +1289,7 @@ class ApplyPatchTests(TestCase):
             hunks=[hunk],
         )
 
-        result = apply_patch(patch, original)
+        result = apply_patch_hunks(patch, original)
         self.assertIsNone(result)
 
     def test_multiple_hunks(self) -> None:
@@ -1323,7 +1323,7 @@ class ApplyPatchTests(TestCase):
             hunks=[hunk1, hunk2],
         )
 
-        result = apply_patch(patch, original)
+        result = apply_patch_hunks(patch, original)
         self.assertIsNotNone(result)
         self.assertEqual(
             result, [b"LINE 1\n", b"line 2\n", b"line 3\n", b"line 4\n", b"LINE 5\n"]
@@ -1346,7 +1346,7 @@ class ApplyPatchTests(TestCase):
             hunks=[hunk],
         )
 
-        result = apply_patch(patch, [])
+        result = apply_patch_hunks(patch, [])
         self.assertIsNotNone(result)
         self.assertEqual(result, [b"new line 1\n", b"new line 2\n"])
 
@@ -1368,7 +1368,7 @@ class ApplyPatchTests(TestCase):
             hunks=[hunk],
         )
 
-        result = apply_patch(patch, original)
+        result = apply_patch_hunks(patch, original)
         self.assertIsNotNone(result)
         self.assertEqual(result, [])
 

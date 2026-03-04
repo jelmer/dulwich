@@ -11753,3 +11753,163 @@ diff --git a/test.txt b/test.txt
             result = f.read()
         # The merge should have occurred (may have conflict markers)
         self.assertIsNotNone(result)
+
+
+class AmTests(PorcelainTestCase):
+    def _make_email_patch(
+        self,
+        subject: str,
+        diff: bytes,
+        author_name: str = "Test Author",
+        author_email: str = "test@example.com",
+        date: str = "Mon, 1 Jan 2024 12:00:00 +0000",
+        body: str = "",
+    ) -> bytes:
+        """Build a raw email-format patch message."""
+        lines = [
+            f"From: {author_name} <{author_email}>",
+            f"Date: {date}",
+            f"Subject: {subject}",
+            "",
+        ]
+        if body:
+            lines.append(body)
+            lines.append("")
+        lines.append("---")
+        raw = "\n".join(lines).encode("utf-8") + b"\n" + diff
+        return raw
+
+    def test_am_single_patch(self) -> None:
+        """Test applying a single email-format patch."""
+        # Create a file and commit it
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline 2\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        diff = b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+"""
+        email_patch = self._make_email_patch(
+            subject="[PATCH] Change line 2",
+            diff=diff,
+            body="This changes line 2 to line two.",
+        )
+
+        import io
+
+        shas = porcelain.am(self.repo_path, patches=[io.BytesIO(email_patch)])
+        self.assertEqual(len(shas), 1)
+
+        # Verify file content
+        with open(file_path, "rb") as f:
+            result = f.read()
+        self.assertEqual(result, b"line 1\nline two\nline 3\n")
+
+        # Verify commit metadata
+        with porcelain.open_repo_closing(self.repo_path) as r:
+            commit_obj = r[shas[0]]
+            self.assertEqual(commit_obj.author, b"Test Author <test@example.com>")
+            self.assertIn(b"Change line 2", commit_obj.message)
+            self.assertIn(b"This changes line 2 to line two.", commit_obj.message)
+
+    def test_am_multiple_patches(self) -> None:
+        """Test applying an mbox with multiple patches."""
+        # Create a file and commit it
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline 2\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        # Build an mbox with two patches
+        patch1 = self._make_email_patch(
+            subject="[PATCH 1/2] Change line 2",
+            diff=b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+""",
+        )
+        patch2 = self._make_email_patch(
+            subject="[PATCH 2/2] Change line 3",
+            diff=b"""\
+diff --git a/test.txt b/test.txt
+index abcdefg..1234567 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+ line two
+-line 3
++line three
+""",
+            date="Mon, 1 Jan 2024 13:00:00 +0000",
+        )
+
+        # Build mbox format
+        mbox_content = b"From nobody Mon Jan  1 12:00:00 2024\n" + patch1
+        mbox_content += b"\nFrom nobody Mon Jan  1 13:00:00 2024\n" + patch2
+
+        # Write to a file
+        mbox_path = os.path.join(self.repo_path, "patches.mbox")
+        with open(mbox_path, "wb") as f:
+            f.write(mbox_content)
+
+        shas = porcelain.am(self.repo_path, patches=mbox_path)
+        self.assertEqual(len(shas), 2)
+
+        # Verify final file content
+        with open(file_path, "rb") as f:
+            result = f.read()
+        self.assertEqual(result, b"line 1\nline two\nline three\n")
+
+    def test_am_subject_munging(self) -> None:
+        """Test that [PATCH] prefix is stripped from commit message."""
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline 2\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        diff = b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+"""
+        email_patch = self._make_email_patch(
+            subject="[PATCH v2 1/1] Improve line 2",
+            diff=diff,
+        )
+
+        import io
+
+        shas = porcelain.am(self.repo_path, patches=[io.BytesIO(email_patch)])
+        self.assertEqual(len(shas), 1)
+
+        # Subject should have [PATCH v2 1/1] stripped
+        with porcelain.open_repo_closing(self.repo_path) as r:
+            commit_obj = r[shas[0]]
+            # Should start with the actual subject, not the [PATCH...] prefix
+            self.assertTrue(commit_obj.message.startswith(b"Improve line 2"))

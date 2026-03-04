@@ -7336,8 +7336,70 @@ class cmd_apply(Command):
             sys.stdout.write("Patch can be applied cleanly.\n")
 
 
+class cmd_am(Command):
+    """Apply patches from mailbox-style email messages."""
+
+    def run(self, args: Sequence[str]) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "patches",
+            nargs="*",
+            default=None,
+            help="Mailbox file(s) to apply (reads from stdin if not specified)",
+        )
+        parser.add_argument(
+            "--3way",
+            "-3",
+            action="store_true",
+            dest="three_way",
+            help="Fall back to 3-way merge if the patch does not apply cleanly",
+        )
+        parser.add_argument(
+            "-k",
+            "--keep",
+            action="store_true",
+            dest="keep_subject",
+            help="Keep subject intact without munging",
+        )
+        parser.add_argument(
+            "--scissors",
+            "-c",
+            action="store_true",
+            help="Remove everything before scissors line",
+        )
+        parser.add_argument(
+            "--message-id",
+            action="store_true",
+            dest="message_id",
+            help="Include Message-ID in commit message",
+        )
+        parser.add_argument(
+            "-p",
+            "--strip",
+            type=int,
+            default=1,
+            metavar="NUM",
+            help="Remove NUM leading path components (default: 1)",
+        )
+
+        parsed_args = parser.parse_args(args)
+
+        shas = porcelain.am(
+            repo=".",
+            patches=parsed_args.patches or None,
+            three_way=parsed_args.three_way,
+            keep_subject=parsed_args.keep_subject,
+            scissors=parsed_args.scissors,
+            message_id=parsed_args.message_id,
+            strip=parsed_args.strip,
+        )
+        for sha in shas:
+            sys.stdout.write(sha.decode("ascii") + "\n")
+
+
 commands = {
     "add": cmd_add,
+    "am": cmd_am,
     "apply": cmd_apply,
     "annotate": cmd_annotate,
     "archive": cmd_archive,

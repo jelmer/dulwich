@@ -22,6 +22,7 @@
 """Simple wrapper that provides porcelain-like functions on top of Dulwich.
 
 Currently implemented:
+ * am
  * apply_patch
  * archive
  * add
@@ -97,6 +98,7 @@ __all__ = [
     "TransportKwargs",
     "active_branch",
     "add",
+    "am",
     "annotate",
     "archive",
     "bisect_bad",
@@ -8582,4 +8584,108 @@ def apply_patch(
             check=check,
             strip=strip,
             three_way=three_way,
+        )
+
+
+def am(
+    repo: RepoPath = ".",
+    patches: str | bytes | BinaryIO | list[str | bytes | BinaryIO] | None = None,
+    three_way: bool = False,
+    keep_subject: bool = False,
+    keep_non_patch: bool = False,
+    scissors: bool = False,
+    message_id: bool = False,
+    strip: int = 1,
+    committer: bytes | None = None,
+    commit_timestamp: float | None = None,
+    commit_timezone: int | None = None,
+) -> list[bytes]:
+    """Apply patches from mailbox-style email messages, creating commits.
+
+    Args:
+        repo: Path to the repository
+        patches: Patch input(s) - file path(s), file-like object(s), or None for stdin.
+            Can be a single mbox file containing multiple messages.
+        three_way: Fall back to 3-way merge if patch does not apply cleanly
+        keep_subject: If True, keep subject intact without munging
+        keep_non_patch: If True, only strip [PATCH] from brackets
+        scissors: If True, remove everything before scissors line
+        message_id: If True, include Message-ID in commit message
+        strip: Number of leading path components to strip (default: 1)
+        committer: Optional committer identity (bytes)
+        commit_timestamp: Optional committer timestamp
+        commit_timezone: Optional committer timezone offset
+
+    Returns:
+        List of commit SHAs (bytes) created
+    """
+    import email.parser
+    import mailbox
+    import tempfile
+
+    from ..am import am as am_impl
+
+    # Normalize input to a list
+    if patches is None:
+        import sys
+
+        inputs: list[str | bytes | BinaryIO] = [sys.stdin.buffer]
+    elif isinstance(patches, list):
+        inputs = patches
+    else:
+        inputs = [patches]
+
+    # Collect all email messages
+    msgs: list[email.message.Message] = []
+    parser = email.parser.BytesParser()
+
+    for inp in inputs:
+        # Read content
+        if isinstance(inp, (str, bytes)):
+            if isinstance(inp, str):
+                path = inp
+            else:
+                path = inp.decode("utf-8")
+            with open(path, "rb") as f:
+                content = f.read()
+        else:
+            content = inp.read()
+            if isinstance(content, str):
+                content = content.encode("utf-8")
+
+        # Detect mbox format (multiple messages starting with "From ")
+        if content.startswith(b"From "):
+            # Parse as mbox using mailbox module
+            with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+            try:
+                mbox = mailbox.mbox(tmp_path)
+                try:
+                    for mbox_msg in mbox:
+                        msgs.append(mbox_msg)
+                finally:
+                    mbox.close()
+            finally:
+                import os
+
+                os.unlink(tmp_path)
+        else:
+            # Parse as single email message
+            msg = parser.parsebytes(content)
+            msgs.append(msg)
+
+    with open_repo_closing(repo) as r:
+        return am_impl(
+            r,
+            msgs,
+            three_way=three_way,
+            keep_subject=keep_subject,
+            keep_non_patch=keep_non_patch,
+            scissors=scissors,
+            message_id=message_id,
+            strip=strip,
+            committer=committer,
+            commit_timestamp=commit_timestamp,
+            commit_timezone=commit_timezone,
         )

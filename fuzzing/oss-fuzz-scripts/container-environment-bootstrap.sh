@@ -72,8 +72,6 @@ prepare_dictionaries_for_fuzz_targets() {
 
 prepare_dictionaries_for_fuzz_targets "$SRC/dulwich/fuzzing/dictionaries" "$SRC/dulwich/fuzzing/"
 
-apt-get update && apt-get install -y libgpgme-dev libgpg-error-dev
-
 # The OSS-Fuzz base image includes a modified cargo executable for pure rust projects
 # but it can cause linking errors with PyO3's extension-module feature so we remove it.
 rm -rf /usr/local/bin/cargo

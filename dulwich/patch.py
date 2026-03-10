@@ -30,6 +30,7 @@ __all__ = [
     "FIRST_FEW_BYTES",
     "DiffAlgorithmNotAvailable",
     "MailinfoResult",
+    "PatchApplicationFailure",
     "apply_patch_hunks",
     "apply_patches",
     "commit_patch_id",
@@ -75,6 +76,10 @@ from .objects import S_ISGITLINK, Blob, Commit, ObjectID, RawObjectID
 FIRST_FEW_BYTES = 8000
 
 DEFAULT_DIFF_ALGORITHM = "myers"
+
+
+class PatchApplicationFailure(Exception):
+    """Raised when a patch does not apply cleanly."""
 
 
 class DiffAlgorithmNotAvailable(Exception):
@@ -1654,7 +1659,7 @@ def apply_patches(
             # Note: if _had_conflicts is True, the result contains conflict markers
             # Git would exit with error code, but we continue processing
         elif result is None:
-            raise ValueError(
+            raise PatchApplicationFailure(
                 f"Patch does not apply to {file_path.decode('utf-8', errors='replace')}"
             )
 

@@ -11913,3 +11913,265 @@ index 1234567..abcdefg 100644
             commit_obj = r[shas[0]]
             # Should start with the actual subject, not the [PATCH...] prefix
             self.assertTrue(commit_obj.message.startswith(b"Improve line 2"))
+
+    def test_am_abort(self) -> None:
+        """Test aborting am restores original HEAD."""
+        from dulwich.am import AmConflict
+
+        # Create a file and commit it
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline 2\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        orig_sha = porcelain.commit(self.repo_path, message=b"initial")
+
+        # First patch applies fine
+        patch1 = self._make_email_patch(
+            subject="[PATCH 1/2] Change line 2",
+            diff=b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+""",
+        )
+        # Second patch conflicts (expects "line 2" but it's now "line two")
+        patch2 = self._make_email_patch(
+            subject="[PATCH 2/2] Also change line 2",
+            diff=b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line TWO
+ line 3
+""",
+            date="Mon, 1 Jan 2024 13:00:00 +0000",
+        )
+
+        import io
+
+        with self.assertRaises(AmConflict):
+            porcelain.am(
+                self.repo_path,
+                patches=[io.BytesIO(patch1), io.BytesIO(patch2)],
+            )
+
+        # Abort should restore to original HEAD
+        porcelain.am_abort(self.repo_path)
+
+        with porcelain.open_repo_closing(self.repo_path) as r:
+            self.assertEqual(r.head(), orig_sha)
+
+        # Working tree should be restored
+        with open(file_path, "rb") as f:
+            result = f.read()
+        self.assertEqual(result, b"line 1\nline 2\nline 3\n")
+
+    def test_am_continue(self) -> None:
+        """Test continuing am after resolving a conflict."""
+        from dulwich.am import AmConflict
+
+        # Create a file and commit it
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline 2\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        # First patch applies fine
+        patch1 = self._make_email_patch(
+            subject="[PATCH 1/2] Change line 2",
+            diff=b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+""",
+        )
+        # Second patch conflicts
+        patch2 = self._make_email_patch(
+            subject="[PATCH 2/2] Also change line 2",
+            diff=b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line TWO
+ line 3
+""",
+            date="Mon, 1 Jan 2024 13:00:00 +0000",
+        )
+
+        import io
+
+        with self.assertRaises(AmConflict):
+            porcelain.am(
+                self.repo_path,
+                patches=[io.BytesIO(patch1), io.BytesIO(patch2)],
+            )
+
+        # Manually resolve: write the desired result and stage it
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline TWO\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+
+        # Continue should create the commit
+        shas = porcelain.am_continue(self.repo_path)
+        self.assertEqual(len(shas), 1)
+
+        # Verify the commit
+        with porcelain.open_repo_closing(self.repo_path) as r:
+            commit_obj = r[shas[0]]
+            self.assertIn(b"Also change line 2", commit_obj.message)
+
+        with open(file_path, "rb") as f:
+            result = f.read()
+        self.assertEqual(result, b"line 1\nline TWO\nline 3\n")
+
+    def test_am_skip(self) -> None:
+        """Test skipping a patch during am."""
+        from dulwich.am import AmConflict
+
+        # Create a file and commit it
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline 2\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        # First patch applies fine
+        patch1 = self._make_email_patch(
+            subject="[PATCH 1/2] Change line 2",
+            diff=b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+""",
+        )
+        # Second patch conflicts
+        patch2 = self._make_email_patch(
+            subject="[PATCH 2/2] Also change line 2",
+            diff=b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line TWO
+ line 3
+""",
+            date="Mon, 1 Jan 2024 13:00:00 +0000",
+        )
+
+        import io
+
+        with self.assertRaises(AmConflict):
+            porcelain.am(
+                self.repo_path,
+                patches=[io.BytesIO(patch1), io.BytesIO(patch2)],
+            )
+
+        # Skip the conflicting patch
+        shas = porcelain.am_skip(self.repo_path)
+        self.assertEqual(len(shas), 0)  # No more patches after skipping the last one
+
+        # File should be back to what patch1 left it as
+        with open(file_path, "rb") as f:
+            result = f.read()
+        self.assertEqual(result, b"line 1\nline two\nline 3\n")
+
+        # State should be cleaned up
+        with porcelain.open_repo_closing(self.repo_path) as r:
+            state_dir = os.path.join(r.controldir(), "rebase-apply")
+            self.assertFalse(os.path.exists(state_dir))
+
+    def test_am_quit(self) -> None:
+        """Test quitting am keeps partial progress."""
+        from dulwich.am import AmConflict
+
+        # Create a file and commit it
+        file_path = os.path.join(self.repo_path, "test.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"line 1\nline 2\nline 3\n")
+        porcelain.add(self.repo_path, paths=["test.txt"])
+        porcelain.commit(self.repo_path, message=b"initial")
+
+        # First patch applies fine
+        patch1 = self._make_email_patch(
+            subject="[PATCH 1/2] Change line 2",
+            diff=b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line two
+ line 3
+""",
+        )
+        # Second patch conflicts
+        patch2 = self._make_email_patch(
+            subject="[PATCH 2/2] Also change line 2",
+            diff=b"""\
+diff --git a/test.txt b/test.txt
+index 1234567..abcdefg 100644
+--- a/test.txt
++++ b/test.txt
+@@ -1,3 +1,3 @@
+ line 1
+-line 2
++line TWO
+ line 3
+""",
+            date="Mon, 1 Jan 2024 13:00:00 +0000",
+        )
+
+        import io
+
+        with self.assertRaises(AmConflict):
+            porcelain.am(
+                self.repo_path,
+                patches=[io.BytesIO(patch1), io.BytesIO(patch2)],
+            )
+
+        # Remember HEAD before quit (should include patch1's commit)
+        with porcelain.open_repo_closing(self.repo_path) as r:
+            head_before_quit = r.head()
+
+        porcelain.am_quit(self.repo_path)
+
+        # HEAD should be unchanged (partial progress kept)
+        with porcelain.open_repo_closing(self.repo_path) as r:
+            self.assertEqual(r.head(), head_before_quit)
+
+        # State should be cleaned up
+        with porcelain.open_repo_closing(self.repo_path) as r:
+            state_dir = os.path.join(r.controldir(), "rebase-apply")
+            self.assertFalse(os.path.exists(state_dir))

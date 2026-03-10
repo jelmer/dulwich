@@ -1,5 +1,10 @@
 1.2.0	UNRELEASED
 
+ * Add ``am`` command and ``porcelain.am()`` for applying mailbox-style
+   email patches (``git am``), with state persistence for
+   ``--continue``, ``--skip``, ``--abort``, and ``--quit`` recovery
+   operations. (Jelmer Vernooĳ, #1692)
+
  * Add support for ``extensions.relativeworktrees`` repository extension,
    allowing Git worktrees to use relative paths instead of absolute paths
    when linking worktrees. (Jelmer Vernooĳ, #2112)

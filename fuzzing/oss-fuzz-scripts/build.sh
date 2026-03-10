@@ -4,7 +4,7 @@ set -euo pipefail
 
 unset RUSTFLAGS # The OSS-Fuzz provided RUSTFLAGS cause issues that break PyO3 based Rust extension builds.
 export PATH="${PATH}:${HOME}/.cargo/bin"
-python3 -m pip install -v ".[fastimport,paramiko,https,pgp]"
+python3 -m pip install -v ".[fastimport,paramiko,https]"
 
 find "$SRC" -maxdepth 1 \
   \( -name '*_seed_corpus.zip' -o -name '*.options' -o -name '*.dict' \) \

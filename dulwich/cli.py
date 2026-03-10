@@ -7382,19 +7382,56 @@ class cmd_am(Command):
             help="Remove NUM leading path components (default: 1)",
         )
 
+        # Recovery operations (mutually exclusive)
+        recovery = parser.add_mutually_exclusive_group()
+        recovery.add_argument(
+            "--continue",
+            action="store_true",
+            dest="am_continue",
+            help="Continue applying patches after resolving a conflict",
+        )
+        recovery.add_argument(
+            "--skip",
+            action="store_true",
+            help="Skip the current patch and continue",
+        )
+        recovery.add_argument(
+            "--abort",
+            action="store_true",
+            help="Abort and restore the original state",
+        )
+        recovery.add_argument(
+            "--quit",
+            action="store_true",
+            help="Quit without reverting changes",
+        )
+
         parsed_args = parser.parse_args(args)
 
-        shas = porcelain.am(
-            repo=".",
-            patches=parsed_args.patches or None,
-            three_way=parsed_args.three_way,
-            keep_subject=parsed_args.keep_subject,
-            scissors=parsed_args.scissors,
-            message_id=parsed_args.message_id,
-            strip=parsed_args.strip,
-        )
-        for sha in shas:
-            sys.stdout.write(sha.decode("ascii") + "\n")
+        if parsed_args.am_continue:
+            shas = porcelain.am_continue(repo=".")
+            for sha in shas:
+                sys.stdout.write(sha.decode("ascii") + "\n")
+        elif parsed_args.skip:
+            shas = porcelain.am_skip(repo=".")
+            for sha in shas:
+                sys.stdout.write(sha.decode("ascii") + "\n")
+        elif parsed_args.abort:
+            porcelain.am_abort(repo=".")
+        elif parsed_args.quit:
+            porcelain.am_quit(repo=".")
+        else:
+            shas = porcelain.am(
+                repo=".",
+                patches=parsed_args.patches or None,
+                three_way=parsed_args.three_way,
+                keep_subject=parsed_args.keep_subject,
+                scissors=parsed_args.scissors,
+                message_id=parsed_args.message_id,
+                strip=parsed_args.strip,
+            )
+            for sha in shas:
+                sys.stdout.write(sha.decode("ascii") + "\n")
 
 
 commands = {

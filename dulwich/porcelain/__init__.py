@@ -99,6 +99,10 @@ __all__ = [
     "active_branch",
     "add",
     "am",
+    "am_abort",
+    "am_continue",
+    "am_quit",
+    "am_skip",
     "annotate",
     "archive",
     "bisect_bad",
@@ -8689,3 +8693,89 @@ def am(
             commit_timestamp=commit_timestamp,
             commit_timezone=commit_timezone,
         )
+
+
+def am_continue(
+    repo: RepoPath = ".",
+    committer: bytes | None = None,
+    commit_timestamp: float | None = None,
+    commit_timezone: int | None = None,
+) -> list[bytes]:
+    """Continue applying patches after resolving a conflict.
+
+    The user should have resolved conflicts and staged the result.
+
+    Args:
+        repo: Path to the repository
+        committer: Optional committer identity
+        commit_timestamp: Optional committer timestamp
+        commit_timezone: Optional committer timezone offset
+
+    Returns:
+        List of commit SHAs created
+    """
+    from ..am import am_continue as am_continue_impl
+
+    with open_repo_closing(repo) as r:
+        return am_continue_impl(
+            r,
+            committer=committer,
+            commit_timestamp=commit_timestamp,
+            commit_timezone=commit_timezone,
+        )
+
+
+def am_skip(
+    repo: RepoPath = ".",
+    committer: bytes | None = None,
+    commit_timestamp: float | None = None,
+    commit_timezone: int | None = None,
+) -> list[bytes]:
+    """Skip the current patch and continue with remaining patches.
+
+    Args:
+        repo: Path to the repository
+        committer: Optional committer identity
+        commit_timestamp: Optional committer timestamp
+        commit_timezone: Optional committer timezone offset
+
+    Returns:
+        List of commit SHAs created
+    """
+    from ..am import am_skip as am_skip_impl
+
+    with open_repo_closing(repo) as r:
+        return am_skip_impl(
+            r,
+            committer=committer,
+            commit_timestamp=commit_timestamp,
+            commit_timezone=commit_timezone,
+        )
+
+
+def am_abort(repo: RepoPath = ".") -> None:
+    """Abort the current am and restore the original state.
+
+    Resets HEAD, index, and working tree to the state before am started.
+
+    Args:
+        repo: Path to the repository
+    """
+    from ..am import am_abort as am_abort_impl
+
+    with open_repo_closing(repo) as r:
+        am_abort_impl(r)
+
+
+def am_quit(repo: RepoPath = ".") -> None:
+    """Quit the current am without reverting changes.
+
+    Removes am state but keeps HEAD, index, and working tree as-is.
+
+    Args:
+        repo: Path to the repository
+    """
+    from ..am import am_quit as am_quit_impl
+
+    with open_repo_closing(repo) as r:
+        am_quit_impl(r)

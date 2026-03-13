@@ -48,7 +48,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .repo import Repo
 
-from .objects import Commit
+from .objects import Commit, ObjectID
 from .patch import (
     PatchApplicationFailure,
     apply_patches,
@@ -161,12 +161,12 @@ class DiskAmStateManager:
             raise AmError("Corrupt am state: missing 'last' file")
         return int(data)
 
-    def get_orig_head(self) -> bytes:
+    def get_orig_head(self) -> ObjectID:
         """Return the original HEAD sha from before am started."""
         data = self._read_file("orig-head")
         if data is None:
             raise AmError("Corrupt am state: missing 'orig-head' file")
-        return data
+        return ObjectID(data)
 
     def get_strip(self) -> int:
         """Return the number of path components to strip."""
@@ -268,7 +268,7 @@ def _parse_author_date(
     return timestamp, tz_offset
 
 
-def _reset_worktree_to_tree(r: "Repo", target_tree_id: bytes) -> None:
+def _reset_worktree_to_tree(r: "Repo", target_tree_id: ObjectID) -> None:
     """Hard-reset working tree and index to match a given tree."""
     from .diff_tree import tree_changes
     from .index import update_working_tree
@@ -301,7 +301,7 @@ def _apply_single_patch(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
-) -> bytes:
+) -> ObjectID:
     """Apply a single patch from state and create a commit.
 
     Returns the commit SHA.
@@ -372,13 +372,13 @@ def _apply_remaining(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
-) -> list[bytes]:
+) -> list[ObjectID]:
     """Apply patches from start to total, cleaning up state on success.
 
     Raises:
         AmConflict: If a patch fails to apply (state preserved for recovery).
     """
-    commit_shas: list[bytes] = []
+    commit_shas: list[ObjectID] = []
     for i in range(start, total + 1):
         state.set_next(i)
         sha = _apply_single_patch(
@@ -409,7 +409,7 @@ def am(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
-) -> list[bytes]:
+) -> list[ObjectID]:
     """Apply patches from email messages to a repository, creating commits.
 
     Saves state to .git/rebase-apply/ so that if a patch fails, the user
@@ -482,7 +482,7 @@ def am_continue(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
-) -> list[bytes]:
+) -> list[ObjectID]:
     """Continue applying patches after resolving a conflict.
 
     The user should have resolved conflicts in the working tree and staged
@@ -550,7 +550,7 @@ def am_skip(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
-) -> list[bytes]:
+) -> list[ObjectID]:
     """Skip the current patch and continue with remaining patches.
 
     Resets the working tree and index to HEAD before continuing.
@@ -620,7 +620,7 @@ def am_abort(r: "Repo") -> None:
 
     # Reset HEAD to original
     try:
-        old_head = r.refs[HEADREF]
+        old_head: ObjectID | None = r.refs[HEADREF]
     except KeyError:
         old_head = None
     r.refs.set_if_equals(HEADREF, old_head, orig_head)

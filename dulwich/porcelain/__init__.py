@@ -8603,7 +8603,7 @@ def am(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
-) -> list[bytes]:
+) -> list[ObjectID]:
     """Apply patches from mailbox-style email messages, creating commits.
 
     Args:
@@ -8700,7 +8700,7 @@ def am_continue(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
-) -> list[bytes]:
+) -> list[ObjectID]:
     """Continue applying patches after resolving a conflict.
 
     The user should have resolved conflicts and staged the result.
@@ -8730,7 +8730,7 @@ def am_skip(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
-) -> list[bytes]:
+) -> list[ObjectID]:
     """Skip the current patch and continue with remaining patches.
 
     Args:

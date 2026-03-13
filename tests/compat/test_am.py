@@ -28,14 +28,14 @@ import tempfile
 from dulwich import porcelain
 from dulwich.repo import Repo
 
-from .utils import CompatTestCase, run_git_or_fail
+from .utils import CompatTestCase, rmtree_ro, run_git_or_fail
 
 
 class CompatAmTestCase(CompatTestCase):
     def setUp(self) -> None:
         super().setUp()
         self.test_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.addCleanup(rmtree_ro, self.test_dir)
         self.repo_path = os.path.join(self.test_dir, "repo")
         self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)

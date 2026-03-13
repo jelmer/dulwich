@@ -3675,6 +3675,49 @@ class cmd_push(Command):
             default=[],
             help="Push option to transmit to the server (e.g. for AGit flow)",
         )
+        parser.add_argument(
+            "--all",
+            action="store_true",
+            help="Push all branches",
+        )
+        parser.add_argument(
+            "--tags",
+            action="store_true",
+            help="Push all tags",
+        )
+        parser.add_argument(
+            "-d",
+            "--delete",
+            action="store_true",
+            help="Delete the specified remote refs",
+        )
+        parser.add_argument(
+            "-n",
+            "--dry-run",
+            action="store_true",
+            help="Do everything except actually send the updates",
+        )
+        parser.add_argument(
+            "--prune",
+            action="store_true",
+            help="Remove remote branches that don't exist locally",
+        )
+        parser.add_argument(
+            "-u",
+            "--set-upstream",
+            action="store_true",
+            help="Set upstream tracking information",
+        )
+        parser.add_argument(
+            "--follow-tags",
+            action="store_true",
+            help="Push annotated tags reachable from pushed commits",
+        )
+        parser.add_argument(
+            "--mirror",
+            action="store_true",
+            help="Mirror all refs (implies --force)",
+        )
         parser.add_argument("to_location", type=str)
         parser.add_argument("refspec", type=str, nargs="*")
         args = parser.parse_args(argv)
@@ -3686,6 +3729,14 @@ class cmd_push(Command):
                 force=args.force,
                 push_options=args.push_options or None,
                 atomic=args.atomic,
+                all=args.all,
+                tags=args.tags,
+                delete=args.delete,
+                dry_run=args.dry_run,
+                prune=args.prune,
+                set_upstream=args.set_upstream,
+                follow_tags=args.follow_tags,
+                mirror=args.mirror,
             )
         except porcelain.DivergedBranches:
             sys.stderr.write("Diverged branches; specify --force to override")

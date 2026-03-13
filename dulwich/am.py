@@ -99,10 +99,11 @@ class DiskAmStateManager:
         with open(os.path.join(self.path, name), "wb") as f:
             f.write(content)
 
-    def _read_file(self, name: str) -> bytes | None:
+    def _read_file(self, name: str, strip: bool = True) -> bytes | None:
         try:
             with open(os.path.join(self.path, name), "rb") as f:
-                return f.read().strip()
+                data = f.read()
+                return data.strip() if strip else data
         except FileNotFoundError:
             return None
 
@@ -194,7 +195,7 @@ class DiskAmStateManager:
 
     def get_patch(self, number: int) -> bytes:
         """Return the raw email bytes for the given patch number."""
-        data = self._read_file(f"{number:04d}")
+        data = self._read_file(f"{number:04d}", strip=False)
         if data is None:
             raise AmError(f"Corrupt am state: missing patch file '{number:04d}'")
         return data
@@ -267,13 +268,10 @@ def _parse_author_date(
     return timestamp, tz_offset
 
 
-def _reset_to_head(r: "Repo") -> None:
-    """Hard-reset working tree and index to current HEAD."""
+def _reset_worktree_to_tree(r: "Repo", target_tree_id: bytes) -> None:
+    """Hard-reset working tree and index to match a given tree."""
     from .diff_tree import tree_changes
     from .index import update_working_tree
-
-    head_commit = r[r.head()]
-    assert isinstance(head_commit, Commit)
 
     index = r.open_index()
     if len(index) > 0:
@@ -282,12 +280,12 @@ def _reset_to_head(r: "Repo") -> None:
         index_tree_id = None
 
     changes = tree_changes(
-        r.object_store, index_tree_id, head_commit.tree, want_unchanged=True
+        r.object_store, index_tree_id, target_tree_id, want_unchanged=True
     )
     update_working_tree(
         r,
         index_tree_id,
-        head_commit.tree,
+        target_tree_id,
         change_iterator=changes,
         force_remove_untracked=True,
         allow_overwrite_modified=True,
@@ -575,7 +573,9 @@ def am_skip(
         raise AmError("No am in progress")
 
     # Reset worktree to HEAD to undo the failed patch application
-    _reset_to_head(r)
+    head_commit = r[r.head()]
+    assert isinstance(head_commit, Commit)
+    _reset_worktree_to_tree(r, head_commit.tree)
 
     current = state.get_next()
     total = state.get_last()
@@ -607,9 +607,6 @@ def am_abort(r: "Repo") -> None:
     Raises:
         AmError: If no am is in progress
     """
-    from .diff_tree import tree_changes
-    from .index import update_working_tree
-
     state = _get_state_manager(r)
     if not state.exists():
         raise AmError("No am in progress")
@@ -618,24 +615,8 @@ def am_abort(r: "Repo") -> None:
     orig_commit = r[orig_head]
     assert isinstance(orig_commit, Commit)
 
-    # Reset working tree from current state to orig-head's tree
-    index = r.open_index()
-    if len(index) > 0:
-        index_tree_id = index.commit(r.object_store)
-    else:
-        index_tree_id = None
-
-    changes = tree_changes(
-        r.object_store, index_tree_id, orig_commit.tree, want_unchanged=True
-    )
-    update_working_tree(
-        r,
-        index_tree_id,
-        orig_commit.tree,
-        change_iterator=changes,
-        force_remove_untracked=True,
-        allow_overwrite_modified=True,
-    )
+    # Reset working tree and index to orig-head's tree
+    _reset_worktree_to_tree(r, orig_commit.tree)
 
     # Reset HEAD to original
     try:

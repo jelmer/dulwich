@@ -43,6 +43,7 @@ from dulwich.diff_tree import tree_changes
 from dulwich.errors import CommitError
 from dulwich.object_store import DEFAULT_TEMPFILE_GRACE_PERIOD
 from dulwich.objects import ZERO_SHA, Blob, Commit, Tag, Tree
+from dulwich.patch import PatchApplicationFailure
 from dulwich.porcelain import (
     CheckoutError,  # Hypothetical or real error class
     CountObjectsResult,
@@ -11738,7 +11739,7 @@ diff --git a/test.txt b/test.txt
             f.write(patch_content)
 
         # Without 3-way, this should fail
-        with self.assertRaises(ValueError):
+        with self.assertRaises(PatchApplicationFailure):
             porcelain.apply_patch(self.repo_path, patch_file=patch_file)
 
         # Reset file

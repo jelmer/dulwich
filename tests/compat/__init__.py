@@ -27,6 +27,7 @@ import unittest
 def test_suite() -> unittest.TestSuite:
     names = [
         "aiohttp",
+        "am",
         "bitmap",
         "bundle",
         "bundle_uri",

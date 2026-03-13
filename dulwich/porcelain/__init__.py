@@ -2779,7 +2779,10 @@ def _select_push_refs(
     else:
         # Parse user-provided refspecs (or default to active branch)
         if refspecs is None:
-            refspecs = [active_branch(r)]
+            active_ref = r.refs.follow(HEADREF)[0][1]
+            if not active_ref.startswith(LOCAL_BRANCH_PREFIX):
+                raise ValueError(active_ref)
+            refspecs = [active_ref[len(LOCAL_BRANCH_PREFIX) :]]
         elif isinstance(refspecs, (str, bytes)):
             refspecs = [refspecs]
         refspecs_bytes = [
@@ -2946,7 +2949,7 @@ def push(
                 generate_pack_data=lambda have, want, **kw: (0, iter([])),
                 progress=lambda data: (errstream.write(data), None)[1],
             )
-            update_refs(result.refs or {})
+            update_refs({k: v for k, v in (result.refs or {}).items() if v is not None})
             errstream.write(
                 b"Push to " + remote_location.encode(err_encoding) + b" (dry run).\n"
             )
@@ -2993,7 +2996,7 @@ def push(
                 b"Push to " + remote_location.encode(err_encoding) + b" successful.\n"
             )
 
-        for ref, error in (result.ref_status or {}).items():  # type: ignore[assignment]
+        for ref, error in (result.ref_status or {}).items():
             if error is not None:
                 errstream.write(
                     f"Push of ref {ref.decode('utf-8', 'replace')} failed: {error}\n".encode(
@@ -3011,13 +3014,13 @@ def push(
         # --set-upstream: configure tracking for pushed branches
         if set_upstream and remote_name is not None:
             config = r.get_config()
-            for lh, rh, _force_ref in selected_refs:
+            for local_ref, remote_ref, _force_ref in selected_refs:
                 if (
-                    lh is not None
-                    and rh is not None
-                    and lh.startswith(LOCAL_BRANCH_PREFIX)
+                    local_ref is not None
+                    and remote_ref is not None
+                    and local_ref.startswith(LOCAL_BRANCH_PREFIX)
                 ):
-                    branch_name = lh[len(LOCAL_BRANCH_PREFIX) :]
+                    branch_name = local_ref[len(LOCAL_BRANCH_PREFIX) :]
                     config.set(
                         (b"branch", branch_name),
                         b"remote",
@@ -3026,7 +3029,7 @@ def push(
                     config.set(
                         (b"branch", branch_name),
                         b"merge",
-                        rh,
+                        remote_ref,
                     )
             config.write_to_path()
 

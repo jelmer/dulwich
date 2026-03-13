@@ -2688,6 +2688,121 @@ def get_remote_repo(
     return (remote_name, encoded_location.decode())
 
 
+def _find_reachable_tags(
+    r: BaseRepo,
+    pushed_shas: set[ObjectID],
+    already_included: set[Ref],
+    remote_refs: dict[Ref, ObjectID],
+) -> Iterator[tuple[Ref, ObjectID]]:
+    """Yield annotated tags whose targets are reachable from pushed commits.
+
+    Args:
+      r: Local repository
+      pushed_shas: SHAs being pushed (non-deletion)
+      already_included: Refs already being pushed
+      remote_refs: Current remote refs
+    """
+    reachable: set[ObjectID] = set()
+    for sha in pushed_shas:
+        try:
+            obj = r[sha]
+        except KeyError:
+            continue
+        if isinstance(obj, Commit):
+            for entry in r.get_walker([sha]):
+                reachable.add(entry.commit.id)
+
+    for ref in r.refs.keys():
+        if not ref.startswith(LOCAL_TAG_PREFIX):
+            continue
+        if ref in already_included or ref in remote_refs:
+            continue
+        tag_sha = r.refs[ref]
+        try:
+            tag_obj = r[tag_sha]
+        except KeyError:
+            continue
+        if isinstance(tag_obj, Tag) and tag_obj.object[1] in reachable:
+            yield (Ref(ref), tag_sha)
+
+
+def _select_push_refs(
+    r: BaseRepo,
+    remote_refs: dict[Ref, ObjectID],
+    refspecs: str | bytes | Sequence[str | bytes] | None,
+    *,
+    force: bool = False,
+    mirror_mode: bool = False,
+    all: bool = False,
+    tags: bool = False,
+    delete: bool = False,
+) -> list[tuple[Ref | None, Ref | None, bool]]:
+    """Select which refs to push based on mode flags or user refspecs.
+
+    Returns a list of (local_ref, remote_ref, force) tuples.
+    local_ref is None for deletions.
+
+    Args:
+      r: Local repository
+      remote_refs: Current remote refs dict
+      refspecs: User-provided refspecs (may be None)
+      force: Force overwriting refs
+      mirror_mode: Push all refs
+      all: Push all branches
+      tags: Push all tags
+      delete: Delete the specified remote refs
+    """
+    result: list[tuple[Ref | None, Ref | None, bool]] = []
+
+    if mirror_mode:
+        for ref in r.refs.keys():
+            result.append((Ref(ref), Ref(ref), True))
+    elif all:
+        for ref in r.refs.keys():
+            if ref.startswith(LOCAL_BRANCH_PREFIX):
+                result.append((Ref(ref), Ref(ref), force))
+    elif delete:
+        assert refspecs is not None
+        if isinstance(refspecs, (str, bytes)):
+            refspecs = [refspecs]
+        remote_container = DictRefsContainer(remote_refs)  # type: ignore[arg-type]
+        for spec in refspecs:
+            try:
+                resolved = parse_ref(remote_container, spec)
+            except KeyError:
+                resolved = Ref(spec.encode() if isinstance(spec, str) else spec)
+            result.append((None, resolved, force))
+    elif tags and refspecs is None:
+        for ref in r.refs.keys():
+            if ref.startswith(LOCAL_TAG_PREFIX):
+                result.append((Ref(ref), Ref(ref), force))
+    else:
+        # Parse user-provided refspecs (or default to active branch)
+        if refspecs is None:
+            active_ref = r.refs.follow(HEADREF)[0][1]
+            if not active_ref.startswith(LOCAL_BRANCH_PREFIX):
+                raise ValueError(active_ref)
+            refspecs = [active_ref[len(LOCAL_BRANCH_PREFIX) :]]
+        elif isinstance(refspecs, (str, bytes)):
+            refspecs = [refspecs]
+        refspecs_bytes = [
+            spec.encode() if isinstance(spec, str) else spec for spec in refspecs
+        ]
+        remote_container = DictRefsContainer(remote_refs)  # type: ignore[arg-type]
+        result.extend(
+            parse_reftuples(r.refs, remote_container, refspecs_bytes, force=force)
+        )
+
+    # --tags combined with refspecs: also include all local tags
+    if tags and refspecs is not None and not all and not mirror_mode:
+        already = {rh for _, rh, _ in result}
+        for ref in r.refs.keys():
+            if ref.startswith(LOCAL_TAG_PREFIX) and Ref(ref) not in already:
+                result.append((Ref(ref), Ref(ref), force))
+
+    return result
+
+
 def push(
     repo: RepoPath,
     remote_location: str | bytes | None = None,
@@ -2697,6 +2812,14 @@ def push(
     force: bool = False,
     push_options: list[str] | None = None,
     atomic: bool = False,
+    all: bool = False,
+    tags: bool = False,
+    delete: bool = False,
+    dry_run: bool = False,
+    prune: bool = False,
+    set_upstream: bool = False,
+    follow_tags: bool = False,
+    mirror: bool = False,
     **kwargs: object,
 ) -> SendPackResult:
     """Remote push with dulwich via dulwich.client.
@@ -2711,14 +2834,26 @@ def push(
       push_options: Optional list of push options to send to the server
         (e.g. for AGit flow: ["topic=my-branch", "title=My PR"])
       atomic: If True, request atomic push (all refs update or none do)
+      all: If True, push all branches
+      tags: If True, push all tags
+      delete: If True, delete the specified remote refs
+      dry_run: If True, do everything except actually send the updates
+      prune: If True, remove remote refs that don't exist locally
+      set_upstream: If True, set upstream tracking info for pushed branches
+      follow_tags: If True, push annotated tags reachable from pushed commits
+      mirror: If True, mirror all refs (implies force, push all refs and
+        delete remote refs not present locally)
       **kwargs: Additional keyword arguments for the client
     """
+    if delete and not refspecs:
+        raise Error("--delete requires ref arguments")
+
     # Open the repo
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
-        # Check if mirror mode is enabled
-        mirror_mode = False
-        if remote_name:
+        # Check if mirror mode is enabled (via flag or config)
+        mirror_mode = mirror
+        if not mirror_mode and remote_name:
             try:
                 mirror_mode_val = r.get_config_stack().get_boolean(
                     (b"remote", remote_name.encode()), b"mirror"
@@ -2729,26 +2864,7 @@ def push(
                 pass
 
         if mirror_mode:
-            # Mirror mode: push all refs and delete non-existent ones
-            refspecs = []
-            for ref in r.refs.keys():
-                # Push all refs to the same name on remote
-                refspecs.append(ref + b":" + ref)
-        elif refspecs is None:
-            refspecs = [active_branch(r)]
-
-        # Normalize refspecs to bytes
-        if isinstance(refspecs, str):
-            refspecs_bytes: bytes | list[bytes] = refspecs.encode()
-        elif isinstance(refspecs, bytes):
-            refspecs_bytes = refspecs
-        else:
-            refspecs_bytes = []
-            for spec in refspecs:
-                if isinstance(spec, str):
-                    refspecs_bytes.append(spec.encode())
-                else:
-                    refspecs_bytes.append(spec)
+            force = True
 
         # Get the client and path
         transport_kwargs = _filter_transport_kwargs(**kwargs)
@@ -2758,24 +2874,41 @@ def push(
             **transport_kwargs,
         )
 
-        selected_refs = []
+        selected_refs: list[tuple[Ref | None, Ref | None, bool]] = []
         remote_changed_refs: dict[Ref, ObjectID | None] = {}
 
         def update_refs(refs: dict[Ref, ObjectID]) -> dict[Ref, ObjectID]:
-            remote_refs = DictRefsContainer(refs)  # type: ignore[arg-type]
-            selected_refs.extend(
-                parse_reftuples(r.refs, remote_refs, refspecs_bytes, force=force)
-            )
             new_refs: dict[Ref, ObjectID] = {}
 
-            # In mirror mode, delete remote refs that don't exist locally
-            if mirror_mode:
+            selected_refs.extend(
+                _select_push_refs(
+                    r,
+                    refs,
+                    refspecs,
+                    force=force,
+                    mirror_mode=mirror_mode,
+                    all=all,
+                    tags=tags,
+                    delete=delete,
+                )
+            )
+
+            # Prune remote branches not present locally
+            if prune or mirror_mode:
                 local_refs = set(r.refs.keys())
-                for remote_ref in refs.keys():
-                    if remote_ref not in local_refs:
+                for remote_ref in refs:
+                    should_prune = (mirror_mode and remote_ref not in local_refs) or (
+                        prune
+                        and not mirror_mode
+                        and remote_ref.startswith(LOCAL_BRANCH_PREFIX)
+                        and Ref(remote_ref[len(LOCAL_BRANCH_PREFIX) :])
+                        not in set(r.refs.keys(base=Ref(LOCAL_BRANCH_PREFIX)))
+                    )
+                    if should_prune:
                         new_refs[remote_ref] = ZERO_SHA
                         remote_changed_refs[remote_ref] = None
-            # TODO: Handle selected_refs == {None: None}
+
+            # Apply selected ref mappings
             for lh, rh, force_ref in selected_refs:
                 if lh is None:
                     assert rh is not None
@@ -2793,10 +2926,40 @@ def push(
                         check_diverged(r, refs[rh], localsha)
                     new_refs[rh] = localsha
                     remote_changed_refs[rh] = localsha
+
+            # --follow-tags: push annotated tags reachable from pushed commits
+            if follow_tags:
+                pushed_shas = {sha for sha in new_refs.values() if sha != ZERO_SHA}
+                for ref, sha in _find_reachable_tags(
+                    r, pushed_shas, set(new_refs), refs
+                ):
+                    new_refs[ref] = sha
+                    remote_changed_refs[ref] = sha
+
             return new_refs
 
         err_encoding = getattr(errstream, "encoding", None) or DEFAULT_ENCODING
         remote_location = client.get_url(path)
+
+        if dry_run:
+            # Fetch remote refs without pushing, then compute what would change
+            result = client.send_pack(
+                path.encode(),
+                lambda refs: refs,
+                generate_pack_data=lambda have, want, **kw: (0, iter([])),
+                progress=lambda data: (errstream.write(data), None)[1],
+            )
+            update_refs({k: v for k, v in (result.refs or {}).items() if v is not None})
+            errstream.write(
+                b"Push to " + remote_location.encode(err_encoding) + b" (dry run).\n"
+            )
+            for rh, sha in remote_changed_refs.items():
+                action = "delete" if sha is None else "update"
+                errstream.write(
+                    f"Would {action} {rh.decode('utf-8', 'replace')}\n".encode()
+                )
+            return result
+
         try:
 
             def generate_pack_data_wrapper(
@@ -2806,8 +2969,6 @@ def push(
                 ofs_delta: bool = False,
                 progress: Callable[..., None] | None = None,
             ) -> tuple[int, Iterator[UnpackedObject]]:
-                # Wrap to match the expected signature
-                # Convert AbstractSet to set since generate_pack_data expects set
                 return r.generate_pack_data(
                     set(have), set(want), progress=progress, ofs_delta=ofs_delta
                 )
@@ -2835,7 +2996,7 @@ def push(
                 b"Push to " + remote_location.encode(err_encoding) + b" successful.\n"
             )
 
-        for ref, error in (result.ref_status or {}).items():  # type: ignore[assignment]
+        for ref, error in (result.ref_status or {}).items():
             if error is not None:
                 errstream.write(
                     f"Push of ref {ref.decode('utf-8', 'replace')} failed: {error}\n".encode(
@@ -2849,6 +3010,28 @@ def push(
 
         if remote_name is not None:
             _import_remote_refs(r.refs, remote_name, remote_changed_refs)
+
+        # --set-upstream: configure tracking for pushed branches
+        if set_upstream and remote_name is not None:
+            config = r.get_config()
+            for local_ref, remote_ref, _force_ref in selected_refs:
+                if (
+                    local_ref is not None
+                    and remote_ref is not None
+                    and local_ref.startswith(LOCAL_BRANCH_PREFIX)
+                ):
+                    branch_name = local_ref[len(LOCAL_BRANCH_PREFIX) :]
+                    config.set(
+                        (b"branch", branch_name),
+                        b"remote",
+                        remote_name.encode(),
+                    )
+                    config.set(
+                        (b"branch", branch_name),
+                        b"merge",
+                        remote_ref,
+                    )
+            config.write_to_path()
 
         return result
 

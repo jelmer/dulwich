@@ -7387,8 +7387,107 @@ class cmd_apply(Command):
             sys.stdout.write("Patch can be applied cleanly.\n")
 
 
+class cmd_am(Command):
+    """Apply patches from mailbox-style email messages."""
+
+    def run(self, args: Sequence[str]) -> None:
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "patches",
+            nargs="*",
+            default=None,
+            help="Mailbox file(s) to apply (reads from stdin if not specified)",
+        )
+        parser.add_argument(
+            "--3way",
+            "-3",
+            action="store_true",
+            dest="three_way",
+            help="Fall back to 3-way merge if the patch does not apply cleanly",
+        )
+        parser.add_argument(
+            "-k",
+            "--keep",
+            action="store_true",
+            dest="keep_subject",
+            help="Keep subject intact without munging",
+        )
+        parser.add_argument(
+            "--scissors",
+            "-c",
+            action="store_true",
+            help="Remove everything before scissors line",
+        )
+        parser.add_argument(
+            "--message-id",
+            action="store_true",
+            dest="message_id",
+            help="Include Message-ID in commit message",
+        )
+        parser.add_argument(
+            "-p",
+            "--strip",
+            type=int,
+            default=1,
+            metavar="NUM",
+            help="Remove NUM leading path components (default: 1)",
+        )
+
+        # Recovery operations (mutually exclusive)
+        recovery = parser.add_mutually_exclusive_group()
+        recovery.add_argument(
+            "--continue",
+            action="store_true",
+            dest="am_continue",
+            help="Continue applying patches after resolving a conflict",
+        )
+        recovery.add_argument(
+            "--skip",
+            action="store_true",
+            help="Skip the current patch and continue",
+        )
+        recovery.add_argument(
+            "--abort",
+            action="store_true",
+            help="Abort and restore the original state",
+        )
+        recovery.add_argument(
+            "--quit",
+            action="store_true",
+            help="Quit without reverting changes",
+        )
+
+        parsed_args = parser.parse_args(args)
+
+        if parsed_args.am_continue:
+            shas = porcelain.am_continue(repo=".")
+            for sha in shas:
+                sys.stdout.write(sha.decode("ascii") + "\n")
+        elif parsed_args.skip:
+            shas = porcelain.am_skip(repo=".")
+            for sha in shas:
+                sys.stdout.write(sha.decode("ascii") + "\n")
+        elif parsed_args.abort:
+            porcelain.am_abort(repo=".")
+        elif parsed_args.quit:
+            porcelain.am_quit(repo=".")
+        else:
+            shas = porcelain.am(
+                repo=".",
+                patches=parsed_args.patches or None,
+                three_way=parsed_args.three_way,
+                keep_subject=parsed_args.keep_subject,
+                scissors=parsed_args.scissors,
+                message_id=parsed_args.message_id,
+                strip=parsed_args.strip,
+            )
+            for sha in shas:
+                sys.stdout.write(sha.decode("ascii") + "\n")
+
+
 commands = {
     "add": cmd_add,
+    "am": cmd_am,
     "apply": cmd_apply,
     "annotate": cmd_annotate,
     "archive": cmd_archive,

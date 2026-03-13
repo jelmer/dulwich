@@ -5779,6 +5779,388 @@ class PushTests(PorcelainTestCase):
         self.assertIn(b"refs/heads/should-not-be-deleted", self.repo.refs)
 
 
+class PushOptionsTests(PorcelainTestCase):
+    """Tests for the new push options (--all, --tags, --delete, etc.)."""
+
+    def _setup_clone(self):
+        """Helper to create a commit and clone."""
+        errstream = BytesIO()
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"init",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+        clone_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, clone_path)
+        target_repo = porcelain.clone(
+            self.repo.path, target=clone_path, errstream=errstream
+        )
+        target_repo.close()
+        return clone_path
+
+    def test_push_all(self) -> None:
+        """Test --all pushes all branches."""
+        clone_path = self._setup_clone()
+
+        # Create multiple branches in the clone
+        with Repo(clone_path) as r_clone:
+            head_id = r_clone[b"HEAD"].id
+            r_clone.refs[b"refs/heads/feature1"] = head_id
+            r_clone.refs[b"refs/heads/feature2"] = head_id
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            all=True,
+        )
+
+        # All branches should be pushed to remote
+        self.assertIn(b"refs/heads/feature1", self.repo.refs)
+        self.assertIn(b"refs/heads/feature2", self.repo.refs)
+
+    def test_push_tags(self) -> None:
+        """Test --tags pushes all tags."""
+        clone_path = self._setup_clone()
+
+        # Create tags in the clone
+        with Repo(clone_path) as r_clone:
+            head_id = r_clone[b"HEAD"].id
+            r_clone.refs[b"refs/tags/v1.0"] = head_id
+            r_clone.refs[b"refs/tags/v2.0"] = head_id
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            tags=True,
+        )
+
+        # All tags should be pushed to remote
+        self.assertIn(b"refs/tags/v1.0", self.repo.refs)
+        self.assertIn(b"refs/tags/v2.0", self.repo.refs)
+
+    def test_push_delete_flag(self) -> None:
+        """Test --delete removes remote refs."""
+        clone_path = self._setup_clone()
+
+        # Create a branch on the remote
+        head_id = self.repo[b"HEAD"].id
+        self.repo.refs[b"refs/heads/to-delete"] = head_id
+        self.assertIn(b"refs/heads/to-delete", self.repo.refs)
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            refspecs=[b"refs/heads/to-delete"],
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            delete=True,
+        )
+
+        self.assertNotIn(b"refs/heads/to-delete", self.repo.refs)
+
+    def test_push_delete_requires_refspecs(self) -> None:
+        """Test --delete without refspecs raises an error."""
+        clone_path = self._setup_clone()
+
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.push,
+            clone_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            delete=True,
+        )
+
+    def test_push_prune(self) -> None:
+        """Test --prune removes remote branches not in local."""
+        clone_path = self._setup_clone()
+
+        # Create a branch on the remote that doesn't exist in clone
+        head_id = self.repo[b"HEAD"].id
+        self.repo.refs[b"refs/heads/orphan"] = head_id
+        self.assertIn(b"refs/heads/orphan", self.repo.refs)
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            prune=True,
+        )
+
+        self.assertNotIn(b"refs/heads/orphan", self.repo.refs)
+
+    def test_push_dry_run(self) -> None:
+        """Test --dry-run doesn't actually push."""
+        clone_path = self._setup_clone()
+
+        # Create a new branch in clone
+        with Repo(clone_path) as r_clone:
+            head_id = r_clone[b"HEAD"].id
+            r_clone.refs[b"refs/heads/dry-run-branch"] = head_id
+
+        errstream = BytesIO()
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            refspecs=[b"refs/heads/dry-run-branch"],
+            outstream=BytesIO(),
+            errstream=errstream,
+            dry_run=True,
+        )
+
+        # Branch should NOT be pushed (dry run)
+        self.assertNotIn(b"refs/heads/dry-run-branch", self.repo.refs)
+        # Should mention dry run in output
+        self.assertIn(b"dry run", errstream.getvalue())
+
+    def test_push_set_upstream(self) -> None:
+        """Test --set-upstream sets tracking info."""
+        clone_path = self._setup_clone()
+
+        porcelain.push(
+            clone_path,
+            "origin",
+            refspecs=[b"refs/heads/master"],
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            set_upstream=True,
+        )
+
+        # Check that tracking info was set
+        with Repo(clone_path) as r_clone:
+            config = r_clone.get_config()
+            remote = config.get((b"branch", b"master"), b"remote")
+            merge = config.get((b"branch", b"master"), b"merge")
+            self.assertEqual(remote, b"origin")
+            self.assertEqual(merge, b"refs/heads/master")
+
+    def test_push_mirror_flag(self) -> None:
+        """Test --mirror flag pushes all refs and deletes missing ones."""
+        clone_path = self._setup_clone()
+
+        # Create extra refs in clone
+        with Repo(clone_path) as r_clone:
+            head_id = r_clone[b"HEAD"].id
+            r_clone.refs[b"refs/heads/feature"] = head_id
+            r_clone.refs[b"refs/tags/v1.0"] = head_id
+
+        # Create a branch on remote that doesn't exist in clone
+        self.repo.refs[b"refs/heads/old-branch"] = self.repo[b"HEAD"].id
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            mirror=True,
+        )
+
+        # All local refs should be on remote
+        self.assertIn(b"refs/heads/feature", self.repo.refs)
+        self.assertIn(b"refs/tags/v1.0", self.repo.refs)
+        # Remote-only branch should be deleted
+        self.assertNotIn(b"refs/heads/old-branch", self.repo.refs)
+
+    def test_push_all_does_not_push_tags(self) -> None:
+        """Test --all only pushes branches, not tags."""
+        clone_path = self._setup_clone()
+
+        with Repo(clone_path) as r_clone:
+            head_id = r_clone[b"HEAD"].id
+            r_clone.refs[b"refs/heads/feature"] = head_id
+            r_clone.refs[b"refs/tags/v1.0"] = head_id
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            all=True,
+        )
+
+        self.assertIn(b"refs/heads/feature", self.repo.refs)
+        self.assertNotIn(b"refs/tags/v1.0", self.repo.refs)
+
+    def test_push_tags_with_refspecs(self) -> None:
+        """Test --tags combined with refspecs pushes both."""
+        clone_path = self._setup_clone()
+
+        with Repo(clone_path) as r_clone:
+            head_id = r_clone[b"HEAD"].id
+            r_clone.refs[b"refs/heads/feature"] = head_id
+            r_clone.refs[b"refs/tags/v1.0"] = head_id
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            refspecs=[b"refs/heads/feature"],
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            tags=True,
+        )
+
+        # Both the explicit branch and all tags should be pushed
+        self.assertIn(b"refs/heads/feature", self.repo.refs)
+        self.assertIn(b"refs/tags/v1.0", self.repo.refs)
+
+    def test_push_prune_keeps_tags(self) -> None:
+        """Test --prune only removes branches, not tags."""
+        clone_path = self._setup_clone()
+
+        head_id = self.repo[b"HEAD"].id
+        self.repo.refs[b"refs/heads/orphan-branch"] = head_id
+        self.repo.refs[b"refs/tags/orphan-tag"] = head_id
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            prune=True,
+        )
+
+        # Branch not in local should be pruned
+        self.assertNotIn(b"refs/heads/orphan-branch", self.repo.refs)
+        # Tag should NOT be pruned (prune only affects branches)
+        self.assertIn(b"refs/tags/orphan-tag", self.repo.refs)
+
+    def test_push_delete_short_name(self) -> None:
+        """Test --delete with a short branch name resolves correctly."""
+        clone_path = self._setup_clone()
+
+        head_id = self.repo[b"HEAD"].id
+        self.repo.refs[b"refs/heads/to-delete"] = head_id
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            refspecs=[b"to-delete"],
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            delete=True,
+        )
+
+        self.assertNotIn(b"refs/heads/to-delete", self.repo.refs)
+
+    def test_push_follow_tags(self) -> None:
+        """Test --follow-tags pushes reachable annotated tags."""
+        clone_path = self._setup_clone()
+
+        # Create a new commit in clone
+        handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        os.close(handle)
+        porcelain.add(repo=clone_path, paths=[fullpath])
+        new_id = porcelain.commit(
+            repo=clone_path,
+            message=b"new commit",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Create an annotated tag on the commit
+        porcelain.tag_create(
+            clone_path,
+            tag=b"v1.0",
+            message=b"release v1.0",
+            author=b"author <email>",
+            annotated=True,
+        )
+
+        # Push only the branch with --follow-tags
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            refspecs=[b"refs/heads/master"],
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            follow_tags=True,
+        )
+
+        # The annotated tag should also be pushed
+        self.assertIn(b"refs/tags/v1.0", self.repo.refs)
+        # And the commit should be there
+        self.assertEqual(self.repo.refs[b"refs/heads/master"], new_id)
+
+    def test_push_follow_tags_skips_lightweight(self) -> None:
+        """Test --follow-tags does NOT push lightweight tags."""
+        clone_path = self._setup_clone()
+
+        handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        os.close(handle)
+        porcelain.add(repo=clone_path, paths=[fullpath])
+        porcelain.commit(
+            repo=clone_path,
+            message=b"new commit",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Create a lightweight (non-annotated) tag
+        porcelain.tag_create(
+            clone_path,
+            tag=b"lightweight",
+            annotated=False,
+        )
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            refspecs=[b"refs/heads/master"],
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            follow_tags=True,
+        )
+
+        # Lightweight tag should NOT be pushed
+        self.assertNotIn(b"refs/tags/lightweight", self.repo.refs)
+
+    def test_push_follow_tags_skips_already_on_remote(self) -> None:
+        """Test --follow-tags skips tags already present on remote."""
+        clone_path = self._setup_clone()
+
+        handle, fullpath = tempfile.mkstemp(dir=clone_path)
+        os.close(handle)
+        porcelain.add(repo=clone_path, paths=[fullpath])
+        porcelain.commit(
+            repo=clone_path,
+            message=b"new commit",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Create an annotated tag
+        porcelain.tag_create(
+            clone_path,
+            tag=b"v1.0",
+            message=b"release v1.0",
+            author=b"author <email>",
+            annotated=True,
+        )
+
+        # Pre-set the tag on the remote to a different value
+        self.repo.refs[b"refs/tags/v1.0"] = self.repo[b"HEAD"].id
+        original_tag_sha = self.repo.refs[b"refs/tags/v1.0"]
+
+        porcelain.push(
+            clone_path,
+            self.repo.path,
+            refspecs=[b"refs/heads/master"],
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+            follow_tags=True,
+        )
+
+        # Tag should NOT be overwritten (already on remote)
+        self.assertEqual(self.repo.refs[b"refs/tags/v1.0"], original_tag_sha)
+
+
 class PullTests(PorcelainTestCase):
     def setUp(self) -> None:
         super().setUp()

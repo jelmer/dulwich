@@ -8,6 +8,10 @@
    command and ``porcelain.push()``, enabling AGit flow and other server-side
    push option workflows. (Jelmer Vernooĳ)
 
+ * Add missing push options: ``--all``, ``--tags``, ``--delete``,
+   ``--dry-run``, ``--prune``, ``--set-upstream``, ``--follow-tags``,
+   and ``--mirror``. (Jelmer Vernooĳ, #1844)
+
  * Add support for atomic push operations (``--atomic``). When enabled,
    either all ref updates succeed or none are applied. Both client and
    server now negotiate the ``atomic`` capability.

@@ -2314,7 +2314,20 @@ class PushCommandTest(DulwichCliTestCase):
     def test_push_force(self, mock_push):
         _result, _stdout, _stderr = self._run_cli("push", "-f", "origin")
         mock_push.assert_called_with(
-            ".", "origin", None, force=True, push_options=None, atomic=False
+            ".",
+            "origin",
+            None,
+            force=True,
+            push_options=None,
+            atomic=False,
+            all=False,
+            tags=False,
+            delete=False,
+            dry_run=False,
+            prune=False,
+            set_upstream=False,
+            follow_tags=False,
+            mirror=False,
         )
 
     @patch("dulwich.porcelain.push")
@@ -2329,6 +2342,14 @@ class PushCommandTest(DulwichCliTestCase):
             force=False,
             push_options=["topic=my-feature"],
             atomic=False,
+            all=False,
+            tags=False,
+            delete=False,
+            dry_run=False,
+            prune=False,
+            set_upstream=False,
+            follow_tags=False,
+            mirror=False,
         )
 
     @patch("dulwich.porcelain.push")
@@ -2348,6 +2369,136 @@ class PushCommandTest(DulwichCliTestCase):
             force=False,
             push_options=["topic=my-feature", "title=My PR"],
             atomic=False,
+            all=False,
+            tags=False,
+            delete=False,
+            dry_run=False,
+            prune=False,
+            set_upstream=False,
+            follow_tags=False,
+            mirror=False,
+        )
+
+    @patch("dulwich.porcelain.push")
+    def test_push_all(self, mock_push):
+        _result, _stdout, _stderr = self._run_cli("push", "--all", "origin")
+        mock_push.assert_called_with(
+            ".",
+            "origin",
+            None,
+            force=False,
+            push_options=None,
+            atomic=False,
+            all=True,
+            tags=False,
+            delete=False,
+            dry_run=False,
+            prune=False,
+            set_upstream=False,
+            follow_tags=False,
+            mirror=False,
+        )
+
+    @patch("dulwich.porcelain.push")
+    def test_push_tags(self, mock_push):
+        _result, _stdout, _stderr = self._run_cli("push", "--tags", "origin")
+        mock_push.assert_called_with(
+            ".",
+            "origin",
+            None,
+            force=False,
+            push_options=None,
+            atomic=False,
+            all=False,
+            tags=True,
+            delete=False,
+            dry_run=False,
+            prune=False,
+            set_upstream=False,
+            follow_tags=False,
+            mirror=False,
+        )
+
+    @patch("dulwich.porcelain.push")
+    def test_push_delete(self, mock_push):
+        _result, _stdout, _stderr = self._run_cli(
+            "push", "--delete", "origin", "refs/heads/foo"
+        )
+        mock_push.assert_called_with(
+            ".",
+            "origin",
+            ["refs/heads/foo"],
+            force=False,
+            push_options=None,
+            atomic=False,
+            all=False,
+            tags=False,
+            delete=True,
+            dry_run=False,
+            prune=False,
+            set_upstream=False,
+            follow_tags=False,
+            mirror=False,
+        )
+
+    @patch("dulwich.porcelain.push")
+    def test_push_dry_run(self, mock_push):
+        _result, _stdout, _stderr = self._run_cli("push", "--dry-run", "origin")
+        mock_push.assert_called_with(
+            ".",
+            "origin",
+            None,
+            force=False,
+            push_options=None,
+            atomic=False,
+            all=False,
+            tags=False,
+            delete=False,
+            dry_run=True,
+            prune=False,
+            set_upstream=False,
+            follow_tags=False,
+            mirror=False,
+        )
+
+    @patch("dulwich.porcelain.push")
+    def test_push_set_upstream(self, mock_push):
+        _result, _stdout, _stderr = self._run_cli("push", "-u", "origin", "main")
+        mock_push.assert_called_with(
+            ".",
+            "origin",
+            ["main"],
+            force=False,
+            push_options=None,
+            atomic=False,
+            all=False,
+            tags=False,
+            delete=False,
+            dry_run=False,
+            prune=False,
+            set_upstream=True,
+            follow_tags=False,
+            mirror=False,
+        )
+
+    @patch("dulwich.porcelain.push")
+    def test_push_mirror(self, mock_push):
+        _result, _stdout, _stderr = self._run_cli("push", "--mirror", "origin")
+        mock_push.assert_called_with(
+            ".",
+            "origin",
+            None,
+            force=False,
+            push_options=None,
+            atomic=False,
+            all=False,
+            tags=False,
+            delete=False,
+            dry_run=False,
+            prune=False,
+            set_upstream=False,
+            follow_tags=False,
+            mirror=True,
         )
 
 

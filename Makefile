@@ -41,7 +41,7 @@ check-noextensions:: clean
 	$(RUNTEST) tests.test_suite
 
 check-contrib:: clean
-	$(RUNTEST) -v dulwich.contrib.test_suite
+	$(RUNTEST) -v contrib.test_suite
 
 typing:
 	$(PYTHON) -m mypy dulwich
@@ -54,7 +54,7 @@ style:
 	$(RUFF) check .
 
 coverage:
-	$(COVERAGE) run -m unittest tests.test_suite dulwich.contrib.test_suite
+	$(COVERAGE) run -m unittest tests.test_suite contrib.test_suite
 
 coverage-html: coverage
 	$(COVERAGE) html

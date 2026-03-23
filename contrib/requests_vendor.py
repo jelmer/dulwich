@@ -41,17 +41,17 @@ from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ..config import ConfigFile
+    from dulwich.config import ConfigFile
 
 from requests import Session
 
-from ..client import (
+from dulwich.client import (
     AbstractHttpGitClient,
     HTTPProxyUnauthorized,
     HTTPUnauthorized,
     default_user_agent_string,
 )
-from ..errors import GitProtocolError, NotGitRepository
+from dulwich.errors import GitProtocolError, NotGitRepository
 
 
 class RequestsHttpGitClient(AbstractHttpGitClient):

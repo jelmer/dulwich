@@ -112,7 +112,6 @@ packages = [
     "dulwich",
     "dulwich.aiohttp",
     "dulwich.cloud",
-    "dulwich.contrib",
     "dulwich.porcelain",
     "dulwich.tests",
 ]
@@ -155,6 +154,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D"]  # Don't require docstrings in tests
+"contrib/test_*.py" = ["D"]  # Don't require docstrings in tests
 "fuzzing/**/*.py" = ["D"]  # Don't require docstrings in fuzzing
 "examples/**/*.py" = ["D"]  # Don't require docstrings in examples
 "devscripts/**/*.py" = ["D"]  # Don't require docstrings in devscripts

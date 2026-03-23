@@ -77,6 +77,9 @@ jobs:
         run: |
           pip install --upgrade coverage
           python -m coverage run -p -m unittest tests.test_suite
+      - name: Run contrib tests
+        run: |
+          python -m unittest contrib.test_suite
 
   test-minimal:
     runs-on: ${{ matrix.os }}

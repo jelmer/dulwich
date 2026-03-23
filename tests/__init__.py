@@ -281,9 +281,6 @@ def nocompat_test_suite() -> unittest.TestSuite:
     result = unittest.TestSuite()
     result.addTests(self_test_suite())
     result.addTests(tutorial_test_suite())
-    from .contrib import test_suite as contrib_test_suite
-
-    result.addTests(contrib_test_suite())
     return result
 
 
@@ -303,7 +300,4 @@ def test_suite() -> unittest.TestSuite:
     from .compat import test_suite as compat_test_suite
 
     result.addTests(compat_test_suite())
-    from .contrib import test_suite as contrib_test_suite
-
-    result.addTests(contrib_test_suite())
     return result

@@ -9,6 +9,7 @@ include dulwich/py.typed
 recursive-include docs conf.py *.txt Makefile make.bat
 recursive-include examples *.py
 recursive-include crates *.rs Cargo.toml
+recursive-include contrib *.py *.sh *.txt *.md *.rst
 graft tests/
 graft testdata/
 include tox.ini

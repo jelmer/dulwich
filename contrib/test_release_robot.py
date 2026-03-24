@@ -32,10 +32,11 @@ import unittest
 from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
-from dulwich.contrib import release_robot
 from dulwich.objects import Commit, Tag
 from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit, make_tag
+
+from . import release_robot
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))  # this directory
 
@@ -351,7 +352,7 @@ class MainFunctionTests(unittest.TestCase):
 
     @patch.object(sys, "argv", ["release_robot.py", "/custom/path"])
     @patch("builtins.print")
-    @patch("dulwich.contrib.release_robot.get_current_version")
+    @patch("contrib.release_robot.get_current_version")
     def test_main_custom_dir(self, mock_get_version, mock_print):
         """Test main function with custom directory from command line."""
         mock_get_version.return_value = "4.5.6"

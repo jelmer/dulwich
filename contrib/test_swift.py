@@ -21,7 +21,7 @@
 # License, Version 2.0.
 #
 
-"""Tests for dulwich.contrib.swift."""
+"""Tests for contrib.swift."""
 
 import json
 import posixpath
@@ -30,9 +30,8 @@ from time import time
 from unittest import skipIf
 
 from dulwich.objects import Blob, Commit, Tag, Tree, parse_timezone
-
-from .. import TestCase
-from ..test_object_store import ObjectStoreTests
+from tests import TestCase
+from tests.test_object_store import ObjectStoreTests
 
 missing_libs = []
 
@@ -55,7 +54,7 @@ skipmsg = f"Required libraries are not installed ({missing_libs!r})"
 
 
 if not missing_libs:
-    from dulwich.contrib import swift
+    from contrib import swift
 
 config_file = """[swift]
 auth_url = http://127.0.0.1:8080/auth/%(version_str)s
@@ -241,7 +240,7 @@ class TestSwiftRepo(TestCase):
     def test_init(self) -> None:
         store = {"fakerepo/objects/pack": ""}
         with patch(
-            "dulwich.contrib.swift.SwiftConnector",
+            "contrib.swift.SwiftConnector",
             new_callable=create_swift_connector,
             store=store,
         ):
@@ -249,7 +248,7 @@ class TestSwiftRepo(TestCase):
 
     def test_init_no_data(self) -> None:
         with patch(
-            "dulwich.contrib.swift.SwiftConnector",
+            "contrib.swift.SwiftConnector",
             new_callable=create_swift_connector,
         ):
             self.assertRaises(Exception, swift.SwiftRepo, "fakerepo", self.conf)
@@ -257,7 +256,7 @@ class TestSwiftRepo(TestCase):
     def test_init_bad_data(self) -> None:
         store = {"fakerepo/.git/objects/pack": ""}
         with patch(
-            "dulwich.contrib.swift.SwiftConnector",
+            "contrib.swift.SwiftConnector",
             new_callable=create_swift_connector,
             store=store,
         ):
@@ -266,7 +265,7 @@ class TestSwiftRepo(TestCase):
     def test_put_named_file(self) -> None:
         store = {"fakerepo/objects/pack": ""}
         with patch(
-            "dulwich.contrib.swift.SwiftConnector",
+            "contrib.swift.SwiftConnector",
             new_callable=create_swift_connector,
             store=store,
         ):
@@ -278,7 +277,7 @@ class TestSwiftRepo(TestCase):
     def test_init_bare(self) -> None:
         fsc = FakeSwiftConnector("fakeroot", conf=self.conf)
         with patch(
-            "dulwich.contrib.swift.SwiftConnector",
+            "contrib.swift.SwiftConnector",
             new_callable=create_swift_connector,
             store=fsc.store,
         ):
@@ -377,7 +376,7 @@ class TestSwiftConnector(TestCase):
 
     def test_create_root(self) -> None:
         with patch(
-            "dulwich.contrib.swift.SwiftConnector.test_root_exists",
+            "contrib.swift.SwiftConnector.test_root_exists",
             lambda *args: None,
         ):
             with patch("geventhttpclient.HTTPClient.request", lambda *args: Response()):
@@ -385,7 +384,7 @@ class TestSwiftConnector(TestCase):
 
     def test_create_root_fails(self) -> None:
         with patch(
-            "dulwich.contrib.swift.SwiftConnector.test_root_exists",
+            "contrib.swift.SwiftConnector.test_root_exists",
             lambda *args: None,
         ):
             with patch(
@@ -464,11 +463,11 @@ class TestSwiftConnector(TestCase):
 
     def test_del_root(self) -> None:
         with patch(
-            "dulwich.contrib.swift.SwiftConnector.del_object",
+            "contrib.swift.SwiftConnector.del_object",
             lambda *args: None,
         ):
             with patch(
-                "dulwich.contrib.swift.SwiftConnector.get_container_objects",
+                "contrib.swift.SwiftConnector.get_container_objects",
                 lambda *args: ({"name": "a"}, {"name": "b"}),
             ):
                 with patch(

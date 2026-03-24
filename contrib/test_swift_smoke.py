@@ -44,8 +44,8 @@ from gevent import monkey
 
 monkey.patch_all()
 
+from contrib import swift  # noqa: E402
 from dulwich import client, index, objects, repo, server  # noqa: E402
-from dulwich.contrib import swift  # noqa: E402
 
 
 class DulwichServer:

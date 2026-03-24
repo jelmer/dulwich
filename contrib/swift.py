@@ -66,11 +66,11 @@ if TYPE_CHECKING:
 
 from geventhttpclient import HTTPClient
 
-from ..file import _GitFile
-from ..lru_cache import LRUSizeCache
-from ..object_store import INFODIR, PACKDIR, PackBasedObjectStore
-from ..objects import S_ISGITLINK, Blob, Commit, ObjectID, Tag, Tree
-from ..pack import (
+from dulwich.file import _GitFile
+from dulwich.lru_cache import LRUSizeCache
+from dulwich.object_store import INFODIR, PACKDIR, PackBasedObjectStore
+from dulwich.objects import S_ISGITLINK, Blob, Commit, ObjectID, Tag, Tree
+from dulwich.pack import (
     ObjectContainer,
     Pack,
     PackData,
@@ -87,10 +87,11 @@ from ..pack import (
     write_pack_index_v2,
     write_pack_object,
 )
-from ..protocol import TCP_GIT_PORT, split_peeled_refs, write_info_refs
-from ..refs import HEADREF, Ref, RefsContainer, read_info_refs
-from ..repo import OBJECTDIR, BaseRepo
-from ..server import Backend, BackendRepo, TCPGitServer
+from dulwich.protocol import TCP_GIT_PORT, split_peeled_refs, write_info_refs
+from dulwich.refs import HEADREF, Ref, RefsContainer, read_info_refs
+from dulwich.repo import OBJECTDIR, BaseRepo
+from dulwich.server import Backend, BackendRepo, TCPGitServer
+
 from .greenthreads import GreenThreadsMissingObjectFinder
 
 """
@@ -876,7 +877,7 @@ class SwiftObjectStore(PackBasedObjectStore):
             f.seek(0)
             from typing import cast
 
-            from ..file import _GitFile
+            from dulwich.file import _GitFile
 
             pack = PackData(
                 file=cast(_GitFile, f), filename="", object_format=self.object_format

@@ -19,16 +19,19 @@
 # License, Version 2.0.
 #
 
+"""Contrib."""
+
 import unittest
 
 
 def test_suite() -> unittest.TestSuite:
+    """Return testsuite for contrib."""
     names = [
         "greenthreads",
         "paramiko_vendor",
         "release_robot",
         "swift",
     ]
-    module_names = ["tests.contrib.test_" + name for name in names]
+    module_names = ["contrib.test_" + name for name in names]
     loader = unittest.TestLoader()
     return loader.loadTestsFromNames(module_names)

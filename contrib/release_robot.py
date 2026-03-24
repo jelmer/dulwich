@@ -59,7 +59,7 @@ import sys
 import time
 from typing import Any, cast
 
-from ..repo import Repo
+from dulwich.repo import Repo
 
 # CONSTANTS
 PROJDIR = "."
@@ -94,7 +94,7 @@ def get_recent_tags(projdir: str = PROJDIR) -> list[tuple[str, list[Any]]]:
             # strip the leading text from refs to get "tag name"
             _, tag = key.rsplit("/", 1)
             # check if tag object is "commit" or "tag" pointing to a "commit"
-            from ..objects import Commit, Tag
+            from dulwich.objects import Commit, Tag
 
             if isinstance(obj, Tag):
                 commit_info = obj.object  # a tuple (commit class, commit id)

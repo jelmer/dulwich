@@ -29,7 +29,7 @@ from io import StringIO
 from unittest import skipIf
 from unittest.mock import patch
 
-from .. import TestCase
+from tests import TestCase
 
 try:
     import paramiko
@@ -39,7 +39,7 @@ else:
     has_paramiko = True
     import paramiko.transport
 
-    from dulwich.contrib.paramiko_vendor import ParamikoSSHVendor
+    from contrib.paramiko_vendor import ParamikoSSHVendor
 
     class Server(paramiko.ServerInterface):
         """http://docs.paramiko.org/en/2.4/api/server.html."""
@@ -372,9 +372,7 @@ Host testserver
 
         try:
             # Mock the config path
-            with patch(
-                "dulwich.contrib.paramiko_vendor.os.path.expanduser"
-            ) as mock_expanduser:
+            with patch("contrib.paramiko_vendor.os.path.expanduser") as mock_expanduser:
 
                 def side_effect(path):
                     if path == "~/.ssh/config":
@@ -583,9 +581,7 @@ Host testserver
             config_path = f.name
 
         try:
-            with patch(
-                "dulwich.contrib.paramiko_vendor.os.path.expanduser"
-            ) as mock_expanduser:
+            with patch("contrib.paramiko_vendor.os.path.expanduser") as mock_expanduser:
                 mock_expanduser.side_effect = lambda p: (
                     config_path if p == "~/.ssh/config" else p
                 )

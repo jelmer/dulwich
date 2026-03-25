@@ -268,18 +268,31 @@ WxtWBWHwxfSmqgTXilEA3ALJp0kNolLnEttnhENwJpZHlqtes0ZA4w==
 
 def _set_test_home(test_case: TestCase) -> str:
     home_dir = tempfile.TemporaryDirectory()
-    old_home = os.environ.get("HOME")
-    os.environ["HOME"] = home_dir.name
+    old_env = {
+        key: os.environ.get(key)
+        for key in ("HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH")
+    }
+    os.environ.update(_home_env(home_dir.name))
 
     def cleanup() -> None:
-        if old_home is None:
-            os.environ.pop("HOME", None)
-        else:
-            os.environ["HOME"] = old_home
+        for key, value in old_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
         home_dir.cleanup()
 
     test_case.addCleanup(cleanup)
     return home_dir.name
+
+
+def _home_env(home_dir: str) -> dict[str, str]:
+    env = {"HOME": home_dir, "USERPROFILE": home_dir}
+    if os.name == "nt":
+        drive, path = os.path.splitdrive(home_dir)
+        env["HOMEDRIVE"] = drive
+        env["HOMEPATH"] = path or "\\"
+    return env
 
 
 def _write_known_host(
@@ -638,7 +651,7 @@ Host testserver
     def test_rejects_unknown_host_key(self) -> None:
         """Unknown host keys should be rejected by default."""
         with tempfile.TemporaryDirectory() as home_dir:
-            with patch.dict(os.environ, {"HOME": home_dir}):
+            with patch.dict(os.environ, _home_env(home_dir)):
                 os.mkdir(os.path.join(home_dir, ".ssh"))
                 vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False)
                 with self.assertRaises(paramiko.SSHException):

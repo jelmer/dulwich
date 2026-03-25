@@ -30,6 +30,7 @@ from dulwich.signature import (
     SIGNATURE_FORMAT_OPENPGP,
     SIGNATURE_FORMAT_SSH,
     SIGNATURE_FORMAT_X509,
+    BadSignature,
     GPGCliSignatureVendor,
     GPGSignatureVendor,
     SSHCliSignatureVendor,
@@ -146,7 +147,7 @@ class GPGSignatureVendorTests(unittest.TestCase):
         test_data = b"test data"
         invalid_signature = b"this is not a valid signature"
 
-        with self.assertRaises(gpg.errors.GPGMEError):
+        with self.assertRaises(BadSignature):
             vendor.verify(test_data, invalid_signature)
 
     def test_sign_with_keyid(self) -> None:

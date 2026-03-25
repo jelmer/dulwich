@@ -281,6 +281,12 @@ class GPGSignatureVendor(SignatureSigner, SignatureVerifier):
                     signature=signature,
                 )
 
+                # Check that we actually got valid signatures
+                if not result.signatures:
+                    raise BadSignature(
+                        "GPG signature verification failed: no signatures found"
+                    )
+
                 # Check minimum trust level if configured
                 if self.min_trust_level is not None:
                     min_validity = trust_level_map.get(self.min_trust_level)
@@ -306,7 +312,7 @@ class GPGSignatureVendor(SignatureSigner, SignatureVerifier):
                         signing_keys=signing_fprs,
                         trusted_keys=list(self.keyids),
                     )
-        except gpg.errors.BadSignatures as e:
+        except gpg.errors.GpgError as e:
             raise BadSignature(f"GPG signature verification failed: {e}") from e
 
 

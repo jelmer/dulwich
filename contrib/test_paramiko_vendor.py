@@ -266,10 +266,40 @@ WxtWBWHwxfSmqgTXilEA3ALJp0kNolLnEttnhENwJpZHlqtes0ZA4w==
 -----END RSA PRIVATE KEY-----"""
 
 
+def _set_test_home(test_case: TestCase) -> str:
+    home_dir = tempfile.TemporaryDirectory()
+    old_home = os.environ.get("HOME")
+    os.environ["HOME"] = home_dir.name
+
+    def cleanup() -> None:
+        if old_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = old_home
+        home_dir.cleanup()
+
+    test_case.addCleanup(cleanup)
+    return home_dir.name
+
+
+def _write_known_host(
+    home_dir: str, host: str, port: int, host_key: "paramiko.PKey"
+) -> str:
+    ssh_dir = os.path.join(home_dir, ".ssh")
+    os.makedirs(ssh_dir, exist_ok=True)
+    known_hosts_path = os.path.join(ssh_dir, "known_hosts")
+
+    host_keys = paramiko.HostKeys()
+    host_keys.add(f"[{host}]:{port}", host_key.get_name(), host_key)
+    host_keys.save(known_hosts_path)
+    return known_hosts_path
+
+
 @skipIf(not has_paramiko, "paramiko is not installed")
 class ParamikoSSHVendorTests(TestCase):
     def setUp(self) -> None:
         self.commands = []
+        self.host_key = paramiko.RSAKey.from_private_key(StringIO(SERVER_KEY))
         socket.setdefaulttimeout(10)
         self.addCleanup(socket.setdefaulttimeout, None)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -277,6 +307,10 @@ class ParamikoSSHVendorTests(TestCase):
         self.socket.listen(5)
         self.addCleanup(self.socket.close)
         self.port = self.socket.getsockname()[1]
+        self.home_dir = _set_test_home(self)
+        self.known_hosts_path = _write_known_host(
+            self.home_dir, "127.0.0.1", self.port, self.host_key
+        )
         self.thread = threading.Thread(target=self._run)
         self.thread.start()
 
@@ -290,8 +324,7 @@ class ParamikoSSHVendorTests(TestCase):
             return False
         self.transport = paramiko.Transport(conn)
         self.addCleanup(self.transport.close)
-        host_key = paramiko.RSAKey.from_private_key(StringIO(SERVER_KEY))
-        self.transport.add_server_key(host_key)
+        self.transport.add_server_key(self.host_key)
         server = Server(self.commands)
         self.transport.start_server(server=server)
 
@@ -404,6 +437,10 @@ class ParamikoSSHVendorRealServerTests(TestCase):
     def setUp(self) -> None:
         self.ssh_server = SSHServer()
         self.ssh_server.start()
+        self.home_dir = _set_test_home(self)
+        self.known_hosts_path = _write_known_host(
+            self.home_dir, "127.0.0.1", self.ssh_server.port, self.ssh_server.host_key
+        )
         socket.setdefaulttimeout(10)
         self.addCleanup(socket.setdefaulttimeout, None)
         self.addCleanup(self.ssh_server.stop)
@@ -577,6 +614,7 @@ Host testserver
     HostName 127.0.0.1
     User {USER}
     Port {self.ssh_server.port}
+    UserKnownHostsFile {self.known_hosts_path}
 """)
             config_path = f.name
 
@@ -596,3 +634,18 @@ Host testserver
                 con.close()
         finally:
             os.unlink(config_path)
+
+    def test_rejects_unknown_host_key(self) -> None:
+        """Unknown host keys should be rejected by default."""
+        with tempfile.TemporaryDirectory() as home_dir:
+            with patch.dict(os.environ, {"HOME": home_dir}):
+                os.mkdir(os.path.join(home_dir, ".ssh"))
+                vendor = ParamikoSSHVendor(allow_agent=False, look_for_keys=False)
+                with self.assertRaises(paramiko.SSHException):
+                    vendor.run_command(
+                        "127.0.0.1",
+                        b"should_reject_unknown_host",
+                        username=USER,
+                        port=self.ssh_server.port,
+                        password=PASSWORD,
+                    )

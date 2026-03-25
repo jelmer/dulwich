@@ -27,6 +27,10 @@
    with Git's base85 encoding, and ``--3way`` merge fallback when patches
    don't apply cleanly. (Jelmer Vernooĳ, #1784)
 
+ * Fix GPG signature verification to raise ``BadSignature`` for all
+   GPG errors, not just ``BadSignatures``. Also detect the case where
+   GPG returns no signatures at all. (Jelmer Vernooĳ)
+
  * Fix client incorrectly sending ``unborn`` argument in Git protocol v2
    ``ls-refs`` requests to servers that advertise ``ls-refs`` capability
    without explicitly advertising ``ls-refs=unborn`` support, preventing

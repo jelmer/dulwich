@@ -141,6 +141,34 @@ class ParamikoSSHVendor:
             warnings.warn(f"Could not read SSH config file {config_path}: {e}")
         return ssh_config
 
+    def _load_host_keys(
+        self, client: paramiko.SSHClient, host_config: paramiko.config.SSHConfigDict
+    ) -> None:
+        """Load host keys before connecting.
+
+        This keeps the vendor fail-closed by default while still honoring
+        SSH config overrides for known_hosts paths when present.
+        """
+        client.load_system_host_keys()
+
+        for config_key in ("globalknownhostsfile", "userknownhostsfile"):
+            known_hosts_paths = host_config.get(config_key)
+            if isinstance(known_hosts_paths, str):
+                known_hosts_paths = [known_hosts_paths]
+            if not known_hosts_paths:
+                continue
+
+            for known_hosts_path in known_hosts_paths:
+                expanded_path = os.path.expanduser(known_hosts_path)
+                try:
+                    client.load_host_keys(expanded_path)
+                except FileNotFoundError:
+                    continue
+                except (OSError, PermissionError) as e:
+                    warnings.warn(
+                        f"Could not read known hosts file {expanded_path}: {e}"
+                    )
+
     def run_command(
         self,
         host: str,
@@ -211,8 +239,8 @@ class ParamikoSSHVendor:
 
         connection_kwargs.update(kwargs)
 
-        policy = paramiko.client.MissingHostKeyPolicy()
-        client.set_missing_host_key_policy(policy)
+        self._load_host_keys(client, host_config)
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
         client.connect(**connection_kwargs)
 
         # Open SSH session

@@ -65,6 +65,68 @@ from .repo import (
 from .trailers import add_trailer_to_message
 
 
+def _should_use_relative_paths(
+    repo: Repo,
+    relative_paths: bool | None,
+    existing_path: bytes | None = None,
+) -> bool:
+    """Determine whether to use relative paths for gitdir references.
+
+    Args:
+        repo: The repository
+        relative_paths: Explicit preference (True/False) or None to check config
+        existing_path: Optional existing path to check format (for preserving format)
+
+    Returns:
+        True if relative paths should be used, False otherwise
+    """
+    if relative_paths is not None:
+        return relative_paths
+
+    # Check config
+    config = repo.get_config()
+    try:
+        use_relative = config.get_boolean(
+            (b"worktree",), b"useRelativePaths", default=False
+        )
+        if use_relative:
+            return True
+    except KeyError:
+        pass
+
+    # Preserve existing format if available
+    if existing_path is not None:
+        return not os.path.isabs(os.fsdecode(existing_path))
+
+    return False
+
+
+def _compute_gitdir_path(
+    repo: Repo,
+    gitdir_file: str,
+    worktree_control_dir: str,
+    use_relative: bool,
+) -> str:
+    """Compute the gitdir path and enable extension if needed.
+
+    Args:
+        repo: The repository
+        gitdir_file: Absolute path to the .git file
+        worktree_control_dir: Absolute path to the worktree control directory
+        use_relative: Whether to use relative paths
+
+    Returns:
+        The path to write (relative or absolute)
+    """
+    if use_relative:
+        from .repo import _enable_relative_worktrees_extension
+
+        _enable_relative_worktrees_extension(repo)
+        return os.path.relpath(gitdir_file, worktree_control_dir)
+    else:
+        return gitdir_file
+
+
 class WorkTreeInfo:
     """Information about a single worktree.
 
@@ -176,6 +238,7 @@ class WorkTreeContainer:
         force: bool = False,
         detach: bool = False,
         exist_ok: bool = False,
+        relative_paths: bool | None = None,
     ) -> Repo:
         """Add a new worktree.
 
@@ -186,6 +249,8 @@ class WorkTreeContainer:
             force: Force creation even if branch is already checked out elsewhere
             detach: Detach HEAD in the new worktree
             exist_ok: If True, do not raise an error if the directory already exists
+            relative_paths: If True, use relative paths for gitdir references.
+                If None, check worktree.useRelativePaths config (defaults to False)
 
         Returns:
             The newly created worktree repository
@@ -198,6 +263,7 @@ class WorkTreeContainer:
             force=force,
             detach=detach,
             exist_ok=exist_ok,
+            relative_paths=relative_paths,
         )
 
     def remove(self, path: str | bytes | os.PathLike[str], force: bool = False) -> None:
@@ -227,14 +293,17 @@ class WorkTreeContainer:
         self,
         old_path: str | bytes | os.PathLike[str],
         new_path: str | bytes | os.PathLike[str],
+        relative_paths: bool | None = None,
     ) -> None:
         """Move a worktree to a new location.
 
         Args:
             old_path: Current path of the worktree
             new_path: New path for the worktree
+            relative_paths: If True, use relative paths for gitdir references.
+                If None, check worktree.useRelativePaths config or preserve existing format
         """
-        move_worktree(self._repo, old_path, new_path)
+        move_worktree(self._repo, old_path, new_path, relative_paths=relative_paths)
 
     def lock(
         self, path: str | bytes | os.PathLike[str], reason: str | None = None
@@ -256,18 +325,22 @@ class WorkTreeContainer:
         unlock_worktree(self._repo, path)
 
     def repair(
-        self, paths: Sequence[str | bytes | os.PathLike[str]] | None = None
+        self,
+        paths: Sequence[str | bytes | os.PathLike[str]] | None = None,
+        relative_paths: bool | None = None,
     ) -> builtins.list[str]:
         """Repair worktree administrative files.
 
         Args:
             paths: Optional list of worktree paths to repair. If None, repairs
                    connections from the main repository to all linked worktrees.
+            relative_paths: If True, use relative paths for gitdir references.
+                If None, check worktree.useRelativePaths config or preserve existing format
 
         Returns:
             List of repaired worktree paths
         """
-        return repair_worktree(self._repo, paths=paths)
+        return repair_worktree(self._repo, paths=paths, relative_paths=relative_paths)
 
     def __iter__(self) -> Iterator[WorkTreeInfo]:
         """Iterate over all worktrees."""
@@ -951,6 +1024,7 @@ def add_worktree(
     force: bool = False,
     detach: bool = False,
     exist_ok: bool = False,
+    relative_paths: bool | None = None,
 ) -> Repo:
     """Add a new worktree to the repository.
 
@@ -962,6 +1036,8 @@ def add_worktree(
         force: Force creation even if branch is already checked out elsewhere
         detach: Detach HEAD in the new worktree
         exist_ok: If True, do not raise an error if the directory already exists
+        relative_paths: If True, use relative paths for gitdir references.
+            If None, check worktree.useRelativePaths config (defaults to False)
 
     Returns:
         The newly created worktree repository
@@ -974,6 +1050,9 @@ def add_worktree(
     path = os.fspath(path)
     if isinstance(path, bytes):
         path = os.fsdecode(path)
+
+    # Determine whether to use relative paths
+    use_relative = _should_use_relative_paths(repo, relative_paths)
 
     # Check if path already exists
     if os.path.exists(path) and not exist_ok:
@@ -1020,7 +1099,9 @@ def add_worktree(
 
     # Initialize the worktree
     identifier = os.path.basename(path)
-    wt_repo = RepoClass._init_new_working_directory(path, repo, identifier=identifier)
+    wt_repo = RepoClass._init_new_working_directory(
+        path, repo, identifier=identifier, relative_paths=use_relative
+    )
 
     # Set HEAD appropriately
     if detach:
@@ -1250,6 +1331,7 @@ def move_worktree(
     repo: Repo,
     old_path: str | bytes | os.PathLike[str],
     new_path: str | bytes | os.PathLike[str],
+    relative_paths: bool | None = None,
 ) -> None:
     """Move a worktree to a new location.
 
@@ -1257,6 +1339,8 @@ def move_worktree(
         repo: The main repository
         old_path: Current path of the worktree
         new_path: New path for the worktree
+        relative_paths: If True, use relative paths for gitdir references.
+            If None, check worktree.useRelativePaths config or preserve existing format
 
     Raises:
         ValueError: If the worktree doesn't exist or new path already exists
@@ -1280,19 +1364,37 @@ def move_worktree(
     worktree_id = _find_worktree_id(repo, old_path)
     worktree_control_dir = os.path.join(repo.controldir(), WORKTREES, worktree_id)
 
+    # Read existing path to check format
+    existing_path = None
+    try:
+        with open(os.path.join(worktree_control_dir, GITDIR), "rb") as f:
+            existing_path = f.read().strip()
+    except (FileNotFoundError, PermissionError):
+        pass
+
+    # Determine whether to use relative paths
+    use_relative = _should_use_relative_paths(repo, relative_paths, existing_path)
+
     # Move the actual worktree directory
     shutil.move(old_path, new_path)
 
     # Update the gitdir file in the worktree
-    gitdir_file = os.path.join(new_path, ".git")
+    gitdir_file_abs = os.path.abspath(os.path.join(new_path, ".git"))
+
+    # Compute the path to write
+    gitdir_path = _compute_gitdir_path(
+        repo, gitdir_file_abs, worktree_control_dir, use_relative
+    )
 
     # Update the gitdir pointer in the control directory
     with open(os.path.join(worktree_control_dir, GITDIR), "wb") as f:
-        f.write(os.fsencode(gitdir_file) + b"\n")
+        f.write(os.fsencode(gitdir_path) + b"\n")
 
 
 def repair_worktree(
-    repo: Repo, paths: Sequence[str | bytes | os.PathLike[str]] | None = None
+    repo: Repo,
+    paths: Sequence[str | bytes | os.PathLike[str]] | None = None,
+    relative_paths: bool | None = None,
 ) -> list[str]:
     """Repair worktree administrative files.
 
@@ -1303,6 +1405,8 @@ def repair_worktree(
         repo: The main repository
         paths: Optional list of worktree paths to repair. If None, repairs
                connections from the main repository to all linked worktrees.
+        relative_paths: If True, use relative paths for gitdir references.
+            If None, check worktree.useRelativePaths config or preserve existing format
 
     Returns:
         List of repaired worktree paths
@@ -1348,9 +1452,27 @@ def repair_worktree(
             # Update the gitdir file in the worktree control directory
             gitdir_pointer = os.path.join(worktree_control_path, GITDIR)
             if os.path.exists(gitdir_pointer):
+                # Read existing path to check format
+                existing_path = None
+                try:
+                    with open(gitdir_pointer, "rb") as f:
+                        existing_path = f.read().strip()
+                except (FileNotFoundError, PermissionError):
+                    pass
+
+                # Determine which format to use for this worktree
+                use_relative = _should_use_relative_paths(
+                    repo, relative_paths, existing_path
+                )
+
+                # Compute the path to write
+                gitdir_path_to_write = _compute_gitdir_path(
+                    repo, gitdir_file, worktree_control_path, use_relative
+                )
+
                 # Update to point to the current location
                 with open(gitdir_pointer, "wb") as f:
-                    f.write(os.fsencode(gitdir_file) + b"\n")
+                    f.write(os.fsencode(gitdir_path_to_write) + b"\n")
                 repaired.append(path_str)
     else:
         # Repair from main repository to all linked worktrees
@@ -1393,11 +1515,24 @@ def repair_worktree(
                             if os.path.abspath(current_pointer) != os.path.abspath(
                                 expected_pointer
                             ):
+                                # Determine which format to use
+                                use_relative = _should_use_relative_paths(
+                                    repo, relative_paths, gitdir_contents
+                                )
+
+                                # Compute the path to write (from worktree to control dir)
+                                pointer_to_write = _compute_gitdir_path(
+                                    repo,
+                                    worktree_control_path,
+                                    old_worktree_path,
+                                    use_relative,
+                                )
+
                                 # Update the .git file to point to the correct location
                                 with open(old_gitdir_location, "wb") as wf:
                                     wf.write(
                                         b"gitdir: "
-                                        + os.fsencode(worktree_control_path)
+                                        + os.fsencode(pointer_to_write)
                                         + b"\n"
                                     )
                                 repaired.append(old_worktree_path)

@@ -9,10 +9,12 @@ from unittest.mock import patch
 
 from dulwich.config import ConfigDict
 from dulwich.gc import (
+    DEFAULT_GC_PRUNE_EXPIRE,
     GCStats,
     find_reachable_objects,
     find_unreachable_objects,
     garbage_collect,
+    get_prune_grace_period,
     maybe_auto_gc,
     prune_unreachable_objects,
     should_run_gc,
@@ -780,3 +782,47 @@ class AutoGCTestCase(TestCase):
                 self.assertTrue(result)
                 # gc.log should be removed after successful GC
                 self.assertFalse(os.path.exists(gc_log_path))
+
+
+class GetPruneGracePeriodTestCase(TestCase):
+    """Tests for get_prune_grace_period."""
+
+    def test_default_when_not_configured(self):
+        """Test that default is 2 weeks when gc.pruneExpire is not set."""
+        config = ConfigDict()
+        self.assertEqual(DEFAULT_GC_PRUNE_EXPIRE, get_prune_grace_period(config))
+
+    def test_now(self):
+        """Test gc.pruneExpire = now."""
+        config = ConfigDict()
+        config.set(b"gc", b"pruneExpire", b"now")
+        self.assertEqual(0, get_prune_grace_period(config))
+
+    def test_relative_time(self):
+        """Test gc.pruneExpire with relative time like '2.weeks.ago'."""
+        config = ConfigDict()
+        config.set(b"gc", b"pruneExpire", b"2.weeks.ago")
+        grace_period = get_prune_grace_period(config)
+        # Should be approximately 2 weeks in seconds
+        self.assertAlmostEqual(1209600, grace_period, delta=5)
+
+    def test_relative_time_one_week(self):
+        """Test gc.pruneExpire = 1.week.ago."""
+        config = ConfigDict()
+        config.set(b"gc", b"pruneExpire", b"1.week.ago")
+        grace_period = get_prune_grace_period(config)
+        self.assertAlmostEqual(604800, grace_period, delta=5)
+
+    def test_relative_time_space_separated(self):
+        """Test gc.pruneExpire with space-separated format."""
+        config = ConfigDict()
+        config.set(b"gc", b"pruneExpire", b"3 days ago")
+        grace_period = get_prune_grace_period(config)
+        self.assertAlmostEqual(3 * 86400, grace_period, delta=5)
+
+    def test_invalid_value(self):
+        """Test that invalid gc.pruneExpire raises ValueError."""
+        config = ConfigDict()
+        config.set(b"gc", b"pruneExpire", b"not-a-date")
+        with self.assertRaises(ValueError):
+            get_prune_grace_period(config)

@@ -7266,7 +7266,7 @@ def gc(
     auto: bool = False,
     aggressive: bool = False,
     prune: bool = True,
-    grace_period: int | None = 1209600,  # 2 weeks default
+    grace_period: int | None = None,
     dry_run: bool = False,
     progress: Callable[[str], None] | None = None,
 ) -> "GCStats":
@@ -7277,16 +7277,19 @@ def gc(
       auto: If True, only run gc if needed
       aggressive: If True, use more aggressive settings
       prune: If True, prune unreachable objects
-      grace_period: Grace period in seconds for pruning (default 2 weeks)
+      grace_period: Grace period in seconds for pruning.
+          If None, reads gc.pruneExpire from config (default 2 weeks).
       dry_run: If True, only report what would be done
       progress: Optional progress callback
 
     Returns:
       GCStats object with garbage collection statistics
     """
-    from ..gc import garbage_collect
+    from ..gc import garbage_collect, get_prune_grace_period
 
     with open_repo_closing(repo) as r:
+        if grace_period is None:
+            grace_period = get_prune_grace_period(r.get_config())
         return garbage_collect(
             r,
             auto=auto,

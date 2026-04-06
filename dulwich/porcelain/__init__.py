@@ -3387,8 +3387,8 @@ def _walk_working_dir_paths(
 
         if precompose_unicode and isinstance(dirpath, str):
             dirpath = _precompose_unicode_path(dirpath)
-            dirnames[:] = [_precompose_unicode_path(d) for d in dirnames]
-            filenames = [_precompose_unicode_path(f) for f in filenames]
+            dirnames[:] = [_precompose_unicode_path(d) for d in dirnames if isinstance(d, str)]
+            filenames = [_precompose_unicode_path(f) for f in filenames if isinstance(f, str)]
 
         if dirpath != frompath:
             yield dirpath, True  # type: ignore[misc]

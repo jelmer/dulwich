@@ -4164,6 +4164,10 @@ class ConfigCommandTest(DulwichCliTestCase):
             symlinks = config.get((b"core",), b"symlinks")
         except KeyError:
             symlinks = None
+        try:
+            precomposeunicode = config.get((b"core",), b"precomposeunicode")
+        except KeyError:
+            precomposeunicode = None
 
         # List all values
         result, stdout, _stderr = self._run_cli("config", "--list")
@@ -4174,6 +4178,8 @@ class ConfigCommandTest(DulwichCliTestCase):
         expected += f"core.filemode={filemode.decode('utf-8')}\n"
         if symlinks is not None:
             expected += f"core.symlinks={symlinks.decode('utf-8')}\n"
+        if precomposeunicode is not None:
+            expected += f"core.precomposeunicode={precomposeunicode.decode('utf-8')}\n"
         expected += (
             "core.bare=false\n"
             "core.logallrefupdates=true\n"

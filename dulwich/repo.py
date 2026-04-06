@@ -601,6 +601,11 @@ class BaseRepo:
         if symlinks is False:
             cf.set("core", "symlinks", symlinks)
 
+        # On macOS, set precomposeunicode to true since HFS+/APFS
+        # returns filenames in NFD (decomposed) Unicode form
+        if sys.platform == "darwin":
+            cf.set("core", "precomposeunicode", True)
+
         cf.set("core", "bare", bare)
         cf.set("core", "logallrefupdates", True)
 

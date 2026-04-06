@@ -521,6 +521,10 @@ class UnpackedObject:
 
 _ZLIB_BUFSIZE = 65536  # 64KB buffer for better I/O performance
 
+# Default maximum memory for caching delta base objects (matches Git's default
+# for core.deltaBaseCacheLimit).
+DEFAULT_DELTA_BASE_CACHE_LIMIT = 96 * 1024 * 1024  # 96 MiB
+
 
 def read_zlib_chunks(
     read_some: Callable[[int], bytes],
@@ -1780,6 +1784,7 @@ class PackData:
         depth: int | None = None,
         threads: int | None = None,
         big_file_threshold: int | None = None,
+        delta_base_cache_limit: int | None = None,
     ) -> None:
         """Create a PackData object representing the pack in the given filename.
 
@@ -1799,6 +1804,7 @@ class PackData:
         self.depth = depth
         self.threads = threads
         self.big_file_threshold = big_file_threshold
+        self.delta_base_cache_limit = delta_base_cache_limit
         self._file: IO[bytes]
 
         if file is None:
@@ -1807,8 +1813,10 @@ class PackData:
             self._file = file
         (_version, self._num_objects) = read_pack_header(self._file.read)
 
-        # Use delta_cache_size config if available, otherwise default
-        cache_size = delta_cache_size or (1024 * 1024 * 20)
+        # Use delta_base_cache_limit, then delta_cache_size, then default
+        cache_size = (
+            delta_base_cache_limit or delta_cache_size or DEFAULT_DELTA_BASE_CACHE_LIMIT
+        )
         self._offset_cache = LRUSizeCache[int, tuple[int, OldUnpackedObject]](
             cache_size, compute_size=_compute_object_size
         )
@@ -3980,6 +3988,7 @@ class Pack:
         depth: int | None = None,
         threads: int | None = None,
         big_file_threshold: int | None = None,
+        delta_base_cache_limit: int | None = None,
     ) -> None:
         """Initialize a Pack object.
 
@@ -3993,6 +4002,7 @@ class Pack:
           depth: Maximum depth for delta chains
           threads: Number of threads to use for operations
           big_file_threshold: Size threshold for big file handling
+          delta_base_cache_limit: Maximum bytes for delta base object cache
         """
         self._basename = basename
         self.object_format = object_format
@@ -4008,6 +4018,7 @@ class Pack:
         self.depth = depth
         self.threads = threads
         self.big_file_threshold = big_file_threshold
+        self.delta_base_cache_limit = delta_base_cache_limit
         self._idx_load = lambda: load_pack_index(self._idx_path, object_format)
         self._data_load = lambda: PackData(
             self._data_path,
@@ -4017,6 +4028,7 @@ class Pack:
             depth=depth,
             threads=threads,
             big_file_threshold=big_file_threshold,
+            delta_base_cache_limit=delta_base_cache_limit,
             object_format=object_format,
         )
         self.resolve_ext_ref = resolve_ext_ref

@@ -831,6 +831,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         pack_big_file_threshold: int | None = None,
         *,
         packed_git_limit: int | None = None,
+        delta_base_cache_limit: int | None = None,
         object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Initialize a PackBasedObjectStore.
@@ -846,12 +847,16 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           pack_big_file_threshold: Threshold for treating files as "big"
           packed_git_limit: Maximum total bytes for mmapped pack files.
             When exceeded, least-recently-used packs are closed to free memory.
+          delta_base_cache_limit: Maximum bytes for caching delta base objects.
+            Controls memory used to cache resolved base objects during delta
+            unpacking, corresponding to Git's core.deltaBaseCacheLimit.
           object_format: Hash algorithm to use
         """
         super().__init__(object_format=object_format)
         self._pack_cache: dict[str, Pack] = {}
         self._pack_access_order: list[str] = []
         self.packed_git_limit = packed_git_limit
+        self.delta_base_cache_limit = delta_base_cache_limit
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
         self.pack_delta_window_size = pack_delta_window_size
@@ -1444,6 +1449,7 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
         packed_git_limit: int | None = None,
+        delta_base_cache_limit: int | None = None,
         fsync_object_files: bool = False,
         pack_write_bitmaps: bool = False,
         pack_write_bitmap_hash_cache: bool = True,
@@ -1466,6 +1472,7 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_threads: number of threads for pack operations
           pack_big_file_threshold: threshold for treating files as big
           packed_git_limit: maximum total bytes for mmapped pack files
+          delta_base_cache_limit: maximum bytes for delta base object cache
           fsync_object_files: whether to fsync object files for durability
           pack_write_bitmaps: whether to write bitmap indexes for packs
           pack_write_bitmap_hash_cache: whether to include name-hash cache in bitmaps
@@ -1487,6 +1494,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_threads=pack_threads,
             pack_big_file_threshold=pack_big_file_threshold,
             packed_git_limit=packed_git_limit,
+            delta_base_cache_limit=delta_base_cache_limit,
             object_format=object_format if object_format else DEFAULT_OBJECT_FORMAT,
         )
         self.path = path
@@ -1599,6 +1607,14 @@ class DiskObjectStore(PackBasedObjectStore):
         except KeyError:
             packed_git_limit = None
 
+        # Read core.deltaBaseCacheLimit setting
+        try:
+            delta_base_cache_limit = int(
+                config.get((b"core",), b"deltaBaseCacheLimit").decode()
+            )
+        except KeyError:
+            delta_base_cache_limit = None
+
         # Read core.commitGraph setting
         use_commit_graph = config.get_boolean((b"core",), b"commitGraph", True)
 
@@ -1652,6 +1668,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_threads=pack_threads,
             pack_big_file_threshold=pack_big_file_threshold,
             packed_git_limit=packed_git_limit,
+            delta_base_cache_limit=delta_base_cache_limit,
             fsync_object_files=fsync_object_files,
             pack_write_bitmaps=pack_write_bitmaps,
             pack_write_bitmap_hash_cache=pack_write_bitmap_hash_cache,
@@ -1750,6 +1767,7 @@ class DiskObjectStore(PackBasedObjectStore):
                     depth=self.pack_depth,
                     threads=self.pack_threads,
                     big_file_threshold=self.pack_big_file_threshold,
+                    delta_base_cache_limit=self.delta_base_cache_limit,
                 )
                 new_packs.append(pack)
                 self._pack_cache[pack_hash] = pack
@@ -2008,6 +2026,7 @@ class DiskObjectStore(PackBasedObjectStore):
             depth=self.pack_depth,
             threads=self.pack_threads,
             big_file_threshold=self.pack_big_file_threshold,
+            delta_base_cache_limit=self.delta_base_cache_limit,
         )
         final_pack.check_length_and_checksum()
         # Extract just the hash from pack_base_name (/path/to/pack-HASH -> HASH)
@@ -2274,6 +2293,7 @@ class DiskObjectStore(PackBasedObjectStore):
             depth=self.pack_depth,
             threads=self.pack_threads,
             big_file_threshold=self.pack_big_file_threshold,
+            delta_base_cache_limit=self.delta_base_cache_limit,
         )
         self._pack_cache[base_name] = pack
         return pack

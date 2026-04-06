@@ -2967,6 +2967,7 @@ def get_unstaged_changes(
     filter_blob_callback: Callable[..., Any] | None = None,
     preload_index: bool = False,
     trust_ctime: bool = True,
+    max_stat: int | None = None,
 ) -> Generator[bytes, None, None]:
     """Walk through an index and check for differences against working tree.
 
@@ -2976,11 +2977,15 @@ def get_unstaged_changes(
       filter_blob_callback: Optional callback to filter blobs
       preload_index: If True, use parallel threads to check files (requires threading support)
       trust_ctime: If True, use ctime for change detection (default: True)
+      max_stat: If set, limit the number of stat operations performed.
+        When the limit is reached, remaining files are assumed unchanged.
     Returns: iterator over paths with unstaged changes
     """
     # For each entry in the index check the sha1 & ensure not staged
     if not isinstance(root_path, bytes):
         root_path = os.fsencode(root_path)
+
+    stat_count = 0
 
     if preload_index:
         # Use parallel processing for better performance on slow filesystems
@@ -2993,6 +2998,10 @@ def get_unstaged_changes(
         else:
             # Collect all entries first
             entries = list(index.iteritems())
+
+            if max_stat is not None:
+                # When max_stat is set, limit the entries we process
+                entries = entries[:max_stat]
 
             # Use number of CPUs but cap at 8 threads to avoid overhead
             num_workers = min(multiprocessing.cpu_count(), 8)
@@ -3021,9 +3030,12 @@ def get_unstaged_changes(
     if not preload_index:
         # Serial processing
         for tree_path, entry in index.iteritems():
+            if max_stat is not None and stat_count >= max_stat:
+                return
             result = _check_entry_for_changes(
                 tree_path, entry, root_path, filter_blob_callback, trust_ctime
             )
+            stat_count += 1
             if result is not None:
                 yield result
 

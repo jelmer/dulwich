@@ -4139,6 +4139,20 @@ class Pack:
 
         return pack_bitmap
 
+    @property
+    def mmap_size(self) -> int:
+        """Return the total mmapped memory usage of this pack.
+
+        This includes the pack data file and index file sizes,
+        but only for components that have been loaded (and thus mmapped).
+        """
+        total = 0
+        if self._data is not None:
+            total += self._data._get_size()
+        if self._idx is not None and isinstance(self._idx, FilePackIndex):
+            total += self._idx._size
+        return total
+
     def close(self) -> None:
         """Close the pack file and index."""
         if self._data is not None:

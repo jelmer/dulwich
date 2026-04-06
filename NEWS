@@ -32,6 +32,11 @@
    changes. This improves performance on slow filesystems or very large
    repositories. (Jelmer Vernooĳ, #1853)
 
+ * Add support for ``core.packedGitLimit`` configuration option, which
+   limits the total memory used for mmapped pack files. When exceeded,
+   least-recently-used packs are closed to free memory.
+   (Jelmer Vernooĳ, #1848)
+
  * Fix GPG signature verification to raise ``BadSignature`` for all
    GPG errors, not just ``BadSignatures``. Also detect the case where
    GPG returns no signatures at all. (Jelmer Vernooĳ)

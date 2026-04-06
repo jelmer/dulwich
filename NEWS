@@ -27,6 +27,10 @@
    with Git's base85 encoding, and ``--3way`` merge fallback when patches
    don't apply cleanly. (Jelmer Vernooĳ, #1784)
 
+ * Add support for ``gc.pruneExpire`` configuration option, which controls
+   the grace period before unreachable objects are pruned during garbage
+   collection. (Jelmer Vernooĳ, #1859)
+
  * Add support for ``core.maxStat`` configuration option, which limits
    the number of stat operations performed when checking for unstaged
    changes. This improves performance on slow filesystems or very large

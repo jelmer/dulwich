@@ -863,6 +863,77 @@ class GetUnstagedChangesTests(TestCase):
 
             self.assertEqual(list(changes), [b"foo1"])
 
+    def test_get_unstaged_changes_max_stat(self) -> None:
+        """Test that max_stat limits the number of entries checked."""
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            # Create multiple files
+            files = []
+            for i in range(5):
+                filename = f"foo{i}"
+                fullpath = os.path.join(repo_dir, filename)
+                with open(fullpath, "wb") as f:
+                    f.write(b"origstuff")
+                files.append(filename)
+
+            repo.get_worktree().stage(files)
+            repo.get_worktree().commit(
+                b"test status",
+                author=b"author <email>",
+                committer=b"committer <email>",
+            )
+
+            # Modify all files
+            for filename in files:
+                fullpath = os.path.join(repo_dir, filename)
+                with open(fullpath, "wb") as f:
+                    f.write(b"newstuff")
+                os.utime(fullpath, (0, 0))
+
+            # Without max_stat, all 5 files should be detected as changed
+            all_changes = list(get_unstaged_changes(repo.open_index(), repo_dir))
+            self.assertEqual(len(all_changes), 5)
+
+            # With max_stat=2, at most 2 files should be detected
+            limited_changes = list(
+                get_unstaged_changes(repo.open_index(), repo_dir, max_stat=2)
+            )
+            self.assertLessEqual(len(limited_changes), 2)
+
+    def test_get_unstaged_changes_max_stat_preload(self) -> None:
+        """Test that max_stat works with preload_index=True."""
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            files = []
+            for i in range(5):
+                filename = f"foo{i}"
+                fullpath = os.path.join(repo_dir, filename)
+                with open(fullpath, "wb") as f:
+                    f.write(b"origstuff")
+                files.append(filename)
+
+            repo.get_worktree().stage(files)
+            repo.get_worktree().commit(
+                b"test status",
+                author=b"author <email>",
+                committer=b"committer <email>",
+            )
+
+            for filename in files:
+                fullpath = os.path.join(repo_dir, filename)
+                with open(fullpath, "wb") as f:
+                    f.write(b"newstuff")
+                os.utime(fullpath, (0, 0))
+
+            limited_changes = list(
+                get_unstaged_changes(
+                    repo.open_index(), repo_dir, preload_index=True, max_stat=2
+                )
+            )
+            self.assertLessEqual(len(limited_changes), 2)
+
     def test_get_unstaged_changes_with_preload(self) -> None:
         """Unit test for get_unstaged_changes with preload_index=True."""
         repo_dir = tempfile.mkdtemp()

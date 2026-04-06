@@ -830,6 +830,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
         *,
+        packed_git_limit: int | None = None,
         object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Initialize a PackBasedObjectStore.
@@ -843,10 +844,14 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           pack_depth: Maximum depth for pack deltas
           pack_threads: Number of threads to use for packing
           pack_big_file_threshold: Threshold for treating files as "big"
+          packed_git_limit: Maximum total bytes for mmapped pack files.
+            When exceeded, least-recently-used packs are closed to free memory.
           object_format: Hash algorithm to use
         """
         super().__init__(object_format=object_format)
         self._pack_cache: dict[str, Pack] = {}
+        self._pack_access_order: list[str] = []
+        self.packed_git_limit = packed_git_limit
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
         self.pack_delta_window_size = pack_delta_window_size
@@ -961,6 +966,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             self._pack_cache[base_name] = pack
             if prev_pack:
                 prev_pack.close()
+        self._mark_pack_used(base_name)
+        self._enforce_packed_git_limit()
 
     def generate_pack_data(
         self,
@@ -996,9 +1003,36 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
     def _clear_cached_packs(self) -> None:
         pack_cache = self._pack_cache
         self._pack_cache = {}
+        self._pack_access_order = []
         while pack_cache:
             (_name, pack) = pack_cache.popitem()
             pack.close()
+
+    def _total_pack_mmap_size(self) -> int:
+        """Return the total mmapped memory across all cached packs."""
+        return sum(pack.mmap_size for pack in self._pack_cache.values())
+
+    def _mark_pack_used(self, pack_hash: str) -> None:
+        """Mark a pack as recently used for LRU tracking."""
+        try:
+            self._pack_access_order.remove(pack_hash)
+        except ValueError:
+            pass
+        self._pack_access_order.append(pack_hash)
+
+    def _enforce_packed_git_limit(self) -> None:
+        """Evict least-recently-used packs if the memory limit is exceeded."""
+        if self.packed_git_limit is None:
+            return
+        while (
+            self._pack_access_order
+            and self._total_pack_mmap_size() > self.packed_git_limit
+        ):
+            oldest = self._pack_access_order.pop(0)
+            pack = self._pack_cache.get(oldest)
+            if pack is not None:
+                pack.close()
+                del self._pack_cache[oldest]
 
     def _iter_cached_packs(self) -> Iterator[Pack]:
         return iter(self._pack_cache.values())
@@ -1208,11 +1242,15 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             hexsha = None
         else:
             raise AssertionError(f"Invalid object name {name!r}")
-        for pack in self._iter_cached_packs():
+        for pack_hash, pack in self._pack_cache.items():
             try:
-                return pack.get_raw(sha)
+                result = pack.get_raw(sha)
             except (KeyError, PackFileDisappeared):
                 pass
+            else:
+                self._mark_pack_used(pack_hash)
+                self._enforce_packed_git_limit()
+                return result
         if hexsha is None:
             hexsha = sha_to_hex(sha)
         ret = self._get_loose_object(hexsha)
@@ -1405,6 +1443,7 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_depth: int | None = None,
         pack_threads: int | None = None,
         pack_big_file_threshold: int | None = None,
+        packed_git_limit: int | None = None,
         fsync_object_files: bool = False,
         pack_write_bitmaps: bool = False,
         pack_write_bitmap_hash_cache: bool = True,
@@ -1426,6 +1465,7 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_depth: maximum delta chain depth
           pack_threads: number of threads for pack operations
           pack_big_file_threshold: threshold for treating files as big
+          packed_git_limit: maximum total bytes for mmapped pack files
           fsync_object_files: whether to fsync object files for durability
           pack_write_bitmaps: whether to write bitmap indexes for packs
           pack_write_bitmap_hash_cache: whether to include name-hash cache in bitmaps
@@ -1446,6 +1486,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_depth=pack_depth,
             pack_threads=pack_threads,
             pack_big_file_threshold=pack_big_file_threshold,
+            packed_git_limit=packed_git_limit,
             object_format=object_format if object_format else DEFAULT_OBJECT_FORMAT,
         )
         self.path = path
@@ -1552,6 +1593,12 @@ class DiskObjectStore(PackBasedObjectStore):
         except KeyError:
             pack_big_file_threshold = None
 
+        # Read core.packedGitLimit setting
+        try:
+            packed_git_limit = int(config.get((b"core",), b"packedGitLimit").decode())
+        except KeyError:
+            packed_git_limit = None
+
         # Read core.commitGraph setting
         use_commit_graph = config.get_boolean((b"core",), b"commitGraph", True)
 
@@ -1604,6 +1651,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_depth=pack_depth,
             pack_threads=pack_threads,
             pack_big_file_threshold=pack_big_file_threshold,
+            packed_git_limit=packed_git_limit,
             fsync_object_files=fsync_object_files,
             pack_write_bitmaps=pack_write_bitmaps,
             pack_write_bitmap_hash_cache=pack_write_bitmap_hash_cache,
@@ -1705,9 +1753,15 @@ class DiskObjectStore(PackBasedObjectStore):
                 )
                 new_packs.append(pack)
                 self._pack_cache[pack_hash] = pack
+                self._mark_pack_used(pack_hash)
         # Remove disappeared pack files
         for f in set(self._pack_cache) - pack_files:
             self._pack_cache.pop(f).close()
+            try:
+                self._pack_access_order.remove(f)
+            except ValueError:
+                pass
+        self._enforce_packed_git_limit()
         return new_packs
 
     def _get_shafile_path(self, sha: ObjectID | RawObjectID) -> str:

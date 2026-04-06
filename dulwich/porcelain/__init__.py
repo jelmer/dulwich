@@ -1587,6 +1587,7 @@ def add(
         config = r.get_config_stack()
         preload_index = config.get_boolean(b"core", b"preloadIndex", False)
         trust_ctime = config.get_boolean(b"core", b"trustctime", True)
+        precompose_unicode = config.get_boolean(b"core", b"precomposeunicode", False)
 
         all_unstaged_paths = list(
             get_unstaged_changes(
@@ -1642,6 +1643,7 @@ def add(
                         str(resolved_path),
                         str(repo_path),
                         index,
+                        precompose_unicode=precompose_unicode,
                     )
                 )
                 for untracked_path in current_untracked:
@@ -3259,6 +3261,7 @@ def status(
             max_stat = int(config.get(b"core", b"maxStat"))
         except KeyError:
             max_stat = None
+        precompose_unicode = config.get_boolean(b"core", b"precomposeunicode", False)
 
         unstaged_changes_tree = list(
             get_unstaged_changes(
@@ -3277,6 +3280,7 @@ def status(
             index,
             exclude_ignored=not ignored,
             untracked_files=untracked_files,
+            precompose_unicode=precompose_unicode,
         )
 
         # Convert all paths to filesystem encoding
@@ -3340,10 +3344,23 @@ def shortlog(
         return items
 
 
+def _precompose_unicode_path(path: str) -> str:
+    """Normalize a filesystem path to NFC (precomposed) Unicode form.
+
+    On macOS, HFS+/APFS filesystems return filenames in NFD (decomposed)
+    form. This function normalizes them to NFC so they match the paths
+    stored in the git index.
+    """
+    import unicodedata
+
+    return unicodedata.normalize("NFC", path)
+
+
 def _walk_working_dir_paths(
     frompath: str | bytes | os.PathLike[str],
     basepath: str | bytes | os.PathLike[str],
     prune_dirnames: Callable[[str, list[str]], list[str]] | None = None,
+    precompose_unicode: bool = False,
 ) -> Iterator[tuple[str | bytes, bool]]:
     """Get path, is_dir for files in working dir from frompath.
 
@@ -3352,6 +3369,7 @@ def _walk_working_dir_paths(
       basepath: Path to compare to
       prune_dirnames: Optional callback to prune dirnames during os.walk
         dirnames will be set to result of prune_dirnames(dirpath, dirnames)
+      precompose_unicode: If True, normalize paths to NFC Unicode form
     """
     # Convert paths to strings for os.walk compatibility
 
@@ -3366,6 +3384,11 @@ def _walk_working_dir_paths(
             filenames.remove(".git")
             if dirpath != basepath:
                 continue
+
+        if precompose_unicode and isinstance(dirpath, str):
+            dirpath = _precompose_unicode_path(dirpath)
+            dirnames[:] = [_precompose_unicode_path(d) for d in dirnames]
+            filenames = [_precompose_unicode_path(f) for f in filenames]
 
         if dirpath != frompath:
             yield dirpath, True  # type: ignore[misc]
@@ -3384,6 +3407,7 @@ def get_untracked_paths(
     index: Index,
     exclude_ignored: bool = False,
     untracked_files: str = "all",
+    precompose_unicode: bool = False,
 ) -> Iterator[str]:
     """Get untracked paths.
 
@@ -3396,6 +3420,8 @@ def get_untracked_paths(
         - "no": return an empty list
         - "all": return all files in untracked directories
         - "normal": return untracked directories without listing their contents
+      precompose_unicode: If True, normalize filesystem paths to NFC Unicode
+        form. This is needed on macOS where the filesystem returns NFD paths.
 
     Note: ignored directories will never be walked for performance reasons.
       If exclude_ignored is False, only the path to an ignored directory will
@@ -3484,7 +3510,10 @@ def get_untracked_paths(
     # For "all" mode, use the original behavior
     if untracked_files == "all":
         for ap, is_dir in _walk_working_dir_paths(
-            frompath_str, basepath_str, prune_dirnames=prune_dirnames
+            frompath_str,
+            basepath_str,
+            prune_dirnames=prune_dirnames,
+            precompose_unicode=precompose_unicode,
         ):
             # frompath_str and basepath_str are both str, so ap must be str
             assert isinstance(ap, str)
@@ -3498,7 +3527,10 @@ def get_untracked_paths(
     else:  # "normal" mode
         # Walk directories, handling both files and directories
         for ap, is_dir in _walk_working_dir_paths(
-            frompath_str, basepath_str, prune_dirnames=prune_dirnames
+            frompath_str,
+            basepath_str,
+            prune_dirnames=prune_dirnames,
+            precompose_unicode=precompose_unicode,
         ):
             # frompath_str and basepath_str are both str, so ap must be str
             assert isinstance(ap, str)

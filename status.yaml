@@ -32,3 +32,7 @@ configuration:
     status: supported
   - key: core.symlinks
     status: supported
+  - key: core.precomposeunicode
+    status: supported
+  - key: core.sharedRepository
+    status: supported

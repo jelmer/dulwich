@@ -31,6 +31,10 @@
    the grace period before unreachable objects are pruned during garbage
    collection. (Jelmer Vernooĳ, #1859)
 
+ * Add support for ``core.precomposeunicode`` configuration option
+   for normalizing NFD Unicode paths from macOS filesystems to NFC
+   form. (Jelmer Vernooĳ, #1804)
+
  * Add support for ``core.maxStat`` configuration option, which limits
    the number of stat operations performed when checking for unstaged
    changes. This improves performance on slow filesystems or very large

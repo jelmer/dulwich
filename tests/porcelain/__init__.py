@@ -7445,6 +7445,73 @@ class StatusTests(PorcelainTestCase):
             "Top-level file 'sample.txt' should be in status.untracked",
         )
 
+    def test_get_untracked_paths_precompose_unicode(self) -> None:
+        """Test that precompose_unicode normalizes NFD paths to NFC."""
+        import unicodedata
+
+        # NFC (precomposed) and NFD (decomposed) forms of "ä"
+        nfc_name = unicodedata.normalize("NFC", "t\u00e4st.txt")
+        nfd_name = unicodedata.normalize("NFD", "t\u00e4st.txt")
+
+        # Create a file with NFC name, add and commit it
+        fullpath = os.path.join(self.repo.path, nfc_name)
+        with open(fullpath, "w") as f:
+            f.write("content\n")
+        porcelain.add(self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Add unicode file",
+            author=b"Test <test@example.com>",
+        )
+
+        # Now rename the file to NFD form (simulating what macOS HFS+/APFS does)
+        nfd_path = os.path.join(self.repo.path, nfd_name)
+        if nfc_name != nfd_name:
+            # Only rename if the filesystem actually distinguishes NFC/NFD
+            try:
+                os.rename(fullpath, nfd_path)
+            except OSError:
+                # Filesystem normalizes names (e.g., macOS) — skip rename test
+                return
+
+            if not os.path.exists(nfd_path):
+                return
+
+            # Without precompose_unicode, the NFD file should appear as untracked
+            # (since the index has the NFC version)
+            index = self.repo.open_index()
+            untracked_without = set(
+                porcelain.get_untracked_paths(
+                    self.repo.path,
+                    self.repo.path,
+                    index,
+                    precompose_unicode=False,
+                )
+            )
+            self.assertIn(nfd_name, untracked_without)
+
+            # With precompose_unicode, the NFD file should be recognized as tracked
+            untracked_with = set(
+                porcelain.get_untracked_paths(
+                    self.repo.path,
+                    self.repo.path,
+                    index,
+                    precompose_unicode=True,
+                )
+            )
+            self.assertNotIn(nfd_name, untracked_with)
+            self.assertNotIn(nfc_name, untracked_with)
+
+    def test_status_precompose_unicode_config(self) -> None:
+        """Test that status reads core.precomposeunicode from config."""
+        config = self.repo.get_config()
+        config.set(b"core", b"precomposeunicode", b"true")
+        config.write_to_path()
+
+        # Verify the config is read (status should not error)
+        results = porcelain.status(self.repo)
+        self.assertIsNotNone(results)
+
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 

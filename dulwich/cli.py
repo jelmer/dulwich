@@ -5553,13 +5553,13 @@ class cmd_gc(Command):
         parsed_args = parser.parse_args(args)
 
         # Parse prune grace period from command line
-        gc_kwargs: dict[str, object] = {}
+        grace_period: int | None = None
         if parsed_args.prune:
             from .approxidate import parse_approxidate
 
             try:
                 timestamp = parse_approxidate(parsed_args.prune)
-                gc_kwargs["grace_period"] = max(0, int(time.time() - timestamp))
+                grace_period = max(0, int(time.time() - timestamp))
             except ValueError:
                 logger.error("Invalid prune date: %s", parsed_args.prune)
                 return 1
@@ -5575,9 +5575,9 @@ class cmd_gc(Command):
                 auto=parsed_args.auto,
                 aggressive=parsed_args.aggressive,
                 prune=not parsed_args.no_prune,
+                grace_period=grace_period,
                 dry_run=parsed_args.dry_run,
                 progress=progress if not parsed_args.quiet else None,
-                **gc_kwargs,
             )
 
             # Report results

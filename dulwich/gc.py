@@ -77,9 +77,11 @@ def get_prune_grace_period(config: "Config") -> int:
     from .approxidate import parse_approxidate
 
     try:
-        value = config.get(b"gc", b"pruneExpire")
-        if isinstance(value, bytes):
-            value = value.decode("utf-8")
+        raw_value = config.get(b"gc", b"pruneExpire")
+        if isinstance(raw_value, bytes):
+            value = raw_value.decode("utf-8")
+        else:
+            value = raw_value
     except KeyError:
         return DEFAULT_GC_PRUNE_EXPIRE
 

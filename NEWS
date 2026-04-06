@@ -27,6 +27,11 @@
    with Git's base85 encoding, and ``--3way`` merge fallback when patches
    don't apply cleanly. (Jelmer Vernooĳ, #1784)
 
+ * Add support for ``core.maxStat`` configuration option, which limits
+   the number of stat operations performed when checking for unstaged
+   changes. This improves performance on slow filesystems or very large
+   repositories. (Jelmer Vernooĳ, #1853)
+
  * Fix GPG signature verification to raise ``BadSignature`` for all
    GPG errors, not just ``BadSignatures``. Also detect the case where
    GPG returns no signatures at all. (Jelmer Vernooĳ)

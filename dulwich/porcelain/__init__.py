@@ -3255,10 +3255,19 @@ def status(
         config = r.get_config_stack()
         preload_index = config.get_boolean(b"core", b"preloadIndex", False)
         trust_ctime = config.get_boolean(b"core", b"trustctime", True)
+        try:
+            max_stat = int(config.get(b"core", b"maxStat"))
+        except KeyError:
+            max_stat = None
 
         unstaged_changes_tree = list(
             get_unstaged_changes(
-                index, r.path, filter_callback, preload_index, trust_ctime
+                index,
+                r.path,
+                filter_callback,
+                preload_index,
+                trust_ctime,
+                max_stat,
             )
         )
 

@@ -5514,7 +5514,6 @@ class cmd_gc(Command):
         Args:
             args: Command line arguments
         """
-        import datetime
         import time
 
         parser = argparse.ArgumentParser()
@@ -5553,24 +5552,17 @@ class cmd_gc(Command):
         )
         parsed_args = parser.parse_args(args)
 
-        # Parse prune grace period
-        grace_period = None
+        # Parse prune grace period from command line
+        grace_period: int | None = None
         if parsed_args.prune:
-            from .approxidate import parse_relative_time
+            from .approxidate import parse_approxidate
 
             try:
-                grace_period = parse_relative_time(parsed_args.prune)
+                timestamp = parse_approxidate(parsed_args.prune)
+                grace_period = max(0, int(time.time() - timestamp))
             except ValueError:
-                # Try to parse as absolute date
-                try:
-                    date = datetime.datetime.strptime(parsed_args.prune, "%Y-%m-%d")
-                    grace_period = int(time.time() - date.timestamp())
-                except ValueError:
-                    logger.error("Invalid prune date: %s", parsed_args.prune)
-                    return 1
-        elif not parsed_args.no_prune:
-            # Default to 2 weeks
-            grace_period = 1209600
+                logger.error("Invalid prune date: %s", parsed_args.prune)
+                return 1
 
         # Progress callback
         def progress(msg: str) -> None:

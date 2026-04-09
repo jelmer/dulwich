@@ -35,6 +35,10 @@
    for normalizing NFD Unicode paths from macOS filesystems to NFC
    form. (Jelmer Vernooĳ, #1804)
 
+ * Add support for ``core.gitProxy`` configuration option, which
+   specifies a proxy command for Git protocol (``git://``) connections.
+   (Jelmer Vernooĳ, #1850)
+
  * Add support for ``core.maxStat`` configuration option, which limits
    the number of stat operations performed when checking for unstaged
    changes. This improves performance on slow filesystems or very large

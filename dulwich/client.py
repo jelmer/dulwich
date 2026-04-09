@@ -170,7 +170,12 @@ from .bundle_uri import (
     fetch_bundle_uri,
     parse_bundle_list,
 )
-from .config import Config, apply_instead_of, get_xdg_config_home_path
+from .config import (
+    Config,
+    apply_instead_of,
+    get_git_proxy_command,
+    get_xdg_config_home_path,
+)
 from .credentials import match_partial_url, match_urls
 from .errors import GitProtocolError, HangupException, NotGitRepository, SendPackError
 from .object_format import DEFAULT_OBJECT_FORMAT
@@ -2464,6 +2469,7 @@ class TCPGitClient(TraditionalGitClient):
         report_activity: Callable[[int, str], None] | None = None,
         quiet: bool = False,
         include_tags: bool = False,
+        proxy_command: str | None = None,
     ) -> None:
         """Initialize a TCPGitClient.
 
@@ -2474,11 +2480,15 @@ class TCPGitClient(TraditionalGitClient):
           report_activity: Optional callback for reporting transport activity
           quiet: Whether to suppress progress output
           include_tags: Whether to include tags
+          proxy_command: Optional proxy command (core.gitProxy).
+            The command is run with host and port as arguments and
+            communicates over stdin/stdout.
         """
         if port is None:
             port = TCP_GIT_PORT
         self._host = host
         self._port = port
+        self._proxy_command = proxy_command
         super().__init__(
             thin_packs=thin_packs,
             report_activity=report_activity,
@@ -2510,12 +2520,15 @@ class TCPGitClient(TraditionalGitClient):
           dumb: Whether to use dumb protocol (not used for TCPGitClient)
           username: Username for authentication (not used for TCPGitClient)
           password: Password for authentication (not used for TCPGitClient)
-          config: Configuration object (not used for TCPGitClient)
+          config: Configuration object
 
         Returns:
           A TCPGitClient instance
         """
         assert parsedurl.hostname is not None
+        proxy_command = None
+        if config is not None:
+            proxy_command = get_git_proxy_command(config, parsedurl.hostname)
         return cls(
             parsedurl.hostname,
             port=parsedurl.port,
@@ -2523,6 +2536,7 @@ class TCPGitClient(TraditionalGitClient):
             report_activity=report_activity,
             quiet=quiet,
             include_tags=include_tags,
+            proxy_command=proxy_command,
         )
 
     def get_url(self, path: str) -> str:
@@ -2554,6 +2568,10 @@ class TCPGitClient(TraditionalGitClient):
             raise TypeError(cmd)
         if not isinstance(path, bytes):
             path = path.encode(self._remote_path_encoding)
+
+        if self._proxy_command is not None:
+            return self._connect_via_proxy(cmd, path, protocol_version)
+
         sockaddrs = socket.getaddrinfo(
             self._host, self._port, socket.AF_UNSPEC, socket.SOCK_STREAM
         )
@@ -2611,6 +2629,55 @@ class TCPGitClient(TraditionalGitClient):
             b"git-" + cmd, path, b"host=" + self._host.encode("ascii") + version_str
         )
         return proto, lambda: _fileno_can_read(s.fileno()), None
+
+    def _connect_via_proxy(
+        self,
+        cmd: bytes,
+        path: bytes,
+        protocol_version: int | None = None,
+    ) -> tuple[Protocol, Callable[[], bool], IO[bytes] | None]:
+        """Connect to a git server via a proxy command.
+
+        The proxy command is invoked with the host and port as arguments.
+        It communicates with the git server over its stdin/stdout, acting
+        as a transparent tunnel.
+        """
+        assert self._proxy_command is not None
+        import shlex
+
+        argv = [*shlex.split(self._proxy_command), self._host, str(self._port)]
+        p = subprocess.Popen(
+            argv,
+            bufsize=0,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        pw = SubprocessWrapper(p)
+        proto = Protocol(
+            pw.read,
+            pw.write,
+            pw.close,
+            report_activity=self._report_activity,
+        )
+        if path.startswith(b"/~"):
+            path = path[1:]
+        if cmd == b"upload-pack":
+            if protocol_version is None:
+                self.protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_FETCH
+            else:
+                self.protocol_version = protocol_version
+        else:
+            self.protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_SEND
+
+        if cmd == b"upload-pack" and self.protocol_version == 2:
+            version_str = b"\0\0version=%d\0" % self.protocol_version
+        else:
+            version_str = b""
+        proto.send_cmd(
+            b"git-" + cmd, path, b"host=" + self._host.encode("ascii") + version_str
+        )
+        return proto, pw.can_read, p.stderr
 
 
 class SubprocessWrapper:
@@ -5274,6 +5341,7 @@ def _get_transport_and_path_from_url(
                 report_activity=report_activity,
                 quiet=quiet,
                 include_tags=include_tags,
+                config=config,
             ),
             parsed.path,
         )

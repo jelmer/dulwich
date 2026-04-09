@@ -2384,6 +2384,38 @@ class TCPGitClientTests(TestCase):
         url = c.get_url(path)
         self.assertEqual("git://[2001:db8::1]/jelmer/dulwich", url)
 
+    def test_proxy_command(self) -> None:
+        c = TCPGitClient("example.com", proxy_command="my-proxy")
+        self.assertEqual("my-proxy", c._proxy_command)
+
+    def test_from_parsedurl_with_proxy_config(self) -> None:
+        from io import BytesIO
+        from urllib.parse import urlparse
+
+        from dulwich.config import ConfigFile
+
+        config = ConfigFile.from_file(
+            BytesIO(
+                b"[core]\n"
+                b"\tgitProxy = proxy-for-kernel for kernel.org\n"
+                b"\tgitProxy = default-proxy\n"
+            )
+        )
+        parsed = urlparse("git://kernel.org/pub/linux")
+        c = TCPGitClient.from_parsedurl(parsed, config=config)
+        self.assertEqual("proxy-for-kernel", c._proxy_command)
+
+        parsed = urlparse("git://example.com/repo")
+        c = TCPGitClient.from_parsedurl(parsed, config=config)
+        self.assertEqual("default-proxy", c._proxy_command)
+
+    def test_from_parsedurl_no_config(self) -> None:
+        from urllib.parse import urlparse
+
+        parsed = urlparse("git://example.com/repo")
+        c = TCPGitClient.from_parsedurl(parsed)
+        self.assertIsNone(c._proxy_command)
+
 
 class AuthCallbackPoolManagerTest(TestCase):
     def test_http_auth_callback(self) -> None:

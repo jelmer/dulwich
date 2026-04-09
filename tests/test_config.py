@@ -39,6 +39,7 @@ from dulwich.config import (
     _format_string,
     _parse_string,
     apply_instead_of,
+    get_git_proxy_command,
     parse_submodules,
 )
 
@@ -1276,6 +1277,50 @@ class CaseInsensitiveConfigTests(TestCase):
         # But subsection names are case-sensitive
         with self.assertRaises(KeyError):
             config[("branch", "MASTER")]
+
+
+class GetGitProxyCommandTests(TestCase):
+    def test_no_proxy_configured(self) -> None:
+        config = ConfigDict()
+        self.assertIsNone(get_git_proxy_command(config, "example.com"))
+
+    def test_default_proxy(self) -> None:
+        config = ConfigDict()
+        config.set((b"core",), b"gitProxy", b"my-proxy")
+        self.assertEqual("my-proxy", get_git_proxy_command(config, "example.com"))
+
+    def test_domain_specific_proxy(self) -> None:
+        config = ConfigFile.from_file(
+            BytesIO(
+                b"[core]\n"
+                b"\tgitProxy = proxy-for-kernel for kernel.org\n"
+                b"\tgitProxy = default-proxy\n"
+            )
+        )
+        self.assertEqual(
+            "proxy-for-kernel", get_git_proxy_command(config, "kernel.org")
+        )
+        self.assertEqual(
+            "proxy-for-kernel", get_git_proxy_command(config, "git.kernel.org")
+        )
+        self.assertEqual("default-proxy", get_git_proxy_command(config, "example.com"))
+
+    def test_no_default_no_match(self) -> None:
+        config = ConfigFile.from_file(
+            BytesIO(b"[core]\n\tgitProxy = proxy-cmd for kernel.org\n")
+        )
+        self.assertIsNone(get_git_proxy_command(config, "example.com"))
+
+    def test_exact_domain_match(self) -> None:
+        config = ConfigFile.from_file(
+            BytesIO(b"[core]\n\tgitProxy = proxy-cmd for org\n")
+        )
+        # "kernel.org" ends with ".org", so it matches
+        self.assertEqual("proxy-cmd", get_git_proxy_command(config, "kernel.org"))
+        # "org" is an exact match
+        self.assertEqual("proxy-cmd", get_git_proxy_command(config, "org"))
+        # "notorg" should not match
+        self.assertIsNone(get_git_proxy_command(config, "notorg"))
 
 
 class ConfigFileSetTests(TestCase):

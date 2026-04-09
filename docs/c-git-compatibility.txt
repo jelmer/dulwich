@@ -96,8 +96,8 @@ Patching
 --------
 
 * ✓ ``git format-patch`` - Prepare patches for email submission
-* ✗ ``git am`` - Apply series of patches from mailbox
-* ✗ ``git apply`` - Apply patch to files
+* ✓ ``git am`` - Apply series of patches from mailbox
+* ✓ ``git apply`` - Apply patch to files
 * ✓ ``git mailsplit`` - Simple UNIX mbox splitter program
 * ✓ ``git mailinfo`` - Extracts patch and authorship from a single email
 * ✗ ``git send-email`` - Send collection of patches as emails
@@ -159,7 +159,7 @@ Plumbing Commands
 Manipulation
 ------------
 
-* ✗ ``git apply`` - Apply patch to files
+* ✓ ``git apply`` - Apply patch to files
 * ◐ ``git checkout-index`` - Copy files from index to working tree (API only)
 * ✓ ``git commit-tree`` - Create new commit object
 * ✓ ``git hash-object`` - Compute object ID
@@ -463,6 +463,202 @@ Web Interface
 * ✗ cgit
 * ✗ GitWeb (Perl implementation)
 
+Configuration Options
+=====================
+
+Core (core.*)
+-------------
+
+* ✓ ``core.autocrlf`` - Automatic CRLF line ending conversion
+* ✓ ``core.bare`` - Bare repository flag
+* ✓ ``core.commentChar`` - Comment character for commit messages
+* ✓ ``core.commitGraph`` - Enable commit graph
+* ✓ ``core.compression`` - Object compression level
+* ✓ ``core.deltaBaseCacheLimit`` - Memory limit for delta base cache
+* ✓ ``core.editor`` - Default editor
+* ✓ ``core.eol`` - Line ending style
+* ✓ ``core.excludesFile`` - Global gitignore file
+* ✓ ``core.filemode`` - Honor executable bit
+* ✓ ``core.fsyncObjectFiles`` - Fsync object files to disk
+* ✓ ``core.gitProxy`` - Proxy command for git:// connections
+* ✓ ``core.ignorecase`` - Case-insensitive filename matching
+* ✓ ``core.looseCompression`` - Compression level for loose objects
+* ✓ ``core.maxStat`` - Limit stat operations
+* ✓ ``core.multiPackIndex`` - Enable multi-pack index
+* ✓ ``core.packedGitLimit`` - Memory limit for mmapped pack files
+* ✓ ``core.pager`` - Pager program
+* ✓ ``core.precomposeunicode`` - NFD to NFC Unicode normalization (macOS)
+* ✓ ``core.preloadIndex`` - Preload index for performance
+* ✓ ``core.protectHFS`` - Protect against HFS+ vulnerabilities
+* ✓ ``core.protectNTFS`` - Protect against NTFS vulnerabilities
+* ✓ ``core.repositoryformatversion`` - Repository format version
+* ✓ ``core.safecrlf`` - Safe CRLF checks
+* ✓ ``core.sharedRepository`` - Shared repository permissions
+* ✓ ``core.sparseCheckoutCone`` - Sparse checkout cone mode
+* ✓ ``core.sshCommand`` - SSH command override
+* ✓ ``core.symlinks`` - Create symlinks
+* ✓ ``core.trustctime`` - Trust ctime in index
+* ✗ ``core.abbrev`` - Abbreviate object names
+* ✗ ``core.fsmonitor`` - File system monitor daemon
+* ✗ ``core.hooksPath`` - Custom hooks location
+* ✗ ``core.quotePath`` - Quoting of paths with special characters
+* ✗ ``core.splitIndex`` - Enable split index
+* ✗ ``core.untrackedCache`` - Enable untracked file cache
+* ✗ ``core.whitespace`` - Whitespace error highlighting
+* ✗ ``core.worktree`` - Working directory path override
+
+User (user.*)
+-------------
+
+* ✓ ``user.email`` - User email address
+* ✓ ``user.name`` - User name
+* ✓ ``user.signingkey`` - GPG/SSH signing key
+
+Branch (branch.*)
+-----------------
+
+* ✓ ``branch.autoSetupMerge`` - Auto setup merge tracking
+* ✓ ``branch.sort`` - Branch sorting
+* ✓ ``branch.<name>.merge`` - Tracking branch merge ref
+* ✓ ``branch.<name>.remote`` - Tracking branch remote
+* ✗ ``branch.<name>.pushRemote`` - Remote to push to
+* ✗ ``branch.<name>.rebase`` - Rebase when pulling this branch
+* ✗ ``branch.<name>.description`` - Branch description
+
+Remote (remote.*)
+-----------------
+
+* ✓ ``remote.<name>.url`` - Remote URL
+* ✓ ``remote.<name>.pushInsteadOf`` - Push URL rewriting
+
+HTTP (http.*)
+-------------
+
+* ✓ ``http.extraHeader`` - Extra HTTP headers (supports per-URL)
+* ✓ ``http.proxy`` - HTTP proxy server
+* ✓ ``http.proxyAuthMethod`` - HTTP proxy auth method
+* ✓ ``http.sslCAInfo`` - SSL CA certificate file
+* ✓ ``http.sslVerify`` - Verify SSL certificates
+* ✓ ``http.timeout`` - HTTP timeout
+* ✓ ``http.userAgent`` - User-Agent header (supports per-URL)
+* ✗ ``http.cookieFile`` - Cookie jar file
+* ✗ ``http.lowSpeedLimit`` - Abort if speed falls below limit
+* ✗ ``http.lowSpeedTime`` - Time for low speed detection
+* ✗ ``http.postBuffer`` - Max HTTP POST buffer size
+* ✗ ``http.sslBackend`` - SSL backend
+* ✗ ``http.sslVersion`` - SSL version
+* ✗ ``http.version`` - HTTP protocol version
+
+Pack (pack.*)
+-------------
+
+* ✓ ``pack.bigFileThreshold`` - Large file threshold
+* ✓ ``pack.deltaCacheSize`` - Delta cache size
+* ✓ ``pack.deltaWindowSize`` - Delta window size
+* ✓ ``pack.depth`` - Pack depth
+* ✓ ``pack.indexVersion`` - Pack index version
+* ✓ ``pack.threads`` - Number of pack threads
+* ✓ ``pack.windowMemory`` - Window memory limit
+* ✓ ``pack.writeBitmaps`` - Write bitmap indexes
+* ✓ ``pack.writeBitmapHashCache`` - Write bitmap hash cache
+* ✓ ``pack.writeBitmapLookupTable`` - Write bitmap lookup table
+
+GC (gc.*)
+---------
+
+* ✓ ``gc.auto`` - Auto garbage collection
+* ✓ ``gc.autoPackLimit`` - Auto pack limit
+* ✓ ``gc.logExpiry`` - Log expiry period
+* ✓ ``gc.pruneExpire`` - Unreachable object prune grace period
+
+GPG/Signing (gpg.*)
+--------------------
+
+* ✓ ``commit.gpgSign`` - Sign commits by default
+* ✓ ``gpg.format`` - Signature format (openpgp, x509, ssh)
+* ✓ ``gpg.minTrustLevel`` - Minimum GPG trust level
+* ✓ ``gpg.program`` - GPG program path
+* ✓ ``gpg.ssh.allowedSignersFile`` - SSH allowed signers file
+* ✓ ``gpg.ssh.defaultKeyCommand`` - SSH default key command
+* ✓ ``gpg.ssh.program`` - SSH signing program
+* ✓ ``gpg.ssh.revocationFile`` - SSH revocation file
+* ✓ ``gpg.x509.program`` - X.509 signing program
+* ✓ ``tag.gpgSign`` - Sign tags by default
+
+Extensions (extensions.*)
+-------------------------
+
+* ✓ ``extensions.objectformat`` - Object format (SHA-1/SHA-256)
+* ✓ ``extensions.relativeworktrees`` - Relative worktree paths
+* ✓ ``extensions.worktreeconfig`` - Worktree-specific config
+
+Diff/Merge/Status
+------------------
+
+* ✓ ``merge.<name>.driver`` - Merge driver command
+* ✗ ``diff.algorithm`` - Diff algorithm (patience, histogram, etc.)
+* ✗ ``diff.context`` - Default context lines
+* ✗ ``diff.external`` - External diff tool
+* ✗ ``diff.noprefix`` - Omit a/b prefixes
+* ✗ ``diff.submodule`` - Submodule diff format
+* ✗ ``merge.conflictStyle`` - Conflict marker style (merge, diff3, zdiff3)
+* ✗ ``merge.tool`` - Default merge tool
+* ✗ ``status.showUntrackedFiles`` - Show untracked files
+
+Pull/Push/Fetch/Rebase
+-----------------------
+
+* ✗ ``fetch.fsckObjects`` - Validate object integrity on fetch
+* ✗ ``fetch.prune`` - Auto-prune deleted remote branches
+* ✗ ``fetch.pruneTags`` - Auto-prune deleted remote tags
+* ✗ ``pull.ff`` - Fast-forward only on pull
+* ✗ ``pull.rebase`` - Rebase instead of merge on pull
+* ✗ ``push.default`` - Default push strategy
+* ✗ ``push.followTags`` - Push annotated tags
+* ✗ ``rebase.autoStash`` - Auto-stash before rebase
+* ✗ ``transfer.fsckObjects`` - Validate object integrity on transfer
+
+Credentials
+-----------
+
+* ✓ Credential store file support (``~/.git-credentials``)
+* ✗ ``credential.helper`` - Credential helper programs
+* ✗ ``credential.useHttpPath`` - Include path in credential lookup
+
+Other
+-----
+
+* ✓ ``clean.requireForce`` - Require force for clean
+* ✓ ``feature.manyFiles`` - Many files optimization
+* ✓ ``filter.<name>.clean`` - Clean filter command
+* ✓ ``filter.<name>.process`` - Long-running process filter
+* ✓ ``filter.<name>.required`` - Filter required flag
+* ✓ ``filter.<name>.smudge`` - Smudge filter command
+* ✓ ``i18n.commitEncoding`` - Commit message encoding
+* ✓ ``index.skipHash`` - Skip hash in index
+* ✓ ``index.version`` - Index version
+* ✓ ``init.defaultBranch`` - Default branch name
+* ✓ ``lfs.url`` - LFS server URL
+* ✓ ``maintenance.<task>.enabled`` - Task enabled flag
+* ✓ ``maintenance.<task>.schedule`` - Task schedule
+* ✓ ``maintenance.repo`` - Maintenance repository
+* ✓ ``maintenance.strategy`` - Maintenance strategy
+* ✓ ``notes.displayRef`` - Notes display reference
+* ✓ ``rerere.autoupdate`` - Auto update rerere
+* ✓ ``rerere.enabled`` - Enable rerere
+* ✓ ``sequence.editor`` - Sequence editor (for interactive rebase)
+* ✓ ``url.<base>.insteadOf`` - URL rewriting
+* ✓ ``url.<base>.pushInsteadOf`` - Push URL rewriting
+* ✗ ``advice.*`` - Advice/hint messages
+* ✗ ``alias.*`` - Command aliases
+* ✗ ``color.*`` - Colorization settings
+* ✗ ``commit.cleanup`` - Commit message cleanup mode
+* ✗ ``commit.template`` - Commit message template file
+* ✗ ``format.pretty`` - Default pretty-print format
+* ✗ ``log.abbrevCommit`` - Abbreviate commits in log
+* ✗ ``receive.fsckObjects`` - Validate received objects
+* ✗ ``tag.sort`` - Default tag sorting
+
 Known Limitations
 =================
 
@@ -470,7 +666,6 @@ The following Git features are not currently supported:
 
 * Git GUIs (gitk, git-gui, git-citool)
 * Email workflow tools (git-send-email, git-request-pull)
-* Patch application (git-am, git-apply)
 * Interactive tools (git-difftool, git-mergetool)
 * Newer features (range-diff, scalar, fsmonitor--daemon)
 * Full protocol v2 server support (client is fully supported)

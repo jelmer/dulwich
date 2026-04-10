@@ -203,7 +203,10 @@ __all__ = [
     "parse_timezone_format",
     "path_to_tree_path",
     "print_commit",
+    "print_name_only",
     "print_name_status",
+    "print_oneline",
+    "print_stat",
     "print_tag",
     "prune",
     "pull",
@@ -1953,6 +1956,7 @@ def print_commit(
     commit: Commit,
     decode: Callable[[bytes], str],
     outstream: TextIO = sys.stdout,
+    abbrev_commit: bool = False,
 ) -> None:
     """Write a human-readable commit log entry.
 
@@ -1960,9 +1964,13 @@ def print_commit(
       commit: A `Commit` object
       decode: Function to decode commit data
       outstream: A stream file to write to
+      abbrev_commit: If True, abbreviate commit hashes
     """
     outstream.write("-" * 50 + "\n")
-    outstream.write("commit: " + commit.id.decode("ascii") + "\n")
+    commit_id = commit.id.decode("ascii")
+    if abbrev_commit:
+        commit_id = commit_id[:7]
+    outstream.write("commit: " + commit_id + "\n")
     if len(commit.parents) > 1:
         outstream.write(
             "merge: "
@@ -2182,6 +2190,83 @@ def print_name_status(changes: Iterator[TreeChange]) -> Iterator[str]:
         yield f"{kind:<8}{path1_str:<20}{path2_str:<20}"
 
 
+def print_name_only(changes: Iterator[TreeChange]) -> Iterator[str]:
+    """Print only the names of changed files.
+
+    Args:
+      changes: Iterator of TreeChange objects
+    Yields:
+      Formatted name-only strings for each change
+    """
+    for change in changes:
+        if not change:
+            continue
+        if isinstance(change, list):
+            change = change[0]
+        if change.type == CHANGE_DELETE:
+            assert change.old is not None
+            path = change.old.path
+        else:
+            assert change.new is not None
+            path = change.new.path
+        assert path is not None
+        path_str = (
+            path.decode("utf-8", errors="replace") if isinstance(path, bytes) else path
+        )
+        yield path_str
+
+
+def print_oneline(
+    commit: Commit,
+    decode: Callable[[bytes], str],
+    outstream: TextIO = sys.stdout,
+    abbrev_commit: bool = True,
+) -> None:
+    """Write a single-line commit log entry.
+
+    Args:
+      commit: A `Commit` object
+      decode: Function to decode commit data
+      outstream: A stream file to write to
+      abbrev_commit: If True, abbreviate commit hashes
+    """
+    commit_id = commit.id.decode("ascii")
+    if abbrev_commit:
+        commit_id = commit_id[:7]
+    message = decode(commit.message).split("\n", 1)[0] if commit.message else ""
+    outstream.write(f"{commit_id} {message}\n")
+
+
+def print_stat(
+    store: "BaseObjectStore",
+    commit: Commit,
+    outstream: TextIO = sys.stdout,
+) -> None:
+    """Write a diffstat summary for a commit.
+
+    Args:
+      store: ObjectStore for looking up objects
+      commit: A `Commit` object
+      outstream: A stream file to write to
+    """
+    if commit.parents:
+        parent = store[commit.parents[0]]
+        assert isinstance(parent, Commit)
+        base_tree = parent.tree
+    else:
+        base_tree = None
+
+    diffstream = BytesIO()
+    write_tree_diff(diffstream, store, base_tree, commit.tree)
+    diffstream.seek(0)
+    diff_lines = diffstream.getvalue().split(b"\n")
+
+    from ..diffstat import diffstat
+
+    stat_output = diffstat(diff_lines)
+    outstream.write(stat_output.decode("utf-8", errors="replace") + "\n")
+
+
 def log(
     repo: RepoPath = ".",
     paths: Sequence[str | bytes] | None = None,
@@ -2189,6 +2274,19 @@ def log(
     max_entries: int | None = None,
     reverse: bool = False,
     name_status: bool = False,
+    name_only: bool = False,
+    author: str | None = None,
+    committer: str | None = None,
+    grep: str | None = None,
+    since: str | int | None = None,
+    until: str | int | None = None,
+    no_merges: bool = False,
+    merges: bool = False,
+    oneline: bool = False,
+    abbrev_commit: bool = False,
+    stat: bool = False,
+    patch: bool = False,
+    follow: bool = False,
 ) -> None:
     """Write commit logs.
 
@@ -2197,9 +2295,45 @@ def log(
       paths: Optional set of specific paths to print entries for
       outstream: Stream to write log output to
       reverse: Reverse order in which entries are printed
-      name_status: Print name status
+      name_status: Print name/status for each changed file
+      name_only: Print only names of changed files
       max_entries: Optional maximum number of entries to display
+      author: Filter commits by author pattern
+      committer: Filter commits by committer pattern
+      grep: Filter commits by message pattern
+      since: Show commits after this date (timestamp or date string)
+      until: Show commits before this date (timestamp or date string)
+      no_merges: Exclude merge commits
+      merges: Only show merge commits
+      oneline: Show each commit on a single line
+      abbrev_commit: Abbreviate commit hashes
+      stat: Show diffstat for each commit
+      patch: Show patch (diff) for each commit
+      follow: Follow file renames
     """
+    import re
+
+    since_ts: int | None = None
+    until_ts: int | None = None
+    if since is not None:
+        if isinstance(since, int):
+            since_ts = since
+        else:
+            from ..approxidate import parse_approxidate
+
+            since_ts = parse_approxidate(since)
+    if until is not None:
+        if isinstance(until, int):
+            until_ts = until
+        else:
+            from ..approxidate import parse_approxidate
+
+            until_ts = parse_approxidate(until)
+
+    author_re = re.compile(author.encode(), re.IGNORECASE) if author else None
+    committer_re = re.compile(committer.encode(), re.IGNORECASE) if committer else None
+    grep_re = re.compile(grep.encode(), re.IGNORECASE) if grep else None
+
     with open_repo_closing(repo) as r:
         try:
             include = [r.head()]
@@ -2211,14 +2345,54 @@ def log(
             paths_bytes = [p.encode() if isinstance(p, str) else p for p in paths]
 
         walker = r.get_walker(
-            include=include, max_entries=max_entries, paths=paths_bytes, reverse=reverse
+            include=include,
+            max_entries=None,  # We filter ourselves to handle author/grep/merges
+            paths=paths_bytes,
+            reverse=reverse,
+            since=since_ts,
+            until=until_ts,
+            follow=follow,
         )
+
+        count = 0
         for entry in walker:
+            commit = entry.commit
+
+            # Filter by merge status
+            if no_merges and len(commit.parents) > 1:
+                continue
+            if merges and len(commit.parents) <= 1:
+                continue
+
+            # Filter by author
+            if author_re and not author_re.search(commit.author):
+                continue
+
+            # Filter by committer
+            if committer_re and not committer_re.search(commit.committer):
+                continue
+
+            # Filter by commit message
+            if grep_re and (not commit.message or not grep_re.search(commit.message)):
+                continue
+
+            # Check max_entries after filtering
+            if max_entries is not None and count >= max_entries:
+                break
+            count += 1
 
             def decode_wrapper(x: bytes) -> str:
                 return commit_decode(entry.commit, x)
 
-            print_commit(entry.commit, decode_wrapper, outstream)
+            if oneline:
+                print_oneline(commit, decode_wrapper, outstream, abbrev_commit=True)
+            else:
+                print_commit(
+                    commit,
+                    decode_wrapper,
+                    outstream,
+                    abbrev_commit=abbrev_commit,
+                )
             if name_status:
                 outstream.writelines(
                     [
@@ -2228,6 +2402,28 @@ def log(
                         )
                     ]
                 )
+            if name_only:
+                outstream.writelines(
+                    [
+                        line + "\n"
+                        for line in print_name_only(
+                            cast(Iterator[TreeChange], entry.changes())
+                        )
+                    ]
+                )
+            if stat:
+                print_stat(r.object_store, commit, outstream)
+            if patch:
+                if commit.parents:
+                    parent = r[commit.parents[0]]
+                    assert isinstance(parent, Commit)
+                    base_tree = parent.tree
+                else:
+                    base_tree = None
+                diffstream = BytesIO()
+                write_tree_diff(diffstream, r.object_store, base_tree, commit.tree)
+                diffstream.seek(0)
+                outstream.write(commit_decode(commit, diffstream.getvalue()))
 
 
 # TODO(jelmer): better default for encoding?

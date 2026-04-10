@@ -2607,6 +2607,153 @@ Date:   Fri Jan 01 2010 00:00:00 +0000
 """,
         )
 
+    def test_oneline(self) -> None:
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, oneline=True)
+        lines = outstream.getvalue().strip().split("\n")
+        self.assertEqual(3, len(lines))
+        # Each line should be: abbreviated_hash message
+        for line in lines:
+            parts = line.split(" ", 1)
+            self.assertEqual(7, len(parts[0]))  # abbreviated hash
+
+    def test_abbrev_commit(self) -> None:
+        c1 = make_commit(message=b"Test commit")
+        self.repo.object_store.add_object(c1)
+        self.repo.refs[b"HEAD"] = c1.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, abbrev_commit=True)
+        output = outstream.getvalue()
+        # The commit line should have an abbreviated hash (7 chars)
+        for line in output.split("\n"):
+            if line.startswith("commit: "):
+                commit_hash = line.split(": ", 1)[1]
+                self.assertEqual(7, len(commit_hash))
+
+    def test_author_filter(self) -> None:
+        c1 = make_commit(author=b"Alice <alice@example.com>", message=b"By Alice")
+        c2 = make_commit(
+            author=b"Bob <bob@example.com>",
+            message=b"By Bob",
+            parents=[c1.id],
+        )
+        self.repo.object_store.add_object(c1)
+        self.repo.object_store.add_object(c2)
+        self.repo.refs[b"HEAD"] = c2.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, author="Alice")
+        output = outstream.getvalue()
+        self.assertIn("By Alice", output)
+        self.assertNotIn("By Bob", output)
+
+    def test_committer_filter(self) -> None:
+        c1 = make_commit(
+            committer=b"Alice <alice@example.com>", message=b"Committed by Alice"
+        )
+        c2 = make_commit(
+            committer=b"Bob <bob@example.com>",
+            message=b"Committed by Bob",
+            parents=[c1.id],
+        )
+        self.repo.object_store.add_object(c1)
+        self.repo.object_store.add_object(c2)
+        self.repo.refs[b"HEAD"] = c2.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, committer="Alice")
+        output = outstream.getvalue()
+        self.assertIn("Committed by Alice", output)
+        self.assertNotIn("Committed by Bob", output)
+
+    def test_grep_filter(self) -> None:
+        c1 = make_commit(message=b"Fix bug in parser")
+        c2 = make_commit(message=b"Add new feature", parents=[c1.id])
+        self.repo.object_store.add_object(c1)
+        self.repo.object_store.add_object(c2)
+        self.repo.refs[b"HEAD"] = c2.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, grep="bug")
+        output = outstream.getvalue()
+        self.assertIn("Fix bug in parser", output)
+        self.assertNotIn("Add new feature", output)
+
+    def test_no_merges(self) -> None:
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, no_merges=True)
+        output = outstream.getvalue()
+        # c3 is a merge commit (parents: c1, c2), should be excluded
+        self.assertNotIn("Commit 3", output)
+        self.assertIn("Commit 1", output)
+        self.assertIn("Commit 2", output)
+
+    def test_merges_only(self) -> None:
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, merges=True)
+        output = outstream.getvalue()
+        # Only c3 is a merge commit
+        self.assertIn("Commit 3", output)
+        self.assertNotIn("Commit 1", output)
+        self.assertNotIn("Commit 2", output)
+
+    def test_max_entries_with_filter(self) -> None:
+        c1 = make_commit(author=b"Alice <alice@example.com>", message=b"Alice 1")
+        c2 = make_commit(
+            author=b"Alice <alice@example.com>",
+            message=b"Alice 2",
+            parents=[c1.id],
+        )
+        c3 = make_commit(
+            author=b"Alice <alice@example.com>",
+            message=b"Alice 3",
+            parents=[c2.id],
+        )
+        self.repo.object_store.add_object(c1)
+        self.repo.object_store.add_object(c2)
+        self.repo.object_store.add_object(c3)
+        self.repo.refs[b"HEAD"] = c3.id
+        outstream = StringIO()
+        porcelain.log(
+            self.repo.path,
+            outstream=outstream,
+            author="Alice",
+            max_entries=2,
+        )
+        output = outstream.getvalue()
+        self.assertEqual(2, output.count("-" * 50))
+
+    def test_name_only(self) -> None:
+        # Create a commit with actual file changes
+        c1 = self._commit_file("testfile.txt", b"content")
+        self.repo.refs[b"HEAD"] = c1
+        outstream = StringIO()
+        porcelain.log(self.repo.path, outstream=outstream, name_only=True)
+        output = outstream.getvalue()
+        self.assertIn("testfile.txt", output)
+
+    def _commit_file(self, filename: str, content: bytes) -> bytes:
+        """Helper to create a commit with a file."""
+        fullpath = os.path.join(self.repo.path, filename)
+        with open(fullpath, "wb") as f:
+            f.write(content)
+        porcelain.add(self.repo, paths=[fullpath])
+        return porcelain.commit(
+            self.repo,
+            message=b"Add " + filename.encode(),
+            author=b"Test Author <test@nodomain.com>",
+            committer=b"Test Committer <test@nodomain.com>",
+        )
+
 
 class ShowTests(PorcelainTestCase):
     def test_nolist(self) -> None:

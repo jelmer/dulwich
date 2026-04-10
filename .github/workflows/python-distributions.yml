@@ -55,7 +55,7 @@ jobs:
         id: json-identifiers
         run: |
           echo "linux=$(echo -n '${{ steps.select-build-identifiers.outputs.linux }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "ubuntu-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
-          echo "macos=$(echo -n '${{ steps.select-build-identifiers.outputs.macos }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: (if test("x86_64") then "macos-13" else "macos-latest" end), "build-identifier": .}]')" >> $GITHUB_OUTPUT
+          echo "macos=$(echo -n '${{ steps.select-build-identifiers.outputs.macos }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: (if test("x86_64") then "macos-latest-large" else "macos-latest" end), "build-identifier": .}]')" >> $GITHUB_OUTPUT
           echo "windows=$(echo -n '${{ steps.select-build-identifiers.outputs.windows }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "windows-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
       - name: Merge build identifiers
         id: merged-identifiers

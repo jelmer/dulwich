@@ -44,14 +44,18 @@ jobs:
             echo 'macos=${{ steps.all-build-identifiers.outputs.macos }}' >> $GITHUB_OUTPUT
           else
             echo "linux=$(echo -n '${{ steps.all-build-identifiers.outputs.linux }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
-            echo "macos=$(echo -n '${{ steps.all-build-identifiers.outputs.macos }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
+            # Select the last identifier overall plus the last x86_64 one, to ensure we test both architectures
+            macos_all='${{ steps.all-build-identifiers.outputs.macos }}'
+            macos_last=$(echo -n "$macos_all" | awk '{print $NF}')
+            macos_x86=$(echo -n "$macos_all" | tr ' ' '\n' | grep x86_64 | tail -1)
+            echo "macos=$(echo $macos_last $macos_x86 | tr ' ' '\n' | sort -u | tr '\n' ' ')" >> $GITHUB_OUTPUT
             echo "windows=$(echo -n '${{ steps.all-build-identifiers.outputs.windows }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
           fi
       - name: Output build identifiers
         id: json-identifiers
         run: |
           echo "linux=$(echo -n '${{ steps.select-build-identifiers.outputs.linux }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "ubuntu-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
-          echo "macos=$(echo -n '${{ steps.select-build-identifiers.outputs.macos }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "macos-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
+          echo "macos=$(echo -n '${{ steps.select-build-identifiers.outputs.macos }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: (if test("x86_64") then "macos-13" else "macos-latest" end), "build-identifier": .}]')" >> $GITHUB_OUTPUT
           echo "windows=$(echo -n '${{ steps.select-build-identifiers.outputs.windows }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "windows-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
       - name: Merge build identifiers
         id: merged-identifiers

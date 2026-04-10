@@ -183,4 +183,4 @@ skip = """\
 
 [[tool.cibuildwheel.overrides]]
 select = "*-macosx_x86_64"
-environment = {PATH="$HOME/.cargo/bin:$PATH", CARGO_BUILD_TARGET="x86_64-apple-darwin", ARCHFLAGS="-arch x86_64"}
+environment = {PATH="$HOME/.cargo/bin:$PATH", CARGO_BUILD_TARGET="x86_64-apple-darwin", ARCHFLAGS="-arch x86_64", MACOSX_DEPLOYMENT_TARGET="10.12"}

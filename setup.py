@@ -8,24 +8,6 @@ import sys
 
 from setuptools import setup
 
-if sys.platform == "darwin" and os.path.exists("/usr/bin/xcodebuild"):
-    # XCode 4.0 dropped support for ppc architecture, which is hardcoded in
-    # distutils.sysconfig
-    import subprocess
-
-    p = subprocess.Popen(
-        ["/usr/bin/xcodebuild", "-version"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        env={},
-    )
-    out, err = p.communicate()
-    for line in out.splitlines():
-        line = line.decode("utf8")
-        # Also parse only first digit, because 3.2.1 can't be parsed nicely
-        if line.startswith("Xcode") and int(line.split()[1].split(".")[0]) >= 4:
-            os.environ["ARCHFLAGS"] = ""
-
 tests_require = ["fastimport"]
 
 

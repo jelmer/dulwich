@@ -178,5 +178,5 @@ before-build = "pip install -U setuptools-rust && curl https://sh.rustup.rs -sSf
 archs = ["auto", "universal2", "x86_64", "arm64"]
 before-all = "rustup target add x86_64-apple-darwin aarch64-apple-darwin"
 skip = """\
-    cp*-macosx_x86_64 cp*-macosx_universal2 \
+    cp*-macosx_universal2 \
     """

@@ -180,3 +180,7 @@ before-all = "rustup target add x86_64-apple-darwin aarch64-apple-darwin"
 skip = """\
     cp*-macosx_universal2 \
     """
+
+[[tool.cibuildwheel.overrides]]
+select = "*-macosx_x86_64"
+environment = {PATH="$HOME/.cargo/bin:$PATH", CARGO_BUILD_TARGET="x86_64-apple-darwin", ARCHFLAGS="-arch x86_64"}

@@ -1,5 +1,11 @@
 1.2.0	UNRELEASED
 
+ * Expand ``log`` command options: add ``--oneline``, ``--abbrev-commit``,
+   ``--author``, ``--committer``, ``--grep``, ``--since``/``--after``,
+   ``--until``/``--before``, ``-n``/``--max-count``, ``--no-merges``,
+   ``--merges``, ``--stat``, ``-p``/``--patch``, ``--name-only``,
+   and ``--follow``. (Jelmer Vernooĳ, #1779)
+
  * Add ``am`` command and ``porcelain.am()`` for applying mailbox-style
    email patches (``git am``), with state persistence for
    ``--continue``, ``--skip``, ``--abort``, and ``--quit`` recovery

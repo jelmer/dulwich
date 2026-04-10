@@ -1425,6 +1425,86 @@ class cmd_log(Command):
             action="store_true",
             help="Print name/status for each changed file",
         )
+        parser.add_argument(
+            "--name-only",
+            action="store_true",
+            help="Print only names of changed files",
+        )
+        parser.add_argument(
+            "--oneline",
+            action="store_true",
+            help="Show each commit on a single line",
+        )
+        parser.add_argument(
+            "--abbrev-commit",
+            action="store_true",
+            help="Abbreviate commit hashes",
+        )
+        parser.add_argument(
+            "--author",
+            type=str,
+            default=None,
+            help="Filter by author (regex pattern)",
+        )
+        parser.add_argument(
+            "--committer",
+            type=str,
+            default=None,
+            help="Filter by committer (regex pattern)",
+        )
+        parser.add_argument(
+            "--grep",
+            type=str,
+            default=None,
+            help="Filter by commit message (regex pattern)",
+        )
+        parser.add_argument(
+            "--since",
+            "--after",
+            type=str,
+            default=None,
+            help="Show commits after date",
+        )
+        parser.add_argument(
+            "--until",
+            "--before",
+            type=str,
+            default=None,
+            help="Show commits before date",
+        )
+        parser.add_argument(
+            "-n",
+            "--max-count",
+            type=int,
+            default=None,
+            help="Maximum number of commits to show",
+        )
+        parser.add_argument(
+            "--no-merges",
+            action="store_true",
+            help="Exclude merge commits",
+        )
+        parser.add_argument(
+            "--merges",
+            action="store_true",
+            help="Only show merge commits",
+        )
+        parser.add_argument(
+            "--stat",
+            action="store_true",
+            help="Show diffstat for each commit",
+        )
+        parser.add_argument(
+            "-p",
+            "--patch",
+            action="store_true",
+            help="Show patch (diff) for each commit",
+        )
+        parser.add_argument(
+            "--follow",
+            action="store_true",
+            help="Follow file renames",
+        )
         parser.add_argument("paths", nargs="*", help="Paths to show log for")
         parsed_args = parser.parse_args(args)
 
@@ -1436,6 +1516,20 @@ class cmd_log(Command):
                     paths=parsed_args.paths,
                     reverse=parsed_args.reverse,
                     name_status=parsed_args.name_status,
+                    name_only=parsed_args.name_only,
+                    max_entries=parsed_args.max_count,
+                    author=parsed_args.author,
+                    committer=parsed_args.committer,
+                    grep=parsed_args.grep,
+                    since=parsed_args.since,
+                    until=parsed_args.until,
+                    no_merges=parsed_args.no_merges,
+                    merges=parsed_args.merges,
+                    oneline=parsed_args.oneline,
+                    abbrev_commit=parsed_args.abbrev_commit,
+                    stat=parsed_args.stat,
+                    patch=parsed_args.patch,
+                    follow=parsed_args.follow,
                     outstream=outstream,
                 )
 

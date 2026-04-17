@@ -404,6 +404,27 @@ class IgnoreFilterManagerTests(TestCase):
         self.assertFalse(m.is_ignored("a/b.txt"))
         self.assertTrue(m.is_ignored("a/c.dat"))
 
+    def test_reincluded_parent_allows_file_reinclude(self) -> None:
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b"dist/\n")
+            f.write(b"!dist/\n")
+            f.write(b"dist/*\n")
+            f.write(b"!dist/keep.txt\n")
+
+        os.mkdir(os.path.join(repo.path, "dist"))
+        with open(os.path.join(repo.path, "dist", "drop.txt"), "wb") as f:
+            f.write(b"ignored")
+        with open(os.path.join(repo.path, "dist", "keep.txt"), "wb") as f:
+            f.write(b"visible")
+
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertFalse(m.is_ignored("dist/"))
+        self.assertTrue(m.is_ignored("dist/drop.txt"))
+        self.assertFalse(m.is_ignored("dist/keep.txt"))
+
     def test_issue_1203_directory_negation(self) -> None:
         """Test for issue #1203: gitignore patterns with directory negation."""
         tmp_dir = tempfile.mkdtemp()

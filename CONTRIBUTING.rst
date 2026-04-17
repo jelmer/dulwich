@@ -67,7 +67,7 @@ bytestrings. It is up to the Dulwich API user to encode and decode them if
 necessary. The porcelain may accept unicode strings and convert them to
 bytestrings as necessary on the fly (using 'utf-8').
 
-* on-disk filenames: regular strings, or ideally, pathlib.Path instances
+* on-disk filenames: regular strings (with [surrogateescape](https://peps.python.org/pep-0383/)), or ideally, pathlib.Path instances
 * git-repository related filenames: bytes
 * object sha1 digests (20 bytes long): bytes
 * object sha1 hexdigests (40 bytes long): str (bytestrings on python2, strings
@@ -103,8 +103,7 @@ Tests
 Dulwich has two kinds of tests:
 
 * Unit tests, which test individual functions and classes
-* Compatibility tests, which test that Dulwich behaves in a way that is
-    compatible with C Git
+* Compatibility tests, which test that Dulwich behaves in a way that is compatible with C Git
 
 The former should never invoke C Git, while the latter may do so. This is
 to ensure that it is possible to run the unit tests in an environment
@@ -166,6 +165,8 @@ Merge requests
 --------------
 Please either send pull requests to the maintainer (jelmer@jelmer.uk) or create
 new pull requests on GitHub.
+
+See also Jelmer's [advice on getting your PRs merged](https://jelmer.uk/pages/pr-advice.html).
 
 Licensing
 ---------

@@ -68,21 +68,46 @@ def _check_parent_exclusion(path: str, matching_patterns: Sequence["Pattern"]) -
     Returns:
         True if parent exclusion applies (negation should be ineffective), False otherwise
     """
-    # Find the last negation pattern
-    final_negation = next(
-        (p for p in reversed(matching_patterns) if not p.is_exclude), None
-    )
-    if not final_negation:
+    final_negation_index = None
+    for i in range(len(matching_patterns) - 1, -1, -1):
+        if not matching_patterns[i].is_exclude:
+            final_negation_index = i
+            break
+    if final_negation_index is None:
         return False
 
+    final_negation = matching_patterns[final_negation_index]
     final_pattern_str = _pattern_to_str(final_negation)
+    parent_status: dict[str, bool | None] = {
+        parent: None for parent in _parent_directories(path)
+    }
+    seen_pattern_ids: set[int] = set()
 
-    # Check if any exclusion pattern excludes a parent directory
-    return any(
-        pattern.is_exclude
-        and _pattern_excludes_parent(_pattern_to_str(pattern), path, final_pattern_str)
-        for pattern in matching_patterns
-    )
+    for pattern in matching_patterns[:final_negation_index]:
+        pattern_id = id(pattern)
+        if pattern_id in seen_pattern_ids:
+            continue
+        seen_pattern_ids.add(pattern_id)
+        pattern_str = _pattern_to_str(pattern)
+        for parent in parent_status:
+            if not pattern.match(os.fsencode(parent)):
+                continue
+            if pattern.is_exclude:
+                if _pattern_excludes_parent(pattern_str, path, final_pattern_str):
+                    parent_status[parent] = True
+            else:
+                parent_status[parent] = False
+
+    return any(status is True for status in parent_status.values())
+
+
+def _parent_directories(path: str) -> list[str]:
+    """Return parent directories for a path, with trailing slashes."""
+    path = path.rstrip("/")
+    if not path or "/" not in path:
+        return []
+    parts = path.split("/")
+    return ["/".join(parts[:i]) + "/" for i in range(1, len(parts))]
 
 
 def _pattern_excludes_parent(

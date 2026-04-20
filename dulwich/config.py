@@ -793,7 +793,10 @@ def _parse_string(value: bytes) -> bytes:
             # the rest of the line is a comment
             break
         elif c in _WHITESPACE_CHARS:
-            whitespace.append(c)
+            if in_quotes:
+                ret.append(c)
+            else:
+                whitespace.append(c)
         else:
             if whitespace:
                 ret.extend(whitespace)

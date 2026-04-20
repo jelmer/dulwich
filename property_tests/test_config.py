@@ -76,19 +76,15 @@ if HYPOTHESIS_AVAILABLE:
         max_size=12,
     ).map(lambda value: value.encode("ascii"))
 
-    values = (
-        st.text(
-            alphabet=(
-                "abcdefghijklmnopqrstuvwxyz"
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                "0123456789"
-                ' -_./:#\t\n\\"'
-            ),
-            max_size=32,
-        )
-        .map(lambda value: value.encode("ascii"))
-        .filter(lambda value: not value.endswith((b" ", b"\t")))
-    )
+    values = st.text(
+        alphabet=(
+            "abcdefghijklmnopqrstuvwxyz"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "0123456789"
+            ' -_./:#\t\n\\"'
+        ),
+        max_size=32,
+    ).map(lambda value: value.encode("ascii"))
 
     sections = st.tuples(
         section_names,

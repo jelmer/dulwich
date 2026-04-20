@@ -218,6 +218,17 @@ class ConfigFileTests(TestCase):
         c.write_to_file(f)
         self.assertEqual(b'[branch "blie"]\n\tfoo = bar\n', f.getvalue())
 
+    def test_write_to_file_preserves_quoted_trailing_whitespace(self) -> None:
+        c = ConfigFile()
+        c.set((b"core",), b"foo", b" ")
+        c.set((b"core",), b"bar", b"\t")
+
+        f = BytesIO()
+        c.write_to_file(f)
+        reparsed = self.from_file(f.getvalue())
+
+        self.assertEqual(c, reparsed)
+
     def test_same_line(self) -> None:
         cf = self.from_file(b"[branch.foo] foo = bar\n")
         self.assertEqual(b"bar", cf.get((b"branch", b"foo"), b"foo"))
@@ -1001,7 +1012,9 @@ class FormatStringTests(TestCase):
 class ParseStringTests(TestCase):
     def test_quoted(self) -> None:
         self.assertEqual(b" foo", _parse_string(b'" foo"'))
+        self.assertEqual(b"foo ", _parse_string(b'"foo "'))
         self.assertEqual(b"\tfoo", _parse_string(b'"\\tfoo"'))
+        self.assertEqual(b"foo\t", _parse_string(b'"foo\\t"'))
 
     def test_not_quoted(self) -> None:
         self.assertEqual(b"foo", _parse_string(b"foo"))

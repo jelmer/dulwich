@@ -80,7 +80,7 @@ jobs:
       - name: Property-based tests
         run: |
           pip install --upgrade ".[hypothesis]"
-          python -m unittest property_tests.test_config
+          python -m unittest discover property_tests
         env:
           HYPOTHESIS_PROFILE: ci
       - name: Run contrib tests

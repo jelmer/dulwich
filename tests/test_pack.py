@@ -248,6 +248,10 @@ class TestPackDeltas(TestCase):
         # Should raise ApplyDeltaError
         self.assertRaises(ApplyDeltaError, apply_delta, base, invalid_delta)
 
+    def test_apply_delta_truncated_insert(self) -> None:
+        """Test apply_delta with a truncated insert operation."""
+        self.assertRaises(ApplyDeltaError, apply_delta, b"", b"\x00\x01\x01")
+
     def test_create_delta_insert_only(self) -> None:
         """Test create_delta when only insertions are required."""
         base = b""

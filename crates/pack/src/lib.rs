@@ -170,6 +170,9 @@ fn apply_delta(py: Python, py_src_buf: Py<PyAny>, py_delta: Py<PyAny>) -> PyResu
 
             for i in 0..4 {
                 if cmd & (1 << i) != 0 {
+                    if index >= delta_len {
+                        return Err(ApplyDeltaError::new_err("delta not empty"));
+                    }
                     let x = delta[index] as usize;
                     index += 1;
                     cp_off |= x << (i * 8);
@@ -178,6 +181,9 @@ fn apply_delta(py: Python, py_src_buf: Py<PyAny>, py_delta: Py<PyAny>) -> PyResu
 
             for i in 0..3 {
                 if cmd & (1 << (4 + i)) != 0 {
+                    if index >= delta_len {
+                        return Err(ApplyDeltaError::new_err("delta not empty"));
+                    }
                     let x = delta[index] as usize;
                     index += 1;
                     cp_size |= x << (i * 8);
@@ -193,6 +199,7 @@ fn apply_delta(py: Python, py_src_buf: Py<PyAny>, py_delta: Py<PyAny>) -> PyResu
                 || cp_off > src_size
                 || cp_off > src_size - cp_size
                 || cp_size > dest_size
+                || outindex > dest_size - cp_size
             {
                 break;
             }
@@ -207,6 +214,9 @@ fn apply_delta(py: Python, py_src_buf: Py<PyAny>, py_delta: Py<PyAny>) -> PyResu
             // Raise ApplyDeltaError if there are more bytes to copy than space
             if outindex + cmd as usize > dest_size {
                 return Err(ApplyDeltaError::new_err("Not enough space to copy"));
+            }
+            if index + cmd as usize > delta_len {
+                return Err(ApplyDeltaError::new_err("delta not empty"));
             }
 
             out[outindex..outindex + cmd as usize]

@@ -48,6 +48,7 @@ dev = [
     "dissolve>=0.1.1",
     "codespell==2.4.2",
 ]
+hypothesis = ["hypothesis>=6"]
 merge = ["merge3"]
 fuzzing = ["atheris"]
 patiencediff = ["patiencediff"]

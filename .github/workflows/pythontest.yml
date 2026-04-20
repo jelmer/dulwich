@@ -77,6 +77,12 @@ jobs:
         run: |
           pip install --upgrade coverage
           python -m coverage run -p -m unittest tests.test_suite
+      - name: Property-based tests
+        run: |
+          pip install --upgrade ".[hypothesis]"
+          python -m unittest property_tests.test_config
+        env:
+          HYPOTHESIS_PROFILE: ci
       - name: Run contrib tests
         run: |
           python -m unittest contrib.test_suite

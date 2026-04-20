@@ -122,14 +122,27 @@ This will run the tests using unittest.
 
 .. code:: console
 
-   $ python -m unittest dulwich.tests.test_suite
+   $ python -m unittest tests.test_suite
 
 The compatibility tests that verify Dulwich behaves in a way that is compatible
 with C Git are the slowest, so you may want to avoid them while developing:
 
 .. code:: console
 
-   $ python -m unittest dulwich.tests.nocompat_test_suite
+   $ python -m unittest tests.nocompat_test_suite
+
+Property-based tests
+~~~~~~~~~~~~~~~~~~~~
+
+Property-based tests are present under ``property_tests/`` and use Hypothesis
+to check general properties of Dulwich's parsers and serializers. They are
+separate from the regular ``unittest`` suite so that contributors only run
+them explicitly. Their default Hypothesis profile is deterministic.
+
+.. code:: console
+
+   $ pip install -e ".[hypothesis]"
+   $ python -m unittest property_tests.test_config
 
 testr and tox configuration is also present.
 

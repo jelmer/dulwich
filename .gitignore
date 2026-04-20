@@ -23,6 +23,7 @@ dulwich.egg-info/
 htmlcov/
 docs/api/*.txt
 .mypy_cache/
+.hypothesis/
 .eggs
 dulwich.dist-info
 .stestr

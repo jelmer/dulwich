@@ -134,14 +134,14 @@ with C Git are the slowest, so you may want to avoid them while developing:
 Property-based tests
 ~~~~~~~~~~~~~~~~~~~~
 
-Some tests use Hypothesis to check general properties of Dulwich's parsers and
-serializers. These tests are separate from the regular ``unittest`` suite so
-that contributors only run them explicitly. Their default Hypothesis profile is
-deterministic.
+Property-based tests are present under ``property_tests/`` and use Hypothesis
+to check general properties of Dulwich's parsers and serializers. They are
+separate from the regular ``unittest`` suite so that contributors only run
+them explicitly. Their default Hypothesis profile is deterministic.
 
 .. code:: console
 
-   $ pip install -e ".[test]"
+   $ pip install -e ".[hypothesis]"
    $ python -m unittest property_tests.test_config
 
 testr and tox configuration is also present.

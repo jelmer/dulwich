@@ -142,7 +142,7 @@ them explicitly. Their default Hypothesis profile is deterministic.
 .. code:: console
 
    $ pip install -e ".[hypothesis]"
-   $ python -m unittest property_tests.test_config
+   $ python -m unittest discover property_tests
 
 testr and tox configuration is also present.
 

@@ -41,6 +41,12 @@
    for normalizing NFD Unicode paths from macOS filesystems to NFC
    form. (Jelmer Vernooĳ, #1804)
 
+ * Extend ``core.ignorecase`` and ``core.precomposeunicode`` support to
+   index lookups: when either is enabled, ``porcelain.add`` and
+   ``porcelain.rm`` match existing index entries whose case or Unicode
+   form differs from the supplied path, matching Git's behavior and
+   preventing duplicate entries. (Jelmer Vernooĳ, #1807)
+
  * Add support for ``core.gitProxy`` configuration option, which
    specifies a proxy command for Git protocol (``git://``) connections.
    (Jelmer Vernooĳ, #1850)

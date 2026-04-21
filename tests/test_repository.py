@@ -1378,6 +1378,20 @@ class BuildRepoRootTests(TestCase):
         # https://github.com/jelmer/dulwich/issues/1285 was addressed
         Repo(self._repo_dir)
 
+    def test_open_index_applies_core_ignorecase(self) -> None:
+        r = self._repo
+        c = r.get_config()
+        c.set((b"core",), b"ignorecase", True)
+        c.write_to_path()
+        index = r.open_index()
+        # The root commit staged "a"; an uppercase lookup should find it.
+        self.assertIn(b"A", index)
+
+    def test_open_index_default_is_case_sensitive(self) -> None:
+        index = self._repo.open_index()
+        self.assertIn(b"a", index)
+        self.assertNotIn(b"A", index)
+
     def test_relativeworktrees_extension(self) -> None:
         """Test that repositories with relativeworktrees extension can be opened."""
         r = self._repo

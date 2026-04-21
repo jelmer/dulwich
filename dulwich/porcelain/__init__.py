@@ -1778,7 +1778,7 @@ def remove(
             else:
                 # Treat relative paths as relative to the repository root
                 full_path = os.path.join(r.path, p_str)
-            tree_path = path_to_tree_path(r.path, full_path)
+            tree_path = index.canonical_path(path_to_tree_path(r.path, full_path))
             # Convert to bytes for file operations
             full_path_bytes = os.fsencode(full_path)
             try:

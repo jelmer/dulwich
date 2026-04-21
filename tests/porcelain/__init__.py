@@ -2229,6 +2229,59 @@ class AddTests(PorcelainTestCase):
         # Should not add any files
         self.assertEqual(len(added), 0)
 
+    def test_add_ignorecase_reuses_existing_entry(self) -> None:
+        """With core.ignorecase, adding a differently-cased name
+        updates the existing index entry instead of creating a duplicate.
+        """
+        config = self.repo.get_config()
+        config.set((b"core",), b"ignorecase", True)
+        config.write_to_path()
+
+        lower = os.path.join(self.repo.path, "foo.txt")
+        upper = os.path.join(self.repo.path, "Foo.txt")
+        with open(lower, "w") as f:
+            f.write("lower")
+        porcelain.add(self.repo.path, paths=[lower])
+        with open(upper, "w") as f:
+            f.write("upper")
+        porcelain.add(self.repo.path, paths=[upper])
+
+        self.assertEqual([b"foo.txt"], list(self.repo.open_index().paths()))
+
+    def test_add_precomposeunicode_reuses_existing_entry(self) -> None:
+        """With core.precomposeunicode, adding an NFD-form path updates
+        the NFC-form index entry instead of creating a duplicate.
+        """
+        import unicodedata
+
+        nfc_name = unicodedata.normalize("NFC", "täst.txt")
+        nfd_name = unicodedata.normalize("NFD", "täst.txt")
+        self.assertNotEqual(nfc_name, nfd_name)
+
+        config = self.repo.get_config()
+        config.set((b"core",), b"precomposeunicode", True)
+        config.write_to_path()
+
+        nfc_path = os.path.join(self.repo.path, nfc_name)
+        with open(nfc_path, "w") as f:
+            f.write("nfc")
+        porcelain.add(self.repo.path, paths=[nfc_path])
+
+        # Stage a file whose on-disk name is the NFD form (simulates the
+        # path coming from an NFD-returning filesystem listing).
+        nfd_path = os.path.join(self.repo.path, nfd_name)
+        if os.path.exists(nfd_path):
+            # Filesystem collapses NFC/NFD — nothing meaningful to test.
+            return
+        with open(nfd_path, "w") as f:
+            f.write("nfd")
+        porcelain.add(self.repo.path, paths=[nfd_path])
+
+        self.assertEqual(
+            [nfc_name.encode("utf-8")],
+            list(self.repo.open_index().paths()),
+        )
+
 
 class RemoveTests(PorcelainTestCase):
     def test_remove_file(self) -> None:
@@ -2371,6 +2424,32 @@ class RemoveTests(PorcelainTestCase):
 
         # Verify file was removed
         self.assertFalse(os.path.exists(fullpath))
+
+    def test_remove_ignorecase_finds_entry(self) -> None:
+        """With core.ignorecase, remove matches an entry whose case differs
+        from the argument.
+        """
+        config = self.repo.get_config()
+        config.set((b"core",), b"ignorecase", True)
+        config.write_to_path()
+
+        lower = os.path.join(self.repo.path, "foo.txt")
+        with open(lower, "w") as f:
+            f.write("content")
+        porcelain.add(self.repo.path, paths=[lower])
+        porcelain.commit(
+            repo=self.repo,
+            message=b"add",
+            author=b"test <test@example.com>",
+            committer=b"test <test@example.com>",
+        )
+
+        # Rename on disk to the upper-cased form so the FS lookup succeeds,
+        # then invoke remove with the upper-cased path.
+        upper = os.path.join(self.repo.path, "Foo.txt")
+        os.rename(lower, upper)
+        porcelain.remove(self.repo.path, paths=["Foo.txt"])
+        self.assertEqual([], list(self.repo.open_index().paths()))
 
 
 class MvTests(PorcelainTestCase):

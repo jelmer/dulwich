@@ -29,7 +29,7 @@ import sys
 import tempfile
 from io import BytesIO
 
-from dulwich.config import ConfigDict
+from dulwich.config import ConfigDict, ConfigFile
 from dulwich.diff_tree import (
     CHANGE_ADD,
     CHANGE_COPY,
@@ -58,6 +58,7 @@ from dulwich.index import (
     index_entry_from_path,
     index_entry_from_stat,
     iter_fresh_entries,
+    make_path_normalizer,
     read_index,
     read_index_dict,
     update_working_tree,
@@ -177,6 +178,173 @@ class SimpleIndexTestCase(IndexTestCase):
         # Read it back with pathlib.Path
         index2 = Index(path_obj)
         self.assertIn(b"test", index2)
+
+
+class IndexPathNormalizerTestCase(TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+    def _entry(self) -> IndexEntry:
+        return IndexEntry(
+            ctime=(0, 0),
+            mtime=(0, 0),
+            dev=0,
+            ino=0,
+            mode=0o100644,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=b"0" * 40,
+        )
+
+    def test_no_normalizer_is_case_sensitive(self) -> None:
+        index = Index(os.path.join(self.tempdir, "idx"), read=False)
+        index[b"foo.txt"] = self._entry()
+        self.assertIn(b"foo.txt", index)
+        self.assertNotIn(b"Foo.txt", index)
+
+    def test_ignorecase_contains_matches_existing_entry(self) -> None:
+        index = Index(
+            os.path.join(self.tempdir, "idx"),
+            read=False,
+            path_normalizer=lambda p: p.lower(),
+        )
+        index[b"foo.txt"] = self._entry()
+        self.assertIn(b"Foo.txt", index)
+        self.assertIn(b"FOO.TXT", index)
+
+    def test_ignorecase_getitem_matches_existing_entry(self) -> None:
+        index = Index(
+            os.path.join(self.tempdir, "idx"),
+            read=False,
+            path_normalizer=lambda p: p.lower(),
+        )
+        entry = self._entry()
+        index[b"foo.txt"] = entry
+        self.assertIs(entry, index[b"Foo.txt"])
+        self.assertIs(entry, index[b"FOO.TXT"])
+
+    def test_unknown_path_still_raises(self) -> None:
+        index = Index(
+            os.path.join(self.tempdir, "idx"),
+            read=False,
+            path_normalizer=lambda p: p.lower(),
+        )
+        index[b"foo.txt"] = self._entry()
+        self.assertNotIn(b"other.txt", index)
+        self.assertRaises(KeyError, lambda: index[b"other.txt"])
+
+    def test_setitem_reuses_canonical_key(self) -> None:
+        index = Index(
+            os.path.join(self.tempdir, "idx"),
+            read=False,
+            path_normalizer=lambda p: p.lower(),
+        )
+        index[b"foo.txt"] = self._entry()
+        index[b"Foo.txt"] = self._entry()
+        self.assertEqual([b"foo.txt"], list(index))
+
+    def test_delitem_matches_case_insensitively(self) -> None:
+        index = Index(
+            os.path.join(self.tempdir, "idx"),
+            read=False,
+            path_normalizer=lambda p: p.lower(),
+        )
+        index[b"foo.txt"] = self._entry()
+        del index[b"Foo.txt"]
+        self.assertEqual([], list(index))
+        self.assertNotIn(b"foo.txt", index)
+
+    def test_delete_then_reinsert_uses_new_casing(self) -> None:
+        index = Index(
+            os.path.join(self.tempdir, "idx"),
+            read=False,
+            path_normalizer=lambda p: p.lower(),
+        )
+        index[b"foo.txt"] = self._entry()
+        del index[b"foo.txt"]
+        index[b"Foo.txt"] = self._entry()
+        self.assertEqual([b"Foo.txt"], list(index))
+
+    def test_canonical_path_returns_stored_key(self) -> None:
+        index = Index(
+            os.path.join(self.tempdir, "idx"),
+            read=False,
+            path_normalizer=lambda p: p.lower(),
+        )
+        index[b"foo.txt"] = self._entry()
+        self.assertEqual(b"foo.txt", index.canonical_path(b"Foo.txt"))
+        self.assertEqual(b"foo.txt", index.canonical_path(b"foo.txt"))
+        # Unknown paths pass through unchanged.
+        self.assertEqual(b"bar.txt", index.canonical_path(b"bar.txt"))
+
+    def test_canonical_path_without_normalizer_is_identity(self) -> None:
+        index = Index(os.path.join(self.tempdir, "idx"), read=False)
+        index[b"foo.txt"] = self._entry()
+        self.assertEqual(b"Foo.txt", index.canonical_path(b"Foo.txt"))
+
+    def test_normalized_cache_rebuilds_after_read(self) -> None:
+        path = os.path.join(self.tempdir, "idx")
+        index = Index(
+            path,
+            read=False,
+            path_normalizer=lambda p: p.lower(),
+        )
+        index[b"foo.txt"] = self._entry()
+        index.write()
+
+        reopened = Index(path, path_normalizer=lambda p: p.lower())
+        self.assertIn(b"Foo.txt", reopened)
+        self.assertEqual(b"foo.txt", reopened.canonical_path(b"FOO.TXT"))
+
+
+class MakePathNormalizerTests(TestCase):
+    def _config(self, **kwargs: bytes) -> ConfigFile:
+        cf = ConfigFile()
+        for key, value in kwargs.items():
+            cf.set((b"core",), key.encode(), value)
+        return cf
+
+    def test_returns_none_when_disabled(self) -> None:
+        self.assertIsNone(make_path_normalizer(self._config()))
+
+    def test_ignorecase(self) -> None:
+        normalize = make_path_normalizer(self._config(ignorecase=b"true"))
+        self.assertIsNotNone(normalize)
+        assert normalize is not None  # narrow for type checker
+        self.assertEqual(b"foo.txt", normalize(b"Foo.TXT"))
+
+    def test_precomposeunicode(self) -> None:
+        import unicodedata
+
+        normalize = make_path_normalizer(self._config(precomposeunicode=b"true"))
+        self.assertIsNotNone(normalize)
+        assert normalize is not None
+        nfd = unicodedata.normalize("NFD", "täst.txt").encode("utf-8")
+        nfc = unicodedata.normalize("NFC", "täst.txt").encode("utf-8")
+        self.assertEqual(nfc, normalize(nfd))
+
+    def test_both(self) -> None:
+        import unicodedata
+
+        normalize = make_path_normalizer(
+            self._config(ignorecase=b"true", precomposeunicode=b"true")
+        )
+        self.assertIsNotNone(normalize)
+        assert normalize is not None
+        # ASCII case-folding + NFC normalization (matches git's ignorecase,
+        # which folds ASCII only).
+        nfd = unicodedata.normalize("NFD", "Täst.TXT").encode("utf-8")
+        expected = unicodedata.normalize("NFC", "täst.txt").encode("utf-8")
+        self.assertEqual(expected, normalize(nfd))
+
+    def test_precomposeunicode_invalid_utf8_passes_through(self) -> None:
+        normalize = make_path_normalizer(self._config(precomposeunicode=b"true"))
+        self.assertIsNotNone(normalize)
+        assert normalize is not None
+        self.assertEqual(b"\xff\xfe", normalize(b"\xff\xfe"))
 
 
 class SimpleIndexWriterTestCase(IndexTestCase):

@@ -7675,6 +7675,14 @@ class StatusTests(PorcelainTestCase):
         """Test that precompose_unicode normalizes NFD paths to NFC."""
         import unicodedata
 
+        # macOS git ships with core.precomposeunicode=true in the system
+        # config. Override it at the repo level so open_index() below does
+        # not apply NFC normalization to lookups — that would mask the
+        # "NFD present, NFC in index" assertion we are exercising.
+        config = self.repo.get_config()
+        config.set((b"core",), b"precomposeunicode", False)
+        config.write_to_path()
+
         # NFC (precomposed) and NFD (decomposed) forms of "ä"
         nfc_name = unicodedata.normalize("NFC", "t\u00e4st.txt")
         nfd_name = unicodedata.normalize("NFD", "t\u00e4st.txt")

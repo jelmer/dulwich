@@ -499,14 +499,23 @@ def write_midx(
     # Sort pack entries by pack name (required by Git)
     pack_index_entries_sorted = sorted(pack_index_entries, key=lambda x: x[0])
 
-    # Collect all objects from all packs
-    all_objects: list[tuple[RawObjectID, int, int]] = []  # (sha, pack_id, offset)
+    # Collect all objects from all packs, deduplicating objects that appear
+    # in multiple packs. Git's MIDX format requires strictly increasing OIDs
+    # in the OIDL chunk, so duplicates must be resolved. When the same object
+    # is in multiple packs, we keep the occurrence from the first pack (in
+    # pack-name order), matching how Git itself handles duplicates.
+    seen: dict[RawObjectID, tuple[int, int]] = {}  # sha -> (pack_id, offset)
     pack_names: list[str] = []
 
     for pack_id, (pack_name, entries) in enumerate(pack_index_entries_sorted):
         pack_names.append(pack_name)
         for sha, offset, _crc32 in entries:
-            all_objects.append((sha, pack_id, offset))
+            if sha not in seen:
+                seen[sha] = (pack_id, offset)
+
+    all_objects: list[tuple[RawObjectID, int, int]] = [
+        (sha, pack_id, offset) for sha, (pack_id, offset) in seen.items()
+    ]
 
     # Sort all objects by SHA
     all_objects.sort(key=lambda x: x[0])

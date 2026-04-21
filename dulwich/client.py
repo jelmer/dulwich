@@ -406,27 +406,6 @@ class ReportStatusParser:
             self._ref_statuses.append(ref_status)
 
 
-def _protocol_version_from_env() -> int | None:
-    """Parse the version from the ``GIT_PROTOCOL`` environment variable.
-
-    Git uses a colon-separated ``key=value`` format for ``GIT_PROTOCOL``
-    (for example ``version=2``). Return the requested version as an
-    ``int`` when present and parseable, otherwise ``None``.
-    """
-    value = os.environ.get("GIT_PROTOCOL")
-    if not value:
-        return None
-    for pair in value.split(":"):
-        key, sep, raw_val = pair.partition("=")
-        if not sep or key.strip() != "version":
-            continue
-        try:
-            return int(raw_val.strip())
-        except ValueError:
-            return None
-    return None
-
-
 def negotiate_protocol_version(proto: Protocol) -> int:
     """Negotiate protocol version with the server."""
     pkt = proto.read_pkt_line()
@@ -940,9 +919,7 @@ def _handle_upload_pack_head(
     assert isinstance(wants, list) and isinstance(wants[0], bytes)
     wantcmd = COMMAND_WANT + b" " + wants[0]
     if protocol_version is None:
-        protocol_version = (
-            _protocol_version_from_env() or DEFAULT_GIT_PROTOCOL_VERSION_SEND
-        )
+        protocol_version = DEFAULT_GIT_PROTOCOL_VERSION_SEND
     if protocol_version != 2:
         wantcmd += b" " + b" ".join(sorted(capabilities))
     wantcmd += b"\n"

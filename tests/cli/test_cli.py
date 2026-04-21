@@ -224,6 +224,48 @@ class HelperFunctionsTest(TestCase):
         self.assertAlmostEqual(expected, result, delta=2)
 
 
+class ProtocolVersionFromEnvTest(TestCase):
+    """Tests for :func:`dulwich.cli._protocol_version_from_env`.
+
+    Env lookup lives in the CLI layer so the transport library stays free
+    of process-environment reads. Moved here from tests/test_client.py.
+    """
+
+    def _call(self):
+        from dulwich.cli import _protocol_version_from_env
+
+        return _protocol_version_from_env()
+
+    def test_unset_returns_none(self):
+        self.overrideEnv("GIT_PROTOCOL", None)
+        self.assertIsNone(self._call())
+
+    def test_empty_returns_none(self):
+        self.overrideEnv("GIT_PROTOCOL", "")
+        self.assertIsNone(self._call())
+
+    def test_version_2(self):
+        self.overrideEnv("GIT_PROTOCOL", "version=2")
+        self.assertEqual(self._call(), 2)
+
+    def test_version_1(self):
+        self.overrideEnv("GIT_PROTOCOL", "version=1")
+        self.assertEqual(self._call(), 1)
+
+    def test_version_in_compound_value(self):
+        # GIT_PROTOCOL can carry multiple colon-separated key=value entries.
+        self.overrideEnv("GIT_PROTOCOL", "feature=extra:version=2")
+        self.assertEqual(self._call(), 2)
+
+    def test_non_version_key_returns_none(self):
+        self.overrideEnv("GIT_PROTOCOL", "feature=extra")
+        self.assertIsNone(self._call())
+
+    def test_unparseable_version_returns_none(self):
+        self.overrideEnv("GIT_PROTOCOL", "version=nope")
+        self.assertIsNone(self._call())
+
+
 class AddCommandTest(DulwichCliTestCase):
     """Tests for add command."""
 

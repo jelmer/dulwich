@@ -56,7 +56,6 @@ from dulwich.client import (
     TraditionalGitClient,
     Urllib3HttpGitClient,
     _extract_symrefs_and_agent,
-    _protocol_version_from_env,
     _remote_error_from_stderr,
     _win32_url_to_path,
     build_fetch_request_v2,
@@ -4042,46 +4041,3 @@ class TestPackDataProgressWrapper(TestCase):
             self.assertIn(b"0.00 MiB/s", msg)
 
 
-class TestProtocolVersionFromEnv(TestCase):
-    """Tests for :func:`_protocol_version_from_env`."""
-
-    def setUp(self) -> None:
-        super().setUp()
-        self._old_env = os.environ.get("GIT_PROTOCOL")
-        if "GIT_PROTOCOL" in os.environ:
-            del os.environ["GIT_PROTOCOL"]
-
-    def tearDown(self) -> None:
-        if self._old_env is None:
-            os.environ.pop("GIT_PROTOCOL", None)
-        else:
-            os.environ["GIT_PROTOCOL"] = self._old_env
-        super().tearDown()
-
-    def test_unset_returns_none(self) -> None:
-        self.assertIsNone(_protocol_version_from_env())
-
-    def test_empty_returns_none(self) -> None:
-        os.environ["GIT_PROTOCOL"] = ""
-        self.assertIsNone(_protocol_version_from_env())
-
-    def test_version_2(self) -> None:
-        os.environ["GIT_PROTOCOL"] = "version=2"
-        self.assertEqual(_protocol_version_from_env(), 2)
-
-    def test_version_1(self) -> None:
-        os.environ["GIT_PROTOCOL"] = "version=1"
-        self.assertEqual(_protocol_version_from_env(), 1)
-
-    def test_version_in_compound_value(self) -> None:
-        # GIT_PROTOCOL can carry multiple colon-separated key=value entries.
-        os.environ["GIT_PROTOCOL"] = "feature=extra:version=2"
-        self.assertEqual(_protocol_version_from_env(), 2)
-
-    def test_non_version_key_returns_none(self) -> None:
-        os.environ["GIT_PROTOCOL"] = "feature=extra"
-        self.assertIsNone(_protocol_version_from_env())
-
-    def test_unparseable_version_returns_none(self) -> None:
-        os.environ["GIT_PROTOCOL"] = "version=nope"
-        self.assertIsNone(_protocol_version_from_env())

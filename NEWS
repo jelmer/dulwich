@@ -1,4 +1,4 @@
-1.2.0	UNRELEASED
+1.2.0	2026-04-21
 
  * Expand ``log`` command options: add ``--oneline``, ``--abbrev-commit``,
    ``--author``, ``--committer``, ``--grep``, ``--since``/``--after``,

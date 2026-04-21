@@ -1,3 +1,11 @@
+1.2.1	UNRELEASED
+
+ * Deduplicate objects when writing a multi-pack-index. Objects present
+   in multiple packs (e.g. after ``git gc`` creates a cruft pack) would
+   otherwise produce an OIDL chunk with repeated SHAs, causing ``git
+   multi-pack-index verify`` to fail with "oid lookup out of order".
+   (Jelmer Vernooĳ, #2152)
+
 1.2.0	2026-04-21
 
  * Expand ``log`` command options: add ``--oneline``, ``--abbrev-commit``,

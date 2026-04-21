@@ -178,6 +178,51 @@ class MIDXWriteTests(TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(large_offset, result[1])
 
+    def test_write_duplicate_objects_across_packs(self):
+        """Objects present in multiple packs must only appear once in OIDL.
+
+        Git's MIDX OIDL chunk requires strictly increasing OIDs; duplicates
+        cause 'oid lookup out of order' errors in ``git multi-pack-index
+        verify``. This happens in real repositories when cruft packs preserve
+        unreachable objects that also exist in other packs.
+        """
+        f = BytesIO()
+
+        shared_sha = b"\x05" * 20
+        pack_entries = [
+            (
+                "pack-aaa.idx",
+                [
+                    (b"\x01" * 20, 100, 0),
+                    (shared_sha, 200, 0),
+                ],
+            ),
+            (
+                "pack-bbb.idx",
+                [
+                    (shared_sha, 999, 0),
+                    (b"\x09" * 20, 50, 0),
+                ],
+            ),
+        ]
+
+        write_midx(f, pack_entries, HASH_ALGORITHM_SHA1)
+        f.seek(0)
+        midx = MultiPackIndex("test.midx", file=f, contents=f.read())
+
+        self.assertEqual(3, len(midx))
+
+        # Shared object should resolve to the first pack (pack-aaa sorts first)
+        result = midx.object_offset(shared_sha)
+        self.assertIsNotNone(result)
+        self.assertEqual("pack-aaa.idx", result[0])
+        self.assertEqual(200, result[1])
+
+        # OIDs must be strictly increasing (no duplicates)
+        entries = list(midx.iterentries())
+        shas = [e[0] for e in entries]
+        self.assertEqual(shas, sorted(set(shas)))
+
     def test_write_midx_file(self):
         """Test writing a MIDX file to disk."""
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -23,19 +23,12 @@
 
 import os
 from io import BytesIO
-from unittest import SkipTest
+
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from dulwich.config import ConfigFile
 from tests import TestCase
-
-try:
-    from hypothesis import given, settings
-    from hypothesis import strategies as st
-except ImportError:
-    HYPOTHESIS_AVAILABLE = False
-else:
-    HYPOTHESIS_AVAILABLE = True
-
 
 EXPECTED_PARSE_ERRORS = (
     "without section",
@@ -48,51 +41,47 @@ EXPECTED_PARSE_ERRORS = (
 )
 
 
-if HYPOTHESIS_AVAILABLE:
-    settings.register_profile(
-        "deterministic", max_examples=50, deadline=None, derandomize=True
-    )
-    settings.register_profile("ci", max_examples=50, deadline=None, derandomize=True)
-    settings.register_profile(
-        "local-deep", max_examples=1000, deadline=None, derandomize=True
-    )
-    settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "deterministic"))
+settings.register_profile(
+    "deterministic", max_examples=50, deadline=None, derandomize=True
+)
+settings.register_profile("ci", max_examples=50, deadline=None, derandomize=True)
+settings.register_profile(
+    "local-deep", max_examples=1000, deadline=None, derandomize=True
+)
+settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "deterministic"))
 
-    section_names = st.text(
-        alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-",
-        min_size=1,
-        max_size=12,
-    ).map(lambda value: value.encode("ascii"))
+section_names = st.text(
+    alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-",
+    min_size=1,
+    max_size=12,
+).map(lambda value: value.encode("ascii"))
 
-    subsection_names = st.text(
-        alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._/",
-        min_size=1,
-        max_size=16,
-    ).map(lambda value: value.encode("ascii"))
+subsection_names = st.text(
+    alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._/",
+    min_size=1,
+    max_size=16,
+).map(lambda value: value.encode("ascii"))
 
-    variable_names = st.text(
-        alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-",
-        min_size=1,
-        max_size=12,
-    ).map(lambda value: value.encode("ascii"))
+variable_names = st.text(
+    alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-",
+    min_size=1,
+    max_size=12,
+).map(lambda value: value.encode("ascii"))
 
-    values = st.text(
-        alphabet=(
-            "abcdefghijklmnopqrstuvwxyz"
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            "0123456789"
-            ' -_./:#\t\n\\"'
-        ),
-        max_size=32,
-    ).map(lambda value: value.encode("ascii"))
+values = st.text(
+    alphabet=(
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -_./:#\t\n\\"'
+    ),
+    max_size=32,
+).map(lambda value: value.encode("ascii"))
 
-    sections = st.tuples(
-        section_names,
-        st.one_of(st.none(), subsection_names),
-        st.dictionaries(variable_names, values, min_size=1, max_size=6),
-    )
+sections = st.tuples(
+    section_names,
+    st.one_of(st.none(), subsection_names),
+    st.dictionaries(variable_names, values, min_size=1, max_size=6),
+)
 
-    configs = st.lists(sections, min_size=0, max_size=6)
+configs = st.lists(sections, min_size=0, max_size=6)
 
 
 def _config_from_sections(
@@ -113,37 +102,27 @@ def _config_from_sections(
 class ConfigFilePropertyTests(TestCase):
     """Property tests for ConfigFile."""
 
-    if not HYPOTHESIS_AVAILABLE:
+    @given(st.binary(max_size=512))
+    def test_binary_input_only_raises_expected_parse_errors(self, data: bytes) -> None:
+        """Check that arbitrary bytes only raise expected parse errors."""
+        try:
+            ConfigFile.from_file(BytesIO(data))
+        except ValueError as exc:
+            self.assertTrue(
+                any(message in str(exc) for message in EXPECTED_PARSE_ERRORS),
+                str(exc),
+            )
 
-        def test_hypothesis_available(self) -> None:
-            """Skip these tests when Hypothesis is unavailable."""
-            raise SkipTest("hypothesis is not available")
+    @given(configs)
+    def test_write_roundtrip_preserves_effective_config(
+        self,
+        generated_sections: list[tuple[bytes, bytes | None, dict[bytes, bytes]]],
+    ) -> None:
+        """Check that writing and reading preserves generated configs."""
+        config = _config_from_sections(generated_sections)
 
-    else:
+        output = BytesIO()
+        config.write_to_file(output)
 
-        @given(st.binary(max_size=512))
-        def test_binary_input_only_raises_expected_parse_errors(
-            self, data: bytes
-        ) -> None:
-            """Check that arbitrary bytes only raise expected parse errors."""
-            try:
-                ConfigFile.from_file(BytesIO(data))
-            except ValueError as exc:
-                self.assertTrue(
-                    any(message in str(exc) for message in EXPECTED_PARSE_ERRORS),
-                    str(exc),
-                )
-
-        @given(configs)
-        def test_write_roundtrip_preserves_effective_config(
-            self,
-            generated_sections: list[tuple[bytes, bytes | None, dict[bytes, bytes]]],
-        ) -> None:
-            """Check that writing and reading preserves generated configs."""
-            config = _config_from_sections(generated_sections)
-
-            output = BytesIO()
-            config.write_to_file(output)
-
-            reparsed = ConfigFile.from_file(BytesIO(output.getvalue()))
-            self.assertEqual(config, reparsed)
+        reparsed = ConfigFile.from_file(BytesIO(output.getvalue()))
+        self.assertEqual(config, reparsed)

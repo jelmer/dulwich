@@ -56,6 +56,28 @@ You can generate the documentation by running ``pydoctor --docformat=google dulw
 from the root of the repository, and then opening
 ``apidocs/index.html`` in your web browser.
 
+Layering
+~~~~~~~~
+
+Dulwich is layered into three layers:
+
+* The command-line interface (CLI), which provides the user-facing commands and options
+* The porcelain, which provides a high-level API that is designed to be easy to use and understand,
+  intended to be used by API users who are not necessarily familiar with Git's
+  internal data structures and concepts, and who want to perform common Git operations
+  without shelling out to C Git or dealing with low-level details.
+* The plumbing, which provides a low-level API that closely follows Git's
+  internal data structures and concepts, intended to be used by API users who
+  are familiar with Git's internals and want to perform more complex operations
+  that may not be covered by the porcelain, or who want to have more control
+  over the behavior of their Git operations.
+
+The porcelain and plumbing layers are designed to be used in applications, and as such
+they should not be peaking at e.g. the environment variables. Only the CLI
+layer should be doing that, and it should be doing so in a way that is
+consistent with C Git (e.g. by using the same environment variables and the
+same precedence rules).
+
 String Types
 ~~~~~~~~~~~~
 Like Linux, Git treats filenames as arbitrary bytestrings. There is no prescribed

@@ -77,6 +77,22 @@
    User-Agent header. Supports both global and URL-specific settings. The
    default User-Agent is ``git/dulwich/{version}``. (Jelmer Vernooĳ)
 
+ * Preserve quoted trailing whitespace in config values. Previously, spaces
+   and tabs inside quoted config values were discarded during parsing.
+   (Christopher Toth, #2145)
+
+ * Fix ``.gitignore`` parent re-include handling so that a later ``!dir/``
+   re-include allows a subsequent file-level negation to take effect.
+   (N0zoM1z0, #2141)
+
+ * No longer ship ``contrib/`` as part of the distribution. The ``contrib/``
+   directory has always been documented as unsupported and is now excluded
+   from the installed package. (Jelmer Vernooĳ, #2122)
+
+ * Fix host key verification in ``contrib/paramiko_vendor.py`` by loading
+   known hosts and rejecting unknown SSH host keys by default.
+   (quart27219, #2123)
+
 1.1.0	2026-02-17
 
  * Add support for ``core.commentChar`` configuration option in commit message

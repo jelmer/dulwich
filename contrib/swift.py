@@ -199,7 +199,7 @@ def load_conf(path: str | None = None, file: str | None = None) -> ConfigParser:
 
 
 def swift_load_pack_index(
-    scon: "SwiftConnector", filename: str, object_format: ObjectFormat
+    scon: "SwiftConnector", filename: str, object_format: "ObjectFormat"
 ) -> "PackIndex":
     """Read a pack index file from Swift.
 

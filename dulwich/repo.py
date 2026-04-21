@@ -1786,7 +1786,7 @@ class Repo(BaseRepo):
           NoIndexPresent: If no index is present
         Returns: The matching `Index`
         """
-        from .index import Index
+        from .index import Index, make_path_normalizer
 
         if not self.has_index():
             raise NoIndexPresent
@@ -1822,6 +1822,7 @@ class Repo(BaseRepo):
             skip_hash=skip_hash,
             version=index_version,
             file_mode=file_mode,
+            path_normalizer=make_path_normalizer(config),
         )
 
     def has_index(self) -> bool:

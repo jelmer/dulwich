@@ -62,6 +62,7 @@ __all__ = [
     "get_path_element_normalizer",
     "get_unstaged_changes",
     "index_entry_from_stat",
+    "make_path_normalizer",
     "pathjoin",
     "pathsplit",
     "read_cache_entry",
@@ -1124,6 +1125,7 @@ class Index:
         version: int | None = None,
         *,
         file_mode: int | None = None,
+        path_normalizer: Callable[[bytes], bytes] | None = None,
     ) -> None:
         """Create an index object associated with the given filename.
 
@@ -1133,6 +1135,11 @@ class Index:
           skip_hash: Whether to skip SHA1 hash when writing (for manyfiles feature)
           version: Index format version to use (None = auto-detect from file or use default)
           file_mode: Optional file permission mask for shared repository
+          path_normalizer: Optional function mapping a filesystem path to a
+            canonical form (e.g. case-folded, NFC-normalized). When provided,
+            lookups (``index[path]``, ``path in index``, ``del index[path]``)
+            transparently match paths that normalize to the same form as an
+            existing entry.
         """
         self._filename = os.fspath(filename)
         # TODO(jelmer): Store the version returned by read_index
@@ -1140,9 +1147,32 @@ class Index:
         self._skip_hash = skip_hash
         self._file_mode = file_mode
         self._extensions: list[IndexExtension] = []
+        self._path_normalizer = path_normalizer
+        self._normalized: dict[bytes, bytes] | None = (
+            {} if path_normalizer is not None else None
+        )
         self.clear()
         if read:
             self.read()
+
+    def canonical_path(self, name: bytes) -> bytes:
+        """Resolve ``name`` to the canonical key stored in the index.
+
+        If an entry already exists under ``name`` (or no normalizer is
+        configured), ``name`` is returned unchanged. Otherwise the
+        normalizer is applied and the key of any entry with the same
+        normalized form is returned. Falls back to ``name`` if none.
+
+        Normally callers do not need this because ``index[name]``,
+        ``name in index``, and ``del index[name]`` already apply
+        normalization transparently. Use this when the path is also
+        being used outside the index (for example to look up the same
+        entry in a commit tree), so that both sides agree on the key.
+        """
+        if self._normalized is None or name in self._byname:
+            return name
+        assert self._path_normalizer is not None
+        return self._normalized.get(self._path_normalizer(name), name)
 
     @property
     def path(self) -> bytes | str:
@@ -1220,7 +1250,7 @@ class Index:
         Returns: Either a IndexEntry or a ConflictedIndexEntry
         Raises KeyError: if the entry does not exist
         """
-        return self._byname[key]
+        return self._byname[self.canonical_path(key)]
 
     def __iter__(self) -> Iterator[bytes]:
         """Iterate over the paths and stages in this index."""
@@ -1228,7 +1258,7 @@ class Index:
 
     def __contains__(self, key: bytes) -> bool:
         """Check if a path exists in the index."""
-        return key in self._byname
+        return self.canonical_path(key) in self._byname
 
     def get_sha1(self, path: bytes) -> ObjectID:
         """Return the (git object) SHA1 for the object at a path."""
@@ -1266,17 +1296,30 @@ class Index:
     def clear(self) -> None:
         """Remove all contents from this index."""
         self._byname = {}
+        if self._normalized is not None:
+            self._normalized = {}
 
     def __setitem__(
         self, name: bytes, value: IndexEntry | ConflictedIndexEntry
     ) -> None:
         """Set an entry in the index."""
         assert isinstance(name, bytes)
+        name = self.canonical_path(name)
+        is_new = name not in self._byname
         self._byname[name] = value
+        if is_new and self._normalized is not None:
+            assert self._path_normalizer is not None
+            self._normalized.setdefault(self._path_normalizer(name), name)
 
     def __delitem__(self, name: bytes) -> None:
         """Delete an entry from the index."""
+        name = self.canonical_path(name)
         del self._byname[name]
+        if self._normalized is not None:
+            assert self._path_normalizer is not None
+            normalized_key = self._path_normalizer(name)
+            if self._normalized.get(normalized_key) == name:
+                del self._normalized[normalized_key]
 
     def iteritems(
         self,
@@ -1395,7 +1438,7 @@ class Index:
         # Expand each sparse directory
         for path, entry in sparse_dirs:
             # Remove the sparse directory entry
-            del self._byname[path]
+            del self[path]
 
             # Get the tree object
             tree = object_store[entry.sha]
@@ -1455,7 +1498,7 @@ class Index:
                     flags=0,
                     extended_flags=0,  # Don't copy skip-worktree flag
                 )
-                self._byname[full_path] = new_entry
+                self[full_path] = new_entry
 
     def convert_to_sparse(
         self,
@@ -1501,7 +1544,7 @@ class Index:
                 if path.startswith(dir_path) or path == dir_path_stripped
             ]
             for path in entries_to_remove:
-                del self._byname[path]
+                del self[path]
 
             # Create a sparse directory entry
             # Use minimal metadata since it's not a real file
@@ -1520,7 +1563,7 @@ class Index:
                 flags=0,
                 extended_flags=EXTENDED_FLAG_SKIP_WORKTREE,
             )
-            self._byname[dir_path] = sparse_entry
+            self[dir_path] = sparse_entry
 
         # Add sparse directory extension if not present
         if not self.is_sparse():
@@ -1880,6 +1923,39 @@ def get_path_element_normalizer(config: "Config") -> Callable[[bytes], bytes]:
         return _normalize_path_element_hfs
     else:
         return _normalize_path_element_default
+
+
+def make_path_normalizer(
+    config: "Config",
+) -> Callable[[bytes], bytes] | None:
+    """Build a path normalizer honoring ``core.ignorecase`` and ``core.precomposeunicode``.
+
+    The returned callable maps a filesystem-form path to a canonical form
+    used to match equivalent paths (e.g. ``Foo.txt`` ↔ ``foo.txt`` when
+    ``core.ignorecase=true``, NFD ↔ NFC when ``core.precomposeunicode=true``).
+    Returns ``None`` when neither option is active so callers can skip the
+    comparison entirely.
+    """
+    ignorecase = config.get_boolean(b"core", b"ignorecase", False)
+    precompose = config.get_boolean(b"core", b"precomposeunicode", False)
+    if not ignorecase and not precompose:
+        return None
+
+    def normalize(path: bytes) -> bytes:
+        if precompose:
+            import unicodedata
+
+            try:
+                path = unicodedata.normalize("NFC", path.decode("utf-8")).encode(
+                    "utf-8"
+                )
+            except UnicodeDecodeError:
+                pass
+        if ignorecase:
+            path = path.lower()
+        return path
+
+    return normalize
 
 
 def validate_path_element_default(element: bytes) -> bool:

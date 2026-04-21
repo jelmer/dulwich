@@ -43,6 +43,9 @@ check-noextensions:: clean
 check-contrib:: clean
 	$(RUNTEST) -v contrib.test_suite
 
+check-properties::
+	$(RUNTEST) discover -v property_tests
+
 typing:
 	$(PYTHON) -m mypy dulwich
 

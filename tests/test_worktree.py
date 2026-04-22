@@ -348,6 +348,26 @@ class WorkTreeResetTests(WorkTreeTestCase):
         self.assertFalse(os.path.exists(os.path.join(self.repo.path, "git~1")))
         self.assertTrue(os.path.exists(os.path.join(self.repo.path, "ok.txt")))
 
+    def test_reset_index_defaults_to_protectNTFS(self):
+        """core.protectNTFS defaults to True on every platform.
+
+        A tree authored on POSIX can still be cloned on Windows
+        later, so the NTFS validator must be on by default
+        regardless of os.name (matching Git's PROTECT_NTFS_DEFAULT=1).
+        """
+        # No core.protectNTFS set — rely on the built-in default.
+        evil = Blob.from_string(b"evil")
+        good = Blob.from_string(b"ok")
+        tree = Tree()
+        tree[b"git~1"] = (stat.S_IFREG | 0o644, evil.id)
+        tree[b"ok.txt"] = (stat.S_IFREG | 0o644, good.id)
+        self.repo.object_store.add_objects([(evil, None), (good, None), (tree, None)])
+
+        self.worktree.reset_index(tree.id)
+
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "git~1")))
+        self.assertTrue(os.path.exists(os.path.join(self.repo.path, "ok.txt")))
+
 
 class WorkTreeSparseCheckoutTests(WorkTreeTestCase):
     """Tests for WorkTree sparse checkout operations."""

@@ -793,9 +793,9 @@ class WorkTree:
             tree = head.tree
         config = self._repo.get_config()
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
-        if config.get_boolean(b"core", b"core.protectNTFS", os.name == "nt"):
+        if config.get_boolean(b"core", b"protectNTFS", os.name == "nt"):
             validate_path_element = validate_path_element_ntfs
-        elif config.get_boolean(b"core", b"core.protectHFS", sys.platform == "darwin"):
+        elif config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
             validate_path_element = validate_path_element_hfs
         else:
             validate_path_element = validate_path_element_default

@@ -50,6 +50,20 @@
    that did not exist on disk, leaving LFS-tracked files as pointers when
    cloning from a local repo. (Jelmer Vernooĳ)
 
+ * SECURITY: Reject tree entries whose path components would be
+   interpreted as path separators or alternate-data-stream markers on
+   Windows. A malicious repository could previously craft entries such
+   as ``.git\hooks\pre-commit.exe``, ``..\outside.txt``,
+   ``.git::$INDEX_ALLOCATION`` or any ``git~<digits>`` 8.3 short-name
+   alias of ``.git`` and have them materialized on a Windows clone,
+   planting files under ``.git\`` (which Git for Windows then
+   executes) or escaping the work tree. The NTFS path-element
+   validator now rejects ``\``, ``:``, and all ``git~<digits>`` forms.
+   ``core.protectNTFS`` now defaults to true on every platform
+   (matching Git's ``PROTECT_NTFS_DEFAULT=1``), and ``core.protectNTFS``
+   / ``core.protectHFS`` configuration keys are now read under their
+   documented names. Reported by Christopher Toth.
+
  * Deduplicate objects when writing a multi-pack-index. Objects present
    in multiple packs (e.g. after ``git gc`` creates a cruft pack) would
    otherwise produce an OIDL chunk with repeated SHAs, causing ``git

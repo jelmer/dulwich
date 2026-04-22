@@ -136,11 +136,23 @@ def _protocol_version_from_env() -> int | None:
     for pair in value.split(":"):
         key, sep, raw_val = pair.partition("=")
         if not sep or key.strip() != "version":
+            # TODO: extract and surface features (e.g. ``feature=extra``).
+            # For now dulwich only consumes ``version``; other keys are
+            # ignored rather than being forwarded to the transport.
+            logger.warning(
+                "Ignoring unsupported GIT_PROTOCOL pair %r", pair
+            )
             continue
         try:
             return int(raw_val.strip())
         except ValueError:
+            logger.warning(
+                "Ignoring unparseable GIT_PROTOCOL version %r", raw_val
+            )
             return None
+    logger.warning(
+        "GIT_PROTOCOL %r has no version= pair; ignoring", value
+    )
     return None
 
 

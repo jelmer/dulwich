@@ -37,6 +37,7 @@ from dulwich import cli
 from dulwich.cli import (
     AutoFlushBinaryIOWrapper,
     AutoFlushTextIOWrapper,
+    _protocol_version_from_env,
     _should_auto_flush,
     _ssh_command_from_env,
     detect_terminal_width,
@@ -228,42 +229,37 @@ class ProtocolVersionFromEnvTest(TestCase):
     """Tests for :func:`dulwich.cli._protocol_version_from_env`.
 
     Env lookup lives in the CLI layer so the transport library stays free
-    of process-environment reads. Moved here from tests/test_client.py.
+    of process-environment reads.
     """
-
-    def _call(self):
-        from dulwich.cli import _protocol_version_from_env
-
-        return _protocol_version_from_env()
 
     def test_unset_returns_none(self):
         self.overrideEnv("GIT_PROTOCOL", None)
-        self.assertIsNone(self._call())
+        self.assertIsNone(_protocol_version_from_env())
 
     def test_empty_returns_none(self):
         self.overrideEnv("GIT_PROTOCOL", "")
-        self.assertIsNone(self._call())
+        self.assertIsNone(_protocol_version_from_env())
 
     def test_version_2(self):
         self.overrideEnv("GIT_PROTOCOL", "version=2")
-        self.assertEqual(self._call(), 2)
+        self.assertEqual(_protocol_version_from_env(), 2)
 
     def test_version_1(self):
         self.overrideEnv("GIT_PROTOCOL", "version=1")
-        self.assertEqual(self._call(), 1)
+        self.assertEqual(_protocol_version_from_env(), 1)
 
     def test_version_in_compound_value(self):
         # GIT_PROTOCOL can carry multiple colon-separated key=value entries.
         self.overrideEnv("GIT_PROTOCOL", "feature=extra:version=2")
-        self.assertEqual(self._call(), 2)
+        self.assertEqual(_protocol_version_from_env(), 2)
 
     def test_non_version_key_returns_none(self):
         self.overrideEnv("GIT_PROTOCOL", "feature=extra")
-        self.assertIsNone(self._call())
+        self.assertIsNone(_protocol_version_from_env())
 
     def test_unparseable_version_returns_none(self):
         self.overrideEnv("GIT_PROTOCOL", "version=nope")
-        self.assertIsNone(self._call())
+        self.assertIsNone(_protocol_version_from_env())
 
 
 class AddCommandTest(DulwichCliTestCase):

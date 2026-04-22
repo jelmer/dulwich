@@ -4039,5 +4039,3 @@ class TestPackDataProgressWrapper(TestCase):
         for msg in progress_messages:
             self.assertIn(b"Receiving objects:", msg)
             self.assertIn(b"0.00 MiB/s", msg)
-
-

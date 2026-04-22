@@ -621,6 +621,73 @@ class BuildIndexTests(TestCase):
             )
             self.assertFileContents(epath, b"d")
 
+    def test_ntfs_malicious_entries_dropped(self) -> None:
+        # A malicious tree authored on POSIX containing NTFS-hostile
+        # entries must not materialize any of them under the NTFS
+        # validator — the combination would let an attacker plant
+        # ``.git\hooks\pre-commit.exe`` or ``.git::$INDEX_ALLOCATION``
+        # on a Windows clone.
+        from dulwich.index import validate_path_element_ntfs
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            hook = Blob.from_string(b"malicious hook")
+            escape = Blob.from_string(b"outside payload")
+            shortname = Blob.from_string(b"masquerading as .git")
+            ads = Blob.from_string(b"alternate data stream payload")
+            benign = Blob.from_string(b"ok")
+
+            tree = Tree()
+            tree[b".git\\hooks\\pre-commit.exe"] = (
+                stat.S_IFREG | 0o755,
+                hook.id,
+            )
+            tree[b"..\\outside.txt"] = (stat.S_IFREG | 0o644, escape.id)
+            tree[b"git~1"] = (stat.S_IFREG | 0o644, shortname.id)
+            tree[b".git::$INDEX_ALLOCATION"] = (
+                stat.S_IFREG | 0o644,
+                ads.id,
+            )
+            tree[b"ok.txt"] = (stat.S_IFREG | 0o644, benign.id)
+
+            repo.object_store.add_objects(
+                [(o, None) for o in [hook, escape, shortname, ads, benign, tree]]
+            )
+
+            build_index_from_tree(
+                repo.path,
+                repo.index_path(),
+                repo.object_store,
+                tree.id,
+                validate_path_element=validate_path_element_ntfs,
+            )
+
+            index = repo.open_index()
+            self.assertEqual(list(index), [b"ok.txt"])
+
+            # Nothing written under the literal paths (the POSIX form)
+            # or under `.git/` (the Windows decomposition of `\`).
+            self.assertFalse(
+                os.path.exists(os.path.join(repo.path, ".git\\hooks\\pre-commit.exe"))
+            )
+            self.assertFalse(
+                os.path.exists(
+                    os.path.join(repo.path, ".git", "hooks", "pre-commit.exe")
+                )
+            )
+            # ``git~1`` and ``.git::$INDEX_ALLOCATION`` would resolve
+            # against the existing ``.git`` directory on NTFS (8.3
+            # short-name and alternate-data-stream resolution), so
+            # ``os.path.exists`` can return true even when nothing was
+            # materialized as a literal entry. Check the directory
+            # listing instead.
+            work_tree_entries = os.listdir(repo.path)
+            self.assertNotIn("git~1", work_tree_entries)
+            self.assertNotIn(".git::$INDEX_ALLOCATION", work_tree_entries)
+            # Nothing escaped the work tree either.
+            self.assertNotIn("outside.txt", os.listdir(os.path.dirname(repo.path)))
+
     def test_nonempty(self) -> None:
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -1458,6 +1525,47 @@ class TestValidatePathElement(TestCase):
         # Valid Unicode that shouldn't be confused with .git
         self.assertTrue(validate_path_element_hfs(b".g\xc3\xaft"))  # .gït
         self.assertTrue(validate_path_element_hfs(b"git"))  # git without dot
+
+    def test_ntfs_rejects_backslash(self) -> None:
+        # A backslash is a path separator on Windows, so a tree entry
+        # containing one would materialize as nested directories and
+        # let an attacker plant ``.git\hooks\pre-commit`` or escape
+        # the work tree with ``..\outside``.
+        self.assertFalse(validate_path_element_ntfs(b".git\\hooks\\pre-commit"))
+        self.assertFalse(validate_path_element_ntfs(b"..\\outside"))
+        self.assertFalse(validate_path_element_ntfs(b"a\\b"))
+        self.assertFalse(validate_path_element_ntfs(b"foo\\"))
+
+    def test_non_ntfs_validators_accept_backslash(self) -> None:
+        # On POSIX/HFS a backslash is a valid filename byte. The
+        # protection is gated on the NTFS validator (selected by
+        # core.protectNTFS), so the other validators still accept it.
+        self.assertTrue(validate_path_element_default(b"a\\b"))
+        self.assertTrue(validate_path_element_hfs(b"a\\b"))
+
+    def test_ntfs_rejects_all_short_name_variants(self) -> None:
+        # Git's is_ntfs_dotgit rejects any ``git~<digits>`` 8.3
+        # short-name form; previously only the literal ``git~1`` was
+        # checked.
+        for name in (b"git~1", b"git~2", b"git~10", b"GIT~1", b"gIt~3"):
+            self.assertFalse(
+                validate_path_element_ntfs(name),
+                f"{name!r} should be rejected on NTFS",
+            )
+        # Trailing ``.``/space is stripped by NTFS — same names.
+        self.assertFalse(validate_path_element_ntfs(b"git~1."))
+        self.assertFalse(validate_path_element_ntfs(b"git~1 "))
+        # Names that merely contain ``git~`` are still accepted.
+        self.assertTrue(validate_path_element_ntfs(b"git~foo"))
+        self.assertTrue(validate_path_element_ntfs(b"mygit~1"))
+
+    def test_ntfs_rejects_alternate_data_stream(self) -> None:
+        # NTFS alternate data streams are addressed as ``name:stream``;
+        # a ``:`` anywhere in an element can smuggle a write to
+        # ``.git::$INDEX_ALLOCATION`` etc.
+        self.assertFalse(validate_path_element_ntfs(b".git::$INDEX_ALLOCATION"))
+        self.assertFalse(validate_path_element_ntfs(b".git:evil"))
+        self.assertFalse(validate_path_element_ntfs(b"foo:bar"))
 
 
 class TestDecodeUTF8WithFallback(TestCase):

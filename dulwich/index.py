@@ -1970,6 +1970,14 @@ def validate_path_element_default(element: bytes) -> bool:
     return _normalize_path_element_default(element) not in INVALID_DOTNAMES
 
 
+def _is_ntfs_dotgit_short_name(normalized: bytes) -> bool:
+    """Match NTFS 8.3 short-name forms of ``.git`` (``git~<digits>``)."""
+    if not normalized.startswith(b"git~"):
+        return False
+    tail = normalized[4:]
+    return len(tail) > 0 and tail.isdigit()
+
+
 def validate_path_element_ntfs(element: bytes) -> bool:
     """Validate a path element using NTFS filesystem rules.
 
@@ -1979,10 +1987,20 @@ def validate_path_element_ntfs(element: bytes) -> bool:
     Returns:
       True if path element is valid for NTFS, False otherwise
     """
+    # A backslash is a path separator on Windows, so accepting it
+    # here would let a tree authored on POSIX escape the work tree
+    # or plant files under ``.git\`` when checked out on Windows.
+    if b"\\" in element:
+        return False
+    # NTFS alternate data streams are addressed as ``name:stream``;
+    # reject any element containing ``:`` so ``.git::$INDEX_ALLOCATION``
+    # and similar forms cannot bypass the ``.git`` check.
+    if b":" in element:
+        return False
     normalized = _normalize_path_element_ntfs(element)
     if normalized in INVALID_DOTNAMES:
         return False
-    if normalized == b"git~1":
+    if _is_ntfs_dotgit_short_name(normalized):
         return False
     return True
 

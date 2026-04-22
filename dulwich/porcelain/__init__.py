@@ -5384,7 +5384,10 @@ def _get_worktree_update_config(
     config = repo.get_config()
     honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
 
-    if config.get_boolean(b"core", b"protectNTFS", os.name == "nt"):
+    # core.protectNTFS defaults to True on all platforms (matching
+    # Git's PROTECT_NTFS_DEFAULT=1) because a repo authored on
+    # POSIX can still be cloned on Windows later.
+    if config.get_boolean(b"core", b"protectNTFS", True):
         validate_path_element = validate_path_element_ntfs
     elif config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
         validate_path_element = validate_path_element_hfs

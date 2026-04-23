@@ -6,6 +6,9 @@
    multi-pack-index verify`` to fail with "oid lookup out of order".
    (Jelmer Vernooĳ, #2152)
 
+ * Extend ignorecase and precomposeunicode support to index lookups.
+   (Jelmer Vernooĳ, #1807)
+
 1.2.0	2026-04-21
 
  * Expand ``log`` command options: add ``--oneline``, ``--abbrev-commit``,

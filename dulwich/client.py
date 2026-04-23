@@ -3859,9 +3859,7 @@ class SSHGitClient(TraditionalGitClient):
             try:
                 config_ssh_command = config.get((b"core",), b"sshCommand")
                 self.ssh_command = (
-                    config_ssh_command.decode()
-                    if config_ssh_command
-                    else "ssh"
+                    config_ssh_command.decode() if config_ssh_command else "ssh"
                 )
             except KeyError:
                 self.ssh_command = "ssh"

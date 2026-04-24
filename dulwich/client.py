@@ -3849,32 +3849,22 @@ class SSHGitClient(TraditionalGitClient):
         self.username = username
         self.password = password
         self.key_filename = key_filename
-        # Priority: ssh_command parameter, then env vars, then core.sshCommand config
+        # Priority: ssh_command parameter, then core.sshCommand config.
+        # GIT_SSH_COMMAND / GIT_SSH env vars are read at the CLI layer
+        # (see dulwich.cli._ssh_command_from_env) so the transport library
+        # stays free of process-environment reads.
         if ssh_command:
             self.ssh_command = ssh_command
+        elif config is not None:
+            try:
+                config_ssh_command = config.get((b"core",), b"sshCommand")
+                self.ssh_command = (
+                    config_ssh_command.decode() if config_ssh_command else "ssh"
+                )
+            except KeyError:
+                self.ssh_command = "ssh"
         else:
-            # Check environment variables first
-            env_ssh_command = os.environ.get("GIT_SSH_COMMAND")
-            if env_ssh_command:
-                self.ssh_command = env_ssh_command
-            else:
-                env_ssh = os.environ.get("GIT_SSH")
-                if env_ssh:
-                    self.ssh_command = env_ssh
-                else:
-                    # Fall back to config if no environment variable set
-                    if config is not None:
-                        try:
-                            config_ssh_command = config.get((b"core",), b"sshCommand")
-                            self.ssh_command = (
-                                config_ssh_command.decode()
-                                if config_ssh_command
-                                else "ssh"
-                            )
-                        except KeyError:
-                            self.ssh_command = "ssh"
-                    else:
-                        self.ssh_command = "ssh"
+            self.ssh_command = "ssh"
 
         super().__init__(
             path_encoding=path_encoding,

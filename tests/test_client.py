@@ -1134,23 +1134,23 @@ class SSHGitClientTests(TestCase):
             proto.close()
 
     def test_ssh_command_precedence(self) -> None:
+        # GIT_SSH / GIT_SSH_COMMAND are read at the CLI layer
+        # (dulwich.cli._ssh_command_from_env); SSHGitClient itself should
+        # not consult them. Setting the env var should have no effect when
+        # no ssh_command parameter is passed.
         self.overrideEnv("GIT_SSH", "/path/to/ssh")
-        test_client = SSHGitClient("git.samba.org")
-        self.assertEqual(test_client.ssh_command, "/path/to/ssh")
-
         self.overrideEnv("GIT_SSH_COMMAND", "/path/to/ssh -o Option=Value")
         test_client = SSHGitClient("git.samba.org")
-        self.assertEqual(test_client.ssh_command, "/path/to/ssh -o Option=Value")
+        self.assertEqual(test_client.ssh_command, "ssh")
 
         test_client = SSHGitClient("git.samba.org", ssh_command="ssh -o Option1=Value1")
         self.assertEqual(test_client.ssh_command, "ssh -o Option1=Value1")
 
     def test_ssh_command_config(self) -> None:
-        # Test core.sshCommand config setting
+        # Test core.sshCommand config setting. Env vars are read at the CLI
+        # layer, so this test asserts the config / parameter precedence only.
 
-        # No config, no environment - should default to "ssh"
-        self.overrideEnv("GIT_SSH", None)
-        self.overrideEnv("GIT_SSH_COMMAND", None)
+        # No config, no ssh_command parameter - default to "ssh"
         test_client = SSHGitClient("git.samba.org")
         self.assertEqual(test_client.ssh_command, "ssh")
 
@@ -1166,10 +1166,12 @@ class SSHGitClientTests(TestCase):
         )
         self.assertEqual(test_client.ssh_command, "custom-ssh")
 
-        # Environment variables take precedence over config when no ssh_command parameter
+        # Env vars set in the process do NOT override config at the library
+        # layer - the CLI is responsible for translating them into an explicit
+        # ssh_command argument.
         self.overrideEnv("GIT_SSH_COMMAND", "/usr/bin/ssh -v")
         test_client = SSHGitClient("git.samba.org", config=config)
-        self.assertEqual(test_client.ssh_command, "/usr/bin/ssh -v")
+        self.assertEqual(test_client.ssh_command, "ssh -o StrictHostKeyChecking=no")
 
     def test_ssh_kwargs_passed_to_vendor(self) -> None:
         # Test that ssh_command and other kwargs are actually passed to the SSH vendor

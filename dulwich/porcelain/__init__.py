@@ -1442,6 +1442,7 @@ def clone(
     filter_spec: str | None = None,
     protocol_version: int | None = None,
     recurse_submodules: bool = False,
+    ssh_command: str | None = None,
     **kwargs: str | bytes | Sequence[str | bytes],
 ) -> Repo:
     """Clone a local or remote git repository.
@@ -1464,6 +1465,7 @@ def clone(
       protocol_version: desired Git protocol version. By default the highest
         mutually supported protocol version will be used.
       recurse_submodules: Whether to initialize and clone submodules
+      ssh_command: Optional custom SSH command
       **kwargs: Additional keyword arguments including refspecs to fetch.
         Can be a bytestring, a string, or a list of bytestring/string.
 
@@ -1509,6 +1511,8 @@ def clone(
     else:
         source_str = source.decode() if isinstance(source, bytes) else source
         transport_kwargs = _filter_transport_kwargs(**kwargs)
+        if ssh_command is not None:
+            transport_kwargs["ssh_command"] = ssh_command
         (client, path) = get_transport_and_path(
             source_str, config=config, **transport_kwargs
         )

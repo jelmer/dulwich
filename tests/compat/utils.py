@@ -159,7 +159,21 @@ def run_git(
             # If the environment variable is not set, use the default value
             env[git_env_var] = default_value
 
-    args = [git_path, *args]
+    # Disable background auto-gc and maintenance so pack directory contents
+    # stay quiescent between git invocations. Without this, a commit or repack
+    # can fork a detached gc that keeps modifying (and deleting) pack/idx files
+    # after the foreground git process exits, causing spurious failures in
+    # tests that inspect the pack directory immediately afterwards.
+    args = [
+        git_path,
+        "-c",
+        "gc.auto=0",
+        "-c",
+        "gc.autoDetach=false",
+        "-c",
+        "maintenance.auto=false",
+        *args,
+    ]
     popen_kwargs["stdin"] = subprocess.PIPE
     if capture_stdout:
         popen_kwargs["stdout"] = subprocess.PIPE

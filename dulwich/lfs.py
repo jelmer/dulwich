@@ -503,7 +503,9 @@ class LFSClient:
                         host, path = host_and_path.split(":", 1)
                         remote_url = f"https://{host}/{path}"
 
-            # Convert filesystem paths to file:// URLs
+            # Detect filesystem paths and file:// URLs; for those, the LFS
+            # "endpoint" is the remote's local LFS store rather than an HTTP
+            # path under /info/lfs.
             parsed = urlparse(remote_url)
             # Windows drive letters (e.g., C:\) get parsed as single-letter schemes
             is_windows_path = (
@@ -512,17 +514,36 @@ class LFSClient:
                 and (len(remote_url) < 2 or remote_url[1] == ":")
             )
             if not parsed.scheme or is_windows_path:
-                # Filesystem path - convert to file:// URL
+                local_path = remote_url
+            elif parsed.scheme == "file":
+                from urllib.request import url2pathname
+
+                local_path = url2pathname(parsed.path)
+            else:
+                local_path = None
+
+            if local_path is not None:
+                # For file remotes, point directly at the remote's LFS store.
+                # Worktrees keep LFS data under <remote>/.git/lfs; bare repos
+                # keep it under <remote>/lfs. Probe for an existing layout and
+                # fall back to the worktree layout if neither exists yet.
                 from urllib.request import pathname2url
 
-                remote_url = f"file://{pathname2url(remote_url)}"
+                candidates = [
+                    os.path.join(local_path, ".git", "lfs"),
+                    os.path.join(local_path, "lfs"),
+                ]
+                lfs_path = next(
+                    (p for p in candidates if os.path.isdir(p)), candidates[0]
+                )
+                lfs_url = f"file://{pathname2url(lfs_path)}"
+            else:
+                # Ensure URL ends with .git for consistent LFS endpoint
+                if not remote_url.endswith(".git"):
+                    remote_url = f"{remote_url}.git"
 
-            # Ensure URL ends with .git for consistent LFS endpoint
-            if not remote_url.endswith(".git"):
-                remote_url = f"{remote_url}.git"
-
-            # Standard LFS endpoint is remote_url + "/info/lfs"
-            lfs_url = f"{remote_url}/info/lfs"
+                # Standard LFS endpoint is remote_url + "/info/lfs"
+                lfs_url = f"{remote_url}/info/lfs"
 
             # Return appropriate client based on derived URL scheme
             return cls.from_url(lfs_url, config)

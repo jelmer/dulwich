@@ -22,6 +22,7 @@
 """Tests for LFS porcelain functions."""
 
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -276,9 +277,10 @@ class LFSPorcelainTestCase(TestCase):
         with self.assertRaises(KeyError):
             config.get((b"filter", b"lfs"), b"smudge")
 
-        # Clone the repository (may warn about missing LFS objects)
-        with self.assertLogs("dulwich.lfs", level="WARNING"):
-            cloned_repo = porcelain.clone(source_dir, clone_dir)
+        # Clone the repository. For a file:// remote the built-in filter
+        # resolves pointers against the source repo's LFS store, so no
+        # warning is emitted.
+        cloned_repo = porcelain.clone(source_dir, clone_dir)
 
         # Verify that built-in LFS filter was used
         normalizer = cloned_repo.get_blob_normalizer()
@@ -288,22 +290,60 @@ class LFSPorcelainTestCase(TestCase):
             self.assertEqual(type(lfs_driver).__name__, "LFSFilterDriver")
             self.assertEqual(type(lfs_driver).__module__, "dulwich.lfs")
 
-        # Check that the file remains as a pointer (expected behavior)
-        # The built-in LFS filter preserves pointers when objects aren't available
+        # The built-in filter should have fetched the object from the
+        # source repo's LFS store during checkout.
         cloned_file = os.path.join(clone_dir, "test.bin")
         with open(cloned_file, "rb") as f:
             content = f.read()
-
-        # Should still be a pointer since objects weren't transferred
-        self.assertTrue(
-            content.startswith(b"version https://git-lfs.github.com/spec/v1")
-        )
-        cloned_pointer = LFSPointer.from_bytes(content)
-        self.assertIsNotNone(cloned_pointer)
-        self.assertEqual(cloned_pointer.oid, pointer.oid)
-        self.assertEqual(cloned_pointer.size, pointer.size)
+        self.assertEqual(content, test_content)
 
         source_repo.close()
+        cloned_repo.close()
+
+    def test_clone_with_builtin_lfs_no_object_in_source(self):
+        """Built-in LFS filter leaves a pointer in the working tree when the
+        referenced object is not available in the source repo's LFS store."""
+        # Source repo with a pointer but no matching LFS object
+        source_dir = tempfile.mkdtemp()
+        self.addCleanup(lambda: self._cleanup_test_dir_path(source_dir))
+        source_repo = Repo.init(source_dir)
+
+        gitattributes_path = os.path.join(source_dir, ".gitattributes")
+        with open(gitattributes_path, "w") as f:
+            f.write("*.bin filter=lfs diff=lfs merge=lfs -text\n")
+
+        # Pointer to an object that does not exist anywhere
+        missing_pointer = LFSPointer(
+            "0" * 64,
+            42,
+        )
+        test_file = os.path.join(source_dir, "test.bin")
+        with open(test_file, "wb") as f:
+            f.write(missing_pointer.to_bytes())
+
+        porcelain.add(source_repo, paths=[".gitattributes", "test.bin"])
+        porcelain.commit(source_repo, message=b"Add unresolvable LFS pointer")
+
+        # Make sure the source has no LFS store at all
+        source_lfs = os.path.join(source_dir, ".git", "lfs")
+        if os.path.isdir(source_lfs):
+            shutil.rmtree(source_lfs)
+        source_repo.close()
+
+        clone_dir = tempfile.mkdtemp()
+        self.addCleanup(lambda: self._cleanup_test_dir_path(clone_dir))
+
+        # The smudge filter should warn and fall back to leaving the pointer
+        # in the working tree.
+        with self.assertLogs("dulwich.lfs", level="WARNING"):
+            cloned_repo = porcelain.clone(source_dir, clone_dir)
+
+        with open(os.path.join(clone_dir, "test.bin"), "rb") as f:
+            content = f.read()
+        round_tripped = LFSPointer.from_bytes(content)
+        self.assertIsNotNone(round_tripped)
+        self.assertEqual(round_tripped.oid, missing_pointer.oid)
+        self.assertEqual(round_tripped.size, missing_pointer.size)
         cloned_repo.close()
 
     def _cleanup_test_dir_path(self, path):

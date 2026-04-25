@@ -1,5 +1,13 @@
 1.2.1	UNRELEASED
 
+ * Derive the LFS endpoint as the remote's on-disk LFS store
+   (``<remote>/.git/lfs`` for worktrees, ``<remote>/lfs`` for bare repos)
+   when ``remote.origin.url`` points at a local filesystem path or
+   ``file://`` URL, matching git-lfs behaviour. Previously the built-in
+   smudge filter constructed an HTTP-style ``<remote>.git/info/lfs`` path
+   that did not exist on disk, leaving LFS-tracked files as pointers when
+   cloning from a local repo. (Jelmer Vernooĳ)
+
  * Deduplicate objects when writing a multi-pack-index. Objects present
    in multiple packs (e.g. after ``git gc`` creates a cruft pack) would
    otherwise produce an OIDL chunk with repeated SHAs, causing ``git

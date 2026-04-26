@@ -139,20 +139,14 @@ def _protocol_version_from_env() -> int | None:
             # TODO: extract and surface features (e.g. ``feature=extra``).
             # For now dulwich only consumes ``version``; other keys are
             # ignored rather than being forwarded to the transport.
-            logger.warning(
-                "Ignoring unsupported GIT_PROTOCOL pair %r", pair
-            )
+            logger.warning("Ignoring unsupported GIT_PROTOCOL pair %r", pair)
             continue
         try:
             return int(raw_val.strip())
         except ValueError:
-            logger.warning(
-                "Ignoring unparseable GIT_PROTOCOL version %r", raw_val
-            )
+            logger.warning("Ignoring unparseable GIT_PROTOCOL version %r", raw_val)
             return None
-    logger.warning(
-        "GIT_PROTOCOL %r has no version= pair; ignoring", value
-    )
+    logger.warning("GIT_PROTOCOL %r has no version= pair; ignoring", value)
     return None
 
 
@@ -2128,8 +2122,7 @@ class cmd_clone(Command):
                 branch=parsed_args.branch,
                 refspec=parsed_args.refspec,
                 filter_spec=parsed_args.filter_spec,
-                protocol_version=parsed_args.protocol
-                or _protocol_version_from_env(),
+                protocol_version=parsed_args.protocol or _protocol_version_from_env(),
                 recurse_submodules=parsed_args.recurse_submodules,
                 ssh_command=_ssh_command_from_env(),
             )

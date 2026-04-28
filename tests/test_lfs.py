@@ -28,7 +28,8 @@ import tempfile
 from pathlib import Path
 
 from dulwich.client import LocalGitClient
-from dulwich.lfs import LFSFilterDriver, LFSPointer, LFSStore
+from dulwich.config import ConfigFile
+from dulwich.lfs import FileLFSClient, LFSClient, LFSFilterDriver, LFSPointer, LFSStore
 from dulwich.repo import Repo
 
 from . import TestCase
@@ -334,7 +335,13 @@ class LFSIntegrationTests(TestCase):
             )
 
     def test_builtin_lfs_clone_no_config(self) -> None:
-        """Test cloning with LFS when no git-lfs commands are configured."""
+        """Test cloning with LFS when no git-lfs commands are configured.
+
+        The built-in LFSFilterDriver resolves pointers against the remote's
+        on-disk LFS store for file:// remotes (matching ``git-lfs`` behavior),
+        so the cloned file should contain the original content even without
+        external ``git-lfs`` configured.
+        """
         # Create source repository
         source_dir = os.path.join(self.test_dir, "source")
         os.makedirs(source_dir)
@@ -385,16 +392,54 @@ class LFSIntegrationTests(TestCase):
         with self.assertRaises(KeyError):
             target_config.get((b"filter", b"lfs"), b"smudge")
 
-        # Check the cloned file
+        # The built-in smudge filter should resolve the pointer using the
+        # source repo's LFS store (the derived file:// LFS endpoint).
         cloned_file = os.path.join(target_dir, "test.bin")
         with open(cloned_file, "rb") as f:
             content = f.read()
+        self.assertEqual(content, test_content)
+        target_repo.close()
 
-        # Should still be a pointer (LFS object not in target's store)
-        self.assertTrue(
-            content.startswith(b"version https://git-lfs.github.com/spec/v1")
+    def test_builtin_lfs_clone_unresolvable_pointer(self) -> None:
+        """When the source has no LFS object for a pointer, the built-in
+        filter falls back to leaving the pointer in the working tree."""
+        source_dir = os.path.join(self.test_dir, "source-missing")
+        os.makedirs(source_dir)
+        source_repo = Repo.init(source_dir)
+
+        gitattributes_path = os.path.join(source_dir, ".gitattributes")
+        with open(gitattributes_path, "wb") as f:
+            f.write(b"*.bin filter=lfs\n")
+
+        # Pointer to an LFS object that exists nowhere
+        missing_pointer = LFSPointer("0" * 64, 42)
+        with open(os.path.join(source_dir, "test.bin"), "wb") as f:
+            f.write(missing_pointer.to_bytes())
+
+        worktree = source_repo.get_worktree()
+        worktree.stage([b".gitattributes", b"test.bin"])
+        worktree.commit(
+            message=b"Add unresolvable LFS pointer",
+            committer=b"Test <test@example.com>",
+            author=b"Test <test@example.com>",
+            commit_timestamp=1000000000,
+            author_timestamp=1000000000,
+            commit_timezone=0,
+            author_timezone=0,
         )
-        self.assertIn(test_oid.encode(), content)
+        source_repo.close()
+
+        target_dir = os.path.join(self.test_dir, "target-missing")
+        client = LocalGitClient()
+        with self.assertLogs("dulwich.lfs", level="WARNING"):
+            target_repo = client.clone(source_dir, target_dir)
+
+        with open(os.path.join(target_dir, "test.bin"), "rb") as f:
+            content = f.read()
+        cloned_pointer = LFSPointer.from_bytes(content)
+        self.assertIsNotNone(cloned_pointer)
+        self.assertEqual(cloned_pointer.oid, missing_pointer.oid)
+        self.assertEqual(cloned_pointer.size, missing_pointer.size)
         target_repo.close()
 
     def test_builtin_lfs_with_local_objects(self) -> None:
@@ -1415,16 +1460,71 @@ class LFSClientFromURLTests(TestCase):
         self.assertEqual(client.config, config)
 
     def test_from_config_derives_file_url_from_remote(self) -> None:
-        """Test from_config derives file:// LFS URL from file:// remote URL."""
-        from dulwich.config import ConfigFile
-        from dulwich.lfs import FileLFSClient, LFSClient
+        """Test from_config derives file:// LFS URL from a file:// remote URL.
+
+        For local remotes the LFS "endpoint" is the remote's on-disk LFS
+        store (``<remote>/.git/lfs`` for worktrees, ``<remote>/lfs`` for bare
+        repos), not an HTTP-style ``<remote>/info/lfs`` path.
+        """
+        # Worktree layout: LFS store under <remote>/.git/lfs
+        worktree = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, worktree)
+        Repo.init(str(worktree))
+        (worktree / ".git" / "lfs").mkdir()
 
         config = ConfigFile()
-        # Remote with file:// URL
-        config.set((b"remote", b"origin"), b"url", b"file:///path/to/repo.git")
+        config.set((b"remote", b"origin"), b"url", worktree.as_uri().encode())
 
         client = LFSClient.from_config(config)
         self.assertIsInstance(client, FileLFSClient)
         assert client is not None  # for mypy
-        # Should derive /info/lfs endpoint
-        self.assertEqual(client.url, "file:///path/to/repo.git/info/lfs")
+        self.assertEqual(client.url, (worktree / ".git" / "lfs").as_uri())
+
+        # Bare layout: LFS store under <remote>/lfs
+        bare = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, bare)
+        Repo.init_bare(str(bare))
+        (bare / "lfs").mkdir()
+
+        config = ConfigFile()
+        config.set((b"remote", b"origin"), b"url", bare.as_uri().encode())
+
+        client = LFSClient.from_config(config)
+        self.assertIsInstance(client, FileLFSClient)
+        assert client is not None  # for mypy
+        self.assertEqual(client.url, (bare / "lfs").as_uri())
+
+    def test_from_config_derives_file_url_from_plain_path_remote(self) -> None:
+        """Test from_config handles non-URL local-path remotes (no scheme)."""
+        worktree = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, worktree)
+        Repo.init(str(worktree))
+        (worktree / ".git" / "lfs").mkdir()
+
+        config = ConfigFile()
+        # Plain filesystem path (no file:// scheme)
+        config.set((b"remote", b"origin"), b"url", str(worktree).encode())
+
+        client = LFSClient.from_config(config)
+        self.assertIsInstance(client, FileLFSClient)
+        assert client is not None  # for mypy
+        self.assertEqual(client.url, (worktree / ".git" / "lfs").as_uri())
+
+    def test_from_config_file_remote_downloads_object(self) -> None:
+        """End-to-end: from_config for a file:// remote yields a client
+        that can read LFS objects stored in the remote's LFS store."""
+        worktree = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, worktree)
+        Repo.init(str(worktree))
+        lfs_dir = worktree / ".git" / "lfs"
+        lfs_dir.mkdir()
+        store = LFSStore.create(str(lfs_dir))
+        content = b"remote file LFS content"
+        oid = store.write_object([content])
+
+        config = ConfigFile()
+        config.set((b"remote", b"origin"), b"url", worktree.as_uri().encode())
+
+        client = LFSClient.from_config(config)
+        assert client is not None
+        self.assertEqual(client.download(oid, len(content)), content)

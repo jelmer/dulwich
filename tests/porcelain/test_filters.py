@@ -338,18 +338,13 @@ class PorcelainFilterTests(TestCase):
         target_repo = porcelain.clone(source_dir, target_dir)
         self.addCleanup(target_repo.close)
 
-        # Verify the file was checked out with the filter
+        # Verify the file was checked out with the filter. With the object
+        # available in the source repo's LFS store and a file:// remote,
+        # the built-in filter resolves the pointer during checkout.
         target_file = os.path.join(target_dir, "empty.bin")
         with open(target_file, "rb") as f:
             content = f.read()
-
-        # Without git-lfs configured, the built-in filter is used
-        # Since the LFS object isn't in the target repo's store,
-        # it should remain as a pointer
-        self.assertIn(b"version https://git-lfs", content)
-        self.assertIn(
-            b"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", content
-        )
+        self.assertEqual(content, b"")
 
     def test_builtin_lfs_filter_with_object(self) -> None:
         """Test built-in LFS filter when object is available in store."""

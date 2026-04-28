@@ -67,6 +67,7 @@ from typing import (
     TYPE_CHECKING,
     BinaryIO,
     Protocol,
+    TypeVar,
     cast,
 )
 
@@ -121,7 +122,15 @@ if TYPE_CHECKING:
     from .commit_graph import CommitGraph
     from .config import Config
     from .diff_tree import RenameDetector
-    from .pack import Pack
+    from .pack import FilePackIndex, Pack
+
+
+# Maximum number of times to rescan the pack directory after a pack file
+# disappears between snapshot and lazy open (e.g. concurrent repack).
+# Mirrors git's bounded reprepare_packed_git() retry.
+_MAX_PACK_RESCAN_ATTEMPTS = 3
+
+_T = TypeVar("_T")
 
 
 class GraphWalker(Protocol):
@@ -944,13 +953,16 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
         This does not check alternates.
         """
-        for pack in self.packs:
-            try:
-                if sha in pack:
-                    return True
-            except PackFileDisappeared:
-                pass
-        return False
+
+        def lookup(p: "Pack") -> bool:
+            if sha in p:
+                return True
+            raise KeyError
+
+        try:
+            return self._lookup_in_packs(lookup)
+        except KeyError:
+            return False
 
     def __contains__(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if a particular object is present by SHA1.
@@ -1040,7 +1052,66 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
                 del self._pack_cache[oldest]
 
     def _iter_cached_packs(self) -> Iterator[Pack]:
-        return iter(self._pack_cache.values())
+        return iter(list(self._pack_cache.values()))
+
+    def _evict_pack(self, pack: "Pack | FilePackIndex") -> None:
+        """Evict a pack from the cache after its backing file disappeared.
+
+        ``pack`` may be a :class:`Pack` or a :class:`FilePackIndex`; in the
+        latter case the index's owning ``Pack`` is matched via the cached
+        pack's ``_idx`` reference.
+        """
+        for key, cached in list(self._pack_cache.items()):
+            if cached is pack or cached._idx is pack:
+                del self._pack_cache[key]
+                try:
+                    self._pack_access_order.remove(key)
+                except ValueError:
+                    pass
+                try:
+                    cached.close()
+                except OSError:
+                    pass
+                break
+
+    def _lookup_in_packs(self, lookup: "Callable[[Pack], _T]") -> "_T":
+        """Run ``lookup(pack)`` against each cached pack and return the first hit.
+
+        ``lookup`` should raise ``KeyError`` if the pack does not contain the
+        target. ``PackFileDisappeared`` from a concurrent ``git repack`` /
+        ``gc --auto`` is caught: the stale pack is evicted, the pack
+        directory is rescanned, and the search retries — bounded, mirroring
+        git's ``reprepare_packed_git()``. If no cached pack has the object
+        the pack directory is rescanned once to pick up any newly-arrived
+        packs (e.g. another writer just landed one). ``KeyError`` is raised
+        if no pack — old or new — has the object.
+        """
+        rescanned = False
+        for _attempt in range(_MAX_PACK_RESCAN_ATTEMPTS):
+            disappeared = False
+            for pack_hash, pack in list(self._pack_cache.items()):
+                try:
+                    result = lookup(pack)
+                except KeyError:
+                    continue
+                except PackFileDisappeared as exc:
+                    self._evict_pack(exc.obj)
+                    disappeared = True
+                    continue
+                self._mark_pack_used(pack_hash)
+                self._enforce_packed_git_limit()
+                return result
+            if disappeared:
+                self._update_pack_cache()
+                rescanned = True
+                continue
+            if not rescanned:
+                # Maybe another process just landed a pack with the object.
+                if self._update_pack_cache():
+                    rescanned = True
+                    continue
+            break
+        raise KeyError
 
     def _update_pack_cache(self) -> list[Pack]:
         raise NotImplementedError(self._update_pack_cache)
@@ -1219,8 +1290,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         for pack in self._iter_cached_packs():
             try:
                 yield from pack
-            except PackFileDisappeared:
-                pass
+            except PackFileDisappeared as exc:
+                self._evict_pack(exc.obj)
         yield from self._iter_loose_objects()
         yield from self._iter_alternate_objects()
 
@@ -1247,27 +1318,15 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             hexsha = None
         else:
             raise AssertionError(f"Invalid object name {name!r}")
-        for pack_hash, pack in self._pack_cache.items():
-            try:
-                result = pack.get_raw(sha)
-            except (KeyError, PackFileDisappeared):
-                pass
-            else:
-                self._mark_pack_used(pack_hash)
-                self._enforce_packed_git_limit()
-                return result
+        try:
+            return self._lookup_in_packs(lambda p: p.get_raw(sha))
+        except KeyError:
+            pass
         if hexsha is None:
             hexsha = sha_to_hex(sha)
         ret = self._get_loose_object(hexsha)
         if ret is not None:
             return ret.type_num, ret.as_raw_string()
-        # Maybe something else has added a pack with the object
-        # in the mean time?
-        for pack in self._update_pack_cache():
-            try:
-                return pack.get_raw(sha)
-            except KeyError:
-                pass
         for alternate in self.alternates:
             try:
                 return alternate.get_raw(hexsha)
@@ -1298,27 +1357,33 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """
         todo: set[ObjectID | RawObjectID] = set(shas)
         for p in self._iter_cached_packs():
-            for unpacked in p.iter_unpacked_subset(
-                todo,
-                include_comp=include_comp,
-                allow_missing=True,
-                convert_ofs_delta=convert_ofs_delta,
-            ):
-                yield unpacked
-                hexsha = sha_to_hex(unpacked.sha())
-                todo.remove(hexsha)
+            try:
+                for unpacked in p.iter_unpacked_subset(
+                    todo,
+                    include_comp=include_comp,
+                    allow_missing=True,
+                    convert_ofs_delta=convert_ofs_delta,
+                ):
+                    yield unpacked
+                    hexsha = sha_to_hex(unpacked.sha())
+                    todo.remove(hexsha)
+            except PackFileDisappeared as exc:
+                self._evict_pack(exc.obj)
         # Maybe something else has added a pack with the object
         # in the mean time?
         for p in self._update_pack_cache():
-            for unpacked in p.iter_unpacked_subset(
-                todo,
-                include_comp=include_comp,
-                allow_missing=True,
-                convert_ofs_delta=convert_ofs_delta,
-            ):
-                yield unpacked
-                hexsha = sha_to_hex(unpacked.sha())
-                todo.remove(hexsha)
+            try:
+                for unpacked in p.iter_unpacked_subset(
+                    todo,
+                    include_comp=include_comp,
+                    allow_missing=True,
+                    convert_ofs_delta=convert_ofs_delta,
+                ):
+                    yield unpacked
+                    hexsha = sha_to_hex(unpacked.sha())
+                    todo.remove(hexsha)
+            except PackFileDisappeared as exc:
+                self._evict_pack(exc.obj)
         for alternate in self.alternates:
             assert isinstance(alternate, PackBasedObjectStore)
             for unpacked in alternate.iter_unpacked_subset(
@@ -1350,15 +1415,21 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """
         todo: set[ObjectID] = set(shas)
         for p in self._iter_cached_packs():
-            for o in p.iterobjects_subset(todo, allow_missing=True):
-                yield o
-                todo.remove(o.id)
+            try:
+                for o in p.iterobjects_subset(todo, allow_missing=True):
+                    yield o
+                    todo.remove(o.id)
+            except PackFileDisappeared as exc:
+                self._evict_pack(exc.obj)
         # Maybe something else has added a pack with the object
         # in the mean time?
         for p in self._update_pack_cache():
-            for o in p.iterobjects_subset(todo, allow_missing=True):
-                yield o
-                todo.remove(o.id)
+            try:
+                for o in p.iterobjects_subset(todo, allow_missing=True):
+                    yield o
+                    todo.remove(o.id)
+            except PackFileDisappeared as exc:
+                self._evict_pack(exc.obj)
         for alternate in self.alternates:
             for o in alternate.iterobjects_subset(todo, allow_missing=True):
                 yield o
@@ -1387,20 +1458,14 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             hexsha = None
         else:
             raise AssertionError(f"Invalid object sha1 {sha1!r}")
-        for pack in self._iter_cached_packs():
-            try:
-                return pack.get_unpacked_object(sha, include_comp=include_comp)
-            except (KeyError, PackFileDisappeared):
-                pass
+        try:
+            return self._lookup_in_packs(
+                lambda p: p.get_unpacked_object(sha, include_comp=include_comp)
+            )
+        except KeyError:
+            pass
         if hexsha is None:
             hexsha = sha_to_hex(sha)
-        # Maybe something else has added a pack with the object
-        # in the mean time?
-        for pack in self._update_pack_cache():
-            try:
-                return pack.get_unpacked_object(sha, include_comp=include_comp)
-            except KeyError:
-                pass
         for alternate in self.alternates:
             assert isinstance(alternate, PackBasedObjectStore)
             try:
@@ -2378,23 +2443,19 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         from .midx import write_midx_file
 
-        # Get all pack files
-        packs = self.packs
-        if not packs:
-            # No packs to index
-            return b"\x00" * 20
-
-        # Collect entries from all packs
-        pack_entries: list[tuple[str, list[tuple[RawObjectID, int, int | None]]]] = []
-
-        for pack in packs:
-            # Git stores .idx extension in MIDX, not .pack
-            pack_name = os.path.basename(pack._basename) + ".idx"
-            entries = list(pack.index.iterentries())
-            pack_entries.append((pack_name, entries))
-
-        # Write MIDX file
         midx_path = os.path.join(self.pack_dir, "multi-pack-index")
+        # Skip packs that vanish mid-collection (e.g. concurrent
+        # ``git repack``); the survivors still produce a valid MIDX.
+        pack_entries: list[tuple[str, list[tuple[RawObjectID, int, int | None]]]] = []
+        for pack in self.packs:
+            try:
+                entries = list(pack.index.iterentries())
+            except PackFileDisappeared as exc:
+                self._evict_pack(exc.obj)
+                continue
+            pack_entries.append((os.path.basename(pack._basename) + ".idx", entries))
+        if not pack_entries:
+            return b"\x00" * 20
         return write_midx_file(midx_path, pack_entries)
 
     def write_commit_graph(

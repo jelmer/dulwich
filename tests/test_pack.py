@@ -868,6 +868,28 @@ class TestPack(PackTests):
             # This should not raise an exception
             p.check_length_and_checksum()
 
+    def test_index_missing_file_raises_pack_disappeared(self) -> None:
+        """A missing .idx surfaces as PackFileDisappeared, not FileNotFoundError."""
+        from dulwich.pack import PackFileDisappeared
+
+        basename = os.path.join(self.tempdir, "vanished-pack")
+        pack = Pack(basename, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(pack.close)
+        with self.assertRaises(PackFileDisappeared) as cm:
+            pack.index
+        self.assertIs(cm.exception.obj, pack)
+
+    def test_data_missing_file_raises_pack_disappeared(self) -> None:
+        """A missing .pack surfaces as PackFileDisappeared, not FileNotFoundError."""
+        from dulwich.pack import PackFileDisappeared
+
+        basename = os.path.join(self.tempdir, "vanished-pack")
+        pack = Pack(basename, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(pack.close)
+        with self.assertRaises(PackFileDisappeared) as cm:
+            pack.data
+        self.assertIs(cm.exception.obj, pack)
+
 
 class TestThinPack(PackTests):
     def setUp(self) -> None:

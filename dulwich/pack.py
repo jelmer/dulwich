@@ -383,13 +383,25 @@ def take_msb_bytes(
 
 
 class PackFileDisappeared(Exception):
-    """Raised when a pack file unexpectedly disappears."""
+    """Raised when a pack file unexpectedly disappears.
 
-    def __init__(self, obj: object) -> None:
+    This typically happens when a concurrent operation (e.g. ``git repack``
+    or ``git gc --auto``) removes a pack file between the moment dulwich
+    snapshots the pack directory and the moment it actually opens the
+    pack's ``.idx`` or ``.pack`` file.
+
+    The ``obj`` attribute holds the :class:`Pack` (or :class:`FilePackIndex`)
+    whose backing file vanished, so the caller can evict the stale object
+    from its cache and rescan the pack directory.
+    """
+
+    obj: "Pack | FilePackIndex"
+
+    def __init__(self, obj: "Pack | FilePackIndex") -> None:
         """Initialize PackFileDisappeared exception.
 
         Args:
-            obj: The object that triggered the exception
+            obj: The pack or pack index that disappeared.
         """
         self.obj = obj
 
@@ -1883,7 +1895,7 @@ class PackData:
 
     def __del__(self) -> None:
         """Ensure pack file is closed when PackData is garbage collected."""
-        if self._file is not None:
+        if getattr(self, "_file", None) is not None:
             import warnings
 
             warnings.warn(
@@ -4068,7 +4080,10 @@ class Pack:
         """The pack data object being used."""
         if self._data is None:
             assert self._data_load
-            self._data = self._data_load()
+            try:
+                self._data = self._data_load()
+            except FileNotFoundError as exc:
+                raise PackFileDisappeared(self) from exc
             self.check_length_and_checksum()
         return self._data
 
@@ -4080,7 +4095,10 @@ class Pack:
         """
         if self._idx is None:
             assert self._idx_load
-            self._idx = self._idx_load()
+            try:
+                self._idx = self._idx_load()
+            except FileNotFoundError as exc:
+                raise PackFileDisappeared(self) from exc
         return self._idx
 
     @property

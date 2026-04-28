@@ -527,7 +527,7 @@ class LFSClient:
                 # Worktrees keep LFS data under <remote>/.git/lfs; bare repos
                 # keep it under <remote>/lfs. Probe for an existing layout and
                 # fall back to the worktree layout if neither exists yet.
-                from urllib.request import pathname2url
+                from pathlib import Path
 
                 candidates = [
                     os.path.join(local_path, ".git", "lfs"),
@@ -536,7 +536,7 @@ class LFSClient:
                 lfs_path = next(
                     (p for p in candidates if os.path.isdir(p)), candidates[0]
                 )
-                lfs_url = f"file://{pathname2url(lfs_path)}"
+                lfs_url = Path(lfs_path).as_uri()
             else:
                 # Ensure URL ends with .git for consistent LFS endpoint
                 if not remote_url.endswith(".git"):

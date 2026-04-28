@@ -1018,6 +1018,123 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
                 pack.data._offset_cache._max_size,
             )
 
+    def test_pack_disappeared_during_lookup_recovers(self) -> None:
+        """A concurrent repack that deletes a pack must not raise KeyError.
+
+        Regression for https://github.com/jelmer/dulwich/issues/2159: when a
+        pack is removed between the moment ``_update_pack_cache`` snapshots
+        the pack directory and the moment its index is lazily opened, the
+        store should drop the stale Pack, rescan, and find the object in
+        the replacement pack.
+        """
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+
+        # Two packs that overlap on b1. The "doomed" pack also contains b2
+        # so it has a distinct hash from the survivor (otherwise add_pack
+        # would dedupe).
+        b1 = make_object(Blob, data=b"shared-object")
+        b2 = make_object(Blob, data=b"only-in-doomed")
+
+        f, commit, _abort = store.add_pack()
+        write_pack_objects(
+            f.write, [(b1, None), (b2, None)], object_format=DEFAULT_OBJECT_FORMAT
+        )
+        doomed = commit()
+        self.assertIsNotNone(doomed)
+
+        f, commit, _abort = store.add_pack()
+        write_pack_objects(f.write, [(b1, None)], object_format=DEFAULT_OBJECT_FORMAT)
+        survivor = commit()
+        self.assertIsNotNone(survivor)
+
+        assert doomed is not None
+        # Drop file handles (mimicking eviction or process restart) before
+        # deleting on disk, so the next access goes through lazy load.
+        doomed.close()
+        os.remove(doomed._idx_path)
+        os.remove(doomed._data_path)
+
+        # b1 must still be found via the survivor pack rather than raising
+        # KeyError because of the disappeared doomed pack.
+        type_num, data = store.get_raw(b1.id)
+        self.assertEqual(Blob.type_num, type_num)
+        self.assertEqual(b"shared-object", data)
+
+    def test_contains_packed_recovers_after_pack_disappears(self) -> None:
+        """contains_packed must not return False if a replacement pack exists."""
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+
+        b1 = make_object(Blob, data=b"contains-after-repack")
+        b2 = make_object(Blob, data=b"only-in-doomed-2")
+
+        f, commit, _abort = store.add_pack()
+        write_pack_objects(
+            f.write, [(b1, None), (b2, None)], object_format=DEFAULT_OBJECT_FORMAT
+        )
+        doomed = commit()
+        self.assertIsNotNone(doomed)
+
+        f, commit, _abort = store.add_pack()
+        write_pack_objects(f.write, [(b1, None)], object_format=DEFAULT_OBJECT_FORMAT)
+        survivor = commit()
+        self.assertIsNotNone(survivor)
+
+        assert doomed is not None
+        doomed.close()
+        os.remove(doomed._idx_path)
+        os.remove(doomed._data_path)
+
+        self.assertTrue(store.contains_packed(b1.id))
+
+    def test_iter_handles_disappeared_pack(self) -> None:
+        """Iterating SHAs must not crash when a cached pack file vanishes."""
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+
+        b1 = make_object(Blob, data=b"iter-after-repack")
+        f, commit, _abort = store.add_pack()
+        write_pack_objects(f.write, [(b1, None)], object_format=DEFAULT_OBJECT_FORMAT)
+        original = commit()
+        self.assertIsNotNone(original)
+
+        assert original is not None
+        original.close()
+        os.remove(original._idx_path)
+        os.remove(original._data_path)
+
+        # Should not raise; the disappeared pack is silently dropped.
+        self.assertEqual([], list(store))
+
+    def test_write_midx_handles_disappeared_pack(self) -> None:
+        """write_midx must not crash if a pack disappears mid-collection."""
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+
+        b1 = make_object(Blob, data=b"midx-after-repack")
+        b2 = make_object(Blob, data=b"midx-survivor")
+
+        f, commit, _abort = store.add_pack()
+        write_pack_objects(f.write, [(b1, None)], object_format=DEFAULT_OBJECT_FORMAT)
+        doomed = commit()
+        self.assertIsNotNone(doomed)
+
+        f, commit, _abort = store.add_pack()
+        write_pack_objects(f.write, [(b2, None)], object_format=DEFAULT_OBJECT_FORMAT)
+        survivor = commit()
+        self.assertIsNotNone(survivor)
+
+        assert doomed is not None
+        doomed.close()
+        os.remove(doomed._idx_path)
+        os.remove(doomed._data_path)
+
+        # No exception. The midx is written from the surviving pack.
+        store.write_midx()
+        midx_path = os.path.join(store.pack_dir, "multi-pack-index")
+        self.assertTrue(os.path.exists(midx_path))
+
 
 class TreeLookupPathTests(TestCase):
     def setUp(self) -> None:

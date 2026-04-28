@@ -1,5 +1,13 @@
 1.2.1	UNRELEASED
 
+ * Recover from concurrent pack removals (e.g. a racing ``git repack`` or
+   ``git gc --auto``) instead of raising spurious ``KeyError`` /
+   ``FileNotFoundError``. ``Pack.index`` and ``Pack.data`` now translate
+   ``FileNotFoundError`` during lazy load into ``PackFileDisappeared``,
+   and ``PackBasedObjectStore`` evicts the stale pack and rescans the
+   pack directory before retrying — equivalent to git's
+   ``reprepare_packed_git()``. (Jelmer Vernooĳ, #2159)
+
  * Derive the LFS endpoint as the remote's on-disk LFS store
    (``<remote>/.git/lfs`` for worktrees, ``<remote>/lfs`` for bare repos)
    when ``remote.origin.url`` points at a local filesystem path or

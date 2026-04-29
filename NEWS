@@ -19,6 +19,11 @@
 
 1.2.0	2026-04-21
 
+ * Respect the ``GIT_PROTOCOL`` environment variable when choosing the
+   default Git wire protocol version to send. Colon-separated
+   ``version=N`` entries are parsed and applied when no explicit
+   ``protocol_version`` is passed. (#1862)
+
  * Expand ``log`` command options: add ``--oneline``, ``--abbrev-commit``,
    ``--author``, ``--committer``, ``--grep``, ``--since``/``--after``,
    ``--until``/``--before``, ``-n``/``--max-count``, ``--no-merges``,

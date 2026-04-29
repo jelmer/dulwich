@@ -144,7 +144,7 @@ def _protocol_version_from_env() -> int | None:
         try:
             return int(raw_val.strip())
         except ValueError:
-            logger.warning("Ignoring unparseable GIT_PROTOCOL version %r", raw_val)
+            logger.warning("Ignoring unparsable GIT_PROTOCOL version %r", raw_val)
             return None
     logger.warning("GIT_PROTOCOL %r has no version= pair; ignoring", value)
     return None

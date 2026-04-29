@@ -257,7 +257,7 @@ class ProtocolVersionFromEnvTest(TestCase):
         self.overrideEnv("GIT_PROTOCOL", "feature=extra")
         self.assertIsNone(_protocol_version_from_env())
 
-    def test_unparseable_version_returns_none(self):
+    def test_unparsable_version_returns_none(self):
         self.overrideEnv("GIT_PROTOCOL", "version=nope")
         self.assertIsNone(_protocol_version_from_env())
 

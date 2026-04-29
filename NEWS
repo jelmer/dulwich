@@ -1,4 +1,4 @@
-1.2.1	UNRELEASED
+1.2.1	2026-04-29
 
  * Derive the LFS endpoint as the remote's on-disk LFS store
    (``<remote>/.git/lfs`` for worktrees, ``<remote>/lfs`` for bare repos)

@@ -87,7 +87,7 @@ jobs:
         env:
           CIBW_BUILD: "${{ matrix.build-identifier }}*"
       - name: Upload wheels
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: artifact-${{ matrix.build-identifier }}
           path: ./wheelhouse/*.whl
@@ -109,7 +109,7 @@ jobs:
           CIBW_PLATFORM: android
           CIBW_ARCHS_ANDROID: arm64_v8a x86_64
       - name: Upload Android wheels
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: artifact-android
           path: ./wheelhouse/*.whl
@@ -124,7 +124,7 @@ jobs:
       - run: pip install build
       - run: PURE=true python -m build --wheel
       - name: Upload pure wheels
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: artifact-pure
           path: ./dist/*.whl
@@ -143,7 +143,7 @@ jobs:
       - name: Build sdist
         run: python -m build --sdist
       - name: Upload sdist
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: artifact-source
           path: ./dist/*.tar.gz

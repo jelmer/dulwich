@@ -1881,9 +1881,15 @@ class DiskObjectStore(PackBasedObjectStore):
         raise KeyError(sha)
 
     def _remove_pack(self, pack: Pack) -> None:
+        # _pack_cache is keyed by bare pack hash; pack._basename ends in
+        # "pack-<hash>", so drop the "pack-" prefix to match.
+        basename = os.path.basename(pack._basename)
+        assert basename.startswith("pack-"), f"unexpected pack basename {basename!r}"
+        pack_hash = basename[len("pack-") :]
+        self._pack_cache.pop(pack_hash, None)
         try:
-            del self._pack_cache[os.path.basename(pack._basename)]
-        except KeyError:
+            self._pack_access_order.remove(pack_hash)
+        except ValueError:
             pass
         # Store paths before closing to avoid re-opening files on Windows
         data_path = pack._data_path
@@ -2256,10 +2262,11 @@ class DiskObjectStore(PackBasedObjectStore):
         return self._midx
 
     def _get_pack_by_name(self, pack_name: str) -> Pack:
-        """Get a pack by its base name.
+        """Get a pack referenced by a multi-pack-index entry.
 
         Args:
-            pack_name: Base name of the pack (e.g., 'pack-abc123.pack' or 'pack-abc123.idx')
+            pack_name: Pack file name as stored in the MIDX, of the form
+                ``pack-<hash>.idx``.
 
         Returns:
             Pack object
@@ -2267,20 +2274,17 @@ class DiskObjectStore(PackBasedObjectStore):
         Raises:
             KeyError: If pack doesn't exist
         """
-        # Remove .pack or .idx extension if present
-        if pack_name.endswith(".pack"):
-            base_name = pack_name[:-5]
-        elif pack_name.endswith(".idx"):
-            base_name = pack_name[:-4]
-        else:
-            base_name = pack_name
+        assert pack_name.startswith("pack-") and pack_name.endswith(".idx"), (
+            f"unexpected MIDX pack name {pack_name!r}"
+        )
+        pack_hash = pack_name[len("pack-") : -len(".idx")]
 
-        # Check if already in cache
-        if base_name in self._pack_cache:
-            return self._pack_cache[base_name]
+        try:
+            return self._pack_cache[pack_hash]
+        except KeyError:
+            pass
 
-        # Load the pack
-        pack_path = os.path.join(self.pack_dir, base_name)
+        pack_path = os.path.join(self.pack_dir, "pack-" + pack_hash)
         if not os.path.exists(pack_path + ".pack"):
             raise KeyError(f"Pack {pack_name} not found")
 
@@ -2295,7 +2299,8 @@ class DiskObjectStore(PackBasedObjectStore):
             big_file_threshold=self.pack_big_file_threshold,
             delta_base_cache_limit=self.delta_base_cache_limit,
         )
-        self._pack_cache[base_name] = pack
+        self._pack_cache[pack_hash] = pack
+        self._mark_pack_used(pack_hash)
         return pack
 
     def contains_packed(self, sha: ObjectID | RawObjectID) -> bool:

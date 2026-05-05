@@ -820,6 +820,39 @@ def _escape_value(value: bytes) -> bytes:
     return value
 
 
+def _escape_subsection(name: bytes) -> bytes:
+    r"""Escape a subsection name for writing in a section header.
+
+    Per git-config: inside the quoted subsection name, only ``"`` and ``\``
+    need (and may) be escaped; newline and NUL are not permitted at all.
+    """
+    if b"\n" in name or b"\0" in name:
+        raise ValueError(f"subsection name {name!r} contains a forbidden character")
+    return name.replace(b"\\", b"\\\\").replace(b'"', b'\\"')
+
+
+def _unescape_subsection(name: bytes) -> bytes:
+    r"""Unescape a quoted subsection name read from a section header.
+
+    Per git-config, ``\"`` and ``\\`` are the only recognised escapes.
+    Git silently drops the backslash on any other ``\x`` sequence, so we
+    match that lenient behaviour to stay compatible with config files
+    written by git or by hand (notably ``includeIf`` headers containing
+    Windows paths where backslashes were not doubled).
+    """
+    out = bytearray()
+    i = 0
+    while i < len(name):
+        c = name[i : i + 1]
+        if c == b"\\" and i + 1 < len(name):
+            out += name[i + 1 : i + 2]
+            i += 2
+        else:
+            out += c
+            i += 1
+    return bytes(out)
+
+
 def _check_variable_name(name: bytes) -> bool:
     for i in range(len(name)):
         c = name[i : i + 1]
@@ -913,13 +946,13 @@ def _parse_section_header_line(line: bytes) -> tuple[Section, bytes]:
         # Handle subsections - Git allows more complex syntax for certain sections like includeIf
         if pts[1][:1] == b'"' and pts[1][-1:] == b'"':
             # Standard quoted subsection
-            pts[1] = pts[1][1:-1]
+            pts[1] = _unescape_subsection(pts[1][1:-1])
         elif pts[0] == b"includeIf":
             # Special handling for includeIf sections which can have complex conditions
             # Git allows these without strict quote validation
             pts[1] = pts[1].strip()
             if pts[1][:1] == b'"' and pts[1][-1:] == b'"':
-                pts[1] = pts[1][1:-1]
+                pts[1] = _unescape_subsection(pts[1][1:-1])
         else:
             # Other sections must have quoted subsections
             raise ValueError(f"Invalid subsection {pts[1]!r}")
@@ -1333,7 +1366,13 @@ class ConfigFile(ConfigDict):
             if subsection_name is None:
                 f.write(b"[" + section_name + b"]\n")
             else:
-                f.write(b"[" + section_name + b' "' + subsection_name + b'"]\n')
+                f.write(
+                    b"["
+                    + section_name
+                    + b' "'
+                    + _escape_subsection(subsection_name)
+                    + b'"]\n'
+                )
             for key, value in values.items():
                 value = _format_string(value)
                 f.write(b"\t" + key + b" = " + value + b"\n")

@@ -1,5 +1,12 @@
 1.2.2	UNRELEASED
 
+ * Escape ``"`` and ``\`` in subsection names when writing config
+   files, and unescape them when parsing. Previously a subsection
+   name containing either character was emitted verbatim, producing
+   a corrupt header that re-parsed as the wrong subsection. Newline
+   and NUL in subsection names, which git rejects, now raise
+   ``ValueError``. (Jelmer Vernooĳ)
+
  * Key ``_pack_cache`` consistently by bare pack hash in
    ``DiskObjectStore._get_pack_by_name`` and ``_remove_pack``, finishing
    the migration started by commit d86353e4. The previous mismatch

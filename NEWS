@@ -1,3 +1,12 @@
+1.2.2	UNRELEASED
+
+ * Key ``_pack_cache`` consistently by bare pack hash in
+   ``DiskObjectStore._get_pack_by_name`` and ``_remove_pack``, finishing
+   the migration started by commit d86353e4. The previous mismatch
+   produced duplicate Pack entries for the same file and could surface
+   as ``KeyError`` from ``get_raw`` after an external repack.
+   (Jelmer Vernooĳ)
+
 1.2.1	2026-04-29
 
  * Derive the LFS endpoint as the remote's on-disk LFS store

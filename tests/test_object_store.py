@@ -990,6 +990,77 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             self.assertEqual(1024, pack.delta_base_cache_limit)
             self.assertEqual(1024, pack.data._offset_cache._max_size)
 
+    def _add_blob_in_pack(self, store, data):
+        b = make_object(Blob, data=data)
+        f, commit, abort = store.add_pack()
+        try:
+            write_pack_objects(
+                f.write, [(b, None)], object_format=DEFAULT_OBJECT_FORMAT
+            )
+        except BaseException:
+            abort()
+            raise
+        else:
+            commit()
+        return b
+
+    def test_get_pack_by_name_uses_bare_hash_key(self) -> None:
+        """_get_pack_by_name and _update_pack_cache must agree on cache keys.
+
+        Otherwise both populate _pack_cache for the same file under different
+        keys, causing duplicate Pack objects and spurious eviction in
+        _update_pack_cache's "remove disappeared pack files" loop (the same
+        class of bug as commit d86353e4).
+        """
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+
+        b = self._add_blob_in_pack(store, b"midx test")
+        # Force _update_pack_cache to populate the cache with bare-hash keys.
+        store.get_raw(b.id)
+
+        # All keys in _pack_cache must be bare hashes (no "pack-" prefix).
+        for key in store._pack_cache:
+            self.assertFalse(
+                key.startswith("pack-"),
+                f"_pack_cache key {key!r} should be a bare hash",
+            )
+
+        cached_keys = set(store._pack_cache)
+        self.assertEqual(1, len(cached_keys))
+
+        # Looking up the same pack via _get_pack_by_name (the path used by
+        # MIDXObjectStore.get_raw) must hit the existing cache entry rather
+        # than creating a duplicate keyed differently.
+        pack = next(iter(store._pack_cache.values()))
+        pack_name = os.path.basename(pack._basename) + ".idx"
+        same_pack = store._get_pack_by_name(pack_name)
+        self.assertIs(pack, same_pack)
+        self.assertEqual(cached_keys, set(store._pack_cache))
+
+    def test_get_pack_by_name_does_not_cause_eviction(self) -> None:
+        """After _get_pack_by_name, _update_pack_cache must not evict the pack.
+
+        This is the failure mode that surfaced as a KeyError during reads:
+        a duplicate cache entry under a `pack-HASH` key looked like a
+        "disappeared" pack on the next rescan and got closed while still
+        in use.
+        """
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+
+        b = self._add_blob_in_pack(store, b"eviction test")
+        store.get_raw(b.id)
+
+        pack = next(iter(store._pack_cache.values()))
+        pack_name = os.path.basename(pack._basename) + ".idx"
+        store._get_pack_by_name(pack_name)
+
+        # Trigger _update_pack_cache; nothing on disk has changed, so no
+        # pack should be evicted.
+        store._update_pack_cache()
+        self.assertEqual((Blob.type_num, b"eviction test"), store.get_raw(b.id))
+
     def test_delta_base_cache_limit_uses_default(self) -> None:
         from dulwich.pack import DEFAULT_DELTA_BASE_CACHE_LIMIT
 

@@ -186,22 +186,38 @@ class BackendRepo(TypingProtocol):
     dulwich.repo.Repo.
     """
 
-    object_store: PackBasedObjectStore
-    refs: RefsContainer
-    object_format: "ObjectFormat"
+    # Declared as properties (read-only) rather than attributes so that
+    # implementations exposing more specific subtypes (e.g. Repo, whose
+    # object_store is a DiskObjectStore) still satisfy this protocol.
+    # Mutable Protocol attributes are invariant, which would reject any
+    # such subtype.
+    @property
+    def object_store(self) -> PackBasedObjectStore:
+        """Object store backing this repository."""
+        raise NotImplementedError
 
-    def get_refs(self) -> dict[bytes, bytes]:
+    @property
+    def refs(self) -> RefsContainer:
+        """Refs container for this repository."""
+        raise NotImplementedError
+
+    @property
+    def object_format(self) -> "ObjectFormat":
+        """Hash algorithm used by this repository."""
+        raise NotImplementedError
+
+    def get_refs(self) -> dict[Ref, ObjectID]:
         """Get all the refs in the repository.
 
         Returns: dict of name -> sha
         """
         raise NotImplementedError
 
-    def get_peeled(self, name: bytes) -> ObjectID | None:
+    def get_peeled(self, ref: Ref) -> ObjectID | None:
         """Return the cached peeled value of a ref, if available.
 
         Args:
-          name: Name of the ref to peel
+          ref: Name of the ref to peel
         Returns: The peeled value of the ref. If the ref is known not point to
             a tag, this will be the SHA the ref refers to. If no cached
             information about a tag is available, this method may return None,
@@ -310,7 +326,7 @@ class FileSystemBackend(Backend):
         normcase_root = os.path.normcase(self.root)
         if not normcase_abspath.startswith(normcase_root):
             raise NotGitRepository(f"Path {path!r} not inside root {self.root!r}")
-        return Repo(abspath)  # type: ignore[return-value]
+        return Repo(abspath)
 
 
 class Handler:
@@ -540,7 +556,7 @@ class UploadPackHandler(PackHandler):
 
     def get_tagged(
         self,
-        refs: Mapping[bytes, bytes] | None = None,
+        refs: Mapping[Ref, ObjectID] | None = None,
         repo: BackendRepo | None = None,
     ) -> dict[ObjectID, ObjectID]:
         """Get a dict of peeled values of tags to their original tag shas.
@@ -831,7 +847,7 @@ class _ProtocolGraphWalker:
         self,
         handler: "UploadPackHandler",
         object_store: ObjectContainer,
-        get_peeled: Callable[[bytes], ObjectID | None],
+        get_peeled: Callable[[Ref], ObjectID | None],
         get_symrefs: Callable[[], dict[Ref, Ref]],
     ) -> None:
         """Initialize a ProtocolGraphWalker.
@@ -1666,7 +1682,7 @@ class ReceivePackHandler(PackHandler):
 
             if not refs:
                 zero_sha = ObjectID(b"0" * self.repo.object_format.hex_length)
-                refs = [(CAPABILITIES_REF, zero_sha)]
+                refs = [(Ref(CAPABILITIES_REF), zero_sha)]
             logger.info("Sending capabilities: %s", self.capabilities())
             self.proto.write_pkt_line(
                 format_ref_line(

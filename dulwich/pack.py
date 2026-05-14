@@ -3235,20 +3235,21 @@ def deltas_from_sorted_objects(
     if window_size is None:
         window_size = DEFAULT_PACK_DELTA_WINDOW_SIZE
 
-    possible_bases: deque[tuple[bytes, int, list[bytes]]] = deque()
+    possible_bases: deque[tuple[bytes, int, bytes]] = deque()
     for i, (o, path) in enumerate(objects):
         if progress is not None and i % 1000 == 0:
             progress((f"generating deltas: {i}\r").encode())
         raw = o.as_raw_chunks()
+        raw_bytes = b"".join(raw)  # Join once for efficiency
         winner = raw
         winner_len = sum(map(len, winner))
         winner_base = None
-        for base_id, base_type_num, base in possible_bases:
+        for base_id, base_type_num, base_bytes in possible_bases:
             if base_type_num != o.type_num:
                 continue
             delta_len = 0
             delta = []
-            for chunk in create_delta(b"".join(base), b"".join(raw)):
+            for chunk in create_delta(base_bytes, raw_bytes):
                 delta_len += len(chunk)
                 if delta_len >= winner_len:
                     break
@@ -3264,7 +3265,7 @@ def deltas_from_sorted_objects(
             decomp_len=winner_len,
             decomp_chunks=winner,
         )
-        possible_bases.appendleft((o.sha().digest(), o.type_num, raw))
+        possible_bases.appendleft((o.sha().digest(), o.type_num, raw_bytes))
         while len(possible_bases) > window_size:
             possible_bases.pop()
 

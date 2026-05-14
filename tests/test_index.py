@@ -1448,6 +1448,7 @@ class TestTreeFSPathConversion(TestCase):
 
 class TestIndexEntryFromPath(TestCase):
     def setUp(self):
+        super().setUp()
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
@@ -1880,6 +1881,7 @@ class TestManyFilesFeature(TestCase):
     """Tests for the manyFiles feature (index version 4 and skipHash)."""
 
     def setUp(self):
+        super().setUp()
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
@@ -2045,6 +2047,7 @@ class TestManyFilesRepoIntegration(TestCase):
     """Tests for manyFiles feature integration with Repo."""
 
     def setUp(self):
+        super().setUp()
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
@@ -2084,6 +2087,7 @@ class TestPathPrefixCompression(TestCase):
     """Tests for index version 4 path prefix compression."""
 
     def setUp(self):
+        super().setUp()
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
@@ -2223,6 +2227,7 @@ class TestDetectCaseOnlyRenames(TestCase):
     """Tests for detect_case_only_renames function."""
 
     def setUp(self):
+        super().setUp()
         self.config = ConfigDict()
 
     def test_no_renames(self):
@@ -2469,6 +2474,7 @@ class TestDetectCaseOnlyRenames(TestCase):
 
 class TestUpdateWorkingTree(TestCase):
     def setUp(self):
+        super().setUp()
         self.tempdir = tempfile.mkdtemp()
 
         def cleanup_tempdir():

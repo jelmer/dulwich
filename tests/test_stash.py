@@ -37,6 +37,7 @@ class StashTests(TestCase):
     """Tests for stash."""
 
     def setUp(self):
+        super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.repo_dir = os.path.join(self.test_dir, "repo")
         os.makedirs(self.repo_dir)

@@ -218,6 +218,38 @@ class ConfigFileTests(TestCase):
         c.write_to_file(f)
         self.assertEqual(b'[branch "blie"]\n\tfoo = bar\n', f.getvalue())
 
+    def test_write_to_file_subsection_escapes_quote_and_backslash(self) -> None:
+        c = ConfigFile()
+        c.set((b"branch", b'foo"bar'), b"x", b"1")
+        c.set((b"branch", b"a\\b"), b"y", b"2")
+        f = BytesIO()
+        c.write_to_file(f)
+        self.assertEqual(
+            b'[branch "foo\\"bar"]\n\tx = 1\n[branch "a\\\\b"]\n\ty = 2\n',
+            f.getvalue(),
+        )
+
+    def test_subsection_roundtrip_with_special_chars(self) -> None:
+        for name in (b'foo"bar', b"a\\b", b'a\\"b', b"trailing\\"):
+            c = ConfigFile()
+            c.set((b"branch", name), b"k", b"v")
+            f = BytesIO()
+            c.write_to_file(f)
+            reparsed = self.from_file(f.getvalue())
+            self.assertEqual(b"v", reparsed.get((b"branch", name), b"k"))
+
+    def test_write_to_file_subsection_rejects_newline(self) -> None:
+        c = ConfigFile()
+        c.set((b"branch", b"foo\nbar"), b"k", b"v")
+        self.assertRaises(ValueError, c.write_to_file, BytesIO())
+
+    def test_from_file_subsection_unknown_escape_is_lenient(self) -> None:
+        # Git silently drops the backslash on unrecognised escape sequences
+        # in subsection names; we match that behaviour for compatibility
+        # with includeIf headers containing literal Windows backslashes.
+        cf = self.from_file(b'[branch "foo\\nbar"]\nk = v\n')
+        self.assertEqual(b"v", cf.get((b"branch", b"foonbar"), b"k"))
+
     def test_write_to_file_preserves_quoted_trailing_whitespace(self) -> None:
         c = ConfigFile()
         c.set((b"core",), b"foo", b" ")

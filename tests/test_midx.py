@@ -278,6 +278,26 @@ class MIDXContainsTests(TestCase):
         self.assertTrue(b"\x02" * 20 in midx)
         self.assertFalse(b"\xff" * 20 in midx)
 
+    def test_object_offset_rejects_hex(self):
+        """MIDX has a binary-only contract; hex SHAs are not accepted."""
+        f = BytesIO()
+        pack_entries = [
+            (
+                "pack-test.idx",
+                [
+                    (b"\x01" * 20, 100, 0),
+                ],
+            )
+        ]
+
+        write_midx(f, pack_entries, HASH_ALGORITHM_SHA1)
+        f.seek(0)
+        midx = MultiPackIndex("test.midx", file=f, contents=f.read())
+
+        # 40-byte hex sha is the wrong length for the binary interface
+        self.assertRaises(ValueError, midx.object_offset, b"01" * 20)
+        self.assertRaises(ValueError, midx.object_offset, b"\x01" * 10)
+
 
 class MIDXIterEntriesTests(TestCase):
     """Tests for MIDX iterentries method."""

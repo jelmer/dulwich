@@ -1606,7 +1606,7 @@ def add(
             # When no paths specified, add all untracked and modified files from repo root
             paths = [str(repo_path)]
         relpaths = []
-        if isinstance(paths, (str, bytes, os.PathLike)):
+        if isinstance(paths, str | bytes | os.PathLike):
             paths = [paths]
         for p in paths:
             # Handle bytes paths by decoding them
@@ -2122,7 +2122,7 @@ def show_tag(
     with open_repo_closing(repo) as r:
         print_tag(tag, decode, outstream)
         obj = r[tag.object[1]]
-        assert isinstance(obj, (Tree, Blob, Commit, Tag))
+        assert isinstance(obj, Tree | Blob | Commit | Tag)
         show_object(repo, obj, decode, outstream)
 
 
@@ -2448,7 +2448,7 @@ def show(
     """
     if objects is None:
         objects = ["HEAD"]
-    if isinstance(objects, (str, bytes)):
+    if isinstance(objects, str | bytes):
         objects = [objects]
     with open_repo_closing(repo) as r:
         for objectish in objects:
@@ -2463,7 +2463,7 @@ def show(
                 def decode(x: bytes) -> str:
                     return x.decode(default_encoding)
 
-            assert isinstance(o, (Tree, Blob, Commit, Tag))
+            assert isinstance(o, Tree | Blob | Commit | Tag)
             show_object(r, o, decode, outstream)
 
 
@@ -2773,7 +2773,7 @@ def reset(
                 treeish.decode("utf-8")
                 if isinstance(treeish, bytes)
                 else str(treeish)
-                if not isinstance(treeish, (Commit, Tree, Tag))
+                if not isinstance(treeish, Commit | Tree | Tag)
                 else target_commit.id.hex()
             )
             default_message = f"reset: moving to {treeish_str}".encode()
@@ -2968,7 +2968,7 @@ def _select_push_refs(
                 result.append((Ref(ref), Ref(ref), force))
     elif delete:
         assert refspecs is not None
-        if isinstance(refspecs, (str, bytes)):
+        if isinstance(refspecs, str | bytes):
             refspecs = [refspecs]
         remote_container = DictRefsContainer(remote_refs)  # type: ignore[arg-type]
         for spec in refspecs:
@@ -2988,7 +2988,7 @@ def _select_push_refs(
             if not active_ref.startswith(LOCAL_BRANCH_PREFIX):
                 raise ValueError(active_ref)
             refspecs = [active_ref[len(LOCAL_BRANCH_PREFIX) :]]
-        elif isinstance(refspecs, (str, bytes)):
+        elif isinstance(refspecs, str | bytes):
             refspecs = [refspecs]
         refspecs_bytes = [
             spec.encode() if isinstance(spec, str) else spec for spec in refspecs
@@ -4067,7 +4067,7 @@ def branch_delete(repo: RepoPath, name: str | bytes | Sequence[str | bytes]) -> 
       name: Name of the branch
     """
     with open_repo_closing(repo) as r:
-        if isinstance(name, (list, tuple)):
+        if isinstance(name, list | tuple):
             names = name
         else:
             names = [name]
@@ -5640,7 +5640,7 @@ def checkout(
             # Check if target is a branch name (with or without refs/heads/ prefix)
             branch_ref = None
             if (
-                isinstance(original_target, (str, bytes))
+                isinstance(original_target, str | bytes)
                 and target_bytes in r.refs.keys()
             ):
                 if target_bytes.startswith(LOCAL_BRANCH_PREFIX):
@@ -5649,7 +5649,7 @@ def checkout(
                 # Try adding refs/heads/ prefix
                 potential_branch = (
                     _make_branch_ref(target_bytes)
-                    if isinstance(original_target, (str, bytes))
+                    if isinstance(original_target, str | bytes)
                     else None
                 )
                 if potential_branch in r.refs.keys():
@@ -5880,7 +5880,7 @@ def switch(
             # Check if target is a branch name (with or without refs/heads/ prefix)
             branch_ref = None
             if (
-                isinstance(original_target, (str, bytes))
+                isinstance(original_target, str | bytes)
                 and target_bytes in r.refs.keys()
             ):
                 if target_bytes.startswith(LOCAL_BRANCH_PREFIX):
@@ -5889,7 +5889,7 @@ def switch(
                 # Try adding refs/heads/ prefix
                 potential_branch = (
                     _make_branch_ref(target_bytes)
-                    if isinstance(original_target, (str, bytes))
+                    if isinstance(original_target, str | bytes)
                     else None
                 )
                 if potential_branch in r.refs.keys():
@@ -6622,7 +6622,7 @@ def get_object_by_path(
             path = commit_encode(commit, path)
         (_mode, sha) = tree_lookup_path(r.object_store.__getitem__, base_tree, path)
         obj = r[sha]
-        assert isinstance(obj, (Blob, Tree, Commit, Tag))
+        assert isinstance(obj, Blob | Tree | Commit | Tag)
         return obj
 
 
@@ -6920,7 +6920,7 @@ def merge(
     """
     with open_repo_closing(repo) as r:
         # Handle both single commit and multiple commits
-        if isinstance(committish, (list, tuple)):
+        if isinstance(committish, list | tuple):
             # Multiple commits - use octopus merge
             merge_commit_ids = []
             for c in committish:
@@ -7377,7 +7377,7 @@ def revert(
     from ..merge import three_way_merge
 
     # Normalize commits to a list
-    if isinstance(commits, (str, bytes, Commit, Tag)):
+    if isinstance(commits, str | bytes | Commit | Tag):
         commits = [commits]
 
     with open_repo_closing(repo) as r:
@@ -8168,7 +8168,7 @@ def bisect_start(
         state = BisectState(r)
 
         # Convert single good commit to sequence
-        if good is not None and isinstance(good, (str, bytes, Commit, Tag)):
+        if good is not None and isinstance(good, str | bytes | Commit | Tag):
             good = [good]
 
         # Parse commits
@@ -8283,7 +8283,7 @@ def bisect_skip(
             rev_shas = None
         else:
             # Convert single rev to sequence
-            if isinstance(revs, (str, bytes, Commit, Tag)):
+            if isinstance(revs, str | bytes | Commit | Tag):
                 revs = [revs]
             rev_shas = [parse_commit(r, rev).id for rev in revs]
 
@@ -8368,7 +8368,7 @@ def bisect_replay(
     with open_repo_closing(repo) as r:
         state = BisectState(r)
 
-        if isinstance(log_file, (str, os.PathLike)):
+        if isinstance(log_file, str | os.PathLike):
             with open(log_file) as f:
                 log_content = f.read()
         else:
@@ -8699,7 +8699,7 @@ def mailsplit(
     if is_maildir:
         if input_path is None:
             raise ValueError("input_path is required for Maildir splitting")
-        if not isinstance(input_path, (str, bytes, os.PathLike)):
+        if not isinstance(input_path, str | bytes | os.PathLike):
             raise ValueError("Maildir splitting requires a path, not a file object")
         # Convert PathLike to str for split_maildir
         maildir_path: str | bytes = (
@@ -8990,7 +8990,7 @@ def apply_patch(
             import sys
 
             patch_content = sys.stdin.buffer.read()
-        elif isinstance(patch_file, (str, bytes)):
+        elif isinstance(patch_file, str | bytes):
             # Path to file
             if isinstance(patch_file, bytes):
                 path = patch_file.decode("utf-8")
@@ -9076,7 +9076,7 @@ def am(
 
     for inp in inputs:
         # Read content
-        if isinstance(inp, (str, bytes)):
+        if isinstance(inp, str | bytes):
             if isinstance(inp, str):
                 path = inp
             else:

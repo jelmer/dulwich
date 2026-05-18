@@ -459,7 +459,7 @@ def filter_pack_objects(
             if filter_spec.should_include_blob(blob_size):
                 filtered_ids.append(oid)
             # else: blob is filtered out
-        elif isinstance(obj, (Tree, Commit, Tag)):
+        elif isinstance(obj, Tree | Commit | Tag):
             # For now, include all trees, commits, and tags
             # Tree depth filtering would require tracking depth during traversal
             # which needs to be implemented at the object collection stage

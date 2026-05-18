@@ -421,7 +421,7 @@ def parse_refs(
       KeyError: If one of the refs can not be found
     """
     # TODO: Support * in refspecs
-    if isinstance(refspecs, (bytes, str)):
+    if isinstance(refspecs, bytes | str):
         refspecs = [refspecs]
     ret = []
     for refspec in refspecs:

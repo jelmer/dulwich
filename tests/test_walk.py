@@ -477,6 +477,23 @@ class WalkerTest(TestCase):
         _c1, _c2, c3 = self.make_linear_commits(3)
         self.assertWalkYields([], [c3.id], exclude=[c3.id])
 
+    def test_exclude_diverged_older_than_merge_base(self) -> None:
+        # Linear chain c1..c20 with increasing timestamps. y is a child of c10
+        # with a timestamp older than every commit in the chain (simulates
+        # rebase/auto-stash clock skew). exclude=[y] must exclude c1..c10,
+        # even though c1..c10 get popped from the date-ordered PQ long before
+        # y — too long for the small "extra commits" buffer to paper over.
+        n = 20
+        spec = [[1]] + [[i, i - 1] for i in range(2, n + 1)]
+        times = [100 + i for i in range(1, n + 1)]
+        spec.append([n + 1, 10])
+        times.append(1)
+        commits = self.make_commits(spec, times=times)
+        cs = commits[:n]
+        y = commits[n]
+        expected = list(reversed(cs[10:]))  # c20..c11
+        self.assertWalkYields(expected, [cs[-1].id], exclude=[y.id])
+
 
 class WalkEntryTest(TestCase):
     def setUp(self) -> None:

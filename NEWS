@@ -1,5 +1,12 @@
 1.2.2	UNRELEASED
 
+ * Normalise hex SHAs to binary in ``DiskObjectStore.contains_packed``
+   before consulting the multi-pack-index, mirroring what ``get_raw``
+   already did. Previously, passing a 40-character hex SHA (as
+   ``BaseRepo.__contains__`` does when a hex object id is looked up)
+   raised ``ValueError: SHA size mismatch`` once a ``multi-pack-index``
+   file was present in the repository. (Jelmer Vernooĳ, #2178)
+
  * Drain the ``Walker`` PQ fully into an output buffer before yielding
    when excludes are present, mirroring git's ``limit_list`` /
    ``get_revision_1`` two-phase model. Previously, an exclude seed with

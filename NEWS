@@ -1,5 +1,12 @@
 1.2.2	UNRELEASED
 
+ * Drain the ``Walker`` PQ fully into an output buffer before yielding
+   when excludes are present, mirroring git's ``limit_list`` /
+   ``get_revision_1`` two-phase model. Previously, an exclude seed with
+   an older ``commit_time`` than its ancestors (e.g. from rebase or
+   auto-stash clock skew) could yield reachable commits before
+   ``_exclude_parents`` had a chance to mark them. (Jelmer Vernooĳ, #2176)
+
  * Escape ``"`` and ``\`` in subsection names when writing config
    files, and unescape them when parsing. Previously a subsection
    name containing either character was emitted verbatim, producing

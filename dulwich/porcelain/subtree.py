@@ -132,7 +132,7 @@ def subtree_add(
         # Fetch or parse the commit to add
         if commit is not None:
             # Local commit by SHA or commit object already in this repo
-            if isinstance(commit, (bytes, str)):
+            if isinstance(commit, bytes | str):
                 if isinstance(commit, str):
                     commit = commit.encode("utf-8")
                 subtree_commit = parse_commit(r, commit)
@@ -251,7 +251,7 @@ def subtree_merge(
 
     with open_repo_closing(repo) as r:
         # Parse the commit to merge
-        if isinstance(commit, (bytes, str)):
+        if isinstance(commit, bytes | str):
             if isinstance(commit, str):
                 commit = commit.encode("utf-8")
             merge_commit = parse_commit(r, commit)

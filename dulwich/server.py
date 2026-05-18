@@ -651,7 +651,7 @@ class UploadPackHandler(PackHandler):
             # Use path-aware filtering for tree depth and sparse:oid filters
             # Check if filter requires path tracking
             def needs_path_tracking(filter_spec: FilterSpec) -> bool:
-                if isinstance(filter_spec, (TreeDepthFilter, SparseOidFilter)):
+                if isinstance(filter_spec, TreeDepthFilter | SparseOidFilter):
                     return True
                 if isinstance(filter_spec, CombineFilter):
                     return any(needs_path_tracking(f) for f in filter_spec.filters)

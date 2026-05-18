@@ -179,7 +179,7 @@ def lower_key(key: ConfigKey) -> ConfigKey:
     Raises:
       TypeError: If key is not str, bytes, or tuple
     """
-    if isinstance(key, (bytes, str)):
+    if isinstance(key, bytes | str):
         return key.lower()
 
     if isinstance(key, tuple):
@@ -187,7 +187,7 @@ def lower_key(key: ConfigKey) -> ConfigKey:
         # but preserve the case of subsection names (remaining elements)
         if len(key) > 0:
             first = key[0]
-            assert isinstance(first, (bytes, str))
+            assert isinstance(first, bytes | str)
             return (first.lower(), *key[1:])
         return key
 

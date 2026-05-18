@@ -80,7 +80,7 @@ def split_mbox(
     # Open the mbox file
     mbox_obj: mailbox.mbox | None = None
     mbox_iter: Iterable[mailbox.mboxMessage]
-    if isinstance(input_file, (str, bytes)):
+    if isinstance(input_file, str | bytes):
         if isinstance(input_file, bytes):
             input_file = input_file.decode("utf-8")
         mbox_obj = mailbox.mbox(input_file)
@@ -284,7 +284,7 @@ def mailinfo(
     from .patch import mailinfo as patch_mailinfo
 
     # Handle file path input
-    if isinstance(input_file, (str, bytes)):
+    if isinstance(input_file, str | bytes):
         if isinstance(input_file, bytes):
             input_file = input_file.decode("utf-8")
         with open(input_file, "rb") as f:

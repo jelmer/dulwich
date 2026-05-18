@@ -48,6 +48,7 @@ from dulwich.objects import (
     SubmoduleEncountered,
     Tree,
     TreeEntry,
+    hex_to_sha,
     sha_to_hex,
 )
 from dulwich.pack import REF_DELTA, write_pack_objects
@@ -1205,6 +1206,34 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         store.write_midx()
         midx_path = os.path.join(store.pack_dir, "multi-pack-index")
         self.assertTrue(os.path.exists(midx_path))
+
+    def test_contains_packed_hex_sha_with_midx(self) -> None:
+        """contains_packed must accept hex SHAs even when a MIDX is loaded.
+
+        Regression test for #2178: BaseRepo.__contains__ passes 40-char hex
+        SHAs down to contains_packed, which then consults MIDX. MIDX has a
+        binary-only contract, so contains_packed must normalise hex SHAs
+        before the MIDX lookup. Previously this raised
+        ``ValueError: SHA size mismatch: expected 20, got 40``.
+        """
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+
+        b = self._add_blob_in_pack(store, b"hex-sha-midx-lookup")
+        store.write_midx()
+
+        # Drop any cached state so the freshly written MIDX is loaded.
+        store.close()
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+        self.assertIsNotNone(store.get_midx())
+
+        # Hex SHA (what BaseRepo.__contains__ hands down) must work.
+        self.assertTrue(store.contains_packed(b.id))
+        # Binary SHA must still work.
+        self.assertTrue(store.contains_packed(hex_to_sha(b.id)))
+        # Unknown hex SHA: clean False, no exception.
+        self.assertFalse(store.contains_packed(b"0" * 40))
 
 
 class TreeLookupPathTests(TestCase):

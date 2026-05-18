@@ -383,7 +383,7 @@ class WorkTree:
         """
         root_path_bytes = os.fsencode(self.path)
 
-        if isinstance(fs_paths, (str, bytes, os.PathLike)):
+        if isinstance(fs_paths, str | bytes | os.PathLike):
             fs_paths = [fs_paths]
         fs_paths = list(fs_paths)
 

@@ -507,7 +507,7 @@ class UnpackedObject:
     def _obj(self) -> OldUnpackedObject:
         """Return the decompressed chunks, or (delta base, delta chunks)."""
         if self.pack_type_num in DELTA_TYPES:
-            assert isinstance(self.delta_base, (bytes, int))
+            assert isinstance(self.delta_base, bytes | int)
             return (self.delta_base, self.decomp_chunks)
         else:
             return self.decomp_chunks

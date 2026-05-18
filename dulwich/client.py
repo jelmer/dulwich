@@ -1470,7 +1470,7 @@ class GitClient:
                 target = Repo.init_bare(target_path)
 
             # TODO(jelmer): abstract method for get_location?
-            if isinstance(self, (LocalGitClient, SubprocessGitClient)):
+            if isinstance(self, LocalGitClient | SubprocessGitClient):
                 encoded_path = path.encode("utf-8")
             else:
                 encoded_path = self.get_url(path).encode("utf-8")

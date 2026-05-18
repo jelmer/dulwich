@@ -179,6 +179,13 @@ class _CommitTimeQueue:
         self._last: Commit | None = None
         self._extra_commits_left = _MAX_EXTRA_COMMITS
         self._is_finished = False
+        # When there are excludes, we drain the PQ into _out before yielding
+        # anything. This lets an exclude commit popped late (e.g. due to
+        # clock skew from rebases / auto-stash) flag earlier buffered commits
+        # as excluded before they are emitted — git's two-phase limit_list +
+        # get_revision model. Without excludes, _out stays None and we stream.
+        self._buffered = bool(walker.excluded)
+        self._out: deque[Commit] | None = None
 
         for commit_id in chain(walker.include, walker.excluded):
             self._push(commit_id)
@@ -217,9 +224,13 @@ class _CommitTimeQueue:
                     todo.append(parent_commit)
                 excluded.add(parent)
 
-    def next(self) -> WalkEntry | None:
-        if self._is_finished:
-            return None
+    def _step(self) -> Commit | None:
+        """Pop one commit from the PQ, advancing parents and exclude state.
+
+        Returns the popped commit if it should be considered for output (not
+        excluded at pop time, not past the slop boundary), else ``None``.
+        Returns ``None`` and sets ``_is_finished`` when the walk is done.
+        """
         while self._pq:
             _, commit = heapq.heappop(self._pq)
             sha = commit.id
@@ -255,7 +266,6 @@ class _CommitTimeQueue:
                 reset_extra_commits = False
 
             if reset_extra_commits:
-                # We're not at a boundary, so reset the counter.
                 self._extra_commits_left = _MAX_EXTRA_COMMITS
             else:
                 self._extra_commits_left -= 1
@@ -264,9 +274,32 @@ class _CommitTimeQueue:
 
             if not is_excluded:
                 self._last = commit
-                return WalkEntry(self._walker, commit)
+                return commit
         self._is_finished = True
         return None
+
+    def next(self) -> WalkEntry | None:
+        if self._is_finished and not self._out:
+            return None
+        if self._buffered:
+            if self._out is None:
+                self._out = deque()
+                while not self._is_finished:
+                    commit = self._step()
+                    if commit is not None:
+                        self._out.append(commit)
+            while self._out:
+                commit = self._out.popleft()
+                # An exclude commit popped after this commit was buffered may
+                # have marked it excluded via _exclude_parents.
+                if commit.id in self._excluded:
+                    continue
+                return WalkEntry(self._walker, commit)
+            return None
+        commit = self._step()
+        if commit is None:
+            return None
+        return WalkEntry(self._walker, commit)
 
     __next__ = next
 

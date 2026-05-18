@@ -38,9 +38,6 @@ jobs:
           cp .github/gpgme-config "$HOME/.local/bin/gpgme-config"
           cp .github/gpg-error-config "$HOME/.local/bin/gpg-error-config"
           echo "$HOME/.local/bin" >> $GITHUB_PATH
-      - name: Install native dependencies (MacOS)
-        run: brew install swig gpgme
-        if: "matrix.os == 'macos-latest'"
       - name: Install dependencies
         run: |
           # Install build-time dependencies
@@ -49,7 +46,7 @@ jobs:
           pip install --upgrade ".[merge,fastimport,paramiko,https,patiencediff,colordiff]"  setuptools-rust
       - name: Install gpg on supported platforms
         run: pip install --upgrade ".[pgp]"
-        if: "matrix.os != 'windows-latest' && matrix.python-version != 'pypy3'"
+        if: "matrix.os == 'ubuntu-latest' && matrix.python-version != 'pypy3'"
       - name: Style checks
         run: |
           pip install ".[dev]"

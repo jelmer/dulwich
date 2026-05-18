@@ -2375,12 +2375,17 @@ class DiskObjectStore(PackBasedObjectStore):
         individual pack indexes.
 
         Args:
-            sha: Binary SHA of the object
+            sha: SHA of the object (20/32 bytes binary or 40/64 bytes hex)
 
         Returns:
             True if the object is in a pack file
         """
-        # Check MIDX first for faster lookup
+        # Normalise to binary once: MIDX requires it, and passing binary to
+        # the per-pack fallback avoids N redundant hex->binary conversions
+        # inside PackIndex.object_offset. Mirrors ``get_raw`` below.
+        if len(sha) == self.object_format.hex_length:
+            sha = hex_to_sha(cast(ObjectID, sha))
+
         midx = self.get_midx()
         if midx is not None and sha in midx:
             return True

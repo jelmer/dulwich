@@ -118,6 +118,29 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         self.assertEqual([], entries)
         o.add_thin_pack(f.read, None)
 
+    def test_add_pack_rejects_truncated_checksum(self) -> None:
+        # A pack stream that lost the last few bytes of its trailing
+        # checksum must be rejected by MemoryObjectStore.add_pack;
+        # otherwise a MemoryRepo non-thin fetch would silently accept
+        # truncated network input. add_thin_pack already validates via
+        # PackStreamCopier.verify().
+        from dulwich.errors import ChecksumMismatch
+
+        o = MemoryObjectStore()
+        f, commit, abort = o.add_pack()
+        try:
+            scratch = BytesIO()
+            build_pack(scratch, [(Blob.type_num, b"hello world")])
+            data = scratch.getvalue()
+            # Drop a few bytes of the 20-byte trailing checksum.
+            f.write(data[:-5])
+            self.assertRaises(ChecksumMismatch, commit)
+        except BaseException:
+            abort()
+            raise
+        # The truncated pack must not have leaked objects into the store.
+        self.assertEqual([], list(o))
+
     def test_add_pack_data_with_deltas(self) -> None:
         """Test that add_pack_data properly handles delta objects.
 
@@ -351,6 +374,28 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             entries = build_pack(f, [], store=o)
             self.assertEqual([], entries)
             o.add_thin_pack(f.read, None)
+
+    def test_add_pack_rejects_malformed_tree(self) -> None:
+        # A pack containing a "tree" whose body cannot be parsed must not
+        # be ingested: MemoryObjectStore and ``git fsck`` already reject
+        # such objects, so DiskObjectStore must too. Otherwise a malicious
+        # remote can poison the repository.
+        from dulwich.errors import ObjectFormatException
+
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+        f, commit, abort = o.add_pack()
+        try:
+            build_pack(f, [(Tree.type_num, b"this is not a tree at all")])
+            # build_pack rewinds f; commit() detects the pack only when
+            # f.tell() > 0, so re-seek to the end of the written pack.
+            f.seek(0, os.SEEK_END)
+            self.assertRaises(ObjectFormatException, commit)
+        except BaseException:
+            abort()
+            raise
+        # No pack/index files should have been left behind.
+        self.assertEqual([], os.listdir(o.pack_dir))
 
     def test_pack_index_version_config(self) -> None:
         # Test that pack.indexVersion configuration is respected

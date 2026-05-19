@@ -44,6 +44,7 @@ from dulwich.index import (
     IndexEntry,
     SerializedIndexEntry,
     _compress_path,
+    _decode_utf8_with_fallback,
     _decode_varint,
     _decompress_path,
     _encode_varint,
@@ -1395,6 +1396,82 @@ class TestValidatePathElement(TestCase):
         self.assertTrue(validate_path_element_hfs(b"git"))  # git without dot
 
 
+class TestDecodeUTF8WithFallback(TestCase):
+    """Tests for the xutftowcsn-style lossy UTF-8 decoder."""
+
+    def test_ascii(self) -> None:
+        self.assertEqual("hello", _decode_utf8_with_fallback(b"hello"))
+
+    def test_empty(self) -> None:
+        self.assertEqual("", _decode_utf8_with_fallback(b""))
+
+    def test_valid_two_byte(self) -> None:
+        # U+00E9 LATIN SMALL LETTER E WITH ACUTE = c3 a9
+        self.assertEqual("café", _decode_utf8_with_fallback(b"caf\xc3\xa9"))
+
+    def test_valid_three_byte(self) -> None:
+        # U+20AC EURO SIGN = e2 82 ac
+        self.assertEqual("€", _decode_utf8_with_fallback(b"\xe2\x82\xac"))
+
+    def test_valid_four_byte(self) -> None:
+        # U+1F600 GRINNING FACE = f0 9f 98 80
+        self.assertEqual("\U0001f600", _decode_utf8_with_fallback(b"\xf0\x9f\x98\x80"))
+
+    def test_invalid_high_byte_maps_one_to_one(self) -> None:
+        # 0xff is never a valid UTF-8 byte; should map to U+00FF.
+        self.assertEqual("ÿ", _decode_utf8_with_fallback(b"\xff"))
+        # 0xa0 is the boundary of the 1:1 fallback range.
+        self.assertEqual("\xa0", _decode_utf8_with_fallback(b"\xa0"))
+
+    def test_invalid_low_byte_expands_to_hex(self) -> None:
+        # 0x80-0x9f -> two lowercase hex digits.
+        self.assertEqual("80", _decode_utf8_with_fallback(b"\x80"))
+        self.assertEqual("9f", _decode_utf8_with_fallback(b"\x9f"))
+
+    def test_latin1_mixed(self) -> None:
+        # Latin-1 "café" is 63 61 66 e9 — the trailing e9 is invalid UTF-8
+        # alone and should fall through as U+00E9.
+        self.assertEqual("café", _decode_utf8_with_fallback(b"caf\xe9"))
+
+    def test_truncated_two_byte(self) -> None:
+        # c3 with no trail byte: lead falls through to 1:1 (c3 >= a0).
+        self.assertEqual("Ã", _decode_utf8_with_fallback(b"\xc3"))
+
+    def test_truncated_then_ascii(self) -> None:
+        # c3 followed by 'a' (not a valid trail): c3 -> U+00C3, then 'a'.
+        self.assertEqual("Ãa", _decode_utf8_with_fallback(b"\xc3a"))
+
+    def test_overlong_two_byte_rejected(self) -> None:
+        # c0 af is overlong-encoded '/'. c0 < c2 so it never enters the
+        # 2-byte branch; c0 >= a0 so it maps to U+00C0. Then af -> U+00AF.
+        self.assertEqual("À¯", _decode_utf8_with_fallback(b"\xc0\xaf"))
+
+    def test_overlong_three_byte_rejected(self) -> None:
+        # e0 80 80 is an overlong NUL. The guard `data[1] < 0xa0` rejects
+        # the 3-byte branch; e0 -> U+00E0, then 80 -> "80", then 80 -> "80".
+        self.assertEqual("à8080", _decode_utf8_with_fallback(b"\xe0\x80\x80"))
+
+    def test_codepoint_beyond_max_rejected(self) -> None:
+        # f4 90 80 80 would decode to U+110000 (beyond U+10FFFF).
+        # Guard rejects, f4 falls through to U+00F4, trails go to hex/1:1.
+        self.assertEqual(
+            "ô90" + "80" + "80",
+            _decode_utf8_with_fallback(b"\xf4\x90\x80\x80"),
+        )
+
+    def test_five_byte_lead_falls_through(self) -> None:
+        # 0xf5..0xff never match any multi-byte branch -> 1:1.
+        self.assertEqual("õ", _decode_utf8_with_fallback(b"\xf5"))
+        self.assertEqual("þ", _decode_utf8_with_fallback(b"\xfe"))
+
+    def test_roundtrip_through_fsencode(self) -> None:
+        # The decoder's output must be a real str that os.fsencode can
+        # handle — that's what _tree_to_fs_path relies on.
+        decoded = _decode_utf8_with_fallback(b"caf\xe9/foo")
+        self.assertIsInstance(decoded, str)
+        os.fsencode(decoded)
+
+
 class TestTreeFSPathConversion(TestCase):
     def test_tree_to_fs_path(self) -> None:
         tree_path = "délwíçh/foo".encode()
@@ -1444,6 +1521,23 @@ class TestTreeFSPathConversion(TestCase):
 
         tree_path = _fs_to_tree_path(fs_path)
         self.assertEqual(tree_path, b"path/with/backslash")
+
+    def test_tree_to_fs_path_windows_invalid_utf8(self) -> None:
+        # On Windows, invalid UTF-8 in a tree path must not raise and must
+        # not fall back to raw bytes — it should go through the
+        # xutftowcsn-style mapping (matching git-for-windows behaviour).
+        original_platform = sys.platform
+        sys.platform = "win32"
+        self.addCleanup(setattr, sys, "platform", original_platform)
+
+        # b"caf\xe9" — latin-1 "café". The 0xe9 is invalid UTF-8 and should
+        # map 1:1 to U+00E9.
+        fs_path = _tree_to_fs_path(b"/prefix", b"caf\xe9")
+        self.assertEqual(fs_path, os.path.join(b"/prefix", os.fsencode("café")))
+
+        # b"\x80" — invalid low byte, should expand to two hex digits.
+        fs_path = _tree_to_fs_path(b"/prefix", b"\x80")
+        self.assertEqual(fs_path, os.path.join(b"/prefix", os.fsencode("80")))
 
 
 class TestIndexEntryFromPath(TestCase):

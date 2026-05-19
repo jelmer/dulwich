@@ -22,7 +22,7 @@
 
 """Generates tarballs for Git trees."""
 
-__all__ = ["ChunkedBytesIO", "tar_stream"]
+__all__ = ["ChunkedBytesIO", "UnsafeArchivePathError", "tar_stream"]
 
 import posixpath
 import stat
@@ -39,6 +39,56 @@ if TYPE_CHECKING:
     from .objects import TreeEntry
 
 from .objects import Tree
+
+
+class UnsafeArchivePathError(ValueError):
+    """Raised when a tree contains a path that is unsafe to include in an archive.
+
+    Mirrors git's ``verify_path`` rejection (``error: invalid path``) for tree
+    entries whose names would escape the archive root or alias a special
+    directory on extraction. Examples include absolute paths, ``..`` or
+    ``.git`` components, embedded backslashes, and NTFS alternate-data-stream
+    separators (``:``).
+    """
+
+    def __init__(self, path: bytes) -> None:
+        """Initialize the exception with the offending path."""
+        self.path = path
+        super().__init__(
+            f"unsafe path in tree: {path!r}",
+        )
+
+
+# Characters that are never safe in a tree path destined for an archive:
+# NUL terminates C strings, ``\`` is the Windows path separator (and would
+# let a hostile name like ``..\evil.txt`` slip past a POSIX-only split), and
+# ``:`` is the NTFS alternate-data-stream / drive-letter separator.
+_UNSAFE_PATH_CHARS = (b"\x00", b"\\", b":")
+
+_INVALID_PATH_COMPONENTS = (b".", b"..", b".git", b"")
+
+
+def _is_unsafe_archive_path(path: bytes) -> bool:
+    """Return True if ``path`` should not be emitted into an archive.
+
+    Matches the spirit of git's ``verify_path``: absolute paths, ``.``/``..``/
+    ``.git`` components (case-insensitive), embedded NUL bytes, backslashes,
+    and colons are all rejected, regardless of host platform, because the
+    resulting archive may be extracted anywhere.
+    """
+    if not path:
+        return True
+    for ch in _UNSAFE_PATH_CHARS:
+        if ch in path:
+            return True
+    for component in path.split(b"/"):
+        # Match git's protectNTFS-style normalization: trailing dots and
+        # spaces are stripped before comparison so ``.git.`` / ``.GIT `` are
+        # still recognised as ``.git`` on Windows.
+        normalized = component.lower().rstrip(b". ")
+        if normalized in _INVALID_PATH_COMPONENTS:
+            return True
+    return False
 
 
 class ChunkedBytesIO:
@@ -168,9 +218,17 @@ def tar_stream(
 def _walk_tree(
     store: "BaseObjectStore", tree: "Tree", root: bytes = b""
 ) -> Generator[tuple[bytes, "TreeEntry"], None, None]:
-    """Recursively walk a dulwich Tree, yielding tuples of (absolute path, TreeEntry) along the way."""
+    """Recursively walk a dulwich Tree, yielding tuples of (absolute path, TreeEntry) along the way.
+
+    Raises:
+      UnsafeArchivePathError: if a tree entry's name is unsafe to emit into
+        an archive (matches the spirit of git's ``verify_path`` /
+        ``error: invalid path``).
+    """
     for entry in tree.iteritems():
         assert entry.path is not None
+        if _is_unsafe_archive_path(entry.path):
+            raise UnsafeArchivePathError(entry.path)
         entry_abspath = posixpath.join(root, entry.path)
         assert entry.mode is not None
         if stat.S_ISDIR(entry.mode):

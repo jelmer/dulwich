@@ -710,7 +710,11 @@ class ShaFile:
 
     @staticmethod
     def from_raw_chunks(
-        type_num: int, chunks: list[bytes], sha: ObjectID | RawObjectID | None = None
+        type_num: int,
+        chunks: list[bytes],
+        sha: ObjectID | RawObjectID | None = None,
+        *,
+        object_format: ObjectFormat | None = None,
     ) -> "ShaFile":
         """Creates an object of the indicated type from the raw chunks given.
 
@@ -718,12 +722,15 @@ class ShaFile:
           type_num: The numeric type of the object.
           chunks: An iterable of the raw uncompressed contents.
           sha: Optional known sha for the object
+          object_format: Optional object format (hash algorithm) for the object.
+            Required for trees in SHA-256 repositories so entry parsing uses
+            the correct OID length.
         """
         cls = object_class(type_num)
         if cls is None:
             raise AssertionError(f"unsupported class type num: {type_num}")
         obj = cls()
-        obj.set_raw_chunks(chunks, sha)
+        obj.set_raw_chunks(chunks, sha, object_format=object_format)
         return obj
 
     @classmethod

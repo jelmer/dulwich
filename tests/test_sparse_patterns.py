@@ -631,7 +631,7 @@ class ApplyIncludedPathsTests(TestCase):
 
         # Monkey patch the repo to use our normalizer
         original_get_blob_normalizer = self.repo.get_blob_normalizer
-        self.repo.get_blob_normalizer = lambda: CRLFNormalizer()
+        self.repo.get_blob_normalizer = lambda config=None: CRLFNormalizer()
 
         # Apply sparse checkout
         apply_included_paths(self.repo, included_paths={"unix_file.txt"}, force=False)
@@ -664,7 +664,7 @@ class ApplyIncludedPathsTests(TestCase):
 
         # Monkey patch the repo to use our no-op normalizer
         original_get_blob_normalizer = self.repo.get_blob_normalizer
-        self.repo.get_blob_normalizer = lambda: NoOpNormalizer()
+        self.repo.get_blob_normalizer = lambda config=None: NoOpNormalizer()
 
         # Apply sparse checkout
         apply_included_paths(self.repo, included_paths={"no_norm.txt"}, force=False)

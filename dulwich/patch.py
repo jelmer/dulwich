@@ -68,6 +68,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    from .config import Config
     from .object_store import BaseObjectStore
     from .repo import Repo
 
@@ -1290,6 +1291,7 @@ def _apply_rename_or_copy(
     is_rename: bool,
     cached: bool,
     check: bool,
+    config: "Config | None",
 ) -> tuple[list[bytes] | None, bool]:
     """Apply a rename or copy operation.
 
@@ -1302,6 +1304,7 @@ def _apply_rename_or_copy(
         is_rename: True for rename, False for copy
         cached: Apply to index only, not working tree
         check: Check only, don't apply
+        config: Repository configuration
 
     Returns:
         A tuple of (``original_lines``, ``should_continue``) where:
@@ -1332,7 +1335,7 @@ def _apply_rename_or_copy(
             content = f.read()
     else:
         # Try to read from index
-        index = r.open_index()
+        index = r.open_index(config=config)
         if src_stripped in index:
             entry = index[src_stripped]
             if not isinstance(entry, ConflictedIndexEntry):
@@ -1369,7 +1372,7 @@ def _apply_rename_or_copy(
             os.chmod(dst_fs_path, patch.new_mode)
 
     # Update index
-    index = r.open_index()
+    index = r.open_index(config=config)
     blob = Blob.from_string(content)
     r.object_store.add_object(blob)
 
@@ -1411,6 +1414,8 @@ def apply_patches(
     check: bool = False,
     strip: int = 1,
     three_way: bool = False,
+    *,
+    config: "Config | None" = None,
 ) -> None:
     """Apply a list of file patches to a repository.
 
@@ -1422,11 +1427,16 @@ def apply_patches(
         check: Only check if patch can be applied, don't apply
         strip: Number of leading path components to strip (default: 1)
         three_way: Fall back to 3-way merge if patch does not apply cleanly
+        config: Repository configuration. If None, falls back to
+            ``r.get_config_stack()``.
 
     Raises:
         ValueError: If patch cannot be applied
     """
     from .index import ConflictedIndexEntry, IndexEntry, index_entry_from_stat
+
+    if config is None:
+        config = r.get_config_stack()
 
     for patch in patches:
         # Determine the file path
@@ -1485,6 +1495,7 @@ def apply_patches(
                 is_rename=True,
                 cached=cached,
                 check=check,
+                config=config,
             )
             if should_continue:
                 continue
@@ -1498,6 +1509,7 @@ def apply_patches(
                 is_rename=False,
                 cached=cached,
                 check=check,
+                config=config,
             )
             if should_continue:
                 continue
@@ -1524,7 +1536,7 @@ def apply_patches(
                         os.chmod(fs_path, patch.new_mode)
 
                 # Update index
-                index = r.open_index()
+                index = r.open_index(config=config)
                 blob = Blob.from_string(binary_content)
                 r.object_store.add_object(blob)
 
@@ -1567,7 +1579,7 @@ def apply_patches(
                 else:
                     # File doesn't exist - check if it's in the index
                     try:
-                        index = r.open_index()
+                        index = r.open_index(config=config)
                         if tree_path in index:
                             index_entry: IndexEntry | ConflictedIndexEntry = index[
                                 tree_path
@@ -1675,7 +1687,7 @@ def apply_patches(
             if not cached and os.path.exists(fs_path):
                 os.remove(fs_path)
             # Remove from index
-            index = r.open_index()
+            index = r.open_index(config=config)
             if tree_path in index:
                 del index[tree_path]
                 index.write()
@@ -1692,7 +1704,7 @@ def apply_patches(
                     os.chmod(fs_path, patch.new_mode)
 
             # Update index
-            index = r.open_index()
+            index = r.open_index(config=config)
             blob = Blob.from_string(result_content)
             r.object_store.add_object(blob)
 

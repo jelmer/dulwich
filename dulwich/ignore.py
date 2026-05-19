@@ -732,21 +732,29 @@ class IgnoreFilterManager:
         return True  # Keep original result
 
     @classmethod
-    def from_repo(cls, repo: "Repo") -> "IgnoreFilterManager":
+    def from_repo(
+        cls,
+        repo: "Repo",
+        config: "Config | None" = None,
+    ) -> "IgnoreFilterManager":
         """Create a IgnoreFilterManager from a repository.
 
         Args:
           repo: Repository object
+          config: Configuration to consult for ignorecase and the user-level
+            ignore path. If None, falls back to ``repo.get_config_stack()``.
+
         Returns:
           A `IgnoreFilterManager` object
         """
+        if config is None:
+            config = repo.get_config_stack()
         global_filters = []
         for p in [
             os.path.join(repo.controldir(), "info", "exclude"),
-            default_user_ignore_filter_path(repo.get_config_stack()),
+            default_user_ignore_filter_path(config),
         ]:
             with suppress(OSError):
                 global_filters.append(IgnoreFilter.from_path(os.path.expanduser(p)))
-        config = repo.get_config_stack()
         ignorecase = config.get_boolean((b"core"), (b"ignorecase"), False)
         return cls(repo.path, global_filters, ignorecase)

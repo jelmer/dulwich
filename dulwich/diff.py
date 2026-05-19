@@ -58,7 +58,10 @@ import logging
 import os
 import stat
 from collections.abc import Iterable, Sequence
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
+
+if TYPE_CHECKING:
+    from .config import Config
 
 from ._typing import Buffer
 from .index import ConflictedIndexEntry, commit_index
@@ -91,16 +94,21 @@ def diff_index_to_tree(
     commit_sha: ObjectID | None = None,
     paths: Sequence[bytes] | None = None,
     diff_algorithm: str | None = None,
+    *,
+    config: "Config | None" = None,
 ) -> None:
     """Show staged changes (index vs commit).
 
     Args:
         repo: Repository object
         outstream: Stream to write diff to
+        config: Repository configuration
         commit_sha: SHA of commit to compare against, or None for HEAD
         paths: Optional list of paths to filter (as bytes)
         diff_algorithm: Algorithm to use for diffing ("myers" or "patience"), defaults to DEFAULT_DIFF_ALGORITHM if None
     """
+    if config is None:
+        config = repo.get_config_stack()
     if commit_sha is None:
         try:
             from dulwich.refs import HEADREF
@@ -118,7 +126,7 @@ def diff_index_to_tree(
         old_tree = old_commit.tree
 
     # Get tree from index
-    index = repo.open_index()
+    index = repo.open_index(config=config)
     new_tree = commit_index(repo.object_store, index)
     changes = repo.object_store.tree_changes(old_tree, new_tree, paths=paths)
 
@@ -138,6 +146,8 @@ def diff_working_tree_to_tree(
     commit_sha: ObjectID,
     paths: Sequence[bytes] | None = None,
     diff_algorithm: str | None = None,
+    *,
+    config: "Config | None" = None,
 ) -> None:
     """Compare working tree to a specific commit.
 
@@ -147,15 +157,18 @@ def diff_working_tree_to_tree(
         commit_sha: SHA of commit to compare against
         paths: Optional list of paths to filter (as bytes)
         diff_algorithm: Algorithm to use for diffing ("myers" or "patience"), defaults to DEFAULT_DIFF_ALGORITHM if None
+        config: Repository configuration
     """
+    if config is None:
+        config = repo.get_config_stack()
     commit = repo[commit_sha]
     assert isinstance(commit, Commit)
     tree = commit.tree
-    normalizer = repo.get_blob_normalizer()
+    normalizer = repo.get_blob_normalizer(config=config)
     filter_callback = normalizer.checkin_normalize if normalizer is not None else None
 
     # Get index for tracking new files
-    index = repo.open_index()
+    index = repo.open_index(config=config)
     index_paths = set(index.paths())
     processed_paths = set()
 
@@ -383,6 +396,8 @@ def diff_working_tree_to_index(
     outstream: BinaryIO,
     paths: Sequence[bytes] | None = None,
     diff_algorithm: str | None = None,
+    *,
+    config: "Config | None" = None,
 ) -> None:
     """Compare working tree to index.
 
@@ -391,9 +406,12 @@ def diff_working_tree_to_index(
         outstream: Stream to write diff to
         paths: Optional list of paths to filter (as bytes)
         diff_algorithm: Algorithm to use for diffing ("myers" or "patience"), defaults to DEFAULT_DIFF_ALGORITHM if None
+        config: Repository configuration
     """
-    index = repo.open_index()
-    normalizer = repo.get_blob_normalizer()
+    if config is None:
+        config = repo.get_config_stack()
+    index = repo.open_index(config=config)
+    normalizer = repo.get_blob_normalizer(config=config)
     filter_callback = normalizer.checkin_normalize if normalizer is not None else None
 
     # Process each file in the index

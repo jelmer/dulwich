@@ -158,7 +158,7 @@ from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .config import StackedConfig
+    from .config import Config
     from .object_store import BaseObjectStore
 
 from .attrs import GitAttributes, Pattern
@@ -191,12 +191,12 @@ class LineEndingFilter(FilterDriver):
 
     @classmethod
     def from_config(
-        cls, config: "StackedConfig | None", for_text_attr: bool = False
+        cls, config: "Config | None", for_text_attr: bool = False
     ) -> "LineEndingFilter":
         """Create a LineEndingFilter from git configuration.
 
         Args:
-            config: Git configuration stack
+            config: Git configuration
             for_text_attr: If True, always normalize on checkin (for text attribute)
 
         Returns:
@@ -303,7 +303,7 @@ class LineEndingFilter(FilterDriver):
         """Clean up any resources held by this filter driver."""
         # LineEndingFilter doesn't hold any resources that need cleanup
 
-    def reuse(self, config: "StackedConfig", filter_name: str) -> bool:
+    def reuse(self, config: "Config", filter_name: str) -> bool:
         """Check if this filter driver should be reused with the given configuration."""
         # LineEndingFilter is lightweight and should always be recreated
         # to ensure it uses the latest configuration
@@ -445,7 +445,7 @@ class BlobNormalizer(FilterBlobNormalizer):
 
     def __init__(
         self,
-        config_stack: "StackedConfig",
+        config_stack: "Config",
         gitattributes: Mapping[str, Any],
         core_eol: str = "native",
         autocrlf: bytes = b"false",
@@ -601,7 +601,7 @@ class TreeBlobNormalizer(BlobNormalizer):
 
     def __init__(
         self,
-        config_stack: "StackedConfig",
+        config_stack: "Config",
         git_attributes: Mapping[str, Any],
         object_store: "BaseObjectStore",
         tree: ObjectID | None = None,

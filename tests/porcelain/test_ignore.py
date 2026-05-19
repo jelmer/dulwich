@@ -35,6 +35,7 @@ class CheckIgnoreQuotePathTests(TestCase):
     """Integration tests for check_ignore with quote_path parameter."""
 
     def setUp(self) -> None:
+        super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
 

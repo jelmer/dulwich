@@ -1,5 +1,10 @@
 1.2.3	UNRELEASED
 
+ * HARDEN: Reject unsafe tree paths in ``dulwich.archive.tar_stream``
+   (e.g. ``../evil``, ``.git/...``, embedded ``\`` or ``:``) instead of
+   emitting them as tar member names. Reported by Christopher Toth.
+   (Jelmer Vernooĳ)
+
  * Honour ``GIT_CONFIG_COUNT`` / ``GIT_CONFIG_KEY_<n>`` /
    ``GIT_CONFIG_VALUE_<n>`` in porcelain entry points, via the new
    opt-in ``config.env_config`` helper. (Jelmer Vernooĳ, #2168)

@@ -78,7 +78,7 @@ if TYPE_CHECKING:
     # as possible to reduce start-up time for anything that doesn't need
     # these imports.
     from .attrs import GitAttributes
-    from .config import ConditionMatcher, ConfigFile, StackedConfig
+    from .config import ConditionMatcher, Config, ConfigFile, StackedConfig
     from .diff_tree import RenameDetector
     from .filters import FilterBlobNormalizer, FilterContext
     from .index import Index
@@ -228,7 +228,7 @@ def _get_default_identity() -> tuple[str, str]:
     return (fullname, email)
 
 
-def get_user_identity(config: "StackedConfig", kind: str | None = None) -> bytes:
+def get_user_identity(config: "Config", kind: str | None = None) -> bytes:
     """Determine the identity to use for new commits.
 
     If kind is set, this first checks
@@ -684,8 +684,12 @@ class BaseRepo:
         """Delete a file in the control directory with the given name."""
         raise NotImplementedError(self._del_named_file)
 
-    def open_index(self) -> "Index":
+    def open_index(self, config: "Config | None" = None) -> "Index":
         """Open the index for this repository.
+
+        Args:
+          config: Configuration to consult for index settings. If None,
+            implementations may fall back to ``self.get_config_stack()``.
 
         Raises:
           NoIndexPresent: If no index is present
@@ -1070,8 +1074,14 @@ class BaseRepo:
         """
         raise NotImplementedError(self.get_rebase_state_manager)
 
-    def get_blob_normalizer(self) -> "FilterBlobNormalizer":
+    def get_blob_normalizer(
+        self, config: "Config | None" = None
+    ) -> "FilterBlobNormalizer":
         """Return a BlobNormalizer object for checkin/checkout operations.
+
+        Args:
+          config: Configuration to consult for filter setup. If None,
+            implementations may fall back to ``self.get_config_stack()``.
 
         Returns: BlobNormalizer instance
         """
@@ -1804,8 +1814,12 @@ class Repo(BaseRepo):
         """Return path to the index file."""
         return os.path.join(self.controldir(), INDEX_FILENAME)
 
-    def open_index(self) -> "Index":
+    def open_index(self, config: "Config | None" = None) -> "Index":
         """Open the index for this repository.
+
+        Args:
+          config: Configuration to consult for index settings. If None,
+            falls back to ``self.get_config_stack()``.
 
         Raises:
           NoIndexPresent: If no index is present
@@ -1816,8 +1830,8 @@ class Repo(BaseRepo):
         if not self.has_index():
             raise NoIndexPresent
 
-        # Check for manyFiles feature configuration
-        config = self.get_config_stack()
+        if config is None:
+            config = self.get_config_stack()
         many_files = config.get_boolean(b"feature", b"manyFiles", False)
         skip_hash = False
         index_version = None
@@ -1941,7 +1955,7 @@ class Repo(BaseRepo):
                         head = None
 
                 if checkout and head is not None:
-                    target.get_worktree().reset_index()
+                    target.get_worktree().reset_index(config=target.get_config_stack())
             except BaseException:
                 target.close()
                 raise
@@ -2299,7 +2313,7 @@ class Repo(BaseRepo):
         with open(os.path.join(worktree_controldir, "HEAD"), "wb") as f:
             f.write(main_repo.head() + b"\n")
         r = cls(os.path.normpath(path))
-        r.get_worktree().reset_index()
+        r.get_worktree().reset_index(config=r.get_config_stack())
         return r
 
     @classmethod
@@ -2409,25 +2423,31 @@ class Repo(BaseRepo):
 
         return gitattributes
 
-    def get_blob_normalizer(self) -> "FilterBlobNormalizer":
-        """Return a BlobNormalizer object."""
+    def get_blob_normalizer(
+        self, config: "Config | None" = None
+    ) -> "FilterBlobNormalizer":
+        """Return a BlobNormalizer object.
+
+        Args:
+          config: Configuration to consult for filter setup. If None,
+            falls back to ``self.get_config_stack()``.
+        """
         from .filters import FilterBlobNormalizer, FilterContext, FilterRegistry
 
-        # Get fresh configuration and GitAttributes
-        config_stack = self.get_config_stack()
+        if config is None:
+            config = self.get_config_stack()
         git_attributes = self.get_gitattributes()
 
         # Lazily create FilterContext if needed
         if self.filter_context is None:
-            filter_registry = FilterRegistry(config_stack, self)
+            filter_registry = FilterRegistry(config, self)
             self.filter_context = FilterContext(filter_registry)
         else:
             # Refresh the context with current config to handle config changes
-            self.filter_context.refresh_config(config_stack)
+            self.filter_context.refresh_config(config)
 
-        # Return a new FilterBlobNormalizer with the context
         return FilterBlobNormalizer(
-            config_stack, git_attributes, filter_context=self.filter_context
+            config, git_attributes, filter_context=self.filter_context
         )
 
     def get_gitattributes(self, tree: bytes | None = None) -> "GitAttributes":
@@ -2610,8 +2630,11 @@ class MemoryRepo(BaseRepo):
             return None
         return BytesIO(contents)
 
-    def open_index(self) -> "Index":
+    def open_index(self, config: "Config | None" = None) -> "Index":
         """Fail to open index for this repo, since it is bare.
+
+        Args:
+          config: Unused; kept for signature compatibility with ``BaseRepo``.
 
         Raises:
           NoIndexPresent: Raised when no index is present
@@ -2638,25 +2661,29 @@ class MemoryRepo(BaseRepo):
 
         return MemoryRebaseStateManager(self)
 
-    def get_blob_normalizer(self) -> "FilterBlobNormalizer":
-        """Return a BlobNormalizer object for checkin/checkout operations."""
+    def get_blob_normalizer(
+        self, config: "Config | None" = None
+    ) -> "FilterBlobNormalizer":
+        """Return a BlobNormalizer object for checkin/checkout operations.
+
+        Args:
+          config: Configuration to consult for filter setup. If None,
+            falls back to ``self.get_config_stack()``.
+        """
         from .filters import FilterBlobNormalizer, FilterContext, FilterRegistry
 
-        # Get fresh configuration and GitAttributes
-        config_stack = self.get_config_stack()
+        if config is None:
+            config = self.get_config_stack()
         git_attributes = self.get_gitattributes()
 
-        # Lazily create FilterContext if needed
         if self.filter_context is None:
-            filter_registry = FilterRegistry(config_stack, self)
+            filter_registry = FilterRegistry(config, self)
             self.filter_context = FilterContext(filter_registry)
         else:
-            # Refresh the context with current config to handle config changes
-            self.filter_context.refresh_config(config_stack)
+            self.filter_context.refresh_config(config)
 
-        # Return a new FilterBlobNormalizer with the context
         return FilterBlobNormalizer(
-            config_stack, git_attributes, filter_context=self.filter_context
+            config, git_attributes, filter_context=self.filter_context
         )
 
     def get_gitattributes(self, tree: bytes | None = None) -> "GitAttributes":
@@ -2691,6 +2718,7 @@ class MemoryRepo(BaseRepo):
         merge_heads: list[ObjectID] | None = None,
         no_verify: bool = False,
         sign: bool = False,
+        config: "Config | None" = None,
     ) -> bytes:
         """Create a new commit.
 
@@ -2712,6 +2740,8 @@ class MemoryRepo(BaseRepo):
           merge_heads: Merge heads
           no_verify: Skip pre-commit and commit-msg hooks (ignored for MemoryRepo)
           sign: GPG Sign the commit (ignored for MemoryRepo)
+          config: Configuration to consult for committer/author identity. If
+            None, falls back to ``self.get_config_stack()``.
 
         Returns:
           New commit SHA1
@@ -2730,7 +2760,8 @@ class MemoryRepo(BaseRepo):
             )
         c.tree = tree
 
-        config = self.get_config_stack()
+        if config is None:
+            config = self.get_config_stack()
         if merge_heads is None:
             merge_heads = []
         if committer is None:

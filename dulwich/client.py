@@ -1579,7 +1579,7 @@ class GitClient:
                     head = None
 
             if checkout and head is not None:
-                target.get_worktree().reset_index()
+                target.get_worktree().reset_index(config=target.get_config_stack())
         except BaseException:
             if target is not None:
                 target.close()
@@ -3272,7 +3272,7 @@ class LocalGitClient(GitClient):
                     head = None
 
             if checkout and head is not None:
-                target.get_worktree().reset_index()
+                target.get_worktree().reset_index(config=target.get_config_stack())
         except BaseException:
             if target is not None:
                 target.close()

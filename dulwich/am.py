@@ -46,6 +46,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from .config import Config
     from .repo import Repo
 
 from .objects import Commit, ObjectID
@@ -268,12 +269,14 @@ def _parse_author_date(
     return timestamp, tz_offset
 
 
-def _reset_worktree_to_tree(r: "Repo", target_tree_id: ObjectID) -> None:
+def _reset_worktree_to_tree(
+    r: "Repo", target_tree_id: ObjectID, config: "Config | None"
+) -> None:
     """Hard-reset working tree and index to match a given tree."""
     from .diff_tree import tree_changes
     from .index import update_working_tree
 
-    index = r.open_index()
+    index = r.open_index(config=config)
     if len(index) > 0:
         index_tree_id = index.commit(r.object_store)
     else:
@@ -289,6 +292,7 @@ def _reset_worktree_to_tree(r: "Repo", target_tree_id: ObjectID) -> None:
         change_iterator=changes,
         force_remove_untracked=True,
         allow_overwrite_modified=True,
+        config=config,
     )
 
 
@@ -297,6 +301,7 @@ def _apply_single_patch(
     state: DiskAmStateManager,
     patch_number: int,
     total: int,
+    config: "Config | None",
     *,
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
@@ -342,7 +347,7 @@ def _apply_single_patch(
     three_way = state.get_three_way()
 
     try:
-        apply_patches(r, patches, strip=strip, three_way=three_way)
+        apply_patches(r, patches, strip=strip, three_way=three_way, config=config)
     except PatchApplicationFailure as e:
         raise AmConflict(patch_number, total, str(e)) from e
 
@@ -359,6 +364,7 @@ def _apply_single_patch(
         committer=committer,
         commit_timestamp=commit_timestamp,
         commit_timezone=commit_timezone,
+        config=config,
     )
     return sha
 
@@ -368,6 +374,7 @@ def _apply_remaining(
     state: DiskAmStateManager,
     start: int,
     total: int,
+    config: "Config | None",
     *,
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
@@ -386,6 +393,7 @@ def _apply_remaining(
             state,
             i,
             total,
+            config,
             committer=committer,
             commit_timestamp=commit_timestamp,
             commit_timezone=commit_timezone,
@@ -409,6 +417,7 @@ def am(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
+    config: "Config | None" = None,
 ) -> list[ObjectID]:
     """Apply patches from email messages to a repository, creating commits.
 
@@ -427,6 +436,8 @@ def am(
         committer: Optional committer identity (bytes)
         commit_timestamp: Optional committer timestamp
         commit_timezone: Optional committer timezone offset
+        config: Repository configuration. If None, falls back to
+            ``r.get_config_stack()``.
 
     Returns:
         List of commit SHAs (bytes) created
@@ -435,6 +446,9 @@ def am(
         AmConflict: If a patch fails to apply (state is saved for recovery)
         AmError: If am state already exists (previous am in progress)
     """
+    if config is None:
+        config = r.get_config_stack()
+
     state = _get_state_manager(r)
     if state.exists():
         raise AmError(
@@ -470,6 +484,7 @@ def am(
         state,
         start=1,
         total=len(msg_bytes_list),
+        config=config,
         committer=committer,
         commit_timestamp=commit_timestamp,
         commit_timezone=commit_timezone,
@@ -482,6 +497,7 @@ def am_continue(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
+    config: "Config | None" = None,
 ) -> list[ObjectID]:
     """Continue applying patches after resolving a conflict.
 
@@ -493,6 +509,8 @@ def am_continue(
         committer: Optional committer identity
         commit_timestamp: Optional committer timestamp
         commit_timezone: Optional committer timezone offset
+        config: Repository configuration. If None, falls back to
+            ``r.get_config_stack()``.
 
     Returns:
         List of commit SHAs created (for current + remaining patches)
@@ -501,6 +519,9 @@ def am_continue(
         AmError: If no am is in progress
         AmConflict: If a subsequent patch fails to apply
     """
+    if config is None:
+        config = r.get_config_stack()
+
     state = _get_state_manager(r)
     if not state.exists():
         raise AmError("No am in progress")
@@ -522,6 +543,7 @@ def am_continue(
         committer=committer,
         commit_timestamp=commit_timestamp,
         commit_timezone=commit_timezone,
+        config=config,
     )
     commit_shas = [sha]
 
@@ -533,6 +555,7 @@ def am_continue(
                 state,
                 start=current + 1,
                 total=total,
+                config=config,
                 committer=committer,
                 commit_timestamp=commit_timestamp,
                 commit_timezone=commit_timezone,
@@ -550,6 +573,7 @@ def am_skip(
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
+    config: "Config | None" = None,
 ) -> list[ObjectID]:
     """Skip the current patch and continue with remaining patches.
 
@@ -560,6 +584,8 @@ def am_skip(
         committer: Optional committer identity
         commit_timestamp: Optional committer timestamp
         commit_timezone: Optional committer timezone offset
+        config: Repository configuration. If None, falls back to
+            ``r.get_config_stack()``.
 
     Returns:
         List of commit SHAs created (for remaining patches)
@@ -568,6 +594,9 @@ def am_skip(
         AmError: If no am is in progress
         AmConflict: If a subsequent patch fails to apply
     """
+    if config is None:
+        config = r.get_config_stack()
+
     state = _get_state_manager(r)
     if not state.exists():
         raise AmError("No am in progress")
@@ -575,7 +604,7 @@ def am_skip(
     # Reset worktree to HEAD to undo the failed patch application
     head_commit = r[r.head()]
     assert isinstance(head_commit, Commit)
-    _reset_worktree_to_tree(r, head_commit.tree)
+    _reset_worktree_to_tree(r, head_commit.tree, config)
 
     current = state.get_next()
     total = state.get_last()
@@ -586,6 +615,7 @@ def am_skip(
             state,
             start=current + 1,
             total=total,
+            config=config,
             committer=committer,
             commit_timestamp=commit_timestamp,
             commit_timezone=commit_timezone,
@@ -595,7 +625,7 @@ def am_skip(
         return []
 
 
-def am_abort(r: "Repo") -> None:
+def am_abort(r: "Repo", *, config: "Config | None" = None) -> None:
     """Abort the current am operation and restore the original state.
 
     Resets HEAD to the original commit from before am started, and
@@ -603,10 +633,15 @@ def am_abort(r: "Repo") -> None:
 
     Args:
         r: Repository object
+        config: Repository configuration. If None, falls back to
+            ``r.get_config_stack()``.
 
     Raises:
         AmError: If no am is in progress
     """
+    if config is None:
+        config = r.get_config_stack()
+
     state = _get_state_manager(r)
     if not state.exists():
         raise AmError("No am in progress")
@@ -616,7 +651,7 @@ def am_abort(r: "Repo") -> None:
     assert isinstance(orig_commit, Commit)
 
     # Reset working tree and index to orig-head's tree
-    _reset_worktree_to_tree(r, orig_commit.tree)
+    _reset_worktree_to_tree(r, orig_commit.tree, config)
 
     # Reset HEAD to original
     try:

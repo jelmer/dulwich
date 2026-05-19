@@ -43,6 +43,7 @@ from .refs import Ref, local_branch_name, local_tag_name
 from .repo import BaseRepo
 
 if TYPE_CHECKING:
+    from .config import Config
     from .object_store import BaseObjectStore
     from .refs import Ref, RefsContainer
     from .repo import Repo
@@ -91,12 +92,19 @@ def _parse_number_suffix(suffix: bytes) -> tuple[int, bytes]:
     return int(suffix[:end]), suffix[end:]
 
 
-def parse_object(repo: "Repo", objectish: bytes | str) -> "ShaFile":
+def parse_object(
+    repo: "Repo",
+    objectish: bytes | str,
+    *,
+    config: "Config | None" = None,
+) -> "ShaFile":
     """Parse a string referring to an object.
 
     Args:
       repo: A `Repo` object
       objectish: A string referring to an object
+      config: Repository configuration; required when ``objectish`` is an
+        index path like ``:foo`` so the index can be opened.
     Returns: A git object
     Raises:
       KeyError: If the object can not be found
@@ -118,7 +126,9 @@ def parse_object(repo: "Repo", objectish: bytes | str) -> "ShaFile":
             # Open the index and look up the path
 
             try:
-                index = repo.open_index()
+                if config is None:
+                    config = repo.get_config_stack()
+                index = repo.open_index(config=config)
             except AttributeError:
                 raise NotImplementedError(
                     "Index path lookup requires a non-bare repository"

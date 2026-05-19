@@ -1,4 +1,4 @@
-1.2.2	UNRELEASED
+1.2.2	2026-05-19
 
  * Normalise hex SHAs to binary in ``DiskObjectStore.contains_packed``
    before consulting the multi-pack-index, mirroring what ``get_raw``

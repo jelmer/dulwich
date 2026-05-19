@@ -6,6 +6,14 @@
    ``errno.EILSEQ``, so they pass on Linux filesystems that reject
    non-UTF-8 names (e.g. OpenZFS with ``utf8only=on``). (Matt Van Horn, #2174)
 
+ * HARDEN: Reject unsafe tree paths in ``dulwich.archive.tar_stream``
+   (e.g. ``../evil``, ``.git/...``, embedded ``\`` or ``:``) instead of
+   emitting them as tar member names. Reported by Christopher Toth.
+   (Jelmer Vernooĳ)
+
+ * Honour ``GIT_CONFIG_COUNT`` / ``GIT_CONFIG_KEY_<n>`` /
+   ``GIT_CONFIG_VALUE_<n>`` in porcelain entry points, via the new
+   opt-in ``config.env_config`` helper. (Jelmer Vernooĳ, #2168)
 
 1.2.2	2026-05-19
 

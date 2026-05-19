@@ -38,6 +38,7 @@ __all__ = [
     "FileOpener",
     "StackedConfig",
     "apply_instead_of",
+    "env_config",
     "get_win_legacy_system_paths",
     "get_win_system_paths",
     "get_xdg_config_home_path",
@@ -1468,6 +1469,66 @@ def get_win_legacy_system_paths() -> Iterator[str]:
         yield os.path.join(git_dir, "etc", "gitconfig")
 
 
+def env_config(
+    environ: Mapping[str, str],
+) -> "ConfigFile | None":
+    """Build a ConfigFile from GIT_CONFIG_COUNT/KEY_n/VALUE_n vars.
+
+    See git-config(1). Any missing key/value, a key without a dot, or a
+    non-numeric or negative ``GIT_CONFIG_COUNT`` is treated as an error.
+    Callers that want git's "env overrides everything" precedence should
+    prepend the result to their ``StackedConfig.backends``; nothing in
+    dulwich consults ``os.environ`` for these variables on its own.
+
+    Args:
+      environ: Mapping to read the variables from (e.g. ``os.environ``).
+
+    Returns:
+      A ConfigFile holding the overrides, or None if GIT_CONFIG_COUNT is
+      unset or empty (which git treats as zero pairs).
+    """
+    raw_count = environ.get("GIT_CONFIG_COUNT")
+    if raw_count is None or raw_count == "":
+        return None
+    try:
+        count = int(raw_count)
+    except ValueError:
+        raise ValueError(f"bogus count in GIT_CONFIG_COUNT: {raw_count!r}") from None
+    if count < 0:
+        raise ValueError(f"bogus count in GIT_CONFIG_COUNT: {raw_count!r}")
+
+    cf = ConfigFile()
+    for i in range(count):
+        key_var = f"GIT_CONFIG_KEY_{i}"
+        value_var = f"GIT_CONFIG_VALUE_{i}"
+        try:
+            key = environ[key_var]
+        except KeyError:
+            raise KeyError(f"missing config key {key_var}") from None
+        try:
+            value = environ[value_var]
+        except KeyError:
+            raise KeyError(f"missing config value {value_var}") from None
+        if "." not in key:
+            raise ValueError(f"invalid config format: {key}")
+        # Git keys are <section>.<name> or <section>.<subsection>.<name>.
+        # The subsection (if present) may itself contain dots.
+        first_dot = key.find(".")
+        last_dot = key.rfind(".")
+        section_name = key[:first_dot]
+        name = key[last_dot + 1 :]
+        if first_dot == last_dot:
+            section: Section = (section_name.encode("utf-8"),)
+        else:
+            subsection = key[first_dot + 1 : last_dot]
+            section = (
+                section_name.encode("utf-8"),
+                subsection.encode("utf-8"),
+            )
+        cf.add(section, name.encode("utf-8"), value.encode("utf-8"))
+    return cf
+
+
 class StackedConfig(Config):
     """Configuration which reads from multiple config files.."""
 
@@ -1531,6 +1592,7 @@ class StackedConfig(Config):
                 logger.debug("Gitconfig file not found: %s", path)
                 continue
             backends.append(cf)
+
         return backends
 
     def get(self, section: SectionLike, name: NameLike) -> Value:

@@ -1,8 +1,15 @@
 1.2.3	UNRELEASED
 
+ * Extend the per-test ``OSError`` handlers in the three non-UTF8 filename
+   tests (``test_index.test_no_decode_encode``, ``test_refs.test_cyrillic``,
+   ``test_repository.test_commit_no_encode_decode``) to also skip on
+   ``errno.EILSEQ``, so they pass on Linux filesystems that reject
+   non-UTF-8 names (e.g. OpenZFS with ``utf8only=on``). (Matt Van Horn, #2174)
+
  * Reject ref names with empty path components (e.g. ``refs//a``)
    or with ``.lock`` as a non-final component (e.g. ``refs/a.lock/a``)
-   in ``check_ref_format``, matching ``git check-ref-format``. (Jelmer Vernooĳ; reported by Christopher Toth)
+   in ``check_ref_format``, matching ``git check-ref-format``.
+   (Jelmer Vernooĳ; reported by Christopher Toth)
 
  * HARDEN: Reject unsafe tree paths in ``dulwich.archive.tar_stream``
    (e.g. ``../evil``, ``.git/...``, embedded ``\`` or ``:``) instead of

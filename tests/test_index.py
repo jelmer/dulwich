@@ -21,6 +21,7 @@
 
 """Tests for the index."""
 
+import errno
 import os
 import shutil
 import stat
@@ -779,6 +780,12 @@ class BuildIndexTests(TestCase):
                 if e.errno == 92 and sys.platform == "darwin":
                     # Our filename isn't supported by the platform :(
                     self.skipTest(f"can not write filename {e.filename!r}")
+                elif e.errno == errno.EILSEQ:
+                    # Filesystem rejects non-UTF8 filenames
+                    # (e.g. OpenZFS with utf8only=on).
+                    self.skipTest(
+                        f"filesystem rejects non-UTF8 filename {e.filename!r}"
+                    )
                 else:
                     raise
 

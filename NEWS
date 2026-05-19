@@ -1,3 +1,9 @@
+1.2.3	UNRELEASED
+
+ * Honour ``GIT_CONFIG_COUNT`` / ``GIT_CONFIG_KEY_<n>`` /
+   ``GIT_CONFIG_VALUE_<n>`` in porcelain entry points, via the new
+   opt-in ``config.env_config`` helper. (Jelmer Vernooĳ, #2168)
+
 1.2.2	2026-05-19
 
  * Normalise hex SHAs to binary in ``DiskObjectStore.contains_packed``

@@ -2099,7 +2099,27 @@ class DiskObjectStore(PackBasedObjectStore):
             big_file_threshold=self.pack_big_file_threshold,
             delta_base_cache_limit=self.delta_base_cache_limit,
         )
-        final_pack.check_length_and_checksum()
+        try:
+            final_pack.check_length_and_checksum()
+            # Materialise every object so payloads that fail to parse
+            # (e.g. tree entries with garbage modes) are rejected rather
+            # than silently landed on disk. MemoryObjectStore already
+            # validates ingested objects this way via PackInflater; without
+            # the same check DiskObjectStore was strictly weaker.
+            for _obj in PackInflater.for_pack_data(
+                final_pack.data, resolve_ext_ref=self.get_raw
+            ):
+                pass
+        except BaseException:
+            final_pack.close()
+            with suppress(FileNotFoundError):
+                os.remove(target_pack_path)
+            with suppress(FileNotFoundError):
+                os.remove(target_index_path)
+            if self.pack_write_bitmaps and refs:
+                with suppress(FileNotFoundError):
+                    os.remove(pack_base_name + ".bitmap")
+            raise
         # Extract just the hash from pack_base_name (/path/to/pack-HASH -> HASH)
         pack_hash = os.path.basename(pack_base_name)[len("pack-") :]
         self._add_cached_pack(pack_hash, final_pack)
@@ -2134,7 +2154,7 @@ class DiskObjectStore(PackBasedObjectStore):
             indexer = PackIndexer(
                 f,
                 self.object_format.hash_func,
-                resolve_ext_ref=self.get_raw,  # type: ignore[arg-type]
+                resolve_ext_ref=self.get_raw,
             )
             copier = PackStreamCopier(
                 self.object_format.hash_func,
@@ -2169,7 +2189,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 with PackData(path, file=f, object_format=self.object_format) as pd:
                     indexer = PackIndexer.for_pack_data(
                         pd,
-                        resolve_ext_ref=self.get_raw,  # type: ignore[arg-type]
+                        resolve_ext_ref=self.get_raw,
                     )
                     return self._complete_pack(f, path, len(pd), indexer)  # type: ignore[arg-type]
             else:
@@ -2716,10 +2736,21 @@ class MemoryObjectStore(PackCapableObjectStore):
                 f.seek(0)
 
                 p = PackData.from_file(f, self.object_format, size)
-                for obj in PackInflater.for_pack_data(p, self.get_raw):  # type: ignore[arg-type]
-                    self.add_object(obj)
-                p.close()
-                f.close()
+                try:
+                    # Verify the trailing pack checksum before extracting
+                    # objects. Without this, a fetch that delivered a
+                    # truncated pack would still be accepted: ``add_pack``
+                    # iterates objects by offset and never reaches the
+                    # trailing bytes, so a stream that lost the last few
+                    # bytes of its trailer slipped through silently.
+                    # ``add_thin_pack`` already validates via
+                    # ``PackStreamCopier.verify``; do the equivalent here.
+                    p.check()
+                    for obj in PackInflater.for_pack_data(p, self.get_raw):
+                        self.add_object(obj)
+                finally:
+                    p.close()
+                    f.close()
             else:
                 f.close()
 

@@ -21,6 +21,7 @@
 
 """Tests for the repository."""
 
+import errno
 import glob
 import importlib
 import locale
@@ -1871,8 +1872,17 @@ class BuildRepoRootTests(TestCase):
         names = ["À".encode(encoding) for encoding in encodings]
         for name, encoding in zip(names, encodings):
             full_path = os.path.join(repo_path_bytes, name)
-            with open(full_path, "wb") as f:
-                f.write(encoding.encode("ascii"))
+            try:
+                with open(full_path, "wb") as f:
+                    f.write(encoding.encode("ascii"))
+            except OSError as e:
+                if e.errno == errno.EILSEQ:
+                    # Filesystem rejects non-UTF8 filenames
+                    # (e.g. OpenZFS with utf8only=on).
+                    self.skipTest(
+                        f"filesystem rejects non-UTF8 filename {e.filename!r}"
+                    )
+                raise
             # These files are break tear_down_repo, so cleanup these files
             # ourselves.
             self.addCleanup(os.remove, full_path)

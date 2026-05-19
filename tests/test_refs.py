@@ -21,6 +21,7 @@
 
 """Tests for dulwich.refs."""
 
+import errno
 import os
 import sys
 import tempfile
@@ -778,8 +779,18 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         # reported in https://github.com/dulwich/dulwich/issues/608
         name = b"\xcd\xee\xe2\xe0\xff\xe2\xe5\xf2\xea\xe01"
         encoded_ref = b"refs/heads/" + name
-        with open(os.path.join(os.fsencode(self._repo.path), encoded_ref), "w") as f:
-            f.write("00" * 20)
+        try:
+            with open(
+                os.path.join(os.fsencode(self._repo.path), encoded_ref), "w"
+            ) as f:
+                f.write("00" * 20)
+        except OSError as e:
+            if e.errno == errno.EILSEQ:
+                # Filesystem rejects non-UTF8 filenames (e.g. ZFS utf8only=on).
+                raise SkipTest(
+                    f"filesystem rejects non-UTF8 filename {e.filename!r}"
+                ) from e
+            raise
 
         expected_refs = set(_TEST_REFS.keys())
         expected_refs.add(encoded_ref)

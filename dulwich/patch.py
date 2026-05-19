@@ -171,16 +171,66 @@ def write_commit_patch(
         f.write(version.encode(encoding) + b"\n")
 
 
+def _sanitize_subject_for_filename(text: str, max_length: int = 52) -> str:
+    """Sanitize a string for safe use as part of a filename.
+
+    Matches git's ``format_sanitized_subject`` behavior:
+
+    - Only ``[A-Za-z0-9._]`` are kept; other characters become ``-``
+      (collapsed across runs).
+    - Consecutive ``.`` are collapsed to a single ``.``.
+    - The result is truncated to ``max_length`` characters.
+    - Trailing ``.`` and ``-`` are stripped.
+
+    Args:
+      text: Input string (typically a commit subject line).
+      max_length: Maximum length of the returned string.
+
+    Returns: Sanitized string safe to embed in a filename.
+    """
+    result: list[str] = []
+    # 2 = initial, 1 = saw a non-title char, 0 = saw a title char
+    space = 2
+    i = 0
+    text_len = len(text)
+    while i < text_len:
+        c = text[i]
+        if ("A" <= c <= "Z") or ("a" <= c <= "z") or ("0" <= c <= "9") or c in "._":
+            if space == 1:
+                result.append("-")
+            space = 0
+            result.append(c)
+            if c == ".":
+                while i + 1 < text_len and text[i + 1] == ".":
+                    i += 1
+        else:
+            space |= 1
+        i += 1
+        if len(result) >= max_length:
+            break
+
+    return "".join(result)[:max_length].rstrip(".-")
+
+
 def get_summary(commit: "Commit") -> str:
     """Determine the summary line for use in a filename.
 
+    Sanitizes the commit subject so it is safe to use as a filename
+    component, matching git's ``format_sanitized_subject`` behavior:
+    characters outside ``[A-Za-z0-9._]`` are replaced with ``-`` (with
+    runs collapsed) and consecutive ``.`` are collapsed. The result is
+    also length-limited to prevent overly long filenames.
+
     Args:
       commit: Commit
-    Returns: Summary string
+    Returns: Sanitized summary string suitable for use as a filename
+      component.
     """
     decoded = commit.message.decode(errors="replace")
     lines = decoded.splitlines()
-    return lines[0].replace(" ", "-") if lines else ""
+    if not lines:
+        return ""
+    return _sanitize_subject_for_filename(lines[0])
 
 
 #  Unified Diff

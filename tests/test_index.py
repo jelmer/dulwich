@@ -44,6 +44,7 @@ from dulwich.index import (
     IndexEntry,
     SerializedIndexEntry,
     _compress_path,
+    _decode_utf8_with_fallback,
     _decode_varint,
     _decompress_path,
     _encode_varint,
@@ -780,19 +781,22 @@ class BuildIndexTests(TestCase):
                     self.skipTest(f"can not write filename {e.filename!r}")
                 else:
                     raise
-            except UnicodeDecodeError:
-                # This happens e.g. with python3.6 on Windows.
-                # It implicitly decodes using utf8, which doesn't work.
-                self.skipTest("can not implicitly convert as utf8")
 
             # Verify index entries
             index = repo.open_index()
             self.assertIn(latin1_name, index)
             self.assertIn(utf8_name, index)
 
-            self.assertTrue(os.path.exists(latin1_path))
-
-            self.assertTrue(os.path.exists(utf8_path))
+            if sys.platform == "win32":
+                # On Windows, the latin-1 byte 0xc0 is not valid UTF-8 and
+                # gets remapped 1:1 to U+00C0 by xutftowcsn, so the on-disk
+                # filename is the UTF-8 encoding of U+00C0 (b"\xc3\x80"),
+                # not the raw latin-1 byte. Both tree entries therefore
+                # land on the same on-disk filename.
+                self.assertTrue(os.path.exists(utf8_path))
+            else:
+                self.assertTrue(os.path.exists(latin1_path))
+                self.assertTrue(os.path.exists(utf8_path))
 
     def test_windows_unicode_filename_encoding(self) -> None:
         """Test that Unicode filenames are handled correctly on Windows.
@@ -864,6 +868,67 @@ class BuildIndexTests(TestCase):
                     filename_only, tree_encoding="utf-8"
                 )
                 self.assertEqual(reconstructed_tree_path, utf8_filename_bytes)
+
+    def test_windows_invalid_utf8_filename_xutftowcsn(self) -> None:
+        """On Windows, a tree path with invalid UTF-8 must check out using
+        the xutftowcsn fallback mapping, matching C git on Windows."""
+        if sys.platform != "win32":
+            self.skipTest("xutftowcsn fallback only applies on Windows")
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        with Repo.init(repo_dir) as repo:
+            blob = Blob.from_string(b"contents")
+            tree = Tree()
+            # b"caf\xe9" is latin-1 for U+00E9; the trailing 0xe9 is
+            # invalid UTF-8 and must map 1:1 to U+00E9 under xutftowcsn.
+            invalid_utf8_name = b"caf\xe9"
+            tree[invalid_utf8_name] = (stat.S_IFREG | 0o644, blob.id)
+            repo.object_store.add_objects([(blob, None), (tree, None)])
+
+            try:
+                build_index_from_tree(
+                    repo.path, repo.index_path(), repo.object_store, tree.id
+                )
+            except OSError as e:
+                if "cannot" in str(e).lower():
+                    self.skipTest(f"Platform doesn't support filename: {e}")
+                raise
+
+            # The on-disk filename is the lossy decode of b"caf\xe9", not
+            # the raw invalid-UTF-8 bytes.
+            expected_path = os.path.join(repo.path, "café")
+            self.assertTrue(
+                os.path.exists(expected_path),
+                f"Expected lossy filename at {expected_path}",
+            )
+
+    def test_windows_low_byte_filename_xutftowcsn(self) -> None:
+        """On Windows, invalid bytes in 0x80-0x9f must expand to two hex
+        digits in the on-disk filename, matching C git's xutftowcsn."""
+        if sys.platform != "win32":
+            self.skipTest("xutftowcsn fallback only applies on Windows")
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        with Repo.init(repo_dir) as repo:
+            blob = Blob.from_string(b"contents")
+            tree = Tree()
+            tree[b"\x80foo"] = (stat.S_IFREG | 0o644, blob.id)
+            repo.object_store.add_objects([(blob, None), (tree, None)])
+
+            build_index_from_tree(
+                repo.path, repo.index_path(), repo.object_store, tree.id
+            )
+
+            # 0x80 expands to "80" -> on-disk filename "80foo".
+            expected_path = os.path.join(repo.path, "80foo")
+            self.assertTrue(
+                os.path.exists(expected_path),
+                f"Expected lossy filename at {expected_path}",
+            )
 
     def test_git_submodule(self) -> None:
         repo_dir = tempfile.mkdtemp()
@@ -1395,6 +1460,82 @@ class TestValidatePathElement(TestCase):
         self.assertTrue(validate_path_element_hfs(b"git"))  # git without dot
 
 
+class TestDecodeUTF8WithFallback(TestCase):
+    """Tests for the xutftowcsn-style lossy UTF-8 decoder."""
+
+    def test_ascii(self) -> None:
+        self.assertEqual("hello", _decode_utf8_with_fallback(b"hello"))
+
+    def test_empty(self) -> None:
+        self.assertEqual("", _decode_utf8_with_fallback(b""))
+
+    def test_valid_two_byte(self) -> None:
+        # U+00E9 LATIN SMALL LETTER E WITH ACUTE = c3 a9
+        self.assertEqual("café", _decode_utf8_with_fallback(b"caf\xc3\xa9"))
+
+    def test_valid_three_byte(self) -> None:
+        # U+20AC EURO SIGN = e2 82 ac
+        self.assertEqual("€", _decode_utf8_with_fallback(b"\xe2\x82\xac"))
+
+    def test_valid_four_byte(self) -> None:
+        # U+1F600 GRINNING FACE = f0 9f 98 80
+        self.assertEqual("\U0001f600", _decode_utf8_with_fallback(b"\xf0\x9f\x98\x80"))
+
+    def test_invalid_high_byte_maps_one_to_one(self) -> None:
+        # 0xff is never a valid UTF-8 byte; should map to U+00FF.
+        self.assertEqual("ÿ", _decode_utf8_with_fallback(b"\xff"))
+        # 0xa0 is the boundary of the 1:1 fallback range.
+        self.assertEqual("\xa0", _decode_utf8_with_fallback(b"\xa0"))
+
+    def test_invalid_low_byte_expands_to_hex(self) -> None:
+        # 0x80-0x9f -> two lowercase hex digits.
+        self.assertEqual("80", _decode_utf8_with_fallback(b"\x80"))
+        self.assertEqual("9f", _decode_utf8_with_fallback(b"\x9f"))
+
+    def test_latin1_mixed(self) -> None:
+        # Latin-1 "café" is 63 61 66 e9 — the trailing e9 is invalid UTF-8
+        # alone and should fall through as U+00E9.
+        self.assertEqual("café", _decode_utf8_with_fallback(b"caf\xe9"))
+
+    def test_truncated_two_byte(self) -> None:
+        # c3 with no trail byte: lead falls through to 1:1 (c3 >= a0).
+        self.assertEqual("Ã", _decode_utf8_with_fallback(b"\xc3"))
+
+    def test_truncated_then_ascii(self) -> None:
+        # c3 followed by 'a' (not a valid trail): c3 -> U+00C3, then 'a'.
+        self.assertEqual("Ãa", _decode_utf8_with_fallback(b"\xc3a"))
+
+    def test_overlong_two_byte_rejected(self) -> None:
+        # c0 af is overlong-encoded '/'. c0 < c2 so it never enters the
+        # 2-byte branch; c0 >= a0 so it maps to U+00C0. Then af -> U+00AF.
+        self.assertEqual("À¯", _decode_utf8_with_fallback(b"\xc0\xaf"))
+
+    def test_overlong_three_byte_rejected(self) -> None:
+        # e0 80 80 is an overlong NUL. The guard `data[1] < 0xa0` rejects
+        # the 3-byte branch; e0 -> U+00E0, then 80 -> "80", then 80 -> "80".
+        self.assertEqual("à8080", _decode_utf8_with_fallback(b"\xe0\x80\x80"))
+
+    def test_codepoint_beyond_max_rejected(self) -> None:
+        # f4 90 80 80 would decode to U+110000 (beyond U+10FFFF).
+        # Guard rejects, f4 falls through to U+00F4, trails go to hex/1:1.
+        self.assertEqual(
+            "ô90" + "80" + "80",
+            _decode_utf8_with_fallback(b"\xf4\x90\x80\x80"),
+        )
+
+    def test_five_byte_lead_falls_through(self) -> None:
+        # 0xf5..0xff never match any multi-byte branch -> 1:1.
+        self.assertEqual("õ", _decode_utf8_with_fallback(b"\xf5"))
+        self.assertEqual("þ", _decode_utf8_with_fallback(b"\xfe"))
+
+    def test_roundtrip_through_fsencode(self) -> None:
+        # The decoder's output must be a real str that os.fsencode can
+        # handle — that's what _tree_to_fs_path relies on.
+        decoded = _decode_utf8_with_fallback(b"caf\xe9/foo")
+        self.assertIsInstance(decoded, str)
+        os.fsencode(decoded)
+
+
 class TestTreeFSPathConversion(TestCase):
     def test_tree_to_fs_path(self) -> None:
         tree_path = "délwíçh/foo".encode()
@@ -1444,6 +1585,61 @@ class TestTreeFSPathConversion(TestCase):
 
         tree_path = _fs_to_tree_path(fs_path)
         self.assertEqual(tree_path, b"path/with/backslash")
+
+    def test_tree_to_fs_path_windows_invalid_utf8(self) -> None:
+        # On Windows, invalid UTF-8 in a tree path must not raise and must
+        # not fall back to raw bytes — it should go through the
+        # xutftowcsn-style mapping (matching git-for-windows behaviour).
+        original_platform = sys.platform
+        sys.platform = "win32"
+        self.addCleanup(setattr, sys, "platform", original_platform)
+
+        # b"caf\xe9" — latin-1 "café". The 0xe9 is invalid UTF-8 and should
+        # map 1:1 to U+00E9.
+        fs_path = _tree_to_fs_path(b"/prefix", b"caf\xe9")
+        self.assertEqual(fs_path, os.path.join(b"/prefix", os.fsencode("café")))
+
+        # b"\x80" — invalid low byte, should expand to two hex digits.
+        fs_path = _tree_to_fs_path(b"/prefix", b"\x80")
+        self.assertEqual(fs_path, os.path.join(b"/prefix", os.fsencode("80")))
+
+    def test_fs_to_tree_path_windows_str_unicode(self) -> None:
+        # On Windows, a Unicode str filename should be encoded as UTF-8 in
+        # the tree (not via the filesystem mbcs codec).
+        original_platform = sys.platform
+        sys.platform = "win32"
+        self.addCleanup(setattr, sys, "platform", original_platform)
+
+        tree_path = _fs_to_tree_path("café")
+        self.assertEqual(tree_path, "café".encode())
+
+    def test_fs_to_tree_path_windows_roundtrip_valid_utf8(self) -> None:
+        # Round-trip: valid-UTF-8 tree path -> filesystem -> tree path.
+        original_platform = sys.platform
+        sys.platform = "win32"
+        self.addCleanup(setattr, sys, "platform", original_platform)
+
+        original_tree = "café".encode()
+        # Forward: tree bytes -> fs bytes (joined under a fake prefix).
+        fs = _tree_to_fs_path(b"/prefix", original_tree)
+        # Strip the prefix the way a real caller (after listdir) would,
+        # then go back through _fs_to_tree_path.
+        filename = fs[len(b"/prefix/") :]
+        self.assertEqual(_fs_to_tree_path(filename), original_tree)
+
+    def test_fs_to_tree_path_windows_invalid_utf8_is_one_way(self) -> None:
+        # Document C git's one-way semantics: a tree path with invalid UTF-8
+        # produces a file with a lossy name on disk, and reading that
+        # filename back yields the lossy form — NOT the original bytes.
+        original_platform = sys.platform
+        sys.platform = "win32"
+        self.addCleanup(setattr, sys, "platform", original_platform)
+
+        # Tree path b"\x80foo" -> on-disk name "80foo".
+        fs = _tree_to_fs_path(b"/prefix", b"\x80foo")
+        filename = fs[len(b"/prefix/") :]
+        # The lossy filename round-trips to b"80foo", not b"\x80foo".
+        self.assertEqual(_fs_to_tree_path(filename), b"80foo")
 
 
 class TestIndexEntryFromPath(TestCase):

@@ -47,7 +47,12 @@ from dulwich.repo import (
 )
 from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
-from . import DependencyMissing, TestCase, skipIf
+from . import (
+    DependencyMissing,
+    TestCase,
+    filesystem_supports_non_utf8_filenames,
+    skipIf,
+)
 
 missing_sha = b"b91fa4d900e17e99b433218e988c4eb4a3e9a097"
 
@@ -1867,6 +1872,10 @@ class BuildRepoRootTests(TestCase):
     def test_commit_no_encode_decode(self) -> None:
         r = self._repo
         repo_path_bytes = os.fsencode(r.path)
+        if not filesystem_supports_non_utf8_filenames(r.path):
+            self.skipTest(
+                "filesystem rejects non-UTF8 filenames (e.g. ZFS utf8only=on)"
+            )
         encodings = ("utf8", "latin1")
         names = ["À".encode(encoding) for encoding in encodings]
         for name, encoding in zip(names, encodings):

@@ -26,6 +26,7 @@ __all__ = [
     "SkipTest",
     "TestCase",
     "expectedFailure",
+    "filesystem_supports_non_utf8_filenames",
     "skipIf",
 ]
 
@@ -48,6 +49,41 @@ from unittest import TestCase as _TestCase
 class DependencyMissing(SkipTest):
     def __init__(self, dependency: str) -> None:
         super().__init__(f"Dependency {dependency} missing")
+
+
+def filesystem_supports_non_utf8_filenames(directory: str | None = None) -> bool:
+    """Probe whether the filesystem accepts filenames with non-UTF8 bytes.
+
+    Some filesystems (notably OpenZFS with ``utf8only=on``) reject filenames
+    that are not valid UTF-8, even on platforms whose ``sys.platform`` value
+    suggests otherwise. The existing per-platform skips in the test suite do
+    not catch that case. Use this probe instead, so tests that intentionally
+    write non-UTF8 byte filenames skip on those filesystems rather than fail.
+
+    Args:
+      directory: Directory to probe. Defaults to the system temp directory.
+
+    Returns:
+      ``True`` if the filesystem accepted a probe filename containing a
+      non-UTF8 byte; ``False`` otherwise.
+    """
+    if directory is None:
+        directory = tempfile.gettempdir()
+    probe_dir = tempfile.mkdtemp(dir=directory)
+    try:
+        # 0xff is not a valid UTF-8 lead byte, so any UTF-8-only filesystem
+        # will reject this name with OSError (Linux ZFS utf8only=on returns
+        # EILSEQ on Linux, EINVAL on FreeBSD).
+        probe = os.path.join(os.fsencode(probe_dir), b"\xff_dulwich_probe")
+        try:
+            fd = os.open(probe, os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
+        except (OSError, UnicodeError):
+            return False
+        os.close(fd)
+        os.unlink(probe)
+        return True
+    finally:
+        shutil.rmtree(probe_dir, ignore_errors=True)
 
 
 class TestCase(_TestCase):

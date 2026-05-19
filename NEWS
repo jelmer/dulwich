@@ -1,5 +1,14 @@
 1.2.2	2026-05-19
 
+ * Skip the three non-UTF8 filename tests
+   (``test_index.BuildIndexTests.test_no_decode_encode``,
+   ``test_refs.DiskRefsContainerTests.test_cyrillic``,
+   ``test_repository.BuildRepoRootTests.test_commit_no_encode_decode``)
+   when the filesystem rejects non-UTF8 filenames, e.g. OpenZFS with
+   ``utf8only=on``. Previously these tests treated "Linux + non-darwin /
+   non-win32" as a proxy for "filesystem accepts arbitrary bytes", which
+   fails on UTF-8-only Linux filesystems. (Matt Van Horn, #2174)
+
  * Normalise hex SHAs to binary in ``DiskObjectStore.contains_packed``
    before consulting the multi-pack-index, mirroring what ``get_raw``
    already did. Previously, passing a 40-character hex SHA (as

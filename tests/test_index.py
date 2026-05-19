@@ -75,7 +75,7 @@ from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, Tree, TreeEntry
 from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit
 
-from . import TestCase, skipIf
+from . import TestCase, filesystem_supports_non_utf8_filenames, skipIf
 
 
 def can_symlink() -> bool:
@@ -754,6 +754,10 @@ class BuildIndexTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         repo_dir_bytes = os.fsencode(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
+        if not filesystem_supports_non_utf8_filenames(repo_dir):
+            self.skipTest(
+                "filesystem rejects non-UTF8 filenames (e.g. ZFS utf8only=on)"
+            )
         with Repo.init(repo_dir) as repo:
             # Populate repo
             file = Blob.from_string(b"foo")

@@ -301,12 +301,13 @@ def lfs_migrate(
     from . import open_repo_closing
 
     with open_repo_closing(repo) as r:
+        config = r.get_config_stack()
         # Initialize LFS if needed
         lfs_store = LFSStore.from_repo(r, create=True)
         filter_driver = LFSFilterDriver(lfs_store, config=r.get_config())
 
         # Get current index
-        index = r.open_index()
+        index = r.open_index(config=config)
 
         migrated = 0
 
@@ -404,7 +405,8 @@ def lfs_pointer_check(
 
         if paths is None:
             # Check all files in index
-            index = r.open_index()
+            config = r.get_config_stack()
+            index = r.open_index(config=config)
             paths = [path.decode() for path in index]
 
         for path in paths:
@@ -534,7 +536,8 @@ def lfs_pull(repo: str | os.PathLike[str] | Repo = ".", remote: str = "origin") 
 
         # Then checkout LFS files in working directory
         store = LFSStore.from_repo(r)
-        index = r.open_index()
+        config = r.get_config_stack()
+        index = r.open_index(config=config)
 
         for path, entry in index.items():
             full_path = os.path.join(r.path, path.decode())
@@ -666,7 +669,8 @@ def lfs_status(repo: str | os.PathLike[str] | Repo = ".") -> dict[str, list[str]
 
     with open_repo_closing(repo) as r:
         store = LFSStore.from_repo(r)
-        index = r.open_index()
+        config = r.get_config_stack()
+        index = r.open_index(config=config)
 
         status: dict[str, list[str]] = {
             "tracked": [],

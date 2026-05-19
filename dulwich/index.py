@@ -2685,6 +2685,8 @@ def update_working_tree(
     blob_normalizer: "FilterBlobNormalizer | None" = None,
     tree_encoding: str = "utf-8",
     allow_overwrite_modified: bool = False,
+    *,
+    config: "Config | None" = None,
 ) -> None:
     """Update the working tree and index to match a new tree.
 
@@ -2709,6 +2711,8 @@ def update_working_tree(
       tree_encoding: Encoding used for tree paths (default: utf-8)
       allow_overwrite_modified: If False, raise an error when attempting to
         overwrite files that have been modified compared to old_tree_id
+      config: Repository configuration. If None, falls back to
+        ``repo.get_config_stack()``.
     """
     if validate_path_element is None:
         validate_path_element = validate_path_element_default
@@ -2723,7 +2727,9 @@ def update_working_tree(
     )
 
     repo_path = repo.path if isinstance(repo.path, bytes) else repo.path.encode()
-    index = repo.open_index()
+    if config is None:
+        config = repo.get_config_stack()
+    index = repo.open_index(config=config)
 
     # Convert iterator to list since we need multiple passes
     changes = list(change_iterator)

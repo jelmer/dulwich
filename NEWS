@@ -1,5 +1,9 @@
 1.2.3	UNRELEASED
 
+ * Reject ref names with empty path components (e.g. ``refs//a``)
+   or with ``.lock`` as a non-final component (e.g. ``refs/a.lock/a``)
+   in ``check_ref_format``, matching ``git check-ref-format``. (Jelmer Vernooĳ; reported by Christopher Toth)
+
  * Honour ``GIT_CONFIG_COUNT`` / ``GIT_CONFIG_KEY_<n>`` /
    ``GIT_CONFIG_VALUE_<n>`` in porcelain entry points, via the new
    opt-in ``config.env_config`` helper. (Jelmer Vernooĳ, #2168)

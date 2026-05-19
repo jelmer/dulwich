@@ -2736,10 +2736,21 @@ class MemoryObjectStore(PackCapableObjectStore):
                 f.seek(0)
 
                 p = PackData.from_file(f, self.object_format, size)
-                for obj in PackInflater.for_pack_data(p, self.get_raw):  # type: ignore[arg-type]
-                    self.add_object(obj)
-                p.close()
-                f.close()
+                try:
+                    # Verify the trailing pack checksum before extracting
+                    # objects. Without this, a fetch that delivered a
+                    # truncated pack would still be accepted: ``add_pack``
+                    # iterates objects by offset and never reaches the
+                    # trailing bytes, so a stream that lost the last few
+                    # bytes of its trailer slipped through silently.
+                    # ``add_thin_pack`` already validates via
+                    # ``PackStreamCopier.verify``; do the equivalent here.
+                    p.check()
+                    for obj in PackInflater.for_pack_data(p, self.get_raw):  # type: ignore[arg-type]
+                        self.add_object(obj)
+                finally:
+                    p.close()
+                    f.close()
             else:
                 f.close()
 

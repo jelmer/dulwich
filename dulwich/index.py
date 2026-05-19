@@ -3228,15 +3228,17 @@ def _fs_to_tree_path(fs_path: str | bytes, tree_encoding: str = "utf-8") -> byte
     else:
         fs_path_bytes = fs_path
 
-    # On Windows, we need to ensure tree paths are properly encoded
+    # On Windows the on-disk filename is a UTF-16 wide string; Python gives
+    # us either str (already decoded) or bytes encoded via the filesystem
+    # codec. Normalise to str, then encode under the tree encoding so the
+    # resulting tree path is plain UTF-8. This matches C git's xwcstoutf,
+    # which is just WideCharToMultiByte(CP_UTF8) — it makes no attempt to
+    # reverse the xutftowcsn fallbacks, so a file that was checked out from
+    # a tree path with invalid UTF-8 will read back as the lossy form (the
+    # same divergence C git exhibits, documented as a one-way mapping).
     if sys.platform == "win32":
-        try:
-            # Decode from filesystem encoding, then re-encode with tree encoding
-            fs_path_str = os.fsdecode(fs_path_bytes)
-            fs_path_bytes = fs_path_str.encode(tree_encoding)
-        except UnicodeDecodeError:
-            # If filesystem decoding fails, use the original bytes
-            pass
+        fs_path_str = os.fsdecode(fs_path_bytes)
+        fs_path_bytes = fs_path_str.encode(tree_encoding)
 
     if os_sep_bytes != b"/":
         tree_path = fs_path_bytes.replace(os_sep_bytes, b"/")

@@ -1,13 +1,13 @@
-1.2.2	2026-05-19
+1.2.3	UNRELEASED
 
- * Skip the three non-UTF8 filename tests
-   (``test_index.BuildIndexTests.test_no_decode_encode``,
-   ``test_refs.DiskRefsContainerTests.test_cyrillic``,
-   ``test_repository.BuildRepoRootTests.test_commit_no_encode_decode``)
-   when the filesystem rejects non-UTF8 filenames, e.g. OpenZFS with
-   ``utf8only=on``. Previously these tests treated "Linux + non-darwin /
-   non-win32" as a proxy for "filesystem accepts arbitrary bytes", which
-   fails on UTF-8-only Linux filesystems. (Matt Van Horn, #2174)
+ * Extend the per-test ``OSError`` handlers in the three non-UTF8 filename
+   tests (``test_index.test_no_decode_encode``, ``test_refs.test_cyrillic``,
+   ``test_repository.test_commit_no_encode_decode``) to also skip on
+   ``errno.EILSEQ``, so they pass on Linux filesystems that reject
+   non-UTF-8 names (e.g. OpenZFS with ``utf8only=on``). (Matt Van Horn, #2174)
+
+
+1.2.2	2026-05-19
 
  * Normalise hex SHAs to binary in ``DiskObjectStore.contains_packed``
    before consulting the multi-pack-index, mirroring what ``get_raw``

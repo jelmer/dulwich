@@ -29,7 +29,9 @@ __all__ = [
 ]
 
 import os
+import shlex
 import subprocess
+import sys
 import tempfile
 from collections.abc import Callable
 from typing import Protocol
@@ -62,6 +64,15 @@ class MergeDriver(Protocol):
             If success is False, the content may contain conflict markers
         """
         ...
+
+
+def _shell_quote(value: str) -> str:
+    """Shell-quote ``value`` for the platform's default shell."""
+    if sys.platform == "win32":
+        if any(c in value for c in "\r\n\x00"):
+            raise ValueError("value contains unescapable character for cmd.exe")
+        return '"' + value.replace('"', '""') + '"'
+    return shlex.quote(value)
 
 
 class ProcessMergeDriver:
@@ -110,14 +121,18 @@ class ProcessMergeDriver:
             with open(theirs_path, "wb") as f:
                 f.write(theirs)
 
-            # Prepare command with placeholders
+            # %P is attacker-controllable; quote everything (CVE-2026-42563).
             cmd = self.command
-            cmd = cmd.replace("%O", ancestor_path)
-            cmd = cmd.replace("%A", ours_path)
-            cmd = cmd.replace("%B", theirs_path)
-            cmd = cmd.replace("%L", str(marker_size))
+            cmd = cmd.replace("%O", _shell_quote(ancestor_path))
+            cmd = cmd.replace("%A", _shell_quote(ours_path))
+            cmd = cmd.replace("%B", _shell_quote(theirs_path))
+            cmd = cmd.replace("%L", _shell_quote(str(marker_size)))
             if path:
-                cmd = cmd.replace("%P", path)
+                try:
+                    quoted_path = _shell_quote(path)
+                except ValueError:
+                    return ours, False
+                cmd = cmd.replace("%P", quoted_path)
 
             # Execute merge command
             try:

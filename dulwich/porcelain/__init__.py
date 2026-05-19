@@ -339,7 +339,7 @@ from ..client import (
     SendPackResult,
     get_transport_and_path,
 )
-from ..config import Config, StackedConfig
+from ..config import Config, StackedConfig, env_config
 from ..diff_tree import (
     CHANGE_ADD,
     CHANGE_COPY,
@@ -1483,6 +1483,9 @@ def clone(
 
     if config is None:
         config = StackedConfig.default()
+        env_override = env_config(os.environ)
+        if env_override is not None:
+            config.backends.insert(0, env_override)
 
     if checkout is None:
         checkout = not bare
@@ -5033,6 +5036,9 @@ def ls_remote(
     """
     if config is None:
         config = StackedConfig.default()
+        env_override = env_config(os.environ)
+        if env_override is not None:
+            config.backends.insert(0, env_override)
     remote_str = remote.decode() if isinstance(remote, bytes) else remote
     client, host_path = get_transport_and_path(
         remote_str,

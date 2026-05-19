@@ -2154,7 +2154,7 @@ class DiskObjectStore(PackBasedObjectStore):
             indexer = PackIndexer(
                 f,
                 self.object_format.hash_func,
-                resolve_ext_ref=self.get_raw,  # type: ignore[arg-type]
+                resolve_ext_ref=self.get_raw,
             )
             copier = PackStreamCopier(
                 self.object_format.hash_func,
@@ -2189,7 +2189,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 with PackData(path, file=f, object_format=self.object_format) as pd:
                     indexer = PackIndexer.for_pack_data(
                         pd,
-                        resolve_ext_ref=self.get_raw,  # type: ignore[arg-type]
+                        resolve_ext_ref=self.get_raw,
                     )
                     return self._complete_pack(f, path, len(pd), indexer)  # type: ignore[arg-type]
             else:
@@ -2746,7 +2746,7 @@ class MemoryObjectStore(PackCapableObjectStore):
                     # ``add_thin_pack`` already validates via
                     # ``PackStreamCopier.verify``; do the equivalent here.
                     p.check()
-                    for obj in PackInflater.for_pack_data(p, self.get_raw):  # type: ignore[arg-type]
+                    for obj in PackInflater.for_pack_data(p, self.get_raw):
                         self.add_object(obj)
                 finally:
                     p.close()

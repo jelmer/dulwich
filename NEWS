@@ -6,6 +6,11 @@
    ``errno.EILSEQ``, so they pass on Linux filesystems that reject
    non-UTF-8 names (e.g. OpenZFS with ``utf8only=on``). (Matt Van Horn, #2174)
 
+ * Reject ref names with empty path components (e.g. ``refs//a``)
+   or with ``.lock`` as a non-final component (e.g. ``refs/a.lock/a``)
+   in ``check_ref_format``, matching ``git check-ref-format``.
+   (Jelmer Vernooĳ; reported by Christopher Toth)
+
  * HARDEN: Reject unsafe tree paths in ``dulwich.archive.tar_stream``
    (e.g. ``../evil``, ``.git/...``, embedded ``\`` or ``:``) instead of
    emitting them as tar member names. Reported by Christopher Toth.
@@ -14,6 +19,21 @@
  * Honour ``GIT_CONFIG_COUNT`` / ``GIT_CONFIG_KEY_<n>`` /
    ``GIT_CONFIG_VALUE_<n>`` in porcelain entry points, via the new
    opt-in ``config.env_config`` helper. (Jelmer Vernooĳ, #2168)
+
+ * Reject delta-resolved commit/tree/tag objects with a
+   zero-byte payload in ``DeltaChainIterator``, and turn a delta
+   truncated mid-size-header into a typed ``ApplyDeltaError``.
+   (Jelmer Vernooĳ; reported by Christopher Toth)
+
+ * Verify the trailing pack checksum in
+   ``MemoryObjectStore.add_pack`` so a non-thin fetch into a
+   ``MemoryRepo`` no longer accepts a pack with a truncated trailer.
+   (Jelmer Vernooĳ; reported by Christopher Toth)
+
+ * Inflate every object in ``DiskObjectStore._complete_pack``
+   so malformed trees (and other payloads ``MemoryObjectStore`` and
+   ``git fsck`` reject) no longer silently land on disk.
+   (Jelmer Vernooĳ; reported by Christopher Toth)
 
 1.2.2	2026-05-19
 

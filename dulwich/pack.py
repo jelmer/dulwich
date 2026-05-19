@@ -176,8 +176,8 @@ PACK_SPOOL_FILE_MAX_SIZE = 16 * 1024 * 1024
 DEFAULT_PACK_INDEX_VERSION = 2
 
 
-OldUnpackedObject = tuple[bytes | int, list[bytes]] | list[bytes]
-ResolveExtRefFn = Callable[[bytes], tuple[int, OldUnpackedObject]]
+OldUnpackedObject = tuple[bytes | int, list[bytes]] | list[bytes] | bytes
+ResolveExtRefFn = Callable[[RawObjectID | ObjectID], tuple[int, bytes | list[bytes]]]
 ProgressFn = Callable[[int, str], None]
 PackHint = tuple[int, bytes | None]
 
@@ -2191,6 +2191,7 @@ class DeltaChainIterator(Generic[T]):
         hash_func: Callable[[], "HashObject"],
         *,
         resolve_ext_ref: ResolveExtRefFn | None = None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Initialize DeltaChainIterator.
 
@@ -2198,9 +2199,13 @@ class DeltaChainIterator(Generic[T]):
             file_obj: File object to read pack data from
             hash_func: Hash function to use for computing object IDs
             resolve_ext_ref: Optional function to resolve external references
+            object_format: Optional object format. Required by subclasses
+                that materialise objects (e.g. PackInflater) when iterating
+                packs in a non-default hash algorithm such as SHA-256.
         """
         self._file = file_obj
         self.hash_func = hash_func
+        self._object_format = object_format
         self._resolve_ext_ref = resolve_ext_ref
         self._pending_ofs: dict[int, list[int]] = defaultdict(list)
         self._pending_ref: dict[bytes, list[int]] = defaultdict(list)
@@ -2221,7 +2226,10 @@ class DeltaChainIterator(Generic[T]):
           DeltaChainIterator instance
         """
         walker = cls(
-            None, pack_data.object_format.hash_func, resolve_ext_ref=resolve_ext_ref
+            None,
+            pack_data.object_format.hash_func,
+            resolve_ext_ref=resolve_ext_ref,
+            object_format=pack_data.object_format,
         )
         walker.set_pack_data(pack_data)
         for unpacked in pack_data.iter_unpacked(include_comp=False):
@@ -2249,7 +2257,10 @@ class DeltaChainIterator(Generic[T]):
           DeltaChainIterator instance
         """
         walker = cls(
-            None, pack.object_format.hash_func, resolve_ext_ref=resolve_ext_ref
+            None,
+            pack.object_format.hash_func,
+            resolve_ext_ref=resolve_ext_ref,
+            object_format=pack.object_format,
         )
         walker.set_pack_data(pack.data)
         todo = set()
@@ -2332,7 +2343,7 @@ class DeltaChainIterator(Generic[T]):
             if base_sha not in self._pending_ref:
                 continue
             try:
-                type_num, chunks = self._resolve_ext_ref(base_sha)
+                type_num, chunks = self._resolve_ext_ref(RawObjectID(base_sha))
             except KeyError:
                 # Not an external ref, but may depend on one. Either it will
                 # get popped via a _follow_chain call, or we will raise an
@@ -2341,7 +2352,7 @@ class DeltaChainIterator(Generic[T]):
             self._ext_refs.append(RawObjectID(base_sha))
             self._pending_ref.pop(base_sha)
             for new_offset in pending:
-                yield from self._follow_chain(new_offset, type_num, chunks)  # type: ignore[arg-type]
+                yield from self._follow_chain(new_offset, type_num, chunks)
 
         self._ensure_no_pending()
 
@@ -2349,7 +2360,10 @@ class DeltaChainIterator(Generic[T]):
         raise NotImplementedError
 
     def _resolve_object(
-        self, offset: int, obj_type_num: int, base_chunks: list[bytes] | None
+        self,
+        offset: int,
+        obj_type_num: int,
+        base_chunks: bytes | list[bytes] | None,
     ) -> UnpackedObject:
         assert self._file is not None
         self._file.seek(offset)
@@ -2367,10 +2381,26 @@ class DeltaChainIterator(Generic[T]):
             assert unpacked.pack_type_num in DELTA_TYPES
             unpacked.obj_type_num = obj_type_num
             unpacked.obj_chunks = apply_delta(base_chunks, unpacked.decomp_chunks)
+            # A delta that resolves to a zero-byte payload for a
+            # commit/tree/tag is malformed: ``_parse_message`` /
+            # ``parse_tree`` accept the empty input silently, so without
+            # this guard a too-short delta could materialise an
+            # otherwise-valid SHA pointing at an empty commit object
+            # (which ``git fsck`` rejects). Only blobs may legitimately
+            # be empty, and an empty blob would never be stored as a
+            # delta in practice.
+            # Blob.type_num == 3 (avoid the import cycle).
+            if obj_type_num != 3 and chunks_length(unpacked.obj_chunks) == 0:
+                raise ApplyDeltaError(
+                    f"delta resolved to empty payload for type {obj_type_num}"
+                )
         return unpacked
 
     def _follow_chain(
-        self, offset: int, obj_type_num: int, base_chunks: list[bytes] | None
+        self,
+        offset: int,
+        obj_type_num: int,
+        base_chunks: bytes | list[bytes] | None,
     ) -> Iterator[T]:
         # Unlike PackData.get_object_at, there is no need to cache offsets as
         # this approach by design inflates each object exactly once.
@@ -2444,7 +2474,12 @@ class PackInflater(DeltaChainIterator[ShaFile]):
         Returns:
             ShaFile object from the unpacked data
         """
-        return unpacked.sha_file()
+        assert unpacked.obj_type_num is not None and unpacked.obj_chunks is not None
+        return ShaFile.from_raw_chunks(
+            unpacked.obj_type_num,
+            unpacked.obj_chunks,
+            object_format=self._object_format,
+        )
 
 
 class SHA1Reader(BinaryIO):
@@ -3745,7 +3780,13 @@ def apply_delta(
     def get_delta_header_size(delta: bytes, index: int) -> tuple[int, int]:
         size = 0
         i = 0
-        while delta:
+        while True:
+            # Bound-check explicitly: ``delta[index:index+1]`` silently
+            # returns b"" past the end, which would crash with TypeError
+            # in ``ord`` and leave the caller unable to distinguish a
+            # truncated delta from a programming bug.
+            if index >= delta_length:
+                raise ApplyDeltaError("delta truncated in size header")
             cmd = ord(delta[index : index + 1])
             index += 1
             size |= (cmd & ~0x80) << i
@@ -4423,6 +4464,9 @@ class Pack:
             prev_offset = base_offset
             if get_ref is None:
                 get_ref = self.get_ref
+            assert isinstance(base_obj, tuple), (
+                f"Expected delta tuple, got {base_obj.__class__.__name__}"
+            )
             if base_type == OFS_DELTA:
                 (delta_offset, delta) = base_obj
                 # TODO: clean up asserts and replace with nicer error messages

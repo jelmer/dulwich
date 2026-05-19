@@ -40,7 +40,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dulwich.config import StackedConfig
+    from dulwich.config import Config
     from dulwich.repo import Repo
 
 
@@ -449,7 +449,7 @@ class RerereCache:
         return preimage, postimage
 
 
-def is_rerere_enabled(config: "StackedConfig") -> bool:
+def is_rerere_enabled(config: "Config") -> bool:
     """Check if rerere is enabled in the config.
 
     Args:
@@ -469,7 +469,7 @@ def is_rerere_enabled(config: "StackedConfig") -> bool:
         return False
 
 
-def is_rerere_autoupdate(config: "StackedConfig") -> bool:
+def is_rerere_autoupdate(config: "Config") -> bool:
     """Check if rerere.autoupdate is enabled in the config.
 
     Args:
@@ -493,6 +493,7 @@ def rerere_auto(
     repo: "Repo",
     working_tree_path: bytes | str,
     conflicts: list[bytes],
+    config: "Config | None" = None,
 ) -> tuple[list[tuple[bytes, str]], list[bytes]]:
     """Automatically record conflicts and apply known resolutions.
 
@@ -503,13 +504,16 @@ def rerere_auto(
         repo: Repository object
         working_tree_path: Path to the working tree
         conflicts: List of conflicted file paths
+        config: Configuration to consult for rerere settings. If None,
+            falls back to ``repo.get_config_stack()``.
 
     Returns:
         Tuple of:
         - List of tuples (path, conflict_id) for recorded conflicts
         - List of paths where resolutions were automatically applied
     """
-    config = repo.get_config_stack()
+    if config is None:
+        config = repo.get_config_stack()
     if not is_rerere_enabled(config):
         return [], []
 

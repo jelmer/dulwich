@@ -36,6 +36,7 @@ class BisectPorcelainTests(TestCase):
     """Tests for porcelain bisect functions."""
 
     def setUp(self) -> None:
+        super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.repo = porcelain.init(self.test_dir)
 

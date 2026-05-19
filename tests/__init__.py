@@ -39,7 +39,7 @@ import tempfile
 
 # If Python itself provides an exception, use that
 import unittest
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import ClassVar
 from unittest import SkipTest, expectedFailure, skipIf
 from unittest import TestCase as _TestCase
@@ -50,11 +50,59 @@ class DependencyMissing(SkipTest):
         super().__init__(f"Dependency {dependency} missing")
 
 
+# Environment variables that can leak the developer's real git configuration
+# or identity into the tests. Scrubbed at module import time so even tests
+# that don't go through the dulwich TestCase get protection.
+_GIT_ENV_SCRUB: tuple[str, ...] = (
+    "XDG_CONFIG_HOME",
+    "GIT_CONFIG_GLOBAL",
+    "GIT_CONFIG_SYSTEM",
+    "GIT_CONFIG_COUNT",
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_AUTHOR_DATE",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+    "GIT_COMMITTER_DATE",
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+    "GIT_COMMON_DIR",
+)
+
+
+def _scrub_git_env(override: "Callable[[str, str | None], None]") -> None:
+    override("HOME", "/nonexistent")
+    override("GIT_CONFIG_NOSYSTEM", "1")
+    for name in _GIT_ENV_SCRUB:
+        override(name, None)
+    # GIT_CONFIG_KEY_n / GIT_CONFIG_VALUE_n are indexed - clear any that are
+    # currently set in the environment.
+    for name in list(os.environ):
+        if name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")):
+            override(name, None)
+
+
+def _set_or_clear_env(name: str, value: str | None) -> None:
+    if value is None:
+        os.environ.pop(name, None)
+    else:
+        os.environ[name] = value
+
+
+# Apply the scrub at import time so tests inheriting directly from
+# unittest.TestCase (or ones that skip super().setUp()) still don't see the
+# developer's real ~/.gitconfig, identity, or GIT_CONFIG_* overrides.
+_scrub_git_env(_set_or_clear_env)
+
+
 class TestCase(_TestCase):
     def setUp(self) -> None:
         super().setUp()
-        self.overrideEnv("HOME", "/nonexistent")
-        self.overrideEnv("GIT_CONFIG_NOSYSTEM", "1")
+        _scrub_git_env(self.overrideEnv)
 
     def overrideEnv(self, name: str, value: str | None) -> None:
         def restore() -> None:
@@ -246,7 +294,7 @@ def tutorial_test_suite() -> unittest.TestSuite:
         oldval = os.environ.get(name)
         if value is not None:
             os.environ[name] = value
-        else:
+        elif name in os.environ:
             del os.environ[name]
         to_restore.append((name, oldval))
 
@@ -255,8 +303,7 @@ def tutorial_test_suite() -> unittest.TestSuite:
         test.tempdir = tempfile.mkdtemp()  # type: ignore[attr-defined]
         test.globs.update({"tempdir": test.tempdir})  # type: ignore[attr-defined]
         os.chdir(test.tempdir)  # type: ignore[attr-defined]
-        overrideEnv("HOME", "/nonexistent")
-        overrideEnv("GIT_CONFIG_NOSYSTEM", "1")
+        _scrub_git_env(overrideEnv)
 
     def teardown(test: doctest.DocTest) -> None:
         os.chdir(test.__old_cwd)  # type: ignore[attr-defined]
@@ -264,7 +311,7 @@ def tutorial_test_suite() -> unittest.TestSuite:
         for name, oldval in to_restore:
             if oldval is not None:
                 os.environ[name] = oldval
-            else:
+            elif name in os.environ:
                 del os.environ[name]
         to_restore.clear()
 

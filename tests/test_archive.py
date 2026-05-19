@@ -26,7 +26,12 @@ import tarfile
 from io import BytesIO
 from unittest.mock import patch
 
-from dulwich.archive import ChunkedBytesIO, tar_stream
+from dulwich.archive import (
+    ChunkedBytesIO,
+    UnsafeArchivePathError,
+    _is_unsafe_archive_path,
+    tar_stream,
+)
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, Tree
 from dulwich.tests.utils import build_commit_graph
@@ -124,6 +129,64 @@ class ArchiveTests(TestCase):
 
         # Should contain the file in the subdirectory
         self.assertEqual(["subdir/file.txt"], tf.getnames())
+
+    def test_unsafe_paths_rejected(self) -> None:
+        """Tree entry names that git would reject as invalid are refused.
+
+        Mirrors git's ``error: invalid path`` from ``git archive`` for
+        absolute paths, parent-traversal, ``.git`` aliases, embedded
+        backslashes, and NTFS alternate-data-stream separators.
+        """
+        # NUL is excluded here because Tree serialization uses it as a name
+        # terminator, so a NUL-containing name cannot be round-tripped via the
+        # public Tree API. _is_unsafe_archive_path still rejects it on its own.
+        unsafe_names = [
+            b"../evil.txt",
+            b"/absolute.txt",
+            b".git/hooks/pre-commit",
+            b"..\\evil.txt",
+            b".git\\hooks\\pre-commit",
+            b"visible.txt:hidden",
+            b"..",
+            b".git",
+            b".GIT",
+            b".Git.",
+        ]
+        for name in unsafe_names:
+            store = MemoryObjectStore()
+            b1 = Blob.from_string(b"x")
+            store.add_object(b1)
+            t = Tree()
+            t.add(name, 0o100644, b1.id)
+            store.add_object(t)
+            with self.assertRaises(UnsafeArchivePathError, msg=repr(name)) as cm:
+                b"".join(tar_stream(store, t, mtime=0))
+            self.assertEqual(name, cm.exception.path)
+
+    def test_is_unsafe_archive_path_nul(self) -> None:
+        """NUL bytes in a path are rejected even though they can't be stored in a Tree."""
+        self.assertTrue(_is_unsafe_archive_path(b"foo\x00bar"))
+        self.assertTrue(_is_unsafe_archive_path(b""))
+        self.assertFalse(_is_unsafe_archive_path(b"good.txt"))
+        self.assertFalse(_is_unsafe_archive_path(b"sub/dir/good.txt"))
+
+    def test_unsafe_path_nested_in_subtree(self) -> None:
+        """A ``.git`` directory hidden under a benign parent is still rejected."""
+        store = MemoryObjectStore()
+        b1 = Blob.from_string(b"payload")
+        store.add_object(b1)
+        dotgit = Tree()
+        dotgit.add(b"config", 0o100644, b1.id)
+        store.add_object(dotgit)
+        root = Tree()
+        root.add(b"subdir", 0o040000, dotgit.id)
+        store.add_object(root)
+        # benign so far - now add a malicious sibling
+        outer = Tree()
+        outer.add(b".git", 0o040000, dotgit.id)
+        store.add_object(outer)
+        with self.assertRaises(UnsafeArchivePathError):
+            b"".join(tar_stream(store, outer, mtime=0))
 
     def test_tar_stream_with_submodule(self) -> None:
         """Test tar_stream handles missing objects (submodules) gracefully."""

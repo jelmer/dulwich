@@ -2099,7 +2099,27 @@ class DiskObjectStore(PackBasedObjectStore):
             big_file_threshold=self.pack_big_file_threshold,
             delta_base_cache_limit=self.delta_base_cache_limit,
         )
-        final_pack.check_length_and_checksum()
+        try:
+            final_pack.check_length_and_checksum()
+            # Materialise every object so payloads that fail to parse
+            # (e.g. tree entries with garbage modes) are rejected rather
+            # than silently landed on disk. MemoryObjectStore already
+            # validates ingested objects this way via PackInflater; without
+            # the same check DiskObjectStore was strictly weaker.
+            for _obj in PackInflater.for_pack_data(
+                final_pack.data, resolve_ext_ref=self.get_raw
+            ):
+                pass
+        except BaseException:
+            final_pack.close()
+            with suppress(FileNotFoundError):
+                os.remove(target_pack_path)
+            with suppress(FileNotFoundError):
+                os.remove(target_index_path)
+            if self.pack_write_bitmaps and refs:
+                with suppress(FileNotFoundError):
+                    os.remove(pack_base_name + ".bitmap")
+            raise
         # Extract just the hash from pack_base_name (/path/to/pack-HASH -> HASH)
         pack_hash = os.path.basename(pack_base_name)[len("pack-") :]
         self._add_cached_pack(pack_hash, final_pack)

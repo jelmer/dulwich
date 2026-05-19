@@ -352,6 +352,28 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             self.assertEqual([], entries)
             o.add_thin_pack(f.read, None)
 
+    def test_add_pack_rejects_malformed_tree(self) -> None:
+        # A pack containing a "tree" whose body cannot be parsed must not
+        # be ingested: MemoryObjectStore and ``git fsck`` already reject
+        # such objects, so DiskObjectStore must too. Otherwise a malicious
+        # remote can poison the repository.
+        from dulwich.errors import ObjectFormatException
+
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+        f, commit, abort = o.add_pack()
+        try:
+            build_pack(f, [(Tree.type_num, b"this is not a tree at all")])
+            # build_pack rewinds f; commit() detects the pack only when
+            # f.tell() > 0, so re-seek to the end of the written pack.
+            f.seek(0, os.SEEK_END)
+            self.assertRaises(ObjectFormatException, commit)
+        except BaseException:
+            abort()
+            raise
+        # No pack/index files should have been left behind.
+        self.assertEqual([], os.listdir(o.pack_dir))
+
     def test_pack_index_version_config(self) -> None:
         # Test that pack.indexVersion configuration is respected
         from dulwich.config import ConfigDict

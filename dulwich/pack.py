@@ -2367,6 +2367,19 @@ class DeltaChainIterator(Generic[T]):
             assert unpacked.pack_type_num in DELTA_TYPES
             unpacked.obj_type_num = obj_type_num
             unpacked.obj_chunks = apply_delta(base_chunks, unpacked.decomp_chunks)
+            # A delta that resolves to a zero-byte payload for a
+            # commit/tree/tag is malformed: ``_parse_message`` /
+            # ``parse_tree`` accept the empty input silently, so without
+            # this guard a too-short delta could materialise an
+            # otherwise-valid SHA pointing at an empty commit object
+            # (which ``git fsck`` rejects). Only blobs may legitimately
+            # be empty, and an empty blob would never be stored as a
+            # delta in practice.
+            # Blob.type_num == 3 (avoid the import cycle).
+            if obj_type_num != 3 and chunks_length(unpacked.obj_chunks) == 0:
+                raise ApplyDeltaError(
+                    f"delta resolved to empty payload for type {obj_type_num}"
+                )
         return unpacked
 
     def _follow_chain(
@@ -3745,7 +3758,13 @@ def apply_delta(
     def get_delta_header_size(delta: bytes, index: int) -> tuple[int, int]:
         size = 0
         i = 0
-        while delta:
+        while True:
+            # Bound-check explicitly: ``delta[index:index+1]`` silently
+            # returns b"" past the end, which would crash with TypeError
+            # in ``ord`` and leave the caller unable to distinguish a
+            # truncated delta from a programming bug.
+            if index >= delta_length:
+                raise ApplyDeltaError("delta truncated in size header")
             cmd = ord(delta[index : index + 1])
             index += 1
             size |= (cmd & ~0x80) << i

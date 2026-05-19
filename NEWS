@@ -4,6 +4,11 @@
    ``GIT_CONFIG_VALUE_<n>`` in porcelain entry points, via the new
    opt-in ``config.env_config`` helper. (Jelmer Vernooĳ, #2168)
 
+ * Reject delta-resolved commit/tree/tag objects with a
+   zero-byte payload in ``DeltaChainIterator``, and turn a delta
+   truncated mid-size-header into a typed ``ApplyDeltaError``.
+   (Jelmer Vernooĳ; reported by Christopher Toth)
+
  * Verify the trailing pack checksum in
    ``MemoryObjectStore.add_pack`` so a non-thin fetch into a
    ``MemoryRepo`` no longer accepts a pack with a truncated trailer.

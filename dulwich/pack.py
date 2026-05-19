@@ -2191,6 +2191,7 @@ class DeltaChainIterator(Generic[T]):
         hash_func: Callable[[], "HashObject"],
         *,
         resolve_ext_ref: ResolveExtRefFn | None = None,
+        object_format: "ObjectFormat | None" = None,
     ) -> None:
         """Initialize DeltaChainIterator.
 
@@ -2198,9 +2199,13 @@ class DeltaChainIterator(Generic[T]):
             file_obj: File object to read pack data from
             hash_func: Hash function to use for computing object IDs
             resolve_ext_ref: Optional function to resolve external references
+            object_format: Optional object format. Required by subclasses
+                that materialise objects (e.g. PackInflater) when iterating
+                packs in a non-default hash algorithm such as SHA-256.
         """
         self._file = file_obj
         self.hash_func = hash_func
+        self._object_format = object_format
         self._resolve_ext_ref = resolve_ext_ref
         self._pending_ofs: dict[int, list[int]] = defaultdict(list)
         self._pending_ref: dict[bytes, list[int]] = defaultdict(list)
@@ -2221,7 +2226,10 @@ class DeltaChainIterator(Generic[T]):
           DeltaChainIterator instance
         """
         walker = cls(
-            None, pack_data.object_format.hash_func, resolve_ext_ref=resolve_ext_ref
+            None,
+            pack_data.object_format.hash_func,
+            resolve_ext_ref=resolve_ext_ref,
+            object_format=pack_data.object_format,
         )
         walker.set_pack_data(pack_data)
         for unpacked in pack_data.iter_unpacked(include_comp=False):
@@ -2249,7 +2257,10 @@ class DeltaChainIterator(Generic[T]):
           DeltaChainIterator instance
         """
         walker = cls(
-            None, pack.object_format.hash_func, resolve_ext_ref=resolve_ext_ref
+            None,
+            pack.object_format.hash_func,
+            resolve_ext_ref=resolve_ext_ref,
+            object_format=pack.object_format,
         )
         walker.set_pack_data(pack.data)
         todo = set()
@@ -2463,7 +2474,12 @@ class PackInflater(DeltaChainIterator[ShaFile]):
         Returns:
             ShaFile object from the unpacked data
         """
-        return unpacked.sha_file()
+        assert unpacked.obj_type_num is not None and unpacked.obj_chunks is not None
+        return ShaFile.from_raw_chunks(
+            unpacked.obj_type_num,
+            unpacked.obj_chunks,
+            object_format=self._object_format,
+        )
 
 
 class SHA1Reader(BinaryIO):

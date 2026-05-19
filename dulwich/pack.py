@@ -176,8 +176,8 @@ PACK_SPOOL_FILE_MAX_SIZE = 16 * 1024 * 1024
 DEFAULT_PACK_INDEX_VERSION = 2
 
 
-OldUnpackedObject = tuple[bytes | int, list[bytes]] | list[bytes]
-ResolveExtRefFn = Callable[[bytes], tuple[int, OldUnpackedObject]]
+OldUnpackedObject = tuple[bytes | int, list[bytes]] | list[bytes] | bytes
+ResolveExtRefFn = Callable[[RawObjectID | ObjectID], tuple[int, bytes | list[bytes]]]
 ProgressFn = Callable[[int, str], None]
 PackHint = tuple[int, bytes | None]
 
@@ -2332,7 +2332,7 @@ class DeltaChainIterator(Generic[T]):
             if base_sha not in self._pending_ref:
                 continue
             try:
-                type_num, chunks = self._resolve_ext_ref(base_sha)
+                type_num, chunks = self._resolve_ext_ref(RawObjectID(base_sha))
             except KeyError:
                 # Not an external ref, but may depend on one. Either it will
                 # get popped via a _follow_chain call, or we will raise an
@@ -2341,7 +2341,7 @@ class DeltaChainIterator(Generic[T]):
             self._ext_refs.append(RawObjectID(base_sha))
             self._pending_ref.pop(base_sha)
             for new_offset in pending:
-                yield from self._follow_chain(new_offset, type_num, chunks)  # type: ignore[arg-type]
+                yield from self._follow_chain(new_offset, type_num, chunks)
 
         self._ensure_no_pending()
 
@@ -2349,7 +2349,10 @@ class DeltaChainIterator(Generic[T]):
         raise NotImplementedError
 
     def _resolve_object(
-        self, offset: int, obj_type_num: int, base_chunks: list[bytes] | None
+        self,
+        offset: int,
+        obj_type_num: int,
+        base_chunks: bytes | list[bytes] | None,
     ) -> UnpackedObject:
         assert self._file is not None
         self._file.seek(offset)
@@ -2383,7 +2386,10 @@ class DeltaChainIterator(Generic[T]):
         return unpacked
 
     def _follow_chain(
-        self, offset: int, obj_type_num: int, base_chunks: list[bytes] | None
+        self,
+        offset: int,
+        obj_type_num: int,
+        base_chunks: bytes | list[bytes] | None,
     ) -> Iterator[T]:
         # Unlike PackData.get_object_at, there is no need to cache offsets as
         # this approach by design inflates each object exactly once.
@@ -4442,6 +4448,9 @@ class Pack:
             prev_offset = base_offset
             if get_ref is None:
                 get_ref = self.get_ref
+            assert isinstance(base_obj, tuple), (
+                f"Expected delta tuple, got {base_obj.__class__.__name__}"
+            )
             if base_type == OFS_DELTA:
                 (delta_offset, delta) = base_obj
                 # TODO: clean up asserts and replace with nicer error messages

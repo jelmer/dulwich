@@ -50,10 +50,13 @@ import warnings
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .errors import CommitError, HookError
 from .objects import Blob, Commit, ObjectID, Tag, Tree
+
+if TYPE_CHECKING:
+    from .config import Config
 from .refs import SYMREF, Ref, local_branch_name
 from .repo import (
     GITDIR,
@@ -375,12 +378,17 @@ class WorkTree:
         | bytes
         | os.PathLike[str]
         | Iterable[str | bytes | os.PathLike[str]],
+        config: Config | None = None,
     ) -> None:
         """Stage a set of paths.
 
         Args:
           fs_paths: List of paths, relative to the repository path
+          config: Repository configuration. If None, falls back to
+            ``self._repo.get_config_stack()``.
         """
+        if config is None:
+            config = self._repo.get_config_stack()
         root_path_bytes = os.fsencode(self.path)
 
         if isinstance(fs_paths, str | bytes | os.PathLike):
@@ -394,8 +402,8 @@ class WorkTree:
             index_entry_from_stat,
         )
 
-        index = self._repo.open_index()
-        blob_normalizer = self._repo.get_blob_normalizer()
+        index = self._repo.open_index(config=config)
+        blob_normalizer = self._repo.get_blob_normalizer(config=config)
         for fs_path in fs_paths:
             if not isinstance(fs_path, bytes):
                 fs_path = os.fsencode(fs_path)
@@ -436,16 +444,24 @@ class WorkTree:
                     index[tree_path] = index_entry_from_stat(st, blob.id)
         index.write()
 
-    def unstage(self, fs_paths: Sequence[str]) -> None:
+    def unstage(
+        self,
+        fs_paths: Sequence[str],
+        config: Config | None = None,
+    ) -> None:
         """Unstage specific file in the index.
 
         Args:
           fs_paths: a list of files to unstage,
             relative to the repository path.
+          config: Repository configuration. If None, falls back to
+            ``self._repo.get_config_stack()``.
         """
+        if config is None:
+            config = self._repo.get_config_stack()
         from .index import IndexEntry, _fs_to_tree_path
 
-        index = self._repo.open_index()
+        index = self._repo.open_index(config=config)
         try:
             commit = self._repo[Ref(b"HEAD")]
         except KeyError:
@@ -519,6 +535,7 @@ class WorkTree:
         no_verify: bool = False,
         sign: bool | None = None,
         signoff: bool | None = None,
+        config: Config | None = None,
     ) -> ObjectID:
         """Create a new commit.
 
@@ -549,6 +566,9 @@ class WorkTree:
             pass a str containing Key ID to use a specific GPG key)
           signoff: Add Signed-off-by line (DCO) to commit message.
             If None, uses format.signoff config.
+          config: Configuration to consult for committer/author identity and
+            other commit-time settings. If None, falls back to
+            ``self._repo.get_config_stack()``.
 
         Returns:
           New commit SHA1
@@ -561,16 +581,18 @@ class WorkTree:
         except KeyError:  # no hook defined, silent fallthrough
             pass
 
+        if config is None:
+            config = self._repo.get_config_stack()
+
         c = Commit()
         if tree is None:
-            index = self._repo.open_index()
+            index = self._repo.open_index(config=config)
             c.tree = index.commit(self._repo.object_store)
         else:
             if len(tree) != 40:
                 raise ValueError("tree must be a 40-byte hex sha string")
             c.tree = tree
 
-        config = self._repo.get_config_stack()
         if merge_heads is None:
             merge_heads = self._repo._read_heads("MERGE_HEAD")
         if committer is None:
@@ -768,12 +790,21 @@ class WorkTree:
 
         return c.id
 
-    def reset_index(self, tree: ObjectID | None = None) -> None:
+    def reset_index(
+        self,
+        tree: ObjectID | None = None,
+        config: Config | None = None,
+    ) -> None:
         """Reset the index back to a specific tree.
 
         Args:
           tree: Tree SHA to reset to, None for current HEAD tree.
+          config: Stacked configuration used for filter setup. If None,
+            falls back to ``self._repo.get_config_stack()``.
         """
+        if config is None:
+            config = self._repo.get_config_stack()
+        stacked_config = config
         from .index import (
             build_index_from_tree,
             symlink,
@@ -813,7 +844,7 @@ class WorkTree:
                 with open(dst, "w" + ("b" if isinstance(src, bytes) else "")) as f:
                     f.write(src)
 
-        blob_normalizer = self._repo.get_blob_normalizer()
+        blob_normalizer = self._repo.get_blob_normalizer(config=stacked_config)
         return build_index_from_tree(
             self.path,
             self._repo.index_path(),
@@ -1116,7 +1147,7 @@ def add_worktree(
         wt_repo.refs.set_symbolic_ref(HEADREF, branch)
 
     # Reset index to match HEAD
-    wt_repo.get_worktree().reset_index()
+    wt_repo.get_worktree().reset_index(config=wt_repo.get_config_stack())
 
     return wt_repo
 

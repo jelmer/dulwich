@@ -21,6 +21,7 @@
 
 """Tests for the repository."""
 
+import errno
 import glob
 import importlib
 import locale
@@ -47,12 +48,7 @@ from dulwich.repo import (
 )
 from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
-from . import (
-    DependencyMissing,
-    TestCase,
-    filesystem_supports_non_utf8_filenames,
-    skipIf,
-)
+from . import DependencyMissing, TestCase, skipIf
 
 missing_sha = b"b91fa4d900e17e99b433218e988c4eb4a3e9a097"
 
@@ -1872,16 +1868,21 @@ class BuildRepoRootTests(TestCase):
     def test_commit_no_encode_decode(self) -> None:
         r = self._repo
         repo_path_bytes = os.fsencode(r.path)
-        if not filesystem_supports_non_utf8_filenames(r.path):
-            self.skipTest(
-                "filesystem rejects non-UTF8 filenames (e.g. ZFS utf8only=on)"
-            )
         encodings = ("utf8", "latin1")
         names = ["À".encode(encoding) for encoding in encodings]
         for name, encoding in zip(names, encodings):
             full_path = os.path.join(repo_path_bytes, name)
-            with open(full_path, "wb") as f:
-                f.write(encoding.encode("ascii"))
+            try:
+                with open(full_path, "wb") as f:
+                    f.write(encoding.encode("ascii"))
+            except OSError as e:
+                if e.errno == errno.EILSEQ:
+                    # Filesystem rejects non-UTF8 filenames
+                    # (e.g. OpenZFS with utf8only=on).
+                    self.skipTest(
+                        f"filesystem rejects non-UTF8 filename {e.filename!r}"
+                    )
+                raise
             # These files are break tear_down_repo, so cleanup these files
             # ourselves.
             self.addCleanup(os.remove, full_path)

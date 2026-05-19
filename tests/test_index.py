@@ -21,6 +21,7 @@
 
 """Tests for the index."""
 
+import errno
 import os
 import shutil
 import stat
@@ -75,7 +76,7 @@ from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, Tree, TreeEntry
 from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit
 
-from . import TestCase, filesystem_supports_non_utf8_filenames, skipIf
+from . import TestCase, skipIf
 
 
 def can_symlink() -> bool:
@@ -754,10 +755,6 @@ class BuildIndexTests(TestCase):
         repo_dir = tempfile.mkdtemp()
         repo_dir_bytes = os.fsencode(repo_dir)
         self.addCleanup(shutil.rmtree, repo_dir)
-        if not filesystem_supports_non_utf8_filenames(repo_dir):
-            self.skipTest(
-                "filesystem rejects non-UTF8 filenames (e.g. ZFS utf8only=on)"
-            )
         with Repo.init(repo_dir) as repo:
             # Populate repo
             file = Blob.from_string(b"foo")
@@ -783,6 +780,12 @@ class BuildIndexTests(TestCase):
                 if e.errno == 92 and sys.platform == "darwin":
                     # Our filename isn't supported by the platform :(
                     self.skipTest(f"can not write filename {e.filename!r}")
+                elif e.errno == errno.EILSEQ:
+                    # Filesystem rejects non-UTF8 filenames
+                    # (e.g. OpenZFS with utf8only=on).
+                    self.skipTest(
+                        f"filesystem rejects non-UTF8 filename {e.filename!r}"
+                    )
                 else:
                     raise
 

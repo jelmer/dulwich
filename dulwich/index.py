@@ -3116,6 +3116,71 @@ def get_unstaged_changes(
                 yield result
 
 
+def _decode_utf8_with_fallback(data: bytes) -> str:
+    """Decode bytes as UTF-8, with lossy fallbacks for invalid sequences.
+
+    Mirrors the behaviour of git-for-windows's ``xutftowcsn`` (in
+    ``compat/mingw.c``) so that tree paths containing legacy-encoded or
+    otherwise invalid UTF-8 produce the same on-disk filename as C git.
+
+    Rules:
+      * Valid UTF-8 (1-4 byte sequences, excluding overlongs and codepoints
+        > U+10FFFF) is decoded normally.
+      * Invalid bytes in 0xa0-0xff map 1:1 to U+00A0-U+00FF.
+      * Invalid bytes in 0x80-0x9f are expanded to two lowercase ASCII hex
+        digits (e.g. byte 0x80 -> "80").
+      * Truncated multi-byte sequences and overlong/out-of-range encodings
+        cause the lead byte to fall through to the above invalid-byte rules
+        (the trail bytes are re-evaluated on the next iteration).
+    """
+    out: list[str] = []
+    i = 0
+    n = len(data)
+    while i < n:
+        c = data[i]
+        if c < 0x80:
+            out.append(chr(c))
+            i += 1
+        elif 0xC2 <= c < 0xE0 and i + 1 < n and (data[i + 1] & 0xC0) == 0x80:
+            cp = ((c & 0x1F) << 6) | (data[i + 1] & 0x3F)
+            out.append(chr(cp))
+            i += 2
+        elif (
+            0xE0 <= c < 0xF0
+            and i + 2 < n
+            and not (c == 0xE0 and data[i + 1] < 0xA0)
+            and (data[i + 1] & 0xC0) == 0x80
+            and (data[i + 2] & 0xC0) == 0x80
+        ):
+            cp = ((c & 0x0F) << 12) | ((data[i + 1] & 0x3F) << 6) | (data[i + 2] & 0x3F)
+            out.append(chr(cp))
+            i += 3
+        elif (
+            0xF0 <= c < 0xF5
+            and i + 3 < n
+            and not (c == 0xF0 and data[i + 1] < 0x90)
+            and not (c == 0xF4 and data[i + 1] >= 0x90)
+            and (data[i + 1] & 0xC0) == 0x80
+            and (data[i + 2] & 0xC0) == 0x80
+            and (data[i + 3] & 0xC0) == 0x80
+        ):
+            cp = (
+                ((c & 0x07) << 18)
+                | ((data[i + 1] & 0x3F) << 12)
+                | ((data[i + 2] & 0x3F) << 6)
+                | (data[i + 3] & 0x3F)
+            )
+            out.append(chr(cp))
+            i += 4
+        elif c >= 0xA0:
+            out.append(chr(c))
+            i += 1
+        else:
+            out.append(f"{c:02x}")
+            i += 1
+    return "".join(out)
+
+
 def _tree_to_fs_path(
     root_path: bytes, tree_path: bytes, tree_encoding: str = "utf-8"
 ) -> bytes:
@@ -3134,15 +3199,17 @@ def _tree_to_fs_path(
     else:
         sep_corrected_path = tree_path
 
-    # On Windows, we need to handle tree path encoding properly
+    # On Windows, decode tree-encoded bytes to a str so they can flow into
+    # the wide-char Win32 APIs via Python's filesystem layer. For UTF-8
+    # (the default tree encoding) we use a lossy decoder that matches C
+    # git's xutftowcsn fallbacks; for other encodings we let UnicodeDecodeError
+    # propagate rather than silently producing a corrupt path.
     if sys.platform == "win32":
-        # Decode from tree encoding, then re-encode for filesystem
-        try:
+        if tree_encoding == "utf-8":
+            tree_path_str = _decode_utf8_with_fallback(sep_corrected_path)
+        else:
             tree_path_str = sep_corrected_path.decode(tree_encoding)
-            sep_corrected_path = os.fsencode(tree_path_str)
-        except UnicodeDecodeError:
-            # If decoding fails, use the original bytes
-            pass
+        sep_corrected_path = os.fsencode(tree_path_str)
 
     return os.path.join(root_path, sep_corrected_path)
 
@@ -3161,15 +3228,17 @@ def _fs_to_tree_path(fs_path: str | bytes, tree_encoding: str = "utf-8") -> byte
     else:
         fs_path_bytes = fs_path
 
-    # On Windows, we need to ensure tree paths are properly encoded
+    # On Windows the on-disk filename is a UTF-16 wide string; Python gives
+    # us either str (already decoded) or bytes encoded via the filesystem
+    # codec. Normalise to str, then encode under the tree encoding so the
+    # resulting tree path is plain UTF-8. This matches C git's xwcstoutf,
+    # which is just WideCharToMultiByte(CP_UTF8) — it makes no attempt to
+    # reverse the xutftowcsn fallbacks, so a file that was checked out from
+    # a tree path with invalid UTF-8 will read back as the lossy form (the
+    # same divergence C git exhibits, documented as a one-way mapping).
     if sys.platform == "win32":
-        try:
-            # Decode from filesystem encoding, then re-encode with tree encoding
-            fs_path_str = os.fsdecode(fs_path_bytes)
-            fs_path_bytes = fs_path_str.encode(tree_encoding)
-        except UnicodeDecodeError:
-            # If filesystem decoding fails, use the original bytes
-            pass
+        fs_path_str = os.fsdecode(fs_path_bytes)
+        fs_path_bytes = fs_path_str.encode(tree_encoding)
 
     if os_sep_bytes != b"/":
         tree_path = fs_path_bytes.replace(os_sep_bytes, b"/")

@@ -14,6 +14,10 @@
    auto-stash clock skew) could yield reachable commits before
    ``_exclude_parents`` had a chance to mark them. (Jelmer Vernooĳ, #2176)
 
+ * Match Git for Windows' ``xutftowcsn`` byte-mapping when checking
+   out tree paths that are not valid UTF-8 on Windows.
+   (Jelmer Vernooĳ)
+
  * Escape ``"`` and ``\`` in subsection names when writing config
    files, and unescape them when parsing. Previously a subsection
    name containing either character was emitted verbatim, producing

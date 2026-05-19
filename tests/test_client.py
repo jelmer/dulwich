@@ -2903,6 +2903,7 @@ class DefaultUrllib3ManagerTest(TestCase):
 
 class SubprocessSSHVendorTests(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         # Monkey Patch client subprocess popen
         self._orig_popen = dulwich.client.subprocess.Popen
         dulwich.client.subprocess.Popen = DummyPopen
@@ -3002,6 +3003,7 @@ class SubprocessSSHVendorTests(TestCase):
 
 class PLinkSSHVendorTests(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         # Monkey Patch client subprocess popen
         self._orig_popen = dulwich.client.subprocess.Popen
         dulwich.client.subprocess.Popen = DummyPopen
@@ -3410,6 +3412,7 @@ class TestBuildFetchRequestV2(TestCase):
 
 class TestPackfileUris(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         self.rin = BytesIO()
         self.rout = BytesIO()
 

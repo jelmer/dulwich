@@ -781,19 +781,22 @@ class BuildIndexTests(TestCase):
                     self.skipTest(f"can not write filename {e.filename!r}")
                 else:
                     raise
-            except UnicodeDecodeError:
-                # This happens e.g. with python3.6 on Windows.
-                # It implicitly decodes using utf8, which doesn't work.
-                self.skipTest("can not implicitly convert as utf8")
 
             # Verify index entries
             index = repo.open_index()
             self.assertIn(latin1_name, index)
             self.assertIn(utf8_name, index)
 
-            self.assertTrue(os.path.exists(latin1_path))
-
-            self.assertTrue(os.path.exists(utf8_path))
+            if sys.platform == "win32":
+                # On Windows, the latin-1 byte 0xc0 is not valid UTF-8 and
+                # gets remapped 1:1 to U+00C0 by xutftowcsn, so the on-disk
+                # filename is the UTF-8 encoding of U+00C0 (b"\xc3\x80"),
+                # not the raw latin-1 byte. Both tree entries therefore
+                # land on the same on-disk filename.
+                self.assertTrue(os.path.exists(utf8_path))
+            else:
+                self.assertTrue(os.path.exists(latin1_path))
+                self.assertTrue(os.path.exists(utf8_path))
 
     def test_windows_unicode_filename_encoding(self) -> None:
         """Test that Unicode filenames are handled correctly on Windows.
@@ -865,6 +868,67 @@ class BuildIndexTests(TestCase):
                     filename_only, tree_encoding="utf-8"
                 )
                 self.assertEqual(reconstructed_tree_path, utf8_filename_bytes)
+
+    def test_windows_invalid_utf8_filename_xutftowcsn(self) -> None:
+        """On Windows, a tree path with invalid UTF-8 must check out using
+        the xutftowcsn fallback mapping, matching C git on Windows."""
+        if sys.platform != "win32":
+            self.skipTest("xutftowcsn fallback only applies on Windows")
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        with Repo.init(repo_dir) as repo:
+            blob = Blob.from_string(b"contents")
+            tree = Tree()
+            # b"caf\xe9" is latin-1 for U+00E9; the trailing 0xe9 is
+            # invalid UTF-8 and must map 1:1 to U+00E9 under xutftowcsn.
+            invalid_utf8_name = b"caf\xe9"
+            tree[invalid_utf8_name] = (stat.S_IFREG | 0o644, blob.id)
+            repo.object_store.add_objects([(blob, None), (tree, None)])
+
+            try:
+                build_index_from_tree(
+                    repo.path, repo.index_path(), repo.object_store, tree.id
+                )
+            except OSError as e:
+                if "cannot" in str(e).lower():
+                    self.skipTest(f"Platform doesn't support filename: {e}")
+                raise
+
+            # The on-disk filename is the lossy decode of b"caf\xe9", not
+            # the raw invalid-UTF-8 bytes.
+            expected_path = os.path.join(repo.path, "café")
+            self.assertTrue(
+                os.path.exists(expected_path),
+                f"Expected lossy filename at {expected_path}",
+            )
+
+    def test_windows_low_byte_filename_xutftowcsn(self) -> None:
+        """On Windows, invalid bytes in 0x80-0x9f must expand to two hex
+        digits in the on-disk filename, matching C git's xutftowcsn."""
+        if sys.platform != "win32":
+            self.skipTest("xutftowcsn fallback only applies on Windows")
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+
+        with Repo.init(repo_dir) as repo:
+            blob = Blob.from_string(b"contents")
+            tree = Tree()
+            tree[b"\x80foo"] = (stat.S_IFREG | 0o644, blob.id)
+            repo.object_store.add_objects([(blob, None), (tree, None)])
+
+            build_index_from_tree(
+                repo.path, repo.index_path(), repo.object_store, tree.id
+            )
+
+            # 0x80 expands to "80" -> on-disk filename "80foo".
+            expected_path = os.path.join(repo.path, "80foo")
+            self.assertTrue(
+                os.path.exists(expected_path),
+                f"Expected lossy filename at {expected_path}",
+            )
 
     def test_git_submodule(self) -> None:
         repo_dir = tempfile.mkdtemp()

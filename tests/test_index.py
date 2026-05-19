@@ -1539,6 +1539,44 @@ class TestTreeFSPathConversion(TestCase):
         fs_path = _tree_to_fs_path(b"/prefix", b"\x80")
         self.assertEqual(fs_path, os.path.join(b"/prefix", os.fsencode("80")))
 
+    def test_fs_to_tree_path_windows_str_unicode(self) -> None:
+        # On Windows, a Unicode str filename should be encoded as UTF-8 in
+        # the tree (not via the filesystem mbcs codec).
+        original_platform = sys.platform
+        sys.platform = "win32"
+        self.addCleanup(setattr, sys, "platform", original_platform)
+
+        tree_path = _fs_to_tree_path("café")
+        self.assertEqual(tree_path, "café".encode())
+
+    def test_fs_to_tree_path_windows_roundtrip_valid_utf8(self) -> None:
+        # Round-trip: valid-UTF-8 tree path -> filesystem -> tree path.
+        original_platform = sys.platform
+        sys.platform = "win32"
+        self.addCleanup(setattr, sys, "platform", original_platform)
+
+        original_tree = "café".encode()
+        # Forward: tree bytes -> fs bytes (joined under a fake prefix).
+        fs = _tree_to_fs_path(b"/prefix", original_tree)
+        # Strip the prefix the way a real caller (after listdir) would,
+        # then go back through _fs_to_tree_path.
+        filename = fs[len(b"/prefix/") :]
+        self.assertEqual(_fs_to_tree_path(filename), original_tree)
+
+    def test_fs_to_tree_path_windows_invalid_utf8_is_one_way(self) -> None:
+        # Document C git's one-way semantics: a tree path with invalid UTF-8
+        # produces a file with a lossy name on disk, and reading that
+        # filename back yields the lossy form — NOT the original bytes.
+        original_platform = sys.platform
+        sys.platform = "win32"
+        self.addCleanup(setattr, sys, "platform", original_platform)
+
+        # Tree path b"\x80foo" -> on-disk name "80foo".
+        fs = _tree_to_fs_path(b"/prefix", b"\x80foo")
+        filename = fs[len(b"/prefix/") :]
+        # The lossy filename round-trips to b"80foo", not b"\x80foo".
+        self.assertEqual(_fs_to_tree_path(filename), b"80foo")
+
 
 class TestIndexEntryFromPath(TestCase):
     def setUp(self):

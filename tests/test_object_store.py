@@ -118,6 +118,29 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         self.assertEqual([], entries)
         o.add_thin_pack(f.read, None)
 
+    def test_add_pack_rejects_truncated_checksum(self) -> None:
+        # A pack stream that lost the last few bytes of its trailing
+        # checksum must be rejected by MemoryObjectStore.add_pack;
+        # otherwise a MemoryRepo non-thin fetch would silently accept
+        # truncated network input. add_thin_pack already validates via
+        # PackStreamCopier.verify().
+        from dulwich.errors import ChecksumMismatch
+
+        o = MemoryObjectStore()
+        f, commit, abort = o.add_pack()
+        try:
+            scratch = BytesIO()
+            build_pack(scratch, [(Blob.type_num, b"hello world")])
+            data = scratch.getvalue()
+            # Drop a few bytes of the 20-byte trailing checksum.
+            f.write(data[:-5])
+            self.assertRaises(ChecksumMismatch, commit)
+        except BaseException:
+            abort()
+            raise
+        # The truncated pack must not have leaked objects into the store.
+        self.assertEqual([], list(o))
+
     def test_add_pack_data_with_deltas(self) -> None:
         """Test that add_pack_data properly handles delta objects.
 

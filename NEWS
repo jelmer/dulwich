@@ -4,6 +4,11 @@
    ``GIT_CONFIG_VALUE_<n>`` in porcelain entry points, via the new
    opt-in ``config.env_config`` helper. (Jelmer Vernooĳ, #2168)
 
+ * Verify the trailing pack checksum in
+   ``MemoryObjectStore.add_pack`` so a non-thin fetch into a
+   ``MemoryRepo`` no longer accepts a pack with a truncated trailer.
+   (Jelmer Vernooĳ; reported by Christopher Toth)
+
  * Inflate every object in ``DiskObjectStore._complete_pack``
    so malformed trees (and other payloads ``MemoryObjectStore`` and
    ``git fsck`` reject) no longer silently land on disk.

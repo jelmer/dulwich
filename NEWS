@@ -1,3 +1,11 @@
+1.2.3	UNRELEASED
+
+ * SECURITY: Sanitize commit subjects used in
+   ``porcelain.format_patch`` filenames so a malicious subject (e.g.
+   ``x/../../x``) cannot direct the generated patch outside ``outdir``.
+   ``get_summary`` now matches git's ``format_sanitized_subject``.
+   (Jelmer Vernooĳ)
+
 1.2.2	2026-05-19
 
  * Normalise hex SHAs to binary in ``DiskObjectStore.contains_packed``

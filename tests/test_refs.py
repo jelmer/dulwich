@@ -61,10 +61,10 @@ class CheckRefFormatTests(TestCase):
     def test_valid(self) -> None:
         self.assertTrue(check_ref_format(b"heads/foo"))
         self.assertTrue(check_ref_format(b"foo/bar/baz"))
-        self.assertTrue(check_ref_format(b"refs///heads/foo"))
         self.assertTrue(check_ref_format(b"foo./bar"))
         self.assertTrue(check_ref_format(b"heads/foo@bar"))
         self.assertTrue(check_ref_format(b"heads/fix.lock.error"))
+        self.assertTrue(check_ref_format(b"heads/foo.lock.bar"))
 
     def test_invalid(self) -> None:
         self.assertFalse(check_ref_format(b"foo"))
@@ -76,6 +76,13 @@ class CheckRefFormatTests(TestCase):
         self.assertFalse(check_ref_format(b"heads/foo.lock"))
         self.assertFalse(check_ref_format(b"heads/v@{ation"))
         self.assertFalse(check_ref_format(b"heads/foo\bar"))
+        self.assertFalse(check_ref_format(b"refs//a"))
+        self.assertFalse(check_ref_format(b"refs/heads//a"))
+        self.assertFalse(check_ref_format(b"refs///heads/foo"))
+        self.assertFalse(check_ref_format(b"/refs/heads/foo"))
+        self.assertFalse(check_ref_format(b"refs/a.lock/a"))
+        self.assertFalse(check_ref_format(b"refs/heads/a.lock/a"))
+        self.assertFalse(check_ref_format(b"@"))
 
 
 ONES = b"1" * 40

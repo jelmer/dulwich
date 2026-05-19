@@ -861,6 +861,7 @@ class IsPerWorktreeRefsTests(TestCase):
 
 class DiskRefsContainerWorktreeRefsTest(TestCase):
     def setUp(self) -> None:
+        super().setUp()
         # Create temporary directories
         temp_dir = tempfile.mkdtemp()
         test_dir = os.path.join(temp_dir, "main")

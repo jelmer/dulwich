@@ -36,6 +36,7 @@ class BisectStateTests(TestCase):
     """Tests for BisectState class."""
 
     def setUp(self) -> None:
+        super().setUp()
         self.test_dir = tempfile.mkdtemp()
         self.repo = Repo.init(self.test_dir)
 

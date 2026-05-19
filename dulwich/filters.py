@@ -44,7 +44,7 @@ from .attrs import GitAttributes
 from .objects import Blob
 
 if TYPE_CHECKING:
-    from .config import StackedConfig
+    from .config import Config
     from .protocol import Protocol
     from .repo import BaseRepo
 
@@ -68,7 +68,7 @@ class FilterDriver(TypingProtocol):
         """Clean up any resources held by this filter driver."""
         ...
 
-    def reuse(self, config: "StackedConfig", filter_name: str) -> bool:
+    def reuse(self, config: "Config", filter_name: str) -> bool:
         """Check if this filter driver should be reused with the given configuration.
 
         This method determines whether a cached filter driver instance should continue
@@ -116,7 +116,7 @@ class CompositeFilterDriver:
         for filter_driver in self.filters:
             filter_driver.cleanup()
 
-    def reuse(self, config: "StackedConfig", filter_name: str) -> bool:
+    def reuse(self, config: "Config", filter_name: str) -> bool:
         """Check if all filters can be reused."""
         # A composite filter can only be reused if all its components can
         return all(f.reuse(config, filter_name) for f in self.filters)
@@ -479,7 +479,7 @@ class ProcessFilterDriver:
         self._process = None
         self._protocol = None
 
-    def reuse(self, config: "StackedConfig", filter_name: str) -> bool:
+    def reuse(self, config: "Config", filter_name: str) -> bool:
         """Check if this filter driver should be reused with the given configuration."""
         # Only reuse if it's a long-running process filter AND config hasn't changed
         if self.process_cmd is None:
@@ -602,14 +602,14 @@ class FilterContext:
         # Also close the registry
         self.filter_registry.close()
 
-    def refresh_config(self, config: "StackedConfig") -> None:
+    def refresh_config(self, config: "Config") -> None:
         """Refresh the configuration used by the filter registry.
 
         This should be called when the configuration has changed to ensure
         filters use the latest settings.
 
         Args:
-            config: The new configuration stack
+            config: The new configuration
         """
         # Update the registry's config
         self.filter_registry.config = config
@@ -634,13 +634,13 @@ class FilterRegistry:
 
     def __init__(
         self,
-        config: "StackedConfig | None" = None,
+        config: "Config | None" = None,
         repo: "BaseRepo | None" = None,
     ) -> None:
         """Initialize FilterRegistry.
 
         Args:
-          config: Git configuration stack
+          config: Git configuration
           repo: Repository instance
         """
         self.config = config
@@ -910,7 +910,7 @@ class FilterBlobNormalizer:
 
     def __init__(
         self,
-        config_stack: "StackedConfig | None",
+        config_stack: "Config | None",
         gitattributes: GitAttributes,
         filter_registry: FilterRegistry | None = None,
         repo: "BaseRepo | None" = None,
@@ -919,7 +919,7 @@ class FilterBlobNormalizer:
         """Initialize FilterBlobNormalizer.
 
         Args:
-          config_stack: Git configuration stack
+          config_stack: Git configuration
           gitattributes: GitAttributes instance
           filter_registry: Optional filter registry to use (deprecated, use filter_context)
           repo: Optional repository instance

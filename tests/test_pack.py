@@ -252,6 +252,13 @@ class TestPackDeltas(TestCase):
         """Test apply_delta with a truncated insert operation."""
         self.assertRaises(ApplyDeltaError, apply_delta, b"", b"\x00\x01\x01")
 
+    def test_apply_delta_truncated_header(self) -> None:
+        # A delta that ends mid-size-header used to crash with a
+        # generic TypeError from ``ord(b"")``; the explicit bound
+        # check now turns it into a typed ApplyDeltaError.
+        self.assertRaises(ApplyDeltaError, apply_delta, b"", b"\x80")
+        self.assertRaises(ApplyDeltaError, apply_delta, b"", b"")
+
     def test_create_delta_insert_only(self) -> None:
         """Test create_delta when only insertions are required."""
         base = b""
@@ -1719,6 +1726,30 @@ class DeltaChainIteratorTests(TestCase):
         )
         # Delta resolution changed to DFS
         self.assertEntriesMatch([0, 4, 2, 1, 3], entries, self.make_pack_iter(f))
+
+    def test_ref_delta_rejects_empty_commit_payload(self) -> None:
+        # A delta against a commit/tree/tag that resolves to zero bytes
+        # produces a "valid" SHA pointing at an empty payload that
+        # downstream commit/tree parsers happily accept (their loops
+        # simply iterate zero times). Git fsck rejects such objects, so
+        # we must reject them at pack-read time rather than materialise
+        # the empty payload as a real object.
+        commit = make_object(
+            Commit,
+            tree=b"a" * 40,
+            author=b"me <a@b>",
+            committer=b"me <a@b>",
+            author_time=1,
+            commit_time=1,
+            author_timezone=0,
+            commit_timezone=0,
+            message=b"msg",
+        )
+        self.store.add_object(commit)
+        f = BytesIO()
+        build_pack(f, [(REF_DELTA, (commit.id, b""))], store=self.store)
+        pack_iter = self.make_pack_iter(f)
+        self.assertRaises(ApplyDeltaError, list, pack_iter._walk_all_chains())
 
     def test_long_chain(self) -> None:
         n = 100

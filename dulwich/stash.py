@@ -53,6 +53,7 @@ from .reflog import drop_reflog_entry, read_reflog
 from .refs import Ref
 
 if TYPE_CHECKING:
+    from .config import Config
     from .reflog import Entry
     from .repo import Repo
 
@@ -115,15 +116,19 @@ class Stash:
         if index == 0:
             self._repo.refs[self._ref] = self[0].new_sha
 
-    def pop(self, index: int) -> "Entry":
+    def pop(self, index: int, *, config: "Config | None" = None) -> "Entry":
         """Pop a stash entry and apply its changes.
 
         Args:
           index: Index of the stash entry to pop (0 is the most recent)
+          config: Repository configuration. If None, falls back to
+            ``self._repo.get_config_stack()``.
 
         Returns:
           The stash entry that was popped
         """
+        if config is None:
+            config = self._repo.get_config_stack()
         # Get the stash entry before removing it
         entry = self[index]
 
@@ -182,10 +187,10 @@ class Stash:
                     f.write(src)
 
         # Get blob normalizer for line ending conversion
-        blob_normalizer = self._repo.get_blob_normalizer()
+        blob_normalizer = self._repo.get_blob_normalizer(config=config)
 
         # Open the index
-        repo_index = self._repo.open_index()
+        repo_index = self._repo.open_index(config=config)
 
         # Apply working tree changes
         stash_tree_id = stash_commit.tree
@@ -291,6 +296,8 @@ class Stash:
         committer: bytes | None = None,
         author: bytes | None = None,
         message: bytes | None = None,
+        *,
+        config: "Config | None" = None,
     ) -> ObjectID:
         """Create a new stash.
 
@@ -298,7 +305,11 @@ class Stash:
           committer: Optional committer name to use
           author: Optional author name to use
           message: Optional commit message
+          config: Repository configuration. If None, falls back to
+            ``self._repo.get_config_stack()``.
         """
+        if config is None:
+            config = self._repo.get_config_stack()
         # First, create the index commit.
         commit_kwargs = CommitKwargs()
         if committer is not None:
@@ -306,7 +317,7 @@ class Stash:
         if author is not None:
             commit_kwargs["author"] = author
 
-        index = self._repo.open_index()
+        index = self._repo.open_index(config=config)
         index_tree_id = index.commit(self._repo.object_store)
         # Create a dangling commit for the index state
         # Note: We pass ref=None which is handled specially in do_commit
@@ -318,6 +329,7 @@ class Stash:
             no_verify=True,
             sign=False,
             ref=None,  # Don't update any ref
+            config=config,
             **commit_kwargs,
         )
 
@@ -350,6 +362,7 @@ class Stash:
             merge_heads=[index_commit_id],
             no_verify=True,
             sign=False,
+            config=config,
             **commit_kwargs,
         )
 
@@ -370,6 +383,7 @@ class Stash:
             new_tree_id=head_tree_id,
             change_iterator=changes,
             allow_overwrite_modified=True,  # We need to overwrite modified files
+            config=config,
         )
 
         return cid

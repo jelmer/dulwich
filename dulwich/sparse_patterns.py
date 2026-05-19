@@ -35,11 +35,15 @@ __all__ = [
 import os
 from collections.abc import Sequence, Set
 from fnmatch import fnmatch
+from typing import TYPE_CHECKING
 
 from .file import ensure_dir_exists
 from .index import Index, IndexEntry
 from .objects import Blob
 from .repo import Repo
+
+if TYPE_CHECKING:
+    from .config import Config
 
 
 class SparseCheckoutConflictError(Exception):
@@ -149,7 +153,11 @@ def compute_included_paths_cone(index: Index, lines: Sequence[str]) -> set[str]:
 
 
 def apply_included_paths(
-    repo: Repo, included_paths: Set[str], force: bool = False
+    repo: Repo,
+    included_paths: Set[str],
+    force: bool = False,
+    *,
+    config: "Config | None" = None,
 ) -> None:
     """Apply the sparse-checkout inclusion set to the index and working tree.
 
@@ -162,12 +170,16 @@ def apply_included_paths(
       repo: A path to the repository or a Repo object.
       included_paths: A set of paths (strings) that should remain included.
       force: Whether to forcibly remove locally modified files (default False).
+      config: Repository configuration. If None, falls back to
+        ``repo.get_config_stack()``.
 
     Returns:
       None
     """
-    index = repo.open_index()
-    normalizer = repo.get_blob_normalizer()
+    if config is None:
+        config = repo.get_config_stack()
+    index = repo.open_index(config=config)
+    normalizer = repo.get_blob_normalizer(config=config)
 
     def local_modifications_exist(full_path: str, index_entry: IndexEntry) -> bool:
         if not os.path.exists(full_path):

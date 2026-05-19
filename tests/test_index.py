@@ -1567,6 +1567,56 @@ class TestValidatePathElement(TestCase):
         self.assertFalse(validate_path_element_ntfs(b".git:evil"))
         self.assertFalse(validate_path_element_ntfs(b"foo:bar"))
 
+    def test_ntfs_rejects_reserved_device_names(self) -> None:
+        # CON, PRN, AUX, NUL and COM1..9 / LPT1..9 are reserved
+        # devices on Windows. Opening them resolves to the device
+        # rather than a disk file, with or without an extension and
+        # regardless of case.
+        for name in (
+            b"NUL",
+            b"nul",
+            b"NuL",
+            b"CON",
+            b"PRN",
+            b"AUX",
+            b"COM1",
+            b"COM9",
+            b"LPT1",
+            b"LPT9",
+        ):
+            self.assertFalse(
+                validate_path_element_ntfs(name),
+                f"{name!r} should be rejected on NTFS",
+            )
+
+    def test_ntfs_rejects_reserved_device_names_with_extension(self) -> None:
+        # Extensions do not make a reserved name safe on Windows —
+        # ``NUL.txt`` still opens the NUL device.
+        self.assertFalse(validate_path_element_ntfs(b"NUL.txt"))
+        self.assertFalse(validate_path_element_ntfs(b"aux.foo"))
+        self.assertFalse(validate_path_element_ntfs(b"COM1.bar"))
+        # Multiple extensions still match the stem.
+        self.assertFalse(validate_path_element_ntfs(b"nul.tar.gz"))
+        # Trailing dots/spaces are stripped by NTFS before resolution.
+        self.assertFalse(validate_path_element_ntfs(b"NUL."))
+        self.assertFalse(validate_path_element_ntfs(b"NUL "))
+        self.assertFalse(validate_path_element_ntfs(b"NUL ..."))
+        # A trailing space on the stem itself is also stripped, so
+        # ``NUL .txt`` still resolves to the NUL device.
+        self.assertFalse(validate_path_element_ntfs(b"NUL .txt"))
+
+    def test_ntfs_accepts_names_that_only_resemble_devices(self) -> None:
+        # Only the exact reserved names are devices; longer names
+        # that merely start with one of them are fine.
+        self.assertTrue(validate_path_element_ntfs(b"null"))
+        self.assertTrue(validate_path_element_ntfs(b"console"))
+        self.assertTrue(validate_path_element_ntfs(b"prnt"))
+        self.assertTrue(validate_path_element_ntfs(b"myaux"))
+        # COM0/LPT0 and COM10+ are not in the reserved range.
+        self.assertTrue(validate_path_element_ntfs(b"com0"))
+        self.assertTrue(validate_path_element_ntfs(b"com10"))
+        self.assertTrue(validate_path_element_ntfs(b"lpt0"))
+
 
 class TestDecodeUTF8WithFallback(TestCase):
     """Tests for the xutftowcsn-style lossy UTF-8 decoder."""

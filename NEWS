@@ -64,6 +64,15 @@
    / ``core.protectHFS`` configuration keys are now read under their
    documented names. Reported by Christopher Toth.
 
+ * Reject tree entries whose name resolves to a reserved Windows
+   device (``CON``, ``PRN``, ``AUX``, ``NUL``, ``COM1``-``COM9``,
+   ``LPT1``-``LPT9``), with or without an extension. ``NUL.txt`` and
+   ``AUX.foo`` open the device rather than a disk file on Windows,
+   so a tree authored on POSIX containing such a name would either
+   fail to check out or write to the device on a Windows clone —
+   matching Git's behaviour under ``core.protectNTFS``. Reported by
+   Christopher Toth.
+
  * Deduplicate objects when writing a multi-pack-index. Objects present
    in multiple packs (e.g. after ``git gc`` creates a cruft pack) would
    otherwise produce an OIDL chunk with repeated SHAs, causing ``git

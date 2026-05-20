@@ -56,6 +56,7 @@ __all__ = [
 ]
 
 import os
+import sys
 import types
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import suppress
@@ -67,6 +68,11 @@ from typing import (
     NewType,
     TypeVar,
 )
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 if TYPE_CHECKING:
     from .file import _GitFile
@@ -1711,7 +1717,7 @@ class locked_ref:
         self._realname: Ref | None = None
         self._deleted = False
 
-    def __enter__(self) -> "locked_ref":
+    def __enter__(self) -> Self:
         """Enter the context manager and acquire the lock.
 
         Returns:

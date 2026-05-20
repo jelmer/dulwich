@@ -57,6 +57,7 @@ import io
 import logging
 import os
 import stat
+import sys
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, BinaryIO
 
@@ -69,6 +70,11 @@ from .object_store import iter_tree_contents
 from .objects import S_ISGITLINK, Blob, Commit, ObjectID
 from .patch import write_blob_diff, write_object_diff
 from .repo import Repo
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
 
@@ -718,7 +724,7 @@ class ColorizedDiffStream(BinaryIO):
         """This stream is writable."""
         return True
 
-    def __enter__(self) -> "ColorizedDiffStream":
+    def __enter__(self) -> Self:
         """Context manager entry."""
         return self
 

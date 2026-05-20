@@ -73,6 +73,11 @@ from typing import (
     TypeVar,
 )
 
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 if TYPE_CHECKING:
     # There are no circular imports here, but we try to defer imports as long
     # as possible to reduce start-up time for anything that doesn't need
@@ -2371,7 +2376,7 @@ class Repo(BaseRepo):
             self.filter_context.close()
             self.filter_context = None
 
-    def __enter__(self) -> "Repo":
+    def __enter__(self) -> Self:
         """Enter context manager."""
         return self
 

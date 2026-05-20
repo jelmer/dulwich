@@ -96,6 +96,11 @@ from .patch import DiffAlgorithmNotAvailable
 from .repo import Repo
 from .stripspace import stripspace
 
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 logger = logging.getLogger(__name__)
 
 
@@ -256,7 +261,7 @@ class AutoFlushTextIOWrapper:
         """Delegate all other attributes to the underlying stream."""
         return getattr(self._stream, name)
 
-    def __enter__(self) -> "AutoFlushTextIOWrapper":
+    def __enter__(self) -> Self:
         """Support context manager protocol."""
         return self
 
@@ -339,7 +344,7 @@ class AutoFlushBinaryIOWrapper:
         """Delegate all other attributes to the underlying stream."""
         return getattr(self._stream, name)
 
-    def __enter__(self) -> "AutoFlushBinaryIOWrapper":
+    def __enter__(self) -> Self:
         """Support context manager protocol."""
         return self
 
@@ -799,7 +804,7 @@ class PagerBuffer(BinaryIO):
         """Return next line (not supported)."""
         raise io.UnsupportedOperation("PagerBuffer does not support iteration")
 
-    def __enter__(self) -> "PagerBuffer":
+    def __enter__(self) -> Self:
         """Enter context manager."""
         return self
 
@@ -901,7 +906,7 @@ class Pager(TextIO):
                 pass
             self.pager_process = None
 
-    def __enter__(self) -> "Pager":
+    def __enter__(self) -> Self:
         """Context manager entry."""
         return self
 

@@ -129,6 +129,11 @@ from typing import (
     TypeVar,
 )
 
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 try:
     import mmap
 except ImportError:
@@ -1910,15 +1915,15 @@ class PackData:
                 # Ignore errors during cleanup
                 pass
 
-    def __enter__(self) -> "PackData":
+    def __enter__(self) -> Self:
         """Enter context manager."""
         return self
 
     def __exit__(
         self,
-        exc_type: type | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
+        type: type | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         """Exit context manager."""
         self.close()
@@ -2599,7 +2604,7 @@ class SHA1Reader(BinaryIO):
         """Write data to the file (not supported)."""
         raise UnsupportedOperation("write")
 
-    def __enter__(self) -> "SHA1Reader":
+    def __enter__(self) -> Self:
         """Enter context manager."""
         return self
 
@@ -2767,7 +2772,7 @@ class SHA1Writer(BinaryIO):
         """
         raise UnsupportedOperation("read")
 
-    def __enter__(self) -> "SHA1Writer":
+    def __enter__(self) -> Self:
         """Enter context manager."""
         return self
 
@@ -2934,7 +2939,7 @@ class HashWriter(BinaryIO):
         """
         raise UnsupportedOperation("read")
 
-    def __enter__(self) -> "HashWriter":
+    def __enter__(self) -> Self:
         """Enter context manager."""
         return self
 
@@ -4248,15 +4253,15 @@ class Pack:
                 # Ignore errors during cleanup
                 pass
 
-    def __enter__(self) -> "Pack":
+    def __enter__(self) -> Self:
         """Enter context manager."""
         return self
 
     def __exit__(
         self,
-        exc_type: type | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
+        type: type | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         """Exit context manager."""
         self.close()

@@ -1,6 +1,6 @@
 PYTHON = python3
 RUFF ?= $(PYTHON) -m ruff
-SETUP = $(PYTHON) setup.py
+SETUP = $(PYTHON) -m build
 TESTRUNNER ?= unittest
 RUNTEST = PYTHONHASHSEED=random PYTHONPATH=$(shell pwd)$(if $(PYTHONPATH),:$(PYTHONPATH),) $(PYTHON) -m $(TESTRUNNER) $(TEST_OPTIONS)
 COVERAGE = python3-coverage

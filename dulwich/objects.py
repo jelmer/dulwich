@@ -882,20 +882,22 @@ class Blob(ShaFile):
         self._chunked_text = []
         self._needs_serialization = False
 
-    def _get_data(self) -> bytes:
+    @property
+    def data(self) -> bytes:
+        """The text contained within the blob object."""
         return self.as_raw_string()
 
-    def _set_data(self, data: bytes) -> None:
+    @data.setter
+    def data(self, data: bytes) -> None:
         self.set_raw_string(data)
 
-    data = property(
-        _get_data, _set_data, doc="The text contained within the blob object."
-    )
-
-    def _get_chunked(self) -> list[bytes]:
+    @property
+    def chunked(self) -> list[bytes]:
+        """The text in the blob object, as chunks (not necessarily lines)."""
         return self._chunked_text
 
-    def _set_chunked(self, chunks: list[bytes]) -> None:
+    @chunked.setter
+    def chunked(self, chunks: list[bytes]) -> None:
         self._chunked_text = chunks
 
     def _serialize(self) -> list[bytes]:
@@ -903,12 +905,6 @@ class Blob(ShaFile):
 
     def _deserialize(self, chunks: list[bytes]) -> None:
         self._chunked_text = chunks
-
-    chunked = property(
-        _get_chunked,
-        _set_chunked,
-        doc="The text in the blob object, as chunks (not necessarily lines)",
-    )
 
     @classmethod
     def from_path(
@@ -1229,20 +1225,20 @@ class Tag(ShaFile):
                     f"Unknown field {field.decode('ascii', 'replace')}"
                 )
 
-    def _get_object(self) -> tuple[type[ShaFile], bytes]:
+    @property
+    def object(self) -> tuple[type[ShaFile], ObjectID]:
         """Get the object pointed to by this tag.
 
         Returns: tuple of (object class, sha).
         """
         if self._object_class is None or self._object_sha is None:
             raise ValueError("Tag object is not properly initialized")
-        return (self._object_class, self._object_sha)
+        return (self._object_class, ObjectID(self._object_sha))
 
-    def _set_object(self, value: tuple[type[ShaFile], bytes]) -> None:
-        (self._object_class, self._object_sha) = value
+    @object.setter
+    def object(self, value: tuple[type[ShaFile], bytes]) -> None:
+        self._object_class, self._object_sha = value
         self._needs_serialization = True
-
-    object = property(_get_object, _set_object)
 
     name = serializable_property("name", "The name of this tag")
     tagger = serializable_property(
@@ -2207,20 +2203,16 @@ class Commit(ShaFile):
 
     tree = serializable_property("tree", "Tree that is the state of this commit")
 
-    def _get_parents(self) -> list[ObjectID]:
-        """Return a list of parents of this commit."""
+    @property
+    def parents(self) -> list[ObjectID]:
+        """Parents of this commit, by their SHA1."""
         return self._parents
 
-    def _set_parents(self, value: list[ObjectID]) -> None:
+    @parents.setter
+    def parents(self, value: list[ObjectID]) -> None:
         """Set a list of parents of this commit."""
         self._needs_serialization = True
         self._parents = value
-
-    parents = property(
-        _get_parents,
-        _set_parents,
-        doc="Parents of this commit, by their SHA1.",
-    )
 
     author = serializable_property("author", "The name of the author of the commit")
 

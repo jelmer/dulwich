@@ -30,7 +30,7 @@ __all__ = [
 
 import stat
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO, cast
 
 from fastimport import commands, parser, processor
 from fastimport import errors as fastimport_errors
@@ -164,7 +164,7 @@ class GitFastExporter:
             merges = []
         author, author_email = split_email(commit.author)
         committer, committer_email = split_email(commit.committer)
-        cmd = commands.CommitCommand(  # type: ignore[no-untyped-call,unused-ignore]
+        cmd = commands.CommitCommand(
             ref,
             marker,
             (author, author_email, commit.author_time, commit.author_timezone),
@@ -176,7 +176,7 @@ class GitFastExporter:
             ),
             commit.message,
             from_,
-            merges,
+            cast(list[bytes], merges),
             file_cmds,
         )
         return (cmd, marker)

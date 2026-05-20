@@ -508,7 +508,9 @@ def read_pkt_refs_v2(
         parts = pkt.rstrip(b"\n").split(b" ")
         sha_bytes = parts[0]
         sha: ObjectID | None
-        if sha_bytes == b"unborn":
+        if sha_bytes == b"ERR":
+            raise GitProtocolError(b" ".join(parts[1:]).decode("utf-8", "replace"))
+        elif sha_bytes == b"unborn":
             sha = None
         else:
             sha = ObjectID(sha_bytes)

@@ -104,6 +104,7 @@ __all__ = [
 ]
 
 import logging
+import sys
 import types
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from io import BytesIO
@@ -114,6 +115,11 @@ import dulwich
 
 from .errors import GitProtocolError, HangupException
 from .objects import ObjectID
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 logger = logging.getLogger(__name__)
 
@@ -427,7 +433,7 @@ class Protocol:
                 # Ignore errors during cleanup
                 pass
 
-    def __enter__(self) -> "Protocol":
+    def __enter__(self) -> Self:
         """Enter context manager."""
         return self
 

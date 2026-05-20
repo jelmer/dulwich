@@ -36,6 +36,11 @@ from typing import IO, Any, ClassVar, Literal, overload
 
 from ._typing import Buffer
 
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
+
 
 def ensure_dir_exists(
     dirname: str | bytes | os.PathLike[str] | os.PathLike[bytes],
@@ -284,7 +289,7 @@ class _GitFile(IO[bytes]):
             warnings.warn(f"unclosed {self!r}", ResourceWarning, stacklevel=2)
             self.abort()
 
-    def __enter__(self) -> "_GitFile":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(

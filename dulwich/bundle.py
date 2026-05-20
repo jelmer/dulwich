@@ -29,6 +29,7 @@ __all__ = [
     "write_bundle",
 ]
 
+import sys
 import types
 from collections.abc import Callable, Iterator, Sequence
 from typing import (
@@ -38,6 +39,11 @@ from typing import (
     cast,
     runtime_checkable,
 )
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 if TYPE_CHECKING:
     from .object_format import ObjectFormat
@@ -112,7 +118,7 @@ class Bundle:
             self.pack_data.close()
             self.pack_data = None
 
-    def __enter__(self) -> "Bundle":
+    def __enter__(self) -> Self:
         """Enter context manager."""
         return self
 

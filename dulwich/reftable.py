@@ -67,6 +67,7 @@ import os
 import random
 import shutil
 import struct
+import sys
 import time
 import zlib
 from collections.abc import Callable, Mapping
@@ -81,6 +82,11 @@ from dulwich.refs import (
     Ref,
     RefsContainer,
 )
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 
 def decode_varint_from_stream(stream: BinaryIO) -> int | None:
@@ -826,7 +832,7 @@ class _ReftableBatchContext:
     def __init__(self, refs_container: "ReftableRefsContainer") -> None:
         self.refs_container = refs_container
 
-    def __enter__(self) -> "_ReftableBatchContext":
+    def __enter__(self) -> Self:
         self.refs_container._batch_mode = True
         return self
 

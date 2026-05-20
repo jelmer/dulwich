@@ -652,13 +652,13 @@ class WorkTree:
 
         if ref is None:
             # Create a dangling commit
-            c.parents = merge_heads
+            c.parents = list(merge_heads)
         else:
             try:
                 old_head = self._repo.refs[ref]
                 c.parents = [old_head, *merge_heads]
             except KeyError:
-                c.parents = merge_heads
+                c.parents = list(merge_heads)
 
         # Handle message after parents are set
         if callable(original_message):
@@ -749,7 +749,7 @@ class WorkTree:
                     timezone=commit_timezone,
                 )
             except KeyError:
-                c.parents = merge_heads
+                c.parents = list(merge_heads)
                 if should_sign:
                     from dulwich.signature import get_signature_vendor
 

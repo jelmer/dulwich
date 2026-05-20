@@ -1,4 +1,20 @@
-1.2.3	UNRELEASED
+1.2.3	2026-05-20
+
+ * Raise ``GitProtocolError`` when a protocol v2 ref advertisement
+   contains an ``ERR`` line, aligning v2 error handling with v1.
+   (Antoine Lambert)
+
+ * Return ``Self`` from ``__enter__`` on context managers across the
+   API, so subclasses get the correct type. (Stephen Finucane)
+
+ * Match C git's ``xutftowcsn`` fallback when a tree path is not valid
+   UTF-8 on Windows, and let ``UnicodeDecodeError`` propagate from
+   ``_fs_to_tree_path`` rather than being swallowed. (Jelmer Vernooĳ)
+
+ * Thread ``object_format`` through ``PackInflater`` /
+   ``DeltaChainIterator`` and ``ShaFile.from_raw_chunks`` so trees in
+   SHA-256 repositories are parsed with the correct OID length.
+   (Jelmer Vernooĳ)
 
  * Extend the per-test ``OSError`` handlers in the three non-UTF8 filename
    tests (``test_index.test_no_decode_encode``, ``test_refs.test_cyrillic``,

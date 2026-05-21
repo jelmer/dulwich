@@ -4901,7 +4901,7 @@ def show_branch(
         # Build commit history for visualization
         # Collect all commits reachable from any branch
         all_commits: dict[
-            bytes, tuple[int, list[bytes], str]
+            bytes, tuple[int, list[ObjectID], str]
         ] = {}  # sha -> (timestamp, parents, message)
 
         def collect_commits(sha: bytes, branch_idx: int, visited: set[bytes]) -> None:
@@ -6270,6 +6270,7 @@ def hash_object(
         with open(path, "rb") as f:
             blob.data = f.read()
     else:
+        assert data is not None  # Already checked above
         blob.data = data
 
     # Write to object store if requested

@@ -1,3 +1,8 @@
+1.2.4	UNRELEASED
+
+ * Validate input for various functions dealing with ref prefixes or
+   suffixes, resulting in clearer errors. (Jelmer Vernooĳ, #2192)
+
 1.2.3	2026-05-20
 
  * Raise ``GitProtocolError`` when a protocol v2 ref advertisement
@@ -22,7 +27,7 @@
    ``errno.EILSEQ``, so they pass on Linux filesystems that reject
    non-UTF-8 names (e.g. OpenZFS with ``utf8only=on``). (Matt Van Horn, #2174)
 
- * Reject ref names with empty path components (e.g. ``refs//a``)
+ * HARDEN: Reject ref names with empty path components (e.g. ``refs//a``)
    or with ``.lock`` as a non-final component (e.g. ``refs/a.lock/a``)
    in ``check_ref_format``, matching ``git check-ref-format``.
    (Jelmer Vernooĳ; reported by Christopher Toth)

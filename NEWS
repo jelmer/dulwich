@@ -1,4 +1,4 @@
-1.2.4	UNRELEASED
+1.2.4	2026-05-21
 
  * Tolerate ref names with empty path components (e.g. ``refs/tags//v1.0``)
    for now, emitting a ``DeprecationWarning`` rather than raising a

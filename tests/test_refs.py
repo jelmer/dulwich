@@ -362,6 +362,19 @@ class RefsContainerTests:
             self._refs[b"refs/remotes/origin/other"],
         )
 
+    def test_import_refs_base_trailing_slash(self) -> None:
+        # A trailing slash on the base must not produce a malformed ref
+        # with an empty path component (e.g. b'refs/tags//v1.0').
+        self._refs.import_refs(
+            b"refs/tags/",
+            {b"v1.0": b"42d06bd4b77fed026b154d16493e5deab78f02ec"},
+        )
+        self.assertEqual(
+            b"42d06bd4b77fed026b154d16493e5deab78f02ec",
+            self._refs[b"refs/tags/v1.0"],
+        )
+        self.assertNotIn(b"refs/tags//v1.0", self._refs.allkeys())
+
     def test_import_refs_name_prune(self) -> None:
         self._refs[b"refs/remotes/origin/other"] = (
             b"48d01bd4b77fed026b154d16493e5deab78f02ec"
@@ -1225,6 +1238,12 @@ class RefUtilityFunctionsTests(TestCase):
         # Test idempotency - already has prefix
         self.assertEqual(b"refs/heads/master", local_branch_name(b"refs/heads/master"))
 
+    def test_local_branch_name_leading_slash(self) -> None:
+        """Test local_branch_name rejects names starting with a slash."""
+        from dulwich.refs import local_branch_name
+
+        self.assertRaises(ValueError, local_branch_name, b"/master")
+
     def test_local_tag_name(self) -> None:
         """Test local_tag_name function."""
         from dulwich.refs import local_tag_name
@@ -1235,6 +1254,18 @@ class RefUtilityFunctionsTests(TestCase):
 
         # Test idempotency - already has prefix
         self.assertEqual(b"refs/tags/v1.0", local_tag_name(b"refs/tags/v1.0"))
+
+    def test_local_tag_name_leading_slash(self) -> None:
+        """Test local_tag_name rejects names starting with a slash."""
+        from dulwich.refs import local_tag_name
+
+        self.assertRaises(ValueError, local_tag_name, b"/v1.0")
+
+    def test_local_replace_name_leading_slash(self) -> None:
+        """Test local_replace_name rejects names starting with a slash."""
+        from dulwich.refs import local_replace_name
+
+        self.assertRaises(ValueError, local_replace_name, b"/abc123")
 
     def test_extract_branch_name(self) -> None:
         """Test extract_branch_name function."""

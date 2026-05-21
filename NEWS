@@ -1,7 +1,13 @@
 1.2.4	UNRELEASED
 
- * Validate input for various functions dealing with ref prefixes or
-   suffixes, resulting in clearer errors. (Jelmer Vernooĳ, #2192)
+ * Tolerate ref names with empty path components (e.g. ``refs/tags//v1.0``)
+   for now, emitting a ``DeprecationWarning`` rather than raising a
+   ``RefFormatError``. Such names are constructed by older Poetry releases
+   (fixed in Poetry 2.4.0) and were silently accepted before Dulwich 1.2.3.
+   ``local_branch_name``, ``local_tag_name`` and ``local_replace_name``
+   likewise warn about, and strip, a leading slash instead of raising
+   ``ValueError``. Both will become errors again in a future release.
+   (Jelmer Vernooĳ, #2192)
 
 1.2.3	2026-05-20
 

@@ -58,6 +58,7 @@ __all__ = [
 import os
 import sys
 import types
+import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import suppress
 from typing import (
@@ -153,6 +154,11 @@ def check_ref_format(refname: Ref) -> bool:
         if component.endswith(b".lock"):
             return False
     return True
+
+
+def _collapse_slashes(refname: bytes) -> bytes:
+    """Collapse runs of consecutive slashes in a ref name into a single slash."""
+    return b"/".join(component for component in refname.split(b"/") if component)
 
 
 def parse_remote_ref(ref: bytes) -> tuple[bytes, bytes]:
@@ -399,8 +405,28 @@ class RefsContainer:
         """
         if name in (HEADREF, Ref(b"refs/stash")):
             return
-        if not name.startswith(b"refs/") or not check_ref_format(Ref(name[5:])):
+        if not name.startswith(b"refs/"):
             raise RefFormatError(name)
+        rest = Ref(name[5:])
+        if check_ref_format(rest):
+            return
+        # As of Dulwich 1.2.3 check_ref_format rejects empty path components
+        # (e.g. b'refs/tags//v1.0'). Such names were silently accepted before,
+        # and some callers (e.g. older Poetry releases) still construct them.
+        # Warn rather than raise for now if collapsing repeated slashes would
+        # make the name valid, so the only defect is empty components.
+        if (
+            b"//" in name  # type: ignore[comparison-overlap]
+            and check_ref_format(Ref(_collapse_slashes(rest)))
+        ):
+            warnings.warn(
+                f"Ref name {name!r} contains empty path components; "
+                "this will be rejected in a future version of Dulwich.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+            return
+        raise RefFormatError(name)
 
     def read_ref(self, refname: Ref) -> bytes | None:
         """Read a reference without following any references.
@@ -1470,6 +1496,26 @@ def is_local_branch(x: bytes) -> bool:
     return x.startswith(LOCAL_BRANCH_PREFIX)
 
 
+def _strip_leading_slash(name: bytes, kind: str) -> bytes:
+    """Strip a leading slash from a short ref name, warning if one is present.
+
+    A leading slash here means the caller stripped a ref prefix incorrectly
+    (e.g. used ``ref[len(b"refs/tags"):]`` instead of ``len(b"refs/tags/")``).
+    Joining such a name with a prefix would produce a malformed ref with an
+    empty path component. Warn rather than raise for now; this will become an
+    error in a future release.
+    """
+    if not name.startswith(b"/"):
+        return name
+    warnings.warn(
+        f"{kind} name must not start with a slash: {name!r}; "
+        "this will be rejected in a future version of Dulwich.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+    return name.lstrip(b"/")
+
+
 def local_branch_name(name: bytes) -> Ref:
     """Build a full branch ref from a short name.
 
@@ -1479,9 +1525,6 @@ def local_branch_name(name: bytes) -> Ref:
     Returns:
       Full branch ref name (e.g., b"refs/heads/master")
 
-    Raises:
-      ValueError: If name starts with a slash
-
     Examples:
       >>> local_branch_name(b"master")
       b'refs/heads/master'
@@ -1490,9 +1533,7 @@ def local_branch_name(name: bytes) -> Ref:
     """
     if name.startswith(LOCAL_BRANCH_PREFIX):
         return Ref(name)
-    if name.startswith(b"/"):
-        raise ValueError(f"Branch name must not start with a slash: {name!r}")
-    return Ref(LOCAL_BRANCH_PREFIX + name)
+    return Ref(LOCAL_BRANCH_PREFIX + _strip_leading_slash(name, "Branch"))
 
 
 def local_tag_name(name: bytes) -> Ref:
@@ -1504,9 +1545,6 @@ def local_tag_name(name: bytes) -> Ref:
     Returns:
       Full tag ref name (e.g., b"refs/tags/v1.0")
 
-    Raises:
-      ValueError: If name starts with a slash
-
     Examples:
       >>> local_tag_name(b"v1.0")
       b'refs/tags/v1.0'
@@ -1515,9 +1553,7 @@ def local_tag_name(name: bytes) -> Ref:
     """
     if name.startswith(LOCAL_TAG_PREFIX):
         return Ref(name)
-    if name.startswith(b"/"):
-        raise ValueError(f"Tag name must not start with a slash: {name!r}")
-    return Ref(LOCAL_TAG_PREFIX + name)
+    return Ref(LOCAL_TAG_PREFIX + _strip_leading_slash(name, "Tag"))
 
 
 def local_replace_name(name: bytes) -> Ref:
@@ -1529,9 +1565,6 @@ def local_replace_name(name: bytes) -> Ref:
     Returns:
       Full replace ref name (e.g., b"refs/replace/<sha>")
 
-    Raises:
-      ValueError: If name starts with a slash
-
     Examples:
       >>> local_replace_name(b"abc123")
       b'refs/replace/abc123'
@@ -1540,9 +1573,7 @@ def local_replace_name(name: bytes) -> Ref:
     """
     if name.startswith(LOCAL_REPLACE_PREFIX):
         return Ref(name)
-    if name.startswith(b"/"):
-        raise ValueError(f"Replace name must not start with a slash: {name!r}")
-    return Ref(LOCAL_REPLACE_PREFIX + name)
+    return Ref(LOCAL_REPLACE_PREFIX + _strip_leading_slash(name, "Replace"))
 
 
 def extract_branch_name(ref: bytes) -> bytes:

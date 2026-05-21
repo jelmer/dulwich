@@ -307,6 +307,10 @@ class RefsContainer:
           message: Optional message for reflog
           prune: If True, remove refs not in other
         """
+        # Strip a trailing slash so joining ``base`` with a ref name below
+        # does not produce a malformed ref with an empty path component
+        # (e.g. b'refs/tags/' + b'/' + b'v1.0' -> b'refs/tags//v1.0').
+        base = Ref(base.rstrip(b"/"))
         if prune:
             to_delete = set(self.subkeys(base))
         else:
@@ -1475,6 +1479,9 @@ def local_branch_name(name: bytes) -> Ref:
     Returns:
       Full branch ref name (e.g., b"refs/heads/master")
 
+    Raises:
+      ValueError: If name starts with a slash
+
     Examples:
       >>> local_branch_name(b"master")
       b'refs/heads/master'
@@ -1483,6 +1490,8 @@ def local_branch_name(name: bytes) -> Ref:
     """
     if name.startswith(LOCAL_BRANCH_PREFIX):
         return Ref(name)
+    if name.startswith(b"/"):
+        raise ValueError(f"Branch name must not start with a slash: {name!r}")
     return Ref(LOCAL_BRANCH_PREFIX + name)
 
 
@@ -1495,6 +1504,9 @@ def local_tag_name(name: bytes) -> Ref:
     Returns:
       Full tag ref name (e.g., b"refs/tags/v1.0")
 
+    Raises:
+      ValueError: If name starts with a slash
+
     Examples:
       >>> local_tag_name(b"v1.0")
       b'refs/tags/v1.0'
@@ -1503,6 +1515,8 @@ def local_tag_name(name: bytes) -> Ref:
     """
     if name.startswith(LOCAL_TAG_PREFIX):
         return Ref(name)
+    if name.startswith(b"/"):
+        raise ValueError(f"Tag name must not start with a slash: {name!r}")
     return Ref(LOCAL_TAG_PREFIX + name)
 
 
@@ -1515,6 +1529,9 @@ def local_replace_name(name: bytes) -> Ref:
     Returns:
       Full replace ref name (e.g., b"refs/replace/<sha>")
 
+    Raises:
+      ValueError: If name starts with a slash
+
     Examples:
       >>> local_replace_name(b"abc123")
       b'refs/replace/abc123'
@@ -1523,6 +1540,8 @@ def local_replace_name(name: bytes) -> Ref:
     """
     if name.startswith(LOCAL_REPLACE_PREFIX):
         return Ref(name)
+    if name.startswith(b"/"):
+        raise ValueError(f"Replace name must not start with a slash: {name!r}")
     return Ref(LOCAL_REPLACE_PREFIX + name)
 
 

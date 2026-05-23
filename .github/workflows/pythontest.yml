@@ -70,10 +70,10 @@ jobs:
       - name: codespell
         run: |
           codespell --config .codespellrc .
-      - name: Coverage test suite run
-        run: |
-          pip install --upgrade coverage
-          python -m coverage run -p -m unittest tests.test_suite
+      - name: Install subunit
+        run: pip install --upgrade python-subunit
+      - name: Run test suite
+        uses: jelmer/inquest@main
       - name: Property-based tests
         run: |
           pip install --upgrade ".[hypothesis]"
@@ -105,6 +105,7 @@ jobs:
           python -m pip install --upgrade "setuptools>=77"
           python -m pip install --upgrade pip
           pip install --upgrade .
+      - name: Install subunit
+        run: pip install --upgrade python-subunit
       - name: Test suite run (minimal dependencies, pure Python)
-        run: |
-          python -m unittest tests.test_suite
+        uses: jelmer/inquest@main

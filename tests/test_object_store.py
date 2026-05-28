@@ -29,7 +29,7 @@ import tempfile
 from contextlib import closing
 from io import BytesIO
 
-from dulwich.errors import NotTreeError
+from dulwich.errors import NotTreeError, ObjectFormatException
 from dulwich.index import commit_tree
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import (
@@ -37,6 +37,7 @@ from dulwich.object_store import (
     MemoryObjectStore,
     ObjectStoreGraphWalker,
     OverlayObjectStore,
+    PackInputTooLarge,
     commit_tree_changes,
     read_packs_file,
     tree_lookup_path,
@@ -380,8 +381,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         # be ingested: MemoryObjectStore and ``git fsck`` already reject
         # such objects, so DiskObjectStore must too. Otherwise a malicious
         # remote can poison the repository.
-        from dulwich.errors import ObjectFormatException
-
         o = DiskObjectStore(self.store_dir)
         self.addCleanup(o.close)
         f, commit, abort = o.add_pack()
@@ -396,6 +395,27 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             raise
         # No pack/index files should have been left behind.
         self.assertEqual([], os.listdir(o.pack_dir))
+
+    def test_add_thin_pack_max_input_size(self) -> None:
+        """Bounding wire input rejects packs exceeding the cap.
+
+        Mirrors git's ``receive.maxInputSize`` semantics.
+        """
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+
+        blob = make_object(Blob, data=b"yummy data")
+        o.add_object(blob)
+
+        f = BytesIO()
+        build_pack(
+            f,
+            [(REF_DELTA, (blob.id, b"more yummy data"))],
+            store=o,
+        )
+
+        with self.assertRaises(PackInputTooLarge):
+            o.add_thin_pack(f.read, None, max_input_size=8)
 
     def test_pack_index_version_config(self) -> None:
         # Test that pack.indexVersion configuration is respected

@@ -37,6 +37,18 @@
    ``get_summary`` now matches git's ``format_sanitized_subject``.
    (Jelmer Vernooĳ; reported by Christopher Toth)
 
+ * SECURITY: Honour ``receive.maxInputSize`` in
+   ``ReceivePackHandler``. Previously a remote unauthenticated client
+   could send a tiny crafted pack (~174 bytes) that declared a huge
+   ``dest_size`` in its delta header and trigger hundreds of MB of
+   allocation in ``apply_delta`` / ``add_thin_pack``, exhausting
+   server memory over ``git-receive-pack``. ``add_thin_pack`` now
+   accepts a ``max_input_size`` keyword (in bytes, ``0`` / ``None`` =
+   unlimited, matching git's semantics) and ``ReceivePackHandler``
+   reads ``receive.maxInputSize`` from the repository config and
+   passes it through. Exceeding the cap raises ``PackInputTooLarge``.
+   (Jelmer Vernooĳ; Reported by Liyi, Ziyue, Strick, Maurice and Chenchen @ Univeristy of Sydney)
+
 1.2.4	2026-05-21
 
  * Tolerate ref names with empty path components (e.g. ``refs/tags//v1.0``)

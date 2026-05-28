@@ -29,7 +29,13 @@
    ``ProcessMergeDriver`` commands. ``%P`` is a path from the git
    tree, so a malicious branch could inject shell commands when the
    user had a merge driver configured that referenced ``%P``.
-   Reported by Ravishanker Kusuma (hayageek). (Jelmer Vernooĳ)
+   (Jelmer Vernooĳ; reported by Ravishanker Kusuma (hayageek))
+
+ * SECURITY(CVE-2026-47712): Sanitize commit subjects used in
+   ``porcelain.format_patch`` filenames so a malicious subject (e.g.
+   ``x/../../x``) cannot direct the generated patch outside ``outdir``.
+   ``get_summary`` now matches git's ``format_sanitized_subject``.
+   (Jelmer Vernooĳ; reported by Christopher Toth)
 
 1.2.4	2026-05-21
 

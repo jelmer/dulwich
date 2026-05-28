@@ -3155,6 +3155,76 @@ class FormatPatchTests(PorcelainTestCase):
         )
         self.assertEqual(patches, [])
 
+    def test_format_patch_subject_cannot_escape_outdir(self) -> None:
+        # A malicious commit subject must not be able to direct the
+        # generated patch file outside the requested output directory.
+        tree1 = Tree()
+        c1 = make_commit(tree=tree1, message=b"Initial commit")
+        self.repo.object_store.add_objects([(tree1, None), (c1, None)])
+
+        blob = Blob.from_string(b"data")
+        tree2 = Tree()
+        tree2.add(b"f.txt", 0o100644, blob.id)
+        # Subjects that try to traverse out of outdir via path separators
+        # or parent-directory components.
+        for evil in (b"x/../../x", b"x\\..\\..\\x", b"a:b"):
+            c2 = make_commit(
+                tree=tree2,
+                parents=[c1.id],
+                message=evil,
+            )
+            self.repo.object_store.add_objects(
+                [(blob, None), (tree2, None), (c2, None)]
+            )
+            self.repo[b"HEAD"] = c2.id
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                patches = porcelain.format_patch(
+                    self.repo.path,
+                    committish=c2.id,
+                    outdir=tmpdir,
+                )
+                self.assertEqual(len(patches), 1)
+                real_outdir = os.path.realpath(tmpdir)
+                real_patch = os.path.realpath(patches[0])
+                self.assertEqual(
+                    os.path.dirname(real_patch),
+                    real_outdir,
+                    f"patch for subject {evil!r} escaped outdir: {patches[0]}",
+                )
+                # Filename must not contain path separators or parent refs.
+                base = os.path.basename(patches[0])
+                self.assertNotIn("/", base)
+                self.assertNotIn("\\", base)
+                self.assertNotIn("..", base)
+
+    def test_format_patch_long_subject_truncated(self) -> None:
+        tree1 = Tree()
+        c1 = make_commit(tree=tree1, message=b"Initial commit")
+        self.repo.object_store.add_objects([(tree1, None), (c1, None)])
+
+        blob = Blob.from_string(b"data")
+        tree2 = Tree()
+        tree2.add(b"f.txt", 0o100644, blob.id)
+        c2 = make_commit(
+            tree=tree2,
+            parents=[c1.id],
+            message=b"a" * 500,
+        )
+        self.repo.object_store.add_objects([(blob, None), (tree2, None), (c2, None)])
+        self.repo[b"HEAD"] = c2.id
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            patches = porcelain.format_patch(
+                self.repo.path,
+                committish=c2.id,
+                outdir=tmpdir,
+            )
+            self.assertEqual(len(patches), 1)
+            # Whatever the cap is, an extremely long subject must not
+            # produce a pathologically long filename.
+            self.assertLess(len(os.path.basename(patches[0])), 100)
+
 
 class SymbolicRefTests(PorcelainTestCase):
     def test_set_wrong_symbolic_ref(self) -> None:

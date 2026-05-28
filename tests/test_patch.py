@@ -641,18 +641,63 @@ class DiffTests(TestCase):
 
 
 class GetSummaryTests(TestCase):
-    def test_simple(self) -> None:
-        c = make_commit(
+    def _make_commit(self, message: bytes) -> Commit:
+        return make_commit(
             author=b"Jelmer <jelmer@samba.org>",
             committer=b"Jelmer <jelmer@samba.org>",
             author_time=1271350201,
             commit_time=1271350201,
             author_timezone=0,
             commit_timezone=0,
-            message=b"This is the first line\nAnd this is the second line.\n",
+            message=message,
             tree=Tree().id,
         )
+
+    def test_simple(self) -> None:
+        c = self._make_commit(
+            b"This is the first line\nAnd this is the second line.\n",
+        )
         self.assertEqual("This-is-the-first-line", get_summary(c))
+
+    def test_empty_message(self) -> None:
+        c = self._make_commit(b"")
+        self.assertEqual("", get_summary(c))
+
+    def test_path_traversal_unix(self) -> None:
+        c = self._make_commit(b"x/../../x\n")
+        # Path separators and consecutive dots must be sanitized so the
+        # result cannot escape the requested output directory.
+        summary = get_summary(c)
+        self.assertNotIn("/", summary)
+        self.assertNotIn("..", summary)
+        self.assertEqual("x-.-.-x", summary)
+
+    def test_path_traversal_windows(self) -> None:
+        c = self._make_commit(b"x\\..\\..\\x\n")
+        summary = get_summary(c)
+        self.assertNotIn("\\", summary)
+        self.assertNotIn("..", summary)
+        self.assertEqual("x-.-.-x", summary)
+
+    def test_colon_sanitized(self) -> None:
+        c = self._make_commit(b"feature: do something\n")
+        summary = get_summary(c)
+        self.assertNotIn(":", summary)
+        self.assertEqual("feature-do-something", summary)
+
+    def test_long_subject_truncated(self) -> None:
+        c = self._make_commit(b"a" * 500 + b"\n")
+        summary = get_summary(c)
+        self.assertLessEqual(len(summary), 64)
+
+    def test_trailing_dots_and_dashes_stripped(self) -> None:
+        c = self._make_commit(b"hello...\n")
+        self.assertEqual("hello", get_summary(c))
+
+    def test_only_problematic_chars(self) -> None:
+        c = self._make_commit(b"/\\:..\n")
+        # After sanitization there is nothing usable left.
+        self.assertEqual("", get_summary(c))
 
 
 class DiffAlgorithmTests(TestCase):

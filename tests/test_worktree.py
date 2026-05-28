@@ -30,6 +30,7 @@ from unittest import skipIf
 from dulwich.errors import CommitError
 from dulwich.index import get_unstaged_changes as _get_unstaged_changes
 from dulwich.object_store import tree_lookup_path
+from dulwich.objects import Blob, Tree
 from dulwich.repo import Repo
 from dulwich.worktree import (
     WorkTree,
@@ -318,6 +319,54 @@ class WorkTreeResetTests(WorkTreeTestCase):
         with open(os.path.join(self.repo.path, "a"), "rb") as f:
             contents = f.read()
         self.assertEqual(b"contents of file a", contents)
+
+    def test_reset_index_honors_protectNTFS_config(self):
+        """core.protectNTFS=true must select the NTFS path-element validator.
+
+        The option name read from config must be ``protectNTFS`` (as
+        documented by git-config); the earlier ``core.protectNTFS``
+        form never matched a real config key and silently fell back to
+        the platform default.
+        """
+        # Set protectNTFS on (overriding the POSIX default of False).
+        config = self.repo.get_config()
+        config.set((b"core",), b"protectNTFS", b"true")
+        config.write_to_path()
+
+        # Craft a tree that contains a name the NTFS validator
+        # rejects (git~1, an 8.3 short-name alias for .git).
+        evil = Blob.from_string(b"evil")
+        good = Blob.from_string(b"ok")
+        tree = Tree()
+        tree[b"git~1"] = (stat.S_IFREG | 0o644, evil.id)
+        tree[b"ok.txt"] = (stat.S_IFREG | 0o644, good.id)
+        self.repo.object_store.add_objects([(evil, None), (good, None), (tree, None)])
+
+        self.worktree.reset_index(tree.id)
+
+        # git~1 was dropped by the NTFS validator; ok.txt survived.
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "git~1")))
+        self.assertTrue(os.path.exists(os.path.join(self.repo.path, "ok.txt")))
+
+    def test_reset_index_defaults_to_protectNTFS(self):
+        """core.protectNTFS defaults to True on every platform.
+
+        A tree authored on POSIX can still be cloned on Windows
+        later, so the NTFS validator must be on by default
+        regardless of os.name (matching Git's PROTECT_NTFS_DEFAULT=1).
+        """
+        # No core.protectNTFS set — rely on the built-in default.
+        evil = Blob.from_string(b"evil")
+        good = Blob.from_string(b"ok")
+        tree = Tree()
+        tree[b"git~1"] = (stat.S_IFREG | 0o644, evil.id)
+        tree[b"ok.txt"] = (stat.S_IFREG | 0o644, good.id)
+        self.repo.object_store.add_objects([(evil, None), (good, None), (tree, None)])
+
+        self.worktree.reset_index(tree.id)
+
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "git~1")))
+        self.assertTrue(os.path.exists(os.path.join(self.repo.path, "ok.txt")))
 
 
 class WorkTreeSparseCheckoutTests(WorkTreeTestCase):

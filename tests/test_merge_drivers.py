@@ -21,7 +21,9 @@
 """Tests for merge driver support."""
 
 import importlib.util
+import os
 import sys
+import tempfile
 import unittest
 
 from dulwich.attrs import GitAttributes, Pattern
@@ -204,6 +206,22 @@ class ProcessMergeDriverTests(unittest.TestCase):
             expected = b"path: dir/file.xml\n"
         self.assertEqual(result, expected)
         self.assertTrue(success)
+
+    def test_merge_path_with_shell_metacharacters(self):
+        """Path placeholders are shell-quoted before substitution."""
+        marker = os.path.join(tempfile.gettempdir(), "dulwich_md_injection")
+        if os.path.exists(marker):
+            os.remove(marker)
+        self.addCleanup(
+            lambda: os.path.exists(marker) and os.remove(marker)
+        )
+        command = "cat %P > /dev/null"
+        driver = ProcessMergeDriver(command, "inject_driver")
+        evil = f"a$(touch {marker}).txt"
+
+        driver.merge(b"a", b"b", b"c", path=evil)
+
+        self.assertFalse(os.path.exists(marker))
 
 
 class MergeBlobsWithDriversTests(unittest.TestCase):

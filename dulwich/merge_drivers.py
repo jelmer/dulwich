@@ -29,6 +29,7 @@ __all__ = [
 ]
 
 import os
+import shlex
 import subprocess
 import tempfile
 from collections.abc import Callable
@@ -112,12 +113,12 @@ class ProcessMergeDriver:
 
             # Prepare command with placeholders
             cmd = self.command
-            cmd = cmd.replace("%O", ancestor_path)
-            cmd = cmd.replace("%A", ours_path)
-            cmd = cmd.replace("%B", theirs_path)
+            cmd = cmd.replace("%O", shlex.quote(ancestor_path))
+            cmd = cmd.replace("%A", shlex.quote(ours_path))
+            cmd = cmd.replace("%B", shlex.quote(theirs_path))
             cmd = cmd.replace("%L", str(marker_size))
             if path:
-                cmd = cmd.replace("%P", path)
+                cmd = cmd.replace("%P", shlex.quote(path))
 
             # Execute merge command
             try:

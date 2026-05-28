@@ -1973,6 +1973,33 @@ def validate_path_element_default(element: bytes) -> bool:
     return _normalize_path_element_default(element) not in INVALID_DOTNAMES
 
 
+def _is_ntfs_dotgit_short_name(normalized: bytes) -> bool:
+    """Match NTFS 8.3 short-name forms of ``.git`` (``git~<digits>``)."""
+    if not normalized.startswith(b"git~"):
+        return False
+    tail = normalized[4:]
+    return len(tail) > 0 and tail.isdigit()
+
+
+# Reserved Windows device names. Opening any of these on Windows
+# resolves to a device rather than a file, regardless of any
+# extension or trailing dots/spaces (``NUL``, ``NUL.txt``,
+# ``aux.foo.bar`` all hit the device).
+RESERVED_WINDOWS_DEVICE_NAMES = frozenset(
+    [b"con", b"prn", b"aux", b"nul"]
+    + [b"com%d" % i for i in range(1, 10)]
+    + [b"lpt%d" % i for i in range(1, 10)]
+)
+
+
+def _is_reserved_windows_device_name(normalized: bytes) -> bool:
+    """Match Windows reserved device names regardless of extension."""
+    # The "stem" is the portion before the first ``.``; Windows
+    # also strips trailing spaces from that stem when resolving.
+    stem = normalized.split(b".", 1)[0].rstrip(b" ")
+    return stem in RESERVED_WINDOWS_DEVICE_NAMES
+
+
 def validate_path_element_ntfs(element: bytes) -> bool:
     """Validate a path element using NTFS filesystem rules.
 
@@ -1982,10 +2009,22 @@ def validate_path_element_ntfs(element: bytes) -> bool:
     Returns:
       True if path element is valid for NTFS, False otherwise
     """
+    # A backslash is a path separator on Windows, so accepting it
+    # here would let a tree authored on POSIX escape the work tree
+    # or plant files under ``.git\`` when checked out on Windows.
+    if b"\\" in element:
+        return False
+    # NTFS alternate data streams are addressed as ``name:stream``;
+    # reject any element containing ``:`` so ``.git::$INDEX_ALLOCATION``
+    # and similar forms cannot bypass the ``.git`` check.
+    if b":" in element:
+        return False
     normalized = _normalize_path_element_ntfs(element)
     if normalized in INVALID_DOTNAMES:
         return False
-    if normalized == b"git~1":
+    if _is_ntfs_dotgit_short_name(normalized):
+        return False
+    if _is_reserved_windows_device_name(normalized):
         return False
     return True
 

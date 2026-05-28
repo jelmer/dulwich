@@ -521,7 +521,7 @@ def read_pkt_refs_v2(
             elif part.startswith(b"symref-target:"):
                 symrefs[ref] = Ref(part[14:])
             else:
-                logging.warning("unknown part in pkt-ref: %s", part)
+                logger.warning("unknown part in pkt-ref: %s", part)
         refs[ref] = sha
 
     return refs, symrefs, peeled
@@ -1943,7 +1943,7 @@ class GitClient:
 
     @staticmethod
     def _warn_filter_objects() -> None:
-        logging.warning("object filtering not recognized by server, ignoring")
+        logger.warning("object filtering not recognized by server, ignoring")
 
 
 def check_wants(wants: Set[bytes], refs: Mapping[bytes, bytes]) -> None:

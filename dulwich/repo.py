@@ -58,6 +58,7 @@ __all__ = [
     "serialize_graftpoints",
 ]
 
+import logging
 import os
 import stat
 import sys
@@ -156,6 +157,8 @@ from .refs import (
     read_packed_refs_with_peeled,  # noqa: F401
     write_packed_refs,  # noqa: F401
 )
+
+logger = logging.getLogger(__name__)
 
 CONTROLDIR = ".git"
 OBJECTDIR = "objects"
@@ -835,8 +838,6 @@ class BaseRepo:
           depth: Shallow fetch depth
         Returns: iterator over objects, with __len__ implemented
         """
-        import logging
-
         # Filter out refs pointing to missing objects to avoid errors downstream.
         # This makes Dulwich more robust when dealing with broken refs on disk.
         # Previously serialize_refs() did this filtering as a side-effect.
@@ -846,7 +847,7 @@ class BaseRepo:
             if sha in self.object_store:
                 refs[ref] = sha
             else:
-                logging.warning(
+                logger.warning(
                     "ref %s points at non-present sha %s",
                     ref.decode("utf-8", "replace"),
                     sha.decode("ascii"),

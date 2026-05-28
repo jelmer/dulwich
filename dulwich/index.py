@@ -85,6 +85,7 @@ __all__ = [
 ]
 
 import errno
+import logging
 import os
 import shutil
 import stat
@@ -130,6 +131,8 @@ from .objects import (
     sha_to_hex,
 )
 from .pack import ObjectContainer, SHA1Reader, SHA1Writer
+
+logger = logging.getLogger(__name__)
 
 # Type alias for recursive tree structure used in commit_tree
 TreeDict = dict[bytes, "TreeDict | tuple[int, ObjectID]"]
@@ -2590,9 +2593,7 @@ def detect_case_only_renames(
             try:
                 normalized = normalize_path(change.old.path)
             except UnicodeDecodeError:
-                import logging
-
-                logging.warning(
+                logger.warning(
                     "Skipping case-only rename detection for path with invalid UTF-8: %r",
                     change.old.path,
                 )
@@ -2605,9 +2606,7 @@ def detect_case_only_renames(
             try:
                 normalized = normalize_path(change.old.path)
             except UnicodeDecodeError:
-                import logging
-
-                logging.warning(
+                logger.warning(
                     "Skipping case-only rename detection for path with invalid UTF-8: %r",
                     change.old.path,
                 )
@@ -2623,9 +2622,7 @@ def detect_case_only_renames(
             try:
                 normalized = normalize_path(change.new.path)
             except UnicodeDecodeError:
-                import logging
-
-                logging.warning(
+                logger.warning(
                     "Skipping case-only rename detection for path with invalid UTF-8: %r",
                     change.new.path,
                 )

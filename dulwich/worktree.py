@@ -43,7 +43,6 @@ import builtins
 import os
 import shutil
 import stat
-import sys
 import tempfile
 import time
 import warnings
@@ -807,10 +806,8 @@ class WorkTree:
         stacked_config = config
         from .index import (
             build_index_from_tree,
+            get_path_element_validator,
             symlink,
-            validate_path_element_default,
-            validate_path_element_hfs,
-            validate_path_element_ntfs,
         )
 
         if tree is None:
@@ -824,15 +821,7 @@ class WorkTree:
             tree = head.tree
         config = self._repo.get_config()
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
-        # core.protectNTFS defaults to True on all platforms (matching
-        # Git's PROTECT_NTFS_DEFAULT=1) because a repo authored on
-        # POSIX can still be cloned on Windows later.
-        if config.get_boolean(b"core", b"protectNTFS", True):
-            validate_path_element = validate_path_element_ntfs
-        elif config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
-            validate_path_element = validate_path_element_hfs
-        else:
-            validate_path_element = validate_path_element_default
+        validate_path_element = get_path_element_validator(config)
         if config.get_boolean(b"core", b"symlinks", True):
             symlink_fn = symlink
         else:

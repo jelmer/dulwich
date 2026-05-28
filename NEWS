@@ -1,4 +1,4 @@
-1.2.5	UNRELEASED
+1.2.5	2026-05-28
 
  * SECURITY(GHSA-gfhv-vqv2-4544): Validate submodule paths in
    ``porcelain.submodule_update`` (and thus

@@ -344,8 +344,15 @@ class WorkTreeResetTests(WorkTreeTestCase):
 
         self.worktree.reset_index(tree.id)
 
-        # git~1 was dropped by the NTFS validator; ok.txt survived.
-        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "git~1")))
+        # git~1 was dropped by the NTFS validator; ok.txt survived. On NTFS
+        # the path "git~1" is the 8.3 short-name alias of the real .git
+        # directory, so a bare os.path.exists() check is always true there;
+        # assert instead that no regular file carrying the evil blob was
+        # materialized.
+        evil_path = os.path.join(self.repo.path, "git~1")
+        if os.path.isfile(evil_path):
+            with open(evil_path, "rb") as f:
+                self.assertNotEqual(b"evil", f.read())
         self.assertTrue(os.path.exists(os.path.join(self.repo.path, "ok.txt")))
 
     def test_reset_index_defaults_to_protectNTFS(self):
@@ -365,7 +372,10 @@ class WorkTreeResetTests(WorkTreeTestCase):
 
         self.worktree.reset_index(tree.id)
 
-        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "git~1")))
+        evil_path = os.path.join(self.repo.path, "git~1")
+        if os.path.isfile(evil_path):
+            with open(evil_path, "rb") as f:
+                self.assertNotEqual(b"evil", f.read())
         self.assertTrue(os.path.exists(os.path.join(self.repo.path, "ok.txt")))
 
 

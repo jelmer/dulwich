@@ -181,9 +181,10 @@ class ProcessMergeDriverTests(unittest.TestCase):
 
         result, success = driver.merge(b"a", b"b", b"c", marker_size=15)
 
-        # Expect different line endings on Windows vs Unix
+        # On Windows the value is wrapped in double quotes for cmd.exe and
+        # echo prints them literally; POSIX shells strip the shlex quoting.
         if sys.platform == "win32":
-            expected = b"marker size: 15 \r\n"
+            expected = b'marker size: "15" \r\n'
         else:
             expected = b"marker size: 15\n"
         self.assertEqual(result, expected)
@@ -197,9 +198,10 @@ class ProcessMergeDriverTests(unittest.TestCase):
 
         result, success = driver.merge(b"a", b"b", b"c", path="dir/file.xml")
 
-        # Expect different line endings on Windows vs Unix
+        # On Windows the value is wrapped in double quotes for cmd.exe and
+        # echo prints them literally; POSIX shells strip the shlex quoting.
         if sys.platform == "win32":
-            expected = b"path: dir/file.xml \r\n"
+            expected = b'path: "dir/file.xml" \r\n'
         else:
             expected = b"path: dir/file.xml\n"
         self.assertEqual(result, expected)

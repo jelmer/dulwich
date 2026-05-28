@@ -60,6 +60,7 @@ __all__ = [
     "commit_tree",
     "detect_case_only_renames",
     "get_path_element_normalizer",
+    "get_path_element_validator",
     "get_unstaged_changes",
     "index_entry_from_stat",
     "make_path_normalizer",
@@ -2071,6 +2072,30 @@ def validate_path_element_hfs(element: bytes) -> bool:
         return False
 
     return True
+
+
+def get_path_element_validator(config: "Config") -> Callable[[bytes], bool]:
+    """Get the path-element validator to use when checking out a tree.
+
+    ``core.protectNTFS`` defaults to true on every platform (matching Git's
+    ``PROTECT_NTFS_DEFAULT=1``) because a repository authored on POSIX can
+    still be cloned on Windows later; ``core.protectHFS`` defaults to true on
+    macOS. With both disabled this falls back to the default validator, which
+    only refuses ``.git``, ``.`` and ``..``.
+
+    Args:
+        config: Repository configuration object
+
+    Returns:
+        Function that validates a single path element for the configured
+        filesystem protections.
+    """
+    if config.get_boolean(b"core", b"protectNTFS", True):
+        return validate_path_element_ntfs
+    elif config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
+        return validate_path_element_hfs
+    else:
+        return validate_path_element_default
 
 
 def validate_path(

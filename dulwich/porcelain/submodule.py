@@ -22,7 +22,7 @@
 """Porcelain functions for working with submodules."""
 
 import os
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from typing import TYPE_CHECKING, BinaryIO
 
 from ..config import ConfigFile, read_submodules
@@ -87,6 +87,29 @@ def submodule_init(repo: str | os.PathLike[str] | Repo) -> None:
         config.write_to_path()
 
 
+def _check_submodule_path(path: bytes, validator: Callable[[bytes], bool]) -> None:
+    """Reject submodule paths that would escape the working tree.
+
+    Args:
+      path: Submodule path as it appears in the tree gitlink entry.
+      validator: Path-element validator selected for this repository.
+
+    Raises:
+      Error: If the path is absolute or carries a component (e.g. ``.git`` or
+        ``..``) that the validator rejects. This is the same bar git applies
+        to submodule paths, not a stricter one.
+    """
+    from ..index import validate_path
+    from . import Error
+
+    # Tree paths always use "/" as the separator; a leading "/" or "\\" would
+    # make os.path.join discard the repository root, so treat it as absolute.
+    if path.startswith((b"/", b"\\")):
+        raise Error(f"refusing submodule with absolute path: {path!r}")
+    if not validate_path(path, validator):
+        raise Error(f"refusing submodule with unsafe path: {path!r}")
+
+
 def submodule_list(repo: "RepoPath") -> Iterator[tuple[str, str]]:
     """List submodules.
 
@@ -122,7 +145,7 @@ def submodule_update(
       errstream: Error stream for error messages
     """
     from ..client import get_transport_and_path
-    from ..index import build_index_from_tree
+    from ..index import build_index_from_tree, get_path_element_validator
     from ..refs import HEADREF
     from ..submodule import iter_cached_submodules
     from . import (
@@ -138,12 +161,14 @@ def submodule_update(
 
         config = r.get_config()
         gitmodules_path = os.path.join(r.path, ".gitmodules")
+        path_validator = get_path_element_validator(config)
 
         # Get list of submodules to update
         submodules_to_update = []
         head_commit = r[r.head()]
         assert isinstance(head_commit, Commit)
         for path, sha in iter_cached_submodules(r.object_store, head_commit.tree):
+            _check_submodule_path(path, path_validator)
             path_str = (
                 path.decode(DEFAULT_ENCODING) if isinstance(path, bytes) else path
             )
@@ -231,6 +256,7 @@ def submodule_update(
                         sub_repo.index_path(),
                         sub_repo.object_store,
                         tree_id,
+                        validate_path_element=path_validator,
                     )
             else:
                 # Fetch and checkout in existing submodule

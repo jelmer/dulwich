@@ -5645,6 +5645,106 @@ class SubmoduleTests(PorcelainTestCase):
         with open(nested_submodule_file) as f:
             self.assertEqual(f.read(), "nested submodule content")
 
+    def _build_malicious_submodule_repo(self, submodule_path):
+        """Build a parent repo whose gitlink path is attacker-controlled.
+
+        Returns the path to a bare attacker submodule repository and commits a
+        matching ``.gitmodules`` plus tree gitlink entry into ``self.repo``,
+        both pointing at ``submodule_path``.
+        """
+        attacker_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, attacker_path)
+        attacker = Repo.init_bare(attacker_path, mkdir=False)
+        self.addCleanup(attacker.close)
+
+        payload = Blob.from_string(b"#!/bin/sh\necho PWNED\n")
+        attacker.object_store.add_object(payload)
+        tree = Tree()
+        tree.add(b"post-checkout", 0o100755, payload.id)
+        attacker.object_store.add_object(tree)
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = commit.committer = b"a <a@a>"
+        commit.author_time = commit.commit_time = 0
+        commit.author_timezone = commit.commit_timezone = 0
+        commit.message = b"payload"
+        attacker.object_store.add_object(commit)
+        attacker.refs[b"refs/heads/master"] = commit.id
+        attacker.refs.set_symbolic_ref(b"HEAD", b"refs/heads/master")
+
+        gitmodules = (
+            b'[submodule "evil"]\n'
+            b"\tpath = " + submodule_path + b"\n"
+            b"\turl = " + attacker_path.encode() + b"\n"
+        )
+        # A real clone checks .gitmodules out into the work tree; write it
+        # directly so submodule_update can read it without a full checkout.
+        with open(os.path.join(self.repo.path, ".gitmodules"), "wb") as f:
+            f.write(gitmodules)
+        gmb = Blob.from_string(gitmodules)
+        self.repo.object_store.add_object(gmb)
+        vt = Tree()
+        vt.add(b".gitmodules", 0o100644, gmb.id)
+        vt.add(submodule_path, 0o160000, commit.id)
+        self.repo.object_store.add_object(vt)
+        vc = Commit()
+        vc.tree = vt.id
+        vc.author = vc.committer = b"a <a@a>"
+        vc.author_time = vc.commit_time = 0
+        vc.author_timezone = vc.commit_timezone = 0
+        vc.message = b"parent"
+        self.repo.object_store.add_object(vc)
+        self.repo.refs[b"refs/heads/master"] = vc.id
+        self.repo.refs.set_symbolic_ref(b"HEAD", b"refs/heads/master")
+        return attacker_path
+
+    def test_update_rejects_dotgit_path(self) -> None:
+        # A submodule path of .git/hooks would drop the attacker's tree
+        # into the parent's .git/hooks directory (CVE-style RCE via hooks).
+        self._build_malicious_submodule_repo(b".git/hooks")
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.submodule_update,
+            self.repo,
+            init=True,
+        )
+        hook = os.path.join(self.repo.path, ".git", "hooks", "post-checkout")
+        self.assertFalse(os.path.exists(hook))
+
+    def test_update_rejects_parent_traversal_path(self) -> None:
+        self._build_malicious_submodule_repo(b"../escape")
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.submodule_update,
+            self.repo,
+            init=True,
+        )
+
+    def test_check_submodule_path(self) -> None:
+        from dulwich.index import (
+            validate_path_element_default,
+            validate_path_element_ntfs,
+        )
+        from dulwich.porcelain.submodule import _check_submodule_path
+
+        # .git and .. components are rejected on every platform.
+        for bad in (b".git/hooks", b"..", b"a/../b", b"/abs", b".git"):
+            self.assertRaises(
+                porcelain.Error, _check_submodule_path, bad, validate_path_element_ntfs
+            )
+
+        # A path that is only unsafe on NTFS (a reserved device name) is
+        # refused under the default protectNTFS validator but, like git with
+        # core.protectNTFS=false, accepted by the default validator so an
+        # existing POSIX repository can still be updated.
+        self.assertRaises(
+            porcelain.Error, _check_submodule_path, b"aux", validate_path_element_ntfs
+        )
+        _check_submodule_path(b"aux", validate_path_element_default)
+
+        # Ordinary nested paths pass under either validator.
+        _check_submodule_path(b"libs/foo", validate_path_element_ntfs)
+
 
 class PushTests(PorcelainTestCase):
     def test_simple(self) -> None:

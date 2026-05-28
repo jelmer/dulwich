@@ -1436,6 +1436,13 @@ class TestValidatePathElement(TestCase):
         self.assertFalse(validate_path_element_ntfs(b".giT"))
         self.assertFalse(validate_path_element_ntfs(b".."))
         self.assertFalse(validate_path_element_ntfs(b"git~1"))
+        # Elements containing a backslash or colon must be rejected: NTFS
+        # uses ``\`` as a separator (so ``..\\evil`` would escape) and
+        # ``:`` opens an alternate data stream (which can alias .git).
+        self.assertFalse(validate_path_element_ntfs(b"..\\evil"))
+        self.assertFalse(validate_path_element_ntfs(b"foo\\bar"))
+        self.assertFalse(validate_path_element_ntfs(b"evil:.git"))
+        self.assertFalse(validate_path_element_ntfs(b"foo:bar"))
 
     def test_hfs(self) -> None:
         # Normal paths should pass

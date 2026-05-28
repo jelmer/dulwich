@@ -1979,6 +1979,14 @@ def validate_path_element_ntfs(element: bytes) -> bool:
     Returns:
       True if path element is valid for NTFS, False otherwise
     """
+    # NTFS treats ``\`` as a path separator, so an element that still
+    # contains one would be split further on extraction and could escape
+    # the working tree (e.g. ``..\\evil``). ``:`` introduces an NTFS
+    # alternate data stream and can be used to alias ``.git`` references
+    # (e.g. ``evil:.git\\config``). Both are rejected by git's verify_path
+    # when core.protectNTFS is in effect.
+    if b"\\" in element or b":" in element:
+        return False
     normalized = _normalize_path_element_ntfs(element)
     if normalized in INVALID_DOTNAMES:
         return False

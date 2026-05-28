@@ -49,6 +49,9 @@ if TYPE_CHECKING:
     from .repo import BaseRepo
 
 
+logger = logging.getLogger(__name__)
+
+
 class FilterError(Exception):
     """Exception raised when filter operations fail."""
 
@@ -328,7 +331,7 @@ class ProcessFilterDriver:
             except FilterError as e:
                 if self.required:
                     raise
-                logging.warning("Process filter failed, falling back: %s", e)
+                logger.warning("Process filter failed, falling back: %s", e)
 
         # Fall back to clean command
         if not self.clean_cmd:
@@ -355,7 +358,7 @@ class ProcessFilterDriver:
             if self.required:
                 raise FilterError(f"Required clean filter failed: {e}")
             # If not required, log warning and return original data on failure
-            logging.warning("Optional clean filter failed: %s", e)
+            logger.warning("Optional clean filter failed: %s", e)
             return data
 
     def smudge(self, data: bytes, path: bytes = b"") -> bytes:
@@ -371,7 +374,7 @@ class ProcessFilterDriver:
             except FilterError as e:
                 if self.required:
                     raise
-                logging.warning("Process filter failed, falling back: %s", e)
+                logger.warning("Process filter failed, falling back: %s", e)
 
         # Fall back to smudge command
         if not self.smudge_cmd:
@@ -403,7 +406,7 @@ class ProcessFilterDriver:
                     f"Required smudge filter failed: {e} {e.stderr} {e.stdout}"
                 )
             # If not required, log warning and return original data on failure
-            logging.warning("Optional smudge filter failed: %s", e)
+            logger.warning("Optional smudge filter failed: %s", e)
             return data
 
     def cleanup(self) -> None:

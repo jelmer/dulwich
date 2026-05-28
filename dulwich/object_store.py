@@ -54,6 +54,7 @@ __all__ = [
 ]
 
 import binascii
+import logging
 import os
 import stat
 import sys
@@ -124,6 +125,8 @@ if TYPE_CHECKING:
     from .diff_tree import RenameDetector
     from .pack import FilePackIndex, Pack
 
+
+logger = logging.getLogger(__name__)
 
 # Maximum number of times to rescan the pack directory after a pack file
 # disappears between snapshot and lazy open (e.g. concurrent repack).
@@ -2898,8 +2901,6 @@ def _split_commits_and_tags(
       unknown: How to handle unknown objects: "error", "warn", or "ignore"
     Returns: A tuple of (commits, tags, others) SHA1s
     """
-    import logging
-
     if unknown not in ("error", "warn", "ignore"):
         raise ValueError(
             f"unknown must be 'error', 'warn', or 'ignore', got {unknown!r}"
@@ -2915,9 +2916,7 @@ def _split_commits_and_tags(
             if unknown == "error":
                 raise
             elif unknown == "warn":
-                logging.warning(
-                    "Object %s not found in object store", e.decode("ascii")
-                )
+                logger.warning("Object %s not found in object store", e.decode("ascii"))
             # else: ignore
         else:
             if isinstance(o, Commit):

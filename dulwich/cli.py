@@ -1675,7 +1675,7 @@ class cmd_diff(Command):
                         "Rich is required for colored output. Install with: pip install 'dulwich[colordiff]'"
                     )
                 else:
-                    logging.warning(
+                    logger.warning(
                         "Rich not available, disabling colored output. Install with: pip install 'dulwich[colordiff]'"
                     )
                     return outstream.buffer
@@ -2132,7 +2132,7 @@ class cmd_clone(Command):
                 ssh_command=_ssh_command_from_env(),
             )
         except GitProtocolError as e:
-            logging.exception(e)
+            logger.exception(e)
 
 
 def _get_commit_message_with_template(
@@ -2470,7 +2470,7 @@ class cmd_commit(Command):
                 ".", message=message, all=parsed_args.all, amend=parsed_args.amend
             )
         except CommitMessageError as e:
-            logging.exception(e)
+            logger.exception(e)
             return 1
         return None
 
@@ -2705,7 +2705,7 @@ class cmd_show(Command):
                         "Rich is required for colored output. Install with: pip install 'dulwich[colordiff]'"
                     )
                 else:
-                    logging.warning(
+                    logger.warning(
                         "Rich not available, disabling colored output. Install with: pip install 'dulwich[colordiff]'"
                     )
                     return outstream

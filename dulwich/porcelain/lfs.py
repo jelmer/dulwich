@@ -36,6 +36,8 @@ from dulwich.objects import Blob, Commit, Tree
 from dulwich.refs import HEADREF, Ref
 from dulwich.repo import Repo
 
+logger = logging.getLogger(__name__)
+
 
 def lfs_track(
     repo: str | os.PathLike[str] | Repo = ".",
@@ -647,7 +649,7 @@ def lfs_push(
                     content = f.read()
             except KeyError:
                 # Object not in local store
-                logging.warn("LFS object %s not found locally", oid)
+                logger.warning("LFS object %s not found locally", oid)
             else:
                 client.upload(oid, size, content)
                 pushed += 1

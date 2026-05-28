@@ -1,6 +1,7 @@
 PYTHON = python3
 RUFF ?= $(PYTHON) -m ruff
-SETUP = $(PYTHON) -m build
+SETUP = $(PYTHON) setup.py
+BUILD = $(PYTHON) -m build
 TESTRUNNER ?= unittest
 RUNTEST = PYTHONHASHSEED=random PYTHONPATH=$(shell pwd)$(if $(PYTHONPATH),:$(PYTHONPATH),) $(PYTHON) -m $(TESTRUNNER) $(TEST_OPTIONS)
 COVERAGE = python3-coverage
@@ -16,8 +17,10 @@ sphinx::
 	$(MAKE) -C docs html
 
 build::
-	$(SETUP) build
 	$(SETUP) build_ext -i
+
+dist::
+	$(BUILD)
 
 install::
 	$(SETUP) install --root="$(DESTDIR)"

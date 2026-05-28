@@ -1433,6 +1433,25 @@ class ReceivePackHandler(PackHandler):
             capability_object_format(self.repo.object_format.name),
         ]
 
+    def _receive_max_input_size(self) -> int | None:
+        """Return the configured ``receive.maxInputSize`` for this repo.
+
+        Mirrors git: the value is in bytes, and ``0`` (the default) means
+        unlimited. Returned as ``None`` when unset or zero so it can be
+        passed verbatim as ``add_thin_pack(..., max_input_size=...)``.
+        """
+        config = self.repo.get_config_stack()  # type: ignore[attr-defined]
+        try:
+            raw = config.get((b"receive",), b"maxInputSize")
+        except KeyError:
+            return None
+        try:
+            value = int(raw.decode())
+        except ValueError:
+            logger.warning("Ignoring invalid receive.maxInputSize value %r", raw)
+            return None
+        return value if value > 0 else None
+
     def _apply_pack(
         self, refs: list[tuple[ObjectID, ObjectID, Ref]]
     ) -> Iterator[tuple[bytes, bytes]]:
@@ -1466,7 +1485,11 @@ class ReceivePackHandler(PackHandler):
             # string
             try:
                 recv = getattr(self.proto, "recv", None)
-                self.repo.object_store.add_thin_pack(self.proto.read, recv)  # type: ignore[attr-defined]
+                self.repo.object_store.add_thin_pack(  # type: ignore[attr-defined]
+                    self.proto.read,
+                    recv,
+                    max_input_size=self._receive_max_input_size(),
+                )
                 yield (b"unpack", b"ok")
             except all_exceptions as e:
                 yield (b"unpack", str(e).replace("\n", "").encode("utf-8"))

@@ -55,6 +55,8 @@ if TYPE_CHECKING:
     from .repo import BaseRepo, Repo
 
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_GC_AUTO = 6700
 DEFAULT_GC_AUTO_PACK_LIMIT = 50
 DEFAULT_GC_PRUNE_EXPIRE = 1209600  # 2 weeks in seconds
@@ -486,7 +488,7 @@ def maybe_auto_gc(
         if time.time() - stat_info.st_mtime < expiry_seconds:
             # gc.log exists and is not expired - skip GC
             with open(gc_log_path, "rb") as f:
-                logging.info(
+                logger.info(
                     "gc.log content: %s", f.read().decode("utf-8", errors="replace")
                 )
             return False

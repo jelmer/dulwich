@@ -25,6 +25,12 @@
    ``core.protectNTFS=false``.
    (Jelmer Vernooĳ; reported by Christopher Toth)
 
+ * SECURITY (CVE-2026-42563): Shell-quote values substituted into
+   ``ProcessMergeDriver`` commands. ``%P`` is a path from the git
+   tree, so a malicious branch could inject shell commands when the
+   user had a merge driver configured that referenced ``%P``.
+   Reported by Ravishanker Kusuma (hayageek). (Jelmer Vernooĳ)
+
 1.2.4	2026-05-21
 
  * Tolerate ref names with empty path components (e.g. ``refs/tags//v1.0``)

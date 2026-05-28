@@ -474,6 +474,8 @@ from .worktree import (
     worktree_unlock,
 )
 
+logger = logging.getLogger(__name__)
+
 # Module level tuple definition for status output
 GitStatus = namedtuple("GitStatus", "staged unstaged untracked")
 
@@ -1551,10 +1553,10 @@ def clone(
             submodule_update(repo, init=True, recursive=True)
         except FileNotFoundError as e:
             # .gitmodules file doesn't exist - no submodules to process
-            logging.debug("No .gitmodules file found: %s", e)
+            logger.debug("No .gitmodules file found: %s", e)
         except KeyError as e:
             # Submodule configuration missing
-            logging.warning("Submodule configuration error: %s", e)
+            logger.warning("Submodule configuration error: %s", e)
             if errstream:
                 errstream.write(
                     f"Warning: Submodule configuration error: {e}\n".encode()

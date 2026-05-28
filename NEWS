@@ -1,5 +1,18 @@
 1.2.5	UNRELEASED
 
+ * SECURITY(GHSA-gfhv-vqv2-4544): Validate submodule paths in
+   ``porcelain.submodule_update`` (and thus
+   ``porcelain.clone(recurse_submodules=True)``). A crafted upstream
+   repository could carry a submodule whose path was ``.git/hooks`` (or
+   any other path inside ``.git`` or above the work tree), causing the
+   submodule's tree contents to be written there with their executable
+   bits intact -- dropping a hook that later commands would run. Submodule
+   paths are now rejected if they are absolute or carry a component that
+   the configured path validator refuses, and the submodule's own tree is
+   materialized with the same validator. This is the dulwich analogue of git's
+   CVE-2024-32002 / CVE-2024-32004.
+   (Jelmer Vernooĳ; reported by tonghuaroot)
+
  * SECURITY(CVE-2026-42305): Harden tree path validation against entry
    names that are harmless on POSIX but dangerous when checked out on
    Windows. A crafted tree could previously carry such names through to
@@ -47,7 +60,7 @@
    unlimited, matching git's semantics) and ``ReceivePackHandler``
    reads ``receive.maxInputSize`` from the repository config and
    passes it through. Exceeding the cap raises ``PackInputTooLarge``.
-   (Jelmer Vernooĳ; Reported by Liyi, Ziyue, Strick, Maurice and Chenchen @ Univeristy of Sydney)
+   (Jelmer Vernooĳ; Reported by Liyi, Ziyue, Strick, Maurice and Chenchen @ University of Sydney)
 
 1.2.4	2026-05-21
 

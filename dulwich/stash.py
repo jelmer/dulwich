@@ -28,7 +28,6 @@ __all__ = [
 ]
 
 import os
-import sys
 from typing import TYPE_CHECKING, TypedDict
 
 from .diff_tree import tree_changes
@@ -38,14 +37,12 @@ from .index import (
     _tree_to_fs_path,
     build_file_from_blob,
     commit_tree,
+    get_path_element_validator,
     index_entry_from_stat,
     iter_fresh_objects,
     symlink,
     update_working_tree,
     validate_path,
-    validate_path_element_default,
-    validate_path_element_hfs,
-    validate_path_element_ntfs,
 )
 from .object_store import iter_tree_contents
 from .objects import S_IFGITLINK, Blob, Commit, ObjectID, TreeEntry
@@ -163,16 +160,7 @@ class Stash:
         # Get config for working directory update
         config = self._repo.get_config()
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
-
-        # core.protectNTFS defaults to True on all platforms (matching
-        # Git's PROTECT_NTFS_DEFAULT=1) because a repo authored on
-        # POSIX can still be cloned on Windows later.
-        if config.get_boolean(b"core", b"protectNTFS", True):
-            validate_path_element = validate_path_element_ntfs
-        elif config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
-            validate_path_element = validate_path_element_hfs
-        else:
-            validate_path_element = validate_path_element_default
+        validate_path_element = get_path_element_validator(config)
 
         if config.get_boolean(b"core", b"symlinks", True):
             symlink_fn = symlink

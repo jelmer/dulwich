@@ -1,3 +1,30 @@
+1.2.5	UNRELEASED
+
+ * SECURITY(CVE-2026-42305): Harden tree path validation against entry
+   names that are harmless on POSIX but dangerous when checked out on
+   Windows. A crafted tree could previously carry such names through to
+   the work tree. ``validate_path_element_ntfs`` now also rejects:
+
+   - Windows path separators, so an entry named
+     ``.git\hooks\pre-commit.exe`` can no longer materialize a file
+     inside ``.git`` that Git for Windows would execute.
+   - The alternate data stream marker ``:`` (e.g.
+     ``.git::$INDEX_ALLOCATION``, which writes into ``.git`` directly).
+   - NTFS 8.3 short-name aliases of ``.git`` (``git~<digits>``); only
+     ``git~1`` was rejected before.
+   - Reserved Windows device names (``CON``, ``PRN``, ``AUX``, ``NUL``,
+     ``COM1``-``COM9``, ``LPT1``-``LPT9``), including with an extension or
+     trailing dots/spaces such as ``NUL.txt`` or ``COM1 .bar``.
+
+   In addition, ``core.protectNTFS`` now defaults to true on every
+   platform (matching git after CVE-2019-1353), so a POSIX clone no longer
+   accepts paths that would be unsafe on a later Windows clone, and both
+   ``core.protectNTFS`` and ``core.protectHFS`` are now read under their
+   correct option names, having previously been silently ignored. POSIX
+   users who need literal NTFS-unsafe filenames can opt out with
+   ``core.protectNTFS=false``.
+   (Jelmer Vernooĳ; reported by Christopher Toth)
+
 1.2.4	2026-05-21
 
  * Tolerate ref names with empty path components (e.g. ``refs/tags//v1.0``)
@@ -113,29 +140,6 @@
    smudge filter constructed an HTTP-style ``<remote>.git/info/lfs`` path
    that did not exist on disk, leaving LFS-tracked files as pointers when
    cloning from a local repo. (Jelmer Vernooĳ)
-
- * SECURITY: Reject tree entries whose path components would be
-   interpreted as path separators or alternate-data-stream markers on
-   Windows. A malicious repository could previously craft entries such
-   as ``.git\hooks\pre-commit.exe``, ``..\outside.txt``,
-   ``.git::$INDEX_ALLOCATION`` or any ``git~<digits>`` 8.3 short-name
-   alias of ``.git`` and have them materialized on a Windows clone,
-   planting files under ``.git\`` (which Git for Windows then
-   executes) or escaping the work tree. The NTFS path-element
-   validator now rejects ``\``, ``:``, and all ``git~<digits>`` forms.
-   ``core.protectNTFS`` now defaults to true on every platform
-   (matching Git's ``PROTECT_NTFS_DEFAULT=1``), and ``core.protectNTFS``
-   / ``core.protectHFS`` configuration keys are now read under their
-   documented names. Reported by Christopher Toth.
-
- * Reject tree entries whose name resolves to a reserved Windows
-   device (``CON``, ``PRN``, ``AUX``, ``NUL``, ``COM1``-``COM9``,
-   ``LPT1``-``LPT9``), with or without an extension. ``NUL.txt`` and
-   ``AUX.foo`` open the device rather than a disk file on Windows,
-   so a tree authored on POSIX containing such a name would either
-   fail to check out or write to the device on a Windows clone —
-   matching Git's behaviour under ``core.protectNTFS``. Reported by
-   Christopher Toth.
 
  * Deduplicate objects when writing a multi-pack-index. Objects present
    in multiple packs (e.g. after ``git gc`` creates a cruft pack) would

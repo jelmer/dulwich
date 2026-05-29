@@ -1813,6 +1813,62 @@ class HttpGitClientTests(TestCase):
                 # check also the no redirection case
                 self.assertEqual(processed_url, base_url)
 
+    def test_redirect_drops_credentials_cross_origin(self) -> None:
+        from urllib3._collections import HTTPHeaderDict
+        from urllib3.response import HTTPResponse
+
+        tail = "info/refs?service=git-upload-pack"
+        refs_data = (
+            b"001e# service=git-upload-pack\n00000032"
+            b"fb2bebf4919a011f0fd7cec085443d0031228e76 HEAD\n0000"
+        )
+
+        class PoolManagerMock:
+            def __init__(self, location) -> None:
+                self.headers = HTTPHeaderDict()
+                self._location = location
+                self.sent = []
+
+            def request(
+                self,
+                method,
+                url,
+                fields=None,
+                headers=None,
+                redirect=True,
+                preload_content=True,
+            ):
+                self.sent.append((url, dict(headers or {})))
+                return HTTPResponse(
+                    body=BytesIO(refs_data),
+                    headers={
+                        "Content-Type": "application/x-git-upload-pack-advertisement"
+                    },
+                    request_method=method,
+                    request_url=self._location,
+                    preload_content=preload_content,
+                    status=200,
+                )
+
+        base_url = "https://victim.example/repo.git/"
+
+        # Cross-origin redirect: credentials must not survive the rebase.
+        pm = PoolManagerMock("https://attacker.example/repo.git/" + tail)
+        c = HttpGitClient(
+            base_url, pool_manager=pm, username="user", password="secret"
+        )
+        self.assertIn("authorization", c.pool_manager.headers)
+        c._discover_references(b"git-upload-pack", base_url)
+        self.assertNotIn("authorization", c.pool_manager.headers)
+
+        # Same-origin redirect (path only): credentials are kept.
+        pm = PoolManagerMock("https://victim.example/repo.git/" + tail)
+        c = HttpGitClient(
+            base_url, pool_manager=pm, username="user", password="secret"
+        )
+        c._discover_references(b"git-upload-pack", base_url)
+        self.assertIn("authorization", c.pool_manager.headers)
+
     def test_smart_request_content_type_with_directive_check(self) -> None:
         from urllib3.response import HTTPResponse
 

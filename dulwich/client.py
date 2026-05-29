@@ -4463,6 +4463,9 @@ class AbstractHttpGitClient(GitClient):
         """
         raise NotImplementedError(self._http_request)
 
+    def _reset_credentials(self) -> None:
+        """Drop stored credentials before following a cross-origin redirect."""
+
     def _discover_references(
         self,
         service: bytes,
@@ -4509,6 +4512,15 @@ class AbstractHttpGitClient(GitClient):
                 raise GitProtocolError(
                     f"Redirected from URL {url} to URL {resp.redirect_location} without {tail}"
                 )
+            orig, dest = urlparse(url), urlparse(resp.redirect_location)
+            if (orig.scheme, orig.hostname, orig.port) != (
+                dest.scheme,
+                dest.hostname,
+                dest.port,
+            ):
+                # A server-controlled redirect to a different origin must not
+                # carry the credentials configured for the original host.
+                self._reset_credentials()
             base_url = urljoin(url, resp.redirect_location[: -len(tail)])
 
         try:
@@ -5173,6 +5185,9 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             username=username,
             password=password,
         )
+
+    def _reset_credentials(self) -> None:
+        self.pool_manager.headers.pop("authorization", None)
 
     def _get_url(self, path: str | bytes) -> str:
         if not isinstance(path, str):

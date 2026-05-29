@@ -21,6 +21,9 @@
 
 """Tests for patch.py."""
 
+import os
+import shutil
+import tempfile
 from io import BytesIO, StringIO
 from typing import NoReturn
 
@@ -31,6 +34,7 @@ from dulwich.patch import (
     FilePatch,
     PatchHunk,
     apply_patch_hunks,
+    apply_patches,
     commit_patch_id,
     get_summary,
     git_am_patch_split,
@@ -1533,3 +1537,46 @@ Binary files a/test.bin and b/test.bin differ
         self.assertEqual(len(patches), 1)
         self.assertEqual(patches[0].binary, True)
         self.assertIsNone(patches[0].binary_new)  # No patch data
+
+
+class ApplyPatchesPathTests(TestCase):
+    """Tests that apply_patches refuses paths outside the working tree."""
+
+    def _make_repo(self):
+        from dulwich.repo import Repo
+
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        return Repo.init(path)
+
+    def test_rejects_parent_traversal(self) -> None:
+        r = self._make_repo()
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        target = os.path.join(outside, "pwned")
+        rel = os.path.relpath(target, r.path).encode()
+        diff = (
+            b"diff --git a/x b/x\n"
+            b"new file mode 100644\n"
+            b"--- /dev/null\n"
+            b"+++ b/" + rel + b"\n"
+            b"@@ -0,0 +1 @@\n"
+            b"+owned\n"
+        )
+        self.assertRaises(
+            ValueError, apply_patches, r, parse_unified_diff(diff), strip=1
+        )
+        self.assertFalse(os.path.exists(target))
+
+    def test_allows_in_tree_path(self) -> None:
+        r = self._make_repo()
+        diff = (
+            b"diff --git a/sub/x b/sub/x\n"
+            b"new file mode 100644\n"
+            b"--- /dev/null\n"
+            b"+++ b/sub/x\n"
+            b"@@ -0,0 +1 @@\n"
+            b"+hi\n"
+        )
+        apply_patches(r, parse_unified_diff(diff), strip=1)
+        self.assertTrue(os.path.exists(os.path.join(r.path, "sub", "x")))

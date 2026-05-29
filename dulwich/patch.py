@@ -1332,6 +1332,21 @@ def apply_patch_hunks(
     return result
 
 
+def _ensure_within_repo(repo_path: bytes, fs_path: bytes, rel_path: bytes) -> None:
+    """Reject patch target paths that resolve outside the working tree.
+
+    Patch headers are untrusted (e.g. ``git am`` of a mailbox), so a name such
+    as ``../../etc/cron.d/x`` or an absolute path must not be written through
+    ``os.path.join``. Mirrors git's refusal of paths outside the work tree.
+    """
+    repo_root = os.path.realpath(repo_path)
+    resolved = os.path.realpath(fs_path)
+    if resolved != repo_root and not resolved.startswith(
+        repo_root + os.fsencode(os.sep)
+    ):
+        raise ValueError(f"patch affects file outside repository: {rel_path!r}")
+
+
 def _apply_rename_or_copy(
     r: "Repo",
     src_path: bytes,
@@ -1377,6 +1392,8 @@ def _apply_rename_or_copy(
     repo_path_bytes = r.path.encode("utf-8") if isinstance(r.path, str) else r.path
     src_fs_path = os.path.join(repo_path_bytes, src_stripped)
     dst_fs_path = os.path.join(repo_path_bytes, dst_stripped)
+    _ensure_within_repo(repo_path_bytes, src_fs_path, src_stripped)
+    _ensure_within_repo(repo_path_bytes, dst_fs_path, dst_stripped)
 
     # Read content from source file
     op_name = "rename" if is_rename else "copy"
@@ -1529,9 +1546,9 @@ def apply_patches(
 
         # Convert to filesystem path
         tree_path = file_path
-        fs_path = os.path.join(
-            r.path.encode("utf-8") if isinstance(r.path, str) else r.path, file_path
-        )
+        repo_path_bytes = r.path.encode("utf-8") if isinstance(r.path, str) else r.path
+        fs_path = os.path.join(repo_path_bytes, file_path)
+        _ensure_within_repo(repo_path_bytes, fs_path, file_path)
 
         # Handle renames and copies
         original_lines: list[bytes] | None = None

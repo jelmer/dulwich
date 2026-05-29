@@ -5152,6 +5152,12 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             # If you want callbacks with a custom pool manager, wrap it yourself
             self.pool_manager = pool_manager
 
+        # Credentials are scoped to the origin of base_url. They are attached
+        # per-request in _http_request rather than stored on the pool manager,
+        # so that a redirect to a different origin does not carry them to an
+        # origin they were not configured for.
+        self._auth_header: str | None = None
+        self._auth_origin: tuple[str | None, str | None, int | None] | None = None
         if username is not None:
             # No escaping needed: ":" is not allowed in username:
             # https://tools.ietf.org/html/rfc2617#section-2
@@ -5159,7 +5165,8 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             import urllib3.util
 
             basic_auth = urllib3.util.make_headers(basic_auth=credentials)
-            self.pool_manager.headers.update(basic_auth)  # type: ignore
+            self._auth_header = basic_auth["authorization"]
+            self._auth_origin = self._origin(base_url)
 
         self.config = config
 
@@ -5173,6 +5180,21 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             username=username,
             password=password,
         )
+
+    @staticmethod
+    def _origin(url: str) -> tuple[str | None, str | None, int | None]:
+        """Return the (scheme, host, port) origin of a URL.
+
+        Implicit default ports are resolved to their explicit value so that
+        e.g. ``https://example/`` and ``https://example:443/`` compare equal,
+        matching urllib3's own same-host check.
+        """
+        from urllib3.connection import port_by_scheme
+        from urllib3.util import parse_url
+
+        parsed = parse_url(url)
+        port = parsed.port or port_by_scheme.get(parsed.scheme or "")
+        return (parsed.scheme, parsed.host, port)
 
     def _get_url(self, path: str | bytes) -> str:
         if not isinstance(path, str):
@@ -5194,6 +5216,15 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         if headers is not None:
             req_headers.update(headers)
         req_headers["Pragma"] = "no-cache"
+        # Only attach credentials to requests for the origin they were
+        # configured for. A redirect can rebase the target URL to a different
+        # origin; sending the credentials there would disclose them to a host
+        # they were never configured for.
+        if self._auth_header is not None:
+            if self._origin(url) == self._auth_origin:
+                req_headers["authorization"] = self._auth_header
+            else:
+                req_headers.pop("authorization", None)
 
         try:
             request_kwargs = {

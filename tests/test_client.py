@@ -1649,7 +1649,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual("user", c._username)
         self.assertEqual("passwd", c._password)
 
-        basic_auth = c.pool_manager.headers["authorization"]
+        basic_auth = c._auth_header
         auth_string = "{}:{}".format("user", "passwd")
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
         expected_basic_auth = "Basic {}".format(b64_credentials.decode("latin1"))
@@ -1662,7 +1662,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual("user", c._username)
         self.assertIsNone(c._password)
 
-        basic_auth = c.pool_manager.headers["authorization"]
+        basic_auth = c._auth_header
         auth_string = b"user:"
         b64_credentials = base64.b64encode(auth_string)
         expected_basic_auth = f"Basic {b64_credentials.decode('ascii')}"
@@ -1684,7 +1684,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual(c._username, username)
         self.assertEqual(c._password, None)
 
-        basic_auth = c.pool_manager.headers["authorization"]
+        basic_auth = c._auth_header
         auth_string = username.encode("ascii") + b":"
         b64_credentials = base64.b64encode(auth_string)
         expected_basic_auth = f"Basic {b64_credentials.decode('ascii')}"
@@ -1703,7 +1703,7 @@ class HttpGitClientTests(TestCase):
         self.assertEqual(original_username, c._username)
         self.assertEqual(original_password, c._password)
 
-        basic_auth = c.pool_manager.headers["authorization"]
+        basic_auth = c._auth_header
         auth_string = f"{original_username}:{original_password}"
         b64_credentials = base64.b64encode(auth_string.encode("latin1"))
         expected_basic_auth = "Basic {}".format(b64_credentials.decode("latin1"))
@@ -1812,6 +1812,91 @@ class HttpGitClientTests(TestCase):
             else:
                 # check also the no redirection case
                 self.assertEqual(processed_url, base_url)
+
+    def test_credentials_scoped_to_origin(self) -> None:
+        # Credentials configured for the original host must not be sent to a
+        # different origin that a redirect rebased the request onto.
+        from urllib3.response import HTTPResponse
+
+        tail = "info/refs?service=git-upload-pack"
+        refs_data = (
+            b"001e# service=git-upload-pack\n00000032"
+            b"fb2bebf4919a011f0fd7cec085443d0031228e76 HEAD\n0000"
+        )
+
+        class PoolManagerMock:
+            def __init__(self, redirect_location) -> None:
+                self.headers: dict[str, str] = {}
+                self._redirect_location = redirect_location
+                self.requests: list[tuple[str, dict]] = []
+
+            def request(
+                self,
+                method,
+                url,
+                fields=None,
+                headers=None,
+                redirect=True,
+                preload_content=True,
+                **kwargs,
+            ):
+                self.requests.append((url, dict(headers or {})))
+                if method == "POST":
+                    body = b"0000"
+                    content_type = "application/x-git-upload-pack-result"
+                    request_url = url
+                else:
+                    body = refs_data
+                    content_type = "application/x-git-upload-pack-advertisement"
+                    # urllib3 follows the redirect itself; the response's URL
+                    # reflects the final (redirected) location.
+                    request_url = self._redirect_location
+                return HTTPResponse(
+                    body=BytesIO(body),
+                    headers={"Content-Type": content_type},
+                    request_method=method,
+                    request_url=request_url,
+                    preload_content=preload_content,
+                    status=200,
+                )
+
+        base_url = "https://example.com/repo.git/"
+
+        def auth_header(req_headers):
+            for key, value in req_headers.items():
+                if key.lower() == "authorization":
+                    return value
+            return None
+
+        # Cross-origin redirect: the request that lands on the other origin
+        # must not carry the credentials.
+        pm = PoolManagerMock("https://other.example/repo.git/" + tail)
+        c = HttpGitClient(base_url, pool_manager=pm, username="user", password="secret")
+        c._discover_references(b"git-upload-pack", base_url)
+        # The follow-up smart request POSTs to the rebased origin.
+        c._smart_request("git-upload-pack", "https://other.example/repo.git/", b"0000")
+        other_origin_requests = [
+            (url, hdrs) for url, hdrs in pm.requests if "other.example" in url
+        ]
+        self.assertNotEqual([], other_origin_requests)
+        for url, hdrs in other_origin_requests:
+            self.assertIsNone(auth_header(hdrs), url)
+
+        # Same-origin redirect (path only): credentials are retained.
+        pm = PoolManagerMock("https://example.com/other.git/" + tail)
+        c = HttpGitClient(base_url, pool_manager=pm, username="user", password="secret")
+        c._discover_references(b"git-upload-pack", base_url)
+        for url, hdrs in pm.requests:
+            self.assertEqual("Basic dXNlcjpzZWNyZXQ=", auth_header(hdrs), url)
+
+        # Implicit vs explicit default port is the same origin.
+        pm = PoolManagerMock("https://example.com:443/repo.git/" + tail)
+        c = HttpGitClient(base_url, pool_manager=pm, username="user", password="secret")
+        c._smart_request(
+            "git-upload-pack", "https://example.com:443/repo.git/", b"0000"
+        )
+        for url, hdrs in pm.requests:
+            self.assertEqual("Basic dXNlcjpzZWNyZXQ=", auth_header(hdrs), url)
 
     def test_smart_request_content_type_with_directive_check(self) -> None:
         from urllib3.response import HTTPResponse

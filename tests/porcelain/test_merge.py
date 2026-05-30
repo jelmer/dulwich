@@ -23,11 +23,12 @@
 
 import importlib.util
 import os
+import stat
 import tempfile
 import unittest
 
 from dulwich import porcelain
-from dulwich.objects import ZERO_SHA
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.repo import Repo
 
 from .. import DependencyMissing, TestCase
@@ -477,6 +478,49 @@ class PorcelainMergeTests(TestCase):
             with Repo(tmpdir) as repo:
                 commit = repo[merge_commit]
                 self.assertEqual(len(commit.parents), 2)
+
+    def _commit_tree(self, repo, tree, parents):
+        repo.object_store.add_object(tree)
+        commit = Commit()
+        commit.tree = tree.id
+        commit.parents = parents
+        commit.author = commit.committer = b"Test <test@example.com>"
+        commit.author_time = commit.commit_time = 1
+        commit.author_timezone = commit.commit_timezone = 0
+        commit.message = b"test"
+        repo.object_store.add_object(commit)
+        return commit.id
+
+    def test_merge_rejects_ntfs_dotgit_alias(self):
+        """A fast-forward merge honors core.protectNTFS for the new tree."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with Repo.init(tmpdir) as repo:
+                repo.get_config().set((b"core",), b"protectNTFS", b"true")
+                repo.get_config().write_to_path()
+
+                blob = Blob.from_string(b"base\n")
+                repo.object_store.add_object(blob)
+                base_tree = Tree()
+                base_tree.add(b"ok.txt", stat.S_IFREG | 0o644, blob.id)
+                base = self._commit_tree(repo, base_tree, [])
+                repo.refs[b"refs/heads/master"] = base
+                repo.refs.set_symbolic_ref(b"HEAD", b"refs/heads/master")
+                repo.get_worktree().reset_index(base_tree.id)
+
+                payload = Blob.from_string(b"payload\n")
+                repo.object_store.add_object(payload)
+                attack_tree = Tree()
+                attack_tree.add(b"ok.txt", stat.S_IFREG | 0o644, blob.id)
+                # ``git~2`` is an NTFS 8.3 short-name alias for ``.git``.
+                attack_tree.add(b"git~2", stat.S_IFREG | 0o755, payload.id)
+                attack = self._commit_tree(repo, attack_tree, [base])
+
+                porcelain.merge(repo, attack)
+
+                self.assertFalse(
+                    os.path.exists(os.path.join(tmpdir, "git~2")),
+                    "merge materialized an NTFS .git alias despite protectNTFS",
+                )
 
 
 class PorcelainMergeTreeTests(TestCase):

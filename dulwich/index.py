@@ -2763,7 +2763,9 @@ def update_working_tree(
       new_tree_id: SHA of the tree to update to
       change_iterator: Iterator of TreeChange objects to apply
       honor_filemode: An optional flag to honor core.filemode setting
-      validate_path_element: Function to validate path elements to check out
+      validate_path_element: Function to validate path elements to check out.
+        If None, derived from ``config`` so that ``core.protectNTFS`` and
+        ``core.protectHFS`` are honored by default.
       symlink_fn: Function to use for creating symlinks
       force_remove_untracked: If True, remove files that exist in working
         directory but not in target tree, even if old_tree_id is None
@@ -2775,9 +2777,6 @@ def update_working_tree(
       config: Repository configuration. If None, falls back to
         ``repo.get_config_stack()``.
     """
-    if validate_path_element is None:
-        validate_path_element = validate_path_element_default
-
     from .diff_tree import (
         CHANGE_ADD,
         CHANGE_COPY,
@@ -2790,6 +2789,13 @@ def update_working_tree(
     repo_path = repo.path if isinstance(repo.path, bytes) else repo.path.encode()
     if config is None:
         config = repo.get_config_stack()
+
+    if validate_path_element is None:
+        # Derive the validator from config so callers cannot accidentally
+        # skip ``core.protectNTFS``/``core.protectHFS`` enforcement by
+        # omitting this argument.
+        validate_path_element = get_path_element_validator(config)
+
     index = repo.open_index(config=config)
 
     # Convert iterator to list since we need multiple passes

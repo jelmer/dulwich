@@ -8,6 +8,13 @@
    ``git~2`` even with ``core.protectNTFS=true``.
    (Jelmer Vernooĳ; reported by donovan-jasper)
 
+ * SECURITY: Reject patch target paths that escape the work tree in
+   ``apply_patches``. Patch headers are untrusted (e.g. ``git am`` of a
+   mailbox), so a ``+++``/rename path such as ``../../etc/cron.d/x`` or an
+   absolute path was joined onto the repo path and written outside the
+   working tree. Such paths are now refused.
+   (netliomax25-code)
+
  * Remove the ``force_remove_untracked`` argument from
    ``index.update_working_tree``. It had been a no-op since the function
    was rewritten to apply changes from a diff iterator, and removing

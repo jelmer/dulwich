@@ -590,6 +590,39 @@ class CheckoutError(Error):
     """Indicates that a checkout cannot be performed."""
 
 
+def _checked_worktree_path(repo: "Repo", tree_path: bytes) -> bytes:
+    """Resolve a working-tree path, refusing anything that escapes the repo.
+
+    ``checkout``, ``restore`` and ``reset_file`` write files at caller-supplied
+    paths. Those paths are normally trusted, but validating them as a matter of
+    defense in depth keeps a stray ``../`` or ``.git`` component from writing
+    outside the work tree or into the control directory, matching the bar git
+    applies to its own path operands.
+
+    Args:
+      repo: Repository the path is relative to.
+      tree_path: Path in tree form (``/``-separated), as produced by
+        ``_fs_to_tree_path``.
+
+    Returns:
+      The filesystem path under the repository root, as bytes.
+
+    Raises:
+      Error: If the path is absolute or carries a component the configured
+        ``core.protectNTFS``/``core.protectHFS`` validator rejects.
+    """
+    from ..index import get_path_element_validator, validate_path
+
+    # Tree paths always use "/" as the separator; a leading "/" or "\\" would
+    # make os.path.join discard the repository root, so treat it as absolute.
+    if tree_path.startswith((b"/", b"\\")):
+        raise Error(f"refusing to write path outside repository: {tree_path!r}")
+    validator = get_path_element_validator(repo.get_config_stack())
+    if not validate_path(tree_path, validator):
+        raise Error(f"refusing to write unsafe path: {tree_path!r}")
+    return os.path.join(os.fsencode(repo.path), tree_path)
+
+
 def parse_timezone_format(tz_str: str) -> int:
     """Parse given string and attempt to return a timezone offset.
 
@@ -5593,13 +5626,11 @@ def checkout(
                     # Path doesn't exist in target tree
                     pass
                 else:
+                    # Defense in depth: refuse a path that would escape the
+                    # work tree before creating directories or writing.
+                    file_path = _checked_worktree_path(r, path)
+
                     # Create directories if needed
-                    # Handle path as string
-                    if isinstance(path, bytes):
-                        path_str = path.decode(DEFAULT_ENCODING)
-                    else:
-                        path_str = path
-                    file_path = os.path.join(r.path, path_str)
                     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
                     # Write the file content
@@ -5757,7 +5788,9 @@ def restore(
                         blob = r[index_entry.sha]
                         assert isinstance(blob, Blob), "Expected a Blob object"
 
-                        full_path = os.path.join(os.fsencode(r.path), tree_path)
+                        # Defense in depth: refuse a path that would escape
+                        # the work tree.
+                        full_path = _checked_worktree_path(r, tree_path)
                         mode = index_entry.mode
 
                         # Use build_file_from_blob to write the file
@@ -5794,7 +5827,8 @@ def restore(
                     f"Path '{path if isinstance(path, str) else path.decode(DEFAULT_ENCODING)}' not found in source"
                 )
 
-            full_path = os.path.join(os.fsencode(r.path), tree_path)
+            # Defense in depth: refuse a path that would escape the work tree.
+            full_path = _checked_worktree_path(r, tree_path)
 
             if worktree:
                 # Use build_file_from_blob to restore to working tree
@@ -5963,7 +5997,8 @@ def reset_file(
     tree_path = _fs_to_tree_path(file_path)
 
     file_entry = tree.lookup_path(repo.object_store.__getitem__, tree_path)
-    full_path = os.path.join(os.fsencode(repo.path), tree_path)
+    # Defense in depth: refuse a path that would escape the work tree.
+    full_path = _checked_worktree_path(repo, tree_path)
     blob = repo.object_store[file_entry[1]]
     assert isinstance(blob, Blob)
     mode = file_entry[0]

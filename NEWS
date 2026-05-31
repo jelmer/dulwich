@@ -8,6 +8,12 @@
    ``git~2`` even with ``core.protectNTFS=true``.
    (Jelmer Vernooĳ; reported by donovan-jasper)
 
+ * Remove the ``force_remove_untracked`` argument from
+   ``index.update_working_tree``. It had been a no-op since the function
+   was rewritten to apply changes from a diff iterator, and removing
+   untracked files is not part of ``reset --hard`` semantics.
+   (Jelmer Vernooĳ)
+
 1.2.5	2026-05-28
 
  * SECURITY(GHSA-gfhv-vqv2-4544): Validate submodule paths in

@@ -290,7 +290,6 @@ def _reset_worktree_to_tree(
         index_tree_id,
         target_tree_id,
         change_iterator=changes,
-        force_remove_untracked=True,
         allow_overwrite_modified=True,
         config=config,
     )

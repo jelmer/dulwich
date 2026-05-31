@@ -2786,6 +2786,13 @@ def update_working_tree(
         CHANGE_UNCHANGED,
     )
 
+    if force_remove_untracked:
+        import warnings
+
+        warnings.warn(
+            "force_remove_untracked is a no-op and will be removed in a future release",
+            DeprecationWarning,
+        )
     repo_path = repo.path if isinstance(repo.path, bytes) else repo.path.encode()
     if config is None:
         config = repo.get_config_stack()

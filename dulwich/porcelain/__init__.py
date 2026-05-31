@@ -2876,7 +2876,6 @@ def reset(
                 honor_filemode=honor_filemode,
                 validate_path_element=validate_path_element,
                 symlink_fn=symlink_fn,
-                force_remove_untracked=True,
                 blob_normalizer=blob_normalizer,
                 allow_overwrite_modified=True,  # Allow overwriting modified files,
                 config=r.get_config_stack(),
@@ -5462,7 +5461,7 @@ def _perform_tree_switch(
       repo: Repository object
       current_tree_id: Current tree ID (or None for empty repo)
       target_tree_id: Target tree ID to switch to
-      force: If True, force removal of untracked files and allow overwriting modified files
+      force: If True, allow overwriting modified files
     """
     honor_filemode, validate_path_element, symlink_fn = _get_worktree_update_config(
         repo
@@ -5484,7 +5483,6 @@ def _perform_tree_switch(
         honor_filemode=honor_filemode,
         validate_path_element=validate_path_element,
         symlink_fn=symlink_fn,
-        force_remove_untracked=force,
         blob_normalizer=blob_normalizer,
         allow_overwrite_modified=force,
         config=config,

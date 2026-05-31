@@ -1,4 +1,4 @@
-1.2.6	UNRELEASED
+1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all
    work-tree updates. The 1.2.5 path hardening (CVE-2026-42305) only

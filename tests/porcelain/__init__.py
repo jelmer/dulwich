@@ -4555,6 +4555,38 @@ class RevertTests(PorcelainTestCase):
             porcelain.revert(self.repo.path, commits=[initial_sha])
         self.assertIn("no parents", str(cm.exception))
 
+    def _commit_dotgit_hook_tree(self) -> bytes:
+        # Build a commit whose tree carries a ".git/hooks/post-checkout"
+        # entry. The path resolves through lookup_path, so without the
+        # defense-in-depth check it would write a hook into the control dir.
+        blob = Blob.from_string(b"#!/bin/sh\ntouch owned\n")
+        hooks = Tree()
+        hooks.add(b"post-checkout", 0o100755, blob.id)
+        dotgit = Tree()
+        dotgit.add(b"hooks", stat.S_IFDIR, hooks.id)
+        tree = Tree()
+        tree.add(b".git", stat.S_IFDIR, dotgit.id)
+        for obj in (blob, hooks, dotgit, tree):
+            self.repo.object_store.add_object(obj)
+        return self.repo.get_worktree().commit(
+            message=b"malicious",
+            tree=tree.id,
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+    def test_reset_file_rejects_dotgit_path(self) -> None:
+        sha = self._commit_dotgit_hook_tree()
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.reset_file,
+            self.repo,
+            ".git/hooks/post-checkout",
+            sha,
+        )
+        hook = os.path.join(self.repo.path, ".git", "hooks", "post-checkout")
+        self.assertFalse(os.path.exists(hook))
+
 
 class CheckoutTests(PorcelainTestCase):
     def setUp(self) -> None:
@@ -4899,6 +4931,35 @@ class CheckoutTests(PorcelainTestCase):
         with open(gitignore_file) as f:
             self.assertEqual("*.pyc\n", f.read())
 
+    def test_checkout_rejects_dotgit_path(self) -> None:
+        # A path-specific checkout of ".git/hooks/post-checkout" resolves in
+        # the tree, so without the defense-in-depth check it would drop a hook
+        # into the control directory.
+        blob = Blob.from_string(b"#!/bin/sh\ntouch owned\n")
+        hooks = Tree()
+        hooks.add(b"post-checkout", 0o100755, blob.id)
+        dotgit = Tree()
+        dotgit.add(b"hooks", stat.S_IFDIR, hooks.id)
+        tree = Tree()
+        tree.add(b".git", stat.S_IFDIR, dotgit.id)
+        for obj in (blob, hooks, dotgit, tree):
+            self.repo.object_store.add_object(obj)
+        sha = self.repo.get_worktree().commit(
+            message=b"malicious",
+            tree=tree.id,
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.checkout,
+            self.repo,
+            sha,
+            paths=[b".git/hooks/post-checkout"],
+        )
+        hook = os.path.join(self.repo.path, ".git", "hooks", "post-checkout")
+        self.assertFalse(os.path.exists(hook))
+
     def test_checkout_to_head(self) -> None:
         new_sha = self._commit_something_wrong()
 
@@ -5139,6 +5200,68 @@ class RestoreTests(PorcelainTestCase):
     def test_restore_nonexistent_path(self) -> None:
         with self.assertRaises(porcelain.CheckoutError):
             porcelain.restore(self.repo, paths=["nonexistent"])
+
+    def test_restore_rejects_dotgit_path(self) -> None:
+        # Restoring ".git/hooks/post-checkout" from a source tree resolves,
+        # so the defense-in-depth check must refuse it before writing.
+        blob = Blob.from_string(b"#!/bin/sh\ntouch owned\n")
+        hooks = Tree()
+        hooks.add(b"post-checkout", 0o100755, blob.id)
+        dotgit = Tree()
+        dotgit.add(b"hooks", stat.S_IFDIR, hooks.id)
+        tree = Tree()
+        tree.add(b".git", stat.S_IFDIR, dotgit.id)
+        for obj in (blob, hooks, dotgit, tree):
+            self.repo.object_store.add_object(obj)
+        sha = self.repo.get_worktree().commit(
+            message=b"malicious",
+            tree=tree.id,
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.restore,
+            self.repo,
+            paths=[".git/hooks/post-checkout"],
+            source=sha,
+        )
+        hook = os.path.join(self.repo.path, ".git", "hooks", "post-checkout")
+        self.assertFalse(os.path.exists(hook))
+
+
+class CheckWorktreePathTests(PorcelainTestCase):
+    """Tests for the _checked_worktree_path defense-in-depth helper."""
+
+    def test_rejects_unsafe_paths(self) -> None:
+        from dulwich.porcelain import _checked_worktree_path
+
+        for bad in (
+            b".git/hooks",
+            b".git",
+            b"..",
+            b"a/../b",
+            b"/abs",
+            b"\\abs",
+        ):
+            self.assertRaises(porcelain.Error, _checked_worktree_path, self.repo, bad)
+
+    def test_allows_ordinary_paths(self) -> None:
+        from dulwich.porcelain import _checked_worktree_path
+
+        root = os.fsencode(self.repo.path)
+        self.assertEqual(
+            os.path.join(root, b"foo"),
+            _checked_worktree_path(self.repo, b"foo"),
+        )
+        self.assertEqual(
+            os.path.join(root, b"libs/foo"),
+            _checked_worktree_path(self.repo, b"libs/foo"),
+        )
+        self.assertEqual(
+            os.path.join(root, b".github/workflows/ci.yml"),
+            _checked_worktree_path(self.repo, b".github/workflows/ci.yml"),
+        )
 
 
 class SwitchTests(PorcelainTestCase):

@@ -1,3 +1,19 @@
+1.2.6	UNRELEASED
+
+ * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all
+   work-tree updates. The 1.2.5 path hardening (CVE-2026-42305) only
+   reached ``checkout`` and ``reset``; ``update_working_tree`` (used by
+   ``merge``, ``pull`` and others) fell back to the default validator, so
+   a crafted branch could still check out an NTFS-unsafe name such as
+   ``git~2`` even with ``core.protectNTFS=true``.
+   (Jelmer Vernooĳ; reported by donovan-jasper)
+
+ * Remove the ``force_remove_untracked`` argument from
+   ``index.update_working_tree``. It had been a no-op since the function
+   was rewritten to apply changes from a diff iterator, and removing
+   untracked files is not part of ``reset --hard`` semantics.
+   (Jelmer Vernooĳ)
+
 1.2.5	2026-05-28
 
  * SECURITY(GHSA-gfhv-vqv2-4544): Validate submodule paths in

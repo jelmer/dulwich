@@ -42,6 +42,7 @@ from dulwich.config import (
     env_config,
     get_git_proxy_command,
     parse_submodules,
+    read_submodules,
 )
 
 from . import TestCase
@@ -468,6 +469,23 @@ who\"
 
             cf = ConfigFile.from_path(main_path)
             self.assertEqual(b"true", cf.get((b"core",), b"bare"))
+
+    def test_expand_includes_disabled(self) -> None:
+        """include directives are ignored when expand_includes=False."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = os.path.realpath(tmpdir)
+
+            included_path = os.path.join(tmpdir, "included.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[core]\n    bare = true\n")
+
+            main_path = os.path.join(tmpdir, "main.config")
+            with open(main_path, "wb") as f:
+                escaped_path = included_path.replace("\\", "\\\\")
+                f.write(f"[include]\n    path = {escaped_path}\n".encode())
+
+            cf = ConfigFile.from_path(main_path, expand_includes=False)
+            self.assertRaises(KeyError, cf.get, (b"core",), b"bare")
 
     def test_includeif_hasconfig(self) -> None:
         """Test includeIf with hasconfig conditions."""
@@ -1293,6 +1311,30 @@ class SubmodulesTests(TestCase):
             ],
             got,
         )
+
+    def test_parse_submodules_skips_sectionless_include(self) -> None:
+        cf = ConfigFile.from_file(
+            BytesIO(
+                b"[submodule \"a\"]\n\tpath = a\n\turl = ./a\n[include]\n\tpath = x\n"
+            ),
+            expand_includes=False,
+        )
+        self.assertEqual([(b"a", b"./a", b"a")], list(parse_submodules(cf)))
+
+    def test_read_submodules_ignores_includes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = os.path.realpath(tmpdir)
+            with open(os.path.join(tmpdir, "evil.config"), "wb") as f:
+                f.write(b'[submodule "leaked"]\n\tpath = p\n\turl = file:///\n')
+            gitmodules = os.path.join(tmpdir, ".gitmodules")
+            with open(gitmodules, "wb") as f:
+                f.write(
+                    b'[submodule "real"]\n\tpath = sub\n\turl = ./sub\n'
+                    b"[include]\n\tpath = evil.config\n"
+                )
+            self.assertEqual(
+                [(b"sub", b"./sub", b"real")], list(read_submodules(gitmodules))
+            )
 
 
 class ApplyInsteadOfTests(TestCase):

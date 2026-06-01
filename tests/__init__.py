@@ -223,6 +223,7 @@ def self_test_suite() -> unittest.TestSuite:
         "pack",
         "patch",
         "protocol",
+        "range_diff",
         "rebase",
         "reflog",
         "refs",
@@ -251,6 +252,7 @@ def self_test_suite() -> unittest.TestSuite:
         "cherry_pick",
         "cli",
         "merge",
+        "range_diff",
     ]
     module_names += ["tests.cli.test_" + name for name in cli_names]
     porcelain_names = [
@@ -264,6 +266,7 @@ def self_test_suite() -> unittest.TestSuite:
         "mbox",
         "merge",
         "notes",
+        "range_diff",
         "rebase",
         "submodule",
         "subtree",

@@ -212,6 +212,7 @@ __all__ = [
     "prune",
     "pull",
     "push",
+    "range_diff",
     "rebase",
     "receive_pack",
     "reflog",
@@ -7264,6 +7265,120 @@ def cherry(
             results.append((status, commit_id, message))
 
         return results
+
+
+def range_diff(
+    repo: RepoPath,
+    range1: str | bytes | Commit | Tag,
+    range2: str | bytes | Commit | Tag | None = None,
+    base: str | bytes | Commit | Tag | None = None,
+    *,
+    creation_factor: int | None = None,
+    diff_algorithm: str | None = None,
+    outstream: BinaryIO = default_bytes_out_stream,
+) -> None:
+    """Compare two commit ranges, like ``git range-diff``.
+
+    Three argument forms are supported, mirroring git:
+
+    * ``range_diff(repo, "A..B", "C..D")`` compares the two ranges directly.
+    * ``range_diff(repo, rev1, rev2, base=base)`` compares ``base..rev1``
+      with ``base..rev2``.
+    * ``range_diff(repo, "rev1...rev2")`` compares ``rev2..rev1`` with
+      ``rev1..rev2`` using their merge base.
+
+    Revisions may be given as strings or bytes (including ``A..B`` range
+    syntax), or as Commit or Tag objects.
+
+    Args:
+      repo: Path to repository or a Repo object.
+      range1: First range (``A..B``), or a single revision when ``base`` is
+        given, or ``rev1...rev2`` for the symmetric-difference form.
+      range2: Second range (``C..D``), or a single revision when ``base`` is
+        given. Must be None for the ``rev1...rev2`` form.
+      base: Common base for the ``base rev1 rev2`` form.
+      creation_factor: Percentage controlling when two commits are considered
+        a match (see git's ``--creation-factor``); defaults to git's default.
+      diff_algorithm: Diff algorithm to use ("myers" or "patience").
+      outstream: Stream to write the rendered range-diff to.
+    """
+    from ..graph import find_merge_base
+    from ..objectspec import parse_commit_range
+    from ..range_diff import (
+        DEFAULT_CREATION_FACTOR,
+        format_range_diff,
+    )
+    from ..range_diff import (
+        range_diff as _range_diff,
+    )
+
+    if creation_factor is None:
+        creation_factor = DEFAULT_CREATION_FACTOR
+
+    def has_range_syntax(rev: object, sep: bytes) -> bool:
+        if isinstance(rev, str):
+            return sep.decode() in rev
+        if isinstance(rev, bytes):
+            return sep in rev
+        return False
+
+    with open_repo_closing(repo) as r:
+        if base is not None:
+            # Form: base rev1 rev2 -> base..rev1 and base..rev2
+            if range2 is None:
+                raise Error("Two revisions are required when a base is given")
+            base_id = parse_commit(r, base).id
+            old_base = base_id
+            new_base = base_id
+            old_tip = parse_commit(r, range1).id
+            new_tip = parse_commit(r, range2).id
+        elif range2 is None:
+            # Form: rev1...rev2 -> rev2..rev1 and rev1..rev2
+            if not has_range_syntax(range1, b"..."):
+                raise Error("A single argument must be of the form <rev1>...<rev2>")
+            assert isinstance(range1, (str, bytes))
+            range1 = range1.encode() if isinstance(range1, str) else range1
+            left, right = range1.split(b"...", 1)
+            left_id = parse_commit(r, left).id
+            right_id = parse_commit(r, right or b"HEAD").id
+            merge_bases = find_merge_base(r, [left_id, right_id])
+            if not merge_bases:
+                raise Error("No merge base found for the two revisions")
+            mb = merge_bases[0]
+            old_base = mb
+            old_tip = left_id
+            new_base = mb
+            new_tip = right_id
+        else:
+            # Form: A..B C..D
+            if not isinstance(range1, (str, bytes)) or not isinstance(
+                range2, (str, bytes)
+            ):
+                raise Error(
+                    "Both arguments must be commit ranges of the form <base>..<tip>"
+                )
+            old_range = parse_commit_range(r, range1)
+            new_range = parse_commit_range(r, range2)
+            if old_range is None or new_range is None:
+                raise Error(
+                    "Both arguments must be commit ranges of the form <base>..<tip>"
+                )
+            old_base = old_range[0].id
+            old_tip = old_range[1].id
+            new_base = new_range[0].id
+            new_tip = new_range[1].id
+
+        entries = _range_diff(
+            r,
+            old_base,
+            old_tip,
+            new_base,
+            new_tip,
+            creation_factor=creation_factor,
+            diff_algorithm=diff_algorithm,
+        )
+        for line in format_range_diff(entries):
+            outstream.write(line)
 
 
 def cherry_pick(  # noqa: D417

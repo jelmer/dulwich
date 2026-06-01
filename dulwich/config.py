@@ -1001,6 +1001,7 @@ class ConfigFile(ConfigDict):
         max_include_depth: int = DEFAULT_MAX_INCLUDE_DEPTH,
         file_opener: FileOpener | None = None,
         condition_matchers: Mapping[str, ConditionMatcher] | None = None,
+        expand_includes: bool = True,
     ) -> "ConfigFile":
         """Read configuration from a file-like object.
 
@@ -1012,6 +1013,9 @@ class ConfigFile(ConfigDict):
             max_include_depth: Maximum allowed include depth
             file_opener: Optional callback to open included files
             condition_matchers: Optional dict of condition matchers for includeIf
+            expand_includes: Whether to honor include/includeIf directives. Set
+                to False when parsing untrusted config (e.g. .gitmodules) to
+                avoid following include.path to arbitrary files.
         """
         if include_depth > max_include_depth:
             # Prevent excessive recursion
@@ -1055,16 +1059,17 @@ class ConfigFile(ConfigDict):
                     ret._values[section][setting] = value
 
                     # Process include/includeIf directives
-                    ret._handle_include_directive(
-                        section,
-                        setting,
-                        value,
-                        config_dir=config_dir,
-                        include_depth=include_depth,
-                        max_include_depth=max_include_depth,
-                        file_opener=file_opener,
-                        condition_matchers=condition_matchers,
-                    )
+                    if expand_includes:
+                        ret._handle_include_directive(
+                            section,
+                            setting,
+                            value,
+                            config_dir=config_dir,
+                            include_depth=include_depth,
+                            max_include_depth=max_include_depth,
+                            file_opener=file_opener,
+                            condition_matchers=condition_matchers,
+                        )
 
                     setting = None
             else:  # continuation line
@@ -1081,16 +1086,17 @@ class ConfigFile(ConfigDict):
                     ret._values[section][setting] = value
 
                     # Process include/includeIf directives
-                    ret._handle_include_directive(
-                        section,
-                        setting,
-                        value,
-                        config_dir=config_dir,
-                        include_depth=include_depth,
-                        max_include_depth=max_include_depth,
-                        file_opener=file_opener,
-                        condition_matchers=condition_matchers,
-                    )
+                    if expand_includes:
+                        ret._handle_include_directive(
+                            section,
+                            setting,
+                            value,
+                            config_dir=config_dir,
+                            include_depth=include_depth,
+                            max_include_depth=max_include_depth,
+                            file_opener=file_opener,
+                            condition_matchers=condition_matchers,
+                        )
 
                     continuation = None
                     setting = None
@@ -1313,6 +1319,7 @@ class ConfigFile(ConfigDict):
         max_include_depth: int = DEFAULT_MAX_INCLUDE_DEPTH,
         file_opener: FileOpener | None = None,
         condition_matchers: Mapping[str, ConditionMatcher] | None = None,
+        expand_includes: bool = True,
     ) -> "ConfigFile":
         """Read configuration from a file on disk.
 
@@ -1321,6 +1328,9 @@ class ConfigFile(ConfigDict):
             max_include_depth: Maximum allowed include depth
             file_opener: Optional callback to open included files
             condition_matchers: Optional dict of condition matchers for includeIf
+            expand_includes: Whether to honor include/includeIf directives. Set
+                to False when parsing untrusted config (e.g. .gitmodules) to
+                avoid following include.path to arbitrary files.
         """
         abs_path = os.fspath(path)
         config_dir = os.path.dirname(abs_path)
@@ -1341,6 +1351,7 @@ class ConfigFile(ConfigDict):
                 max_include_depth=max_include_depth,
                 file_opener=file_opener,
                 condition_matchers=condition_matchers,
+                expand_includes=expand_includes,
             )
             ret.path = abs_path
             return ret
@@ -1638,7 +1649,11 @@ def read_submodules(
     path: str | os.PathLike[str],
 ) -> Iterator[tuple[bytes, bytes, bytes]]:
     """Read a .gitmodules file."""
-    cfg = ConfigFile.from_path(path)
+    # .gitmodules is attacker-controlled in any cloned tree; do not expand
+    # include/includeIf directives so a hostile file cannot make us open and
+    # parse arbitrary paths on disk. This matches git, which parses submodule
+    # config with includes disabled.
+    cfg = ConfigFile.from_path(path, expand_includes=False)
     return parse_submodules(cfg)
 
 
@@ -1652,6 +1667,10 @@ def parse_submodules(config: ConfigFile) -> Iterator[tuple[bytes, bytes, bytes]]
         where name is quoted part of the section's name.
     """
     for section in config.sections():
+        if len(section) != 2:
+            # Sections without a subsection name (e.g. a stray [include])
+            # cannot be submodule entries; skip rather than crash.
+            continue
         section_kind, section_name = section
         if section_kind == b"submodule":
             try:

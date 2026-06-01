@@ -61,7 +61,7 @@ def submodule_add(
         # TODO(jelmer): Move this logic to dulwich.submodule
         gitmodules_path = os.path.join(r.path, ".gitmodules")
         try:
-            config = ConfigFile.from_path(gitmodules_path)
+            config = ConfigFile.from_path(gitmodules_path, expand_includes=False)
         except FileNotFoundError:
             config = ConfigFile()
             config.path = gitmodules_path

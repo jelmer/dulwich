@@ -6204,13 +6204,14 @@ def cone_mode_disable(repo: str | os.PathLike[str] | Repo, force: bool = False) 
         commit = repo_obj[repo_obj.head()]
         assert isinstance(commit, Commit)
 
-        from ..index import build_index_from_tree
+        from ..index import build_index_from_tree, get_path_element_validator
 
         build_index_from_tree(
             repo_obj.path,
             repo_obj.index_path(),
             repo_obj.object_store,
             commit.tree,
+            validate_path_element=get_path_element_validator(config),
         )
 
 

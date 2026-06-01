@@ -5563,6 +5563,72 @@ class cmd_cherry(Command):
         return 0
 
 
+class cmd_range_diff(Command):
+    """Compare two commit ranges."""
+
+    def run(self, args: Sequence[str]) -> int | None:
+        """Execute the range-diff command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            Exit code (0 for success, 1 for error)
+        """
+        parser = argparse.ArgumentParser(description="Compare two commit ranges")
+        parser.add_argument(
+            "--creation-factor",
+            type=int,
+            default=None,
+            metavar="N",
+            help="Percentage by which creation is weighted (default: 60)",
+        )
+        parser.add_argument(
+            "--diff-algorithm",
+            choices=["myers", "patience"],
+            default=None,
+            help="Choose a diff algorithm",
+        )
+        parser.add_argument(
+            "revs",
+            nargs="+",
+            help=("<range1> <range2>, or <rev1>...<rev2>, or <base> <rev1> <rev2>"),
+        )
+        parsed_args = parser.parse_args(args)
+
+        revs = parsed_args.revs
+        if len(revs) == 1:
+            range1: str = revs[0]
+            range2 = None
+            base = None
+        elif len(revs) == 2:
+            range1, range2 = revs
+            base = None
+        elif len(revs) == 3:
+            base, range1, range2 = revs
+        else:
+            parser.error("Too many arguments")
+
+        with Repo(".") as repo:
+            config = repo.get_config_stack()
+            with get_pager(config=config, cmd_name="range-diff") as outstream:
+                try:
+                    porcelain.range_diff(
+                        repo,
+                        range1,
+                        range2,
+                        base=base,
+                        creation_factor=parsed_args.creation_factor,
+                        diff_algorithm=parsed_args.diff_algorithm,
+                        outstream=outstream.buffer,
+                    )
+                except porcelain.Error as e:
+                    logger.error(f"Error: {e}")
+                    return 1
+
+        return 0
+
+
 class cmd_cherry_pick(Command):
     """Apply the changes introduced by some existing commits."""
 
@@ -7739,6 +7805,7 @@ commands = {
     "prune": cmd_prune,
     "pull": cmd_pull,
     "push": cmd_push,
+    "range-diff": cmd_range_diff,
     "rebase": cmd_rebase,
     "receive-pack": cmd_receive_pack,
     "reflog": cmd_reflog,

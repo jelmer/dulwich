@@ -1315,7 +1315,7 @@ class SubmodulesTests(TestCase):
     def test_parse_submodules_skips_sectionless_include(self) -> None:
         cf = ConfigFile.from_file(
             BytesIO(
-                b"[submodule \"a\"]\n\tpath = a\n\turl = ./a\n[include]\n\tpath = x\n"
+                b'[submodule "a"]\n\tpath = a\n\turl = ./a\n[include]\n\tpath = x\n'
             ),
             expand_includes=False,
         )

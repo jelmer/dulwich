@@ -101,7 +101,7 @@ Patching
 * ✓ ``git mailsplit`` - Simple UNIX mbox splitter program
 * ✓ ``git mailinfo`` - Extracts patch and authorship from a single email
 * ✗ ``git send-email`` - Send collection of patches as emails
-* ✗ ``git request-pull`` - Generate summary of pending changes
+* ✓ ``git request-pull`` - Generate summary of pending changes
 
 Debugging
 ---------
@@ -665,7 +665,7 @@ Known Limitations
 The following Git features are not currently supported:
 
 * Git GUIs (gitk, git-gui, git-citool)
-* Email workflow tools (git-send-email, git-request-pull)
+* Email workflow tools (git-send-email)
 * Interactive tools (git-difftool, git-mergetool)
 * Newer features (range-diff, scalar, fsmonitor--daemon)
 * Full protocol v2 server support (client is fully supported)

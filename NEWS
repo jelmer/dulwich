@@ -1,3 +1,10 @@
+1.2.7	UNRELEASED
+
+ * Add ``porcelain.request_pull`` and a ``dulwich request-pull`` command
+   that generate a summary of pending changes between repositories,
+   suitable for emailing to a maintainer, like ``git request-pull``.
+   (Jelmer Vernooĳ, #1823)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

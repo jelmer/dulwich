@@ -58,6 +58,7 @@ Currently implemented:
  * remote{_add}
  * receive_pack
  * replace{_create,_delete,_list}
+ * request_pull
  * rerere{_status,_diff,_forget,_clear,_gc}
  * reset
  * revert
@@ -223,6 +224,7 @@ __all__ = [
     "replace_create",
     "replace_delete",
     "replace_list",
+    "request_pull",
     "rerere",
     "rerere_clear",
     "rerere_diff",
@@ -8240,6 +8242,204 @@ def format_patch(
                 filenames.append(filename)
 
     return filenames
+
+
+def _commit_iso_date(commit: Commit) -> str:
+    """Format a commit's committer date like git's ``%ci`` placeholder."""
+    time_tuple = time.gmtime(commit.commit_time + commit.commit_timezone)
+    time_str = time.strftime("%Y-%m-%d %H:%M:%S", time_tuple)
+    timezone_str = format_timezone(commit.commit_timezone).decode("ascii")
+    return f"{time_str} {timezone_str}"
+
+
+def _request_pull_ref(r: "Repo", local: bytes) -> bytes:
+    """Resolve the ref name to advertise in a pull request.
+
+    Mirrors git request-pull, which resolves the local ref through a
+    symbolic ref, then a matching head/tag, and finally falls back to the
+    expression itself.
+    """
+    # A symbolic ref (e.g. HEAD) resolves to the underlying branch.
+    try:
+        target: bytes | None = r.refs.follow(Ref(local))[0][-1]
+    except (KeyError, ValueError):
+        target = None
+    if target is not None and target != local and target.startswith(b"refs/"):
+        return target
+
+    # An exact branch or tag name.
+    for prefix in (b"refs/heads/", b"refs/tags/"):
+        if Ref(prefix + local) in r.refs:
+            return prefix + local
+    if local.startswith(b"refs/") and Ref(local) in r.refs:
+        return local
+
+    return local
+
+
+def request_pull(
+    repo: RepoPath,
+    base: str | bytes,
+    url: str,
+    end: str | bytes | None = None,
+    patch: bool = False,
+    outstream: TextIO = sys.stdout,
+) -> None:
+    """Generate a summary of pending changes, like git request-pull.
+
+    Produces a message asking an upstream maintainer to pull a set of
+    changes from a repository, suitable for sending by email.
+
+    Args:
+      repo: Path to repository
+      base: Commit to start at; must already exist in the upstream
+        history (e.g. a tag or branch the maintainer already has).
+      url: URL of the repository the changes can be pulled from.
+      end: Commit to end at, defaulting to HEAD. May use the
+        ``<local>:<remote>`` syntax to advertise a remote ref name that
+        differs from the local one.
+      patch: If True, include the patch text after the summary.
+      outstream: Stream to write the request to.
+
+    Raises:
+      Error: If there are no commits in common between base and end, or
+        if end resolves to no commits beyond base.
+    """
+    from ..diffstat import diffstat
+    from ..graph import find_merge_base
+
+    base_bytes = base.encode() if isinstance(base, str) else base
+
+    if end is None:
+        local: bytes = b"HEAD"
+        remote: bytes | None = None
+    else:
+        end_bytes = end.encode() if isinstance(end, str) else end
+        if b":" in end_bytes:
+            local, remote = end_bytes.split(b":", 1)
+        else:
+            local, remote = end_bytes, None
+
+    with open_repo_closing(repo) as r:
+        base_commit = parse_commit(r, base_bytes)
+        head_commit = parse_commit(r, local)
+
+        merge_bases = find_merge_base(r, [base_commit.id, head_commit.id])
+        if not merge_bases:
+            raise Error(f"No commits in common between {base!r} and {local.decode()!r}")
+        merge_base = merge_bases[0]
+
+        # Collect the commits being requested for the shortlog, oldest last
+        # so we can sort and group them like git shortlog.
+        walker = r.get_walker(include=[head_commit.id], exclude=[base_commit.id])
+        commits = [entry.commit for entry in walker]
+        if not commits:
+            raise Error(
+                f"No commits between {base!r} and {local.decode()!r}; "
+                "nothing to request"
+            )
+
+        # Resolve the ref name to advertise.
+        if remote is not None:
+            pretty_remote = shorten_ref_name(remote)
+        else:
+            resolved = _request_pull_ref(r, local)
+            pretty_remote = shorten_ref_name(resolved)
+
+        # If the local ref resolves to an annotated tag, surface its message.
+        tag_message: str | None = None
+        try:
+            tagged = parse_object(r, local)
+        except KeyError:
+            tagged = None
+        if isinstance(tagged, Tag):
+            tag_message = tagged.message.decode("utf-8", "replace").strip()
+
+        merge_base_commit = r.object_store[merge_base]
+        assert isinstance(merge_base_commit, Commit)
+
+        def subject(commit: Commit) -> str:
+            decoded: str = commit.message.decode(commit.encoding or "utf-8", "replace")
+            return decoded.split("\n", 1)[0].strip()
+
+        outstream.write(
+            "The following changes since commit {}:\n\n".format(
+                merge_base_commit.id.decode("ascii")
+            )
+        )
+        outstream.write(
+            f"  {subject(merge_base_commit)} ({_commit_iso_date(merge_base_commit)})\n\n"
+        )
+        outstream.write("are available in the Git repository at:\n\n")
+        outstream.write(f"  {url} {pretty_remote.decode('utf-8', 'replace')}\n\n")
+        outstream.write(
+            "for you to fetch changes up to {}:\n\n".format(
+                head_commit.id.decode("ascii")
+            )
+        )
+        outstream.write(
+            f"  {subject(head_commit)} ({_commit_iso_date(head_commit)})\n\n"
+        )
+
+        separator = "-" * 64
+        if tag_message:
+            outstream.write(separator + "\n")
+            outstream.write(tag_message + "\n")
+
+        outstream.write(separator + "\n")
+
+        # Shortlog: group commit subjects by author name. Authors are sorted
+        # case-insensitively; within an author the commits keep chronological
+        # (oldest first) order, like git shortlog.
+        from ..mailmap import Mailmap
+
+        try:
+            mailmap: Mailmap | None = Mailmap.from_path(
+                os.path.join(r.path, ".mailmap")
+            )
+        except FileNotFoundError:
+            mailmap = None
+
+        def author_name(commit: Commit) -> str:
+            ident = commit.author
+            if mailmap is not None:
+                resolved = mailmap.lookup(ident)
+                assert isinstance(resolved, bytes)
+                ident = resolved
+            name: str = ident.decode(commit.encoding or "utf-8", "replace")
+            # Strip the "<email>" portion, keeping just the name.
+            if "<" in name:
+                name = name[: name.index("<")].strip()
+            return name
+
+        by_author: dict[str, list[str]] = {}
+        for commit in reversed(commits):
+            by_author.setdefault(author_name(commit), []).append(subject(commit))
+        for author in sorted(by_author, key=str.lower):
+            subjects = by_author[author]
+            outstream.write(f"{author} ({len(subjects)}):\n")
+            for subj in subjects:
+                outstream.write(f"      {subj}\n")
+            outstream.write("\n")
+
+        # Diffstat between the merge base and the head.
+        diff_content = BytesIO()
+        write_tree_diff(
+            diff_content, r.object_store, merge_base_commit.tree, head_commit.tree
+        )
+        diff_bytes = diff_content.getvalue()
+        stat = diffstat(diff_bytes.splitlines())
+        outstream.write(stat.decode("utf-8", "replace") + "\n")
+
+        if patch:
+            outstream.write("\n")
+            if hasattr(outstream, "buffer"):
+                # Flush the text stream so the binary patch is not written
+                # ahead of the already-buffered text output.
+                outstream.flush()
+                outstream.buffer.write(diff_bytes)
+            else:
+                outstream.write(diff_bytes.decode("utf-8", "replace"))
 
 
 def bisect_start(

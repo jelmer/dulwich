@@ -2272,6 +2272,53 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         self.assertEqual(stdout.strip(), "")
 
 
+class RequestPullCommandTest(DulwichCliTestCase):
+    """Tests for request-pull command."""
+
+    def _commit(self, filename, content, message):
+        from dulwich.objects import Blob, Tree
+
+        blob = Blob.from_string(content)
+        self.repo.object_store.add_object(blob)
+        try:
+            head = self.repo.head()
+            tree = self.repo[self.repo[head].tree].copy()
+        except KeyError:
+            tree = Tree()
+        tree.add(filename, 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+        return self.repo.get_worktree().commit(message=message, tree=tree.id)
+
+    def test_request_pull(self):
+        base = self._commit(b"a.txt", b"a\n", b"Base commit")
+        self._commit(b"b.txt", b"b\n", b"Add b.txt")
+        result, stdout, _stderr = self._run_cli(
+            "request-pull", base.decode("ascii"), "https://example.com/repo.git"
+        )
+        self.assertEqual(result, 0)
+        self.assertIn("The following changes since commit", stdout)
+        self.assertIn("https://example.com/repo.git", stdout)
+        self.assertIn("Add b.txt", stdout)
+        self.assertIn("1 files changed", stdout)
+
+    def test_request_pull_no_common_ancestor(self):
+        from dulwich.objects import Tree
+
+        tree = Tree()
+        self.repo.object_store.add_object(tree)
+        c1 = self.repo.get_worktree().commit(message=b"first root", tree=tree.id)
+        c2 = self.repo.get_worktree().commit(
+            message=b"second root", tree=tree.id, ref=None
+        )
+        result, _stdout, _stderr = self._run_cli(
+            "request-pull",
+            c1.decode("ascii"),
+            "https://example.com/repo.git",
+            c2.decode("ascii"),
+        )
+        self.assertEqual(result, 1)
+
+
 class FetchPackCommandTest(DulwichCliTestCase):
     """Tests for fetch-pack command."""
 

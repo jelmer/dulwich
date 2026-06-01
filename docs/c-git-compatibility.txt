@@ -147,7 +147,7 @@ Other
 * ✗ ``git gui`` - Portable graphical interface to Git
 * ✗ ``git web--browse`` - Launch web browser to view HTML documentation
 * ✗ ``git difftool`` - Show changes using external diff tool
-* ✗ ``git range-diff`` - Compare two commit ranges
+* ✓ ``git range-diff`` - Compare two commit ranges
 * ✗ ``git bugreport`` - Collect information for bug reports
 * ✓ ``git diagnose`` - Display diagnostic information about the environment
 * ✗ ``git fsmonitor--daemon`` - Filesystem monitor daemon
@@ -667,7 +667,7 @@ The following Git features are not currently supported:
 * Git GUIs (gitk, git-gui, git-citool)
 * Email workflow tools (git-send-email)
 * Interactive tools (git-difftool, git-mergetool)
-* Newer features (range-diff, scalar, fsmonitor--daemon)
+* Newer features (scalar, fsmonitor--daemon)
 * Full protocol v2 server support (client is fully supported)
 * Some plumbing commands (mktree, http-push, upload-archive, fmt-merge-msg, merge-one-file)
 * Full submodule feature parity (basic operations supported)

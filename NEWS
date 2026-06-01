@@ -10,6 +10,11 @@
    suitable for emailing to a maintainer, like ``git request-pull``.
    (Jelmer Vernooĳ, #1823)
 
+ * Add ``porcelain.range_diff`` and a ``dulwich range-diff`` command that
+   compare two ranges of commits and show how a patch series evolved, like
+   ``git range-diff``. Requires the ``munkres`` package, installable via the
+   ``dulwich[range_diff]`` extra. (Jelmer Vernooĳ, #1828)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

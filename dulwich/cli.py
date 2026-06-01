@@ -5268,6 +5268,52 @@ class cmd_merge_base(Command):
             return 1
 
 
+class cmd_request_pull(Command):
+    """Generate a summary of pending changes."""
+
+    def run(self, args: Sequence[str]) -> int | None:
+        """Execute the request-pull command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser(
+            description="Generate a request to pull changes into a repository",
+            prog="dulwich request-pull",
+        )
+        parser.add_argument(
+            "-p",
+            "--patch",
+            action="store_true",
+            help="Include patch text in the output",
+        )
+        parser.add_argument(
+            "start", help="Commit the upstream already has (e.g. a tag or branch)"
+        )
+        parser.add_argument("url", help="Repository URL the changes can be pulled from")
+        parser.add_argument(
+            "end",
+            nargs="?",
+            help="Commit to end at (defaults to HEAD). "
+            "Use <local>:<remote> to advertise a different remote ref name.",
+        )
+        parsed_args = parser.parse_args(args)
+
+        try:
+            porcelain.request_pull(
+                ".",
+                parsed_args.start,
+                parsed_args.url,
+                parsed_args.end,
+                patch=parsed_args.patch,
+                outstream=sys.stdout,
+            )
+        except porcelain.Error as e:
+            logger.error("%s", e)
+            return 1
+        return 0
+
+
 class cmd_notes_add(Command):
     """Add notes to a commit."""
 
@@ -7700,6 +7746,7 @@ commands = {
     "remote": cmd_remote,
     "repack": cmd_repack,
     "replace": cmd_replace,
+    "request-pull": cmd_request_pull,
     "reset": cmd_reset,
     "restore": cmd_restore,
     "revert": cmd_revert,

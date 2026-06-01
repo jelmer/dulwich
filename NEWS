@@ -1,5 +1,10 @@
 1.2.7	UNRELEASED
 
+ * SECURITY: Don't expand config ``include`` directives when parsing
+   ``.gitmodules``, so a crafted ``.gitmodules`` in a cloned repository can
+   no longer make ``clone --recurse-submodules`` read arbitrary files.
+   (netliomax25-code)
+
  * Add ``porcelain.request_pull`` and a ``dulwich request-pull`` command
    that generate a summary of pending changes between repositories,
    suitable for emailing to a maintainer, like ``git request-pull``.

@@ -152,6 +152,24 @@ P pack-abcdef1234567890abcdef1234567890abcdef12.pack
             "pack-abcdef1234567890abcdef1234567890abcdef12", self.store._packs[1][0]
         )
 
+    def test_load_packs_rejects_traversal_names(self) -> None:
+        # The pack name is server-controlled and ends up in a local temp
+        # path; only the pack-<hash> form git uses must be accepted. A
+        # backslash-separated name is not split on "/" and would escape the
+        # temp dir on Windows, so it must be dropped.
+        packs_content = (
+            b"P ..\\..\\..\\..\\evil.pack\n"
+            b"P pack-1234567890abcdef1234567890abcdef12345678.pack\n"
+            b"P not-a-pack.pack\n"
+        )
+        self._add_response("objects/info/packs", packs_content)
+
+        self.store._load_packs()
+        self.assertEqual(
+            [("pack-1234567890abcdef1234567890abcdef12345678", None)],
+            self.store._packs,
+        )
+
     def test_get_raw_from_cache(self) -> None:
         sha = b"1" * 40
         self.store._cached_objects[sha] = (Blob.type_num, b"cached content")

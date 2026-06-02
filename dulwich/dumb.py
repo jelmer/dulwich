@@ -27,6 +27,7 @@ __all__ = [
 ]
 
 import os
+import re
 import tempfile
 import zlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -54,6 +55,10 @@ from .objects import (
 from .pack import Pack, PackData, PackIndex, UnpackedObject, load_pack_index_file
 from .protocol import split_peeled_refs
 from .refs import Ref, read_info_refs
+
+# Pack names advertised by a remote may only be of the form git uses,
+# pack-<hash>, with a 40 (SHA-1) or 64 (SHA-256) hex digit name.
+_PACK_NAME_RE = re.compile(r"pack-[0-9a-f]{40}(?:[0-9a-f]{24})?\Z")
 
 
 class DumbHTTPObjectStore(BaseObjectStore):
@@ -190,6 +195,12 @@ class DumbHTTPObjectStore(BaseObjectStore):
                     pack_name = pack_name.split("/")[-1]
                 if pack_name.endswith(".pack"):
                     pack_name = pack_name[:-5]  # Remove .pack extension
+                # The name is server-controlled and is interpolated into both
+                # request URLs and a local temp path, so only accept the
+                # pack-<hash> form git uses; otherwise "/"-stripping still lets
+                # e.g. backslash-separated names escape the temp dir on Windows.
+                if not _PACK_NAME_RE.match(pack_name):
+                    continue
                 self._packs.append((pack_name, None))
 
     def _get_pack_index(self, pack_name: str) -> PackIndex:

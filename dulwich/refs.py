@@ -944,7 +944,18 @@ class DiskRefsContainer(RefsContainer):
             path = path.replace(b"/", os.fsencode(os.path.sep))
 
         root_dir = self.worktree_path if is_per_worktree_ref(name) else self.path
-        return os.path.join(root_dir, path)
+        filename = os.path.join(root_dir, path)
+        # A ref name containing ".." or an absolute path would resolve outside
+        # the ref store. The write paths guard against this via _check_refname,
+        # but lookups (read_loose_ref, follow's resolved symref target,
+        # git-upload-archive's "argument") do not, so enforce containment here.
+        normalized = os.path.normpath(filename)
+        root_norm = os.path.normpath(root_dir)
+        if normalized != root_norm and not normalized.startswith(
+            root_norm + os.fsencode(os.path.sep)
+        ):
+            raise RefFormatError(name)
+        return filename
 
     def get_packed_refs(self) -> dict[Ref, ObjectID]:
         """Get contents of the packed-refs file.
@@ -1051,8 +1062,8 @@ class DiskRefsContainer(RefsContainer):
         Raises:
           IOError: if any other error occurs
         """
-        filename = self.refpath(name)
         try:
+            filename = self.refpath(name)
             with GitFile(filename, "rb") as f:
                 header = f.read(len(SYMREF))
                 if header == SYMREF:
@@ -1063,7 +1074,7 @@ class DiskRefsContainer(RefsContainer):
                     f.seek(0)
                     line = f.readline().rstrip(b"\r\n")
                     return line
-        except (OSError, UnicodeError):
+        except (OSError, UnicodeError, RefFormatError):
             # don't assume anything specific about the error; in
             # particular, invalid or forbidden paths can raise weird
             # errors depending on the specific operating system

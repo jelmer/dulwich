@@ -504,6 +504,20 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             b"42d06bd4b77fed026b154d16493e5deab78f02ec",
         )
 
+    def test_refpath_escape(self) -> None:
+        # A ref name must not be able to address a file outside the ref store.
+        self.assertRaises(
+            errors.RefFormatError, self._refs.refpath, b"../../../etc/passwd"
+        )
+        self.assertRaises(errors.RefFormatError, self._refs.refpath, b"/etc/passwd")
+
+    def test_read_loose_ref_escape(self) -> None:
+        outside = os.path.join(os.path.dirname(self._repo.path), "secret")
+        with open(outside, "wb") as f:
+            f.write(b"42d06bd4b77fed026b154d16493e5deab78f02ec\n")
+        self.assertEqual(None, self._refs.read_loose_ref(b"../secret"))
+        self.assertRaises(KeyError, lambda: self._refs[b"../secret"])
+
     def test_delete_refs_container(self) -> None:
         # We shouldn't delete the refs directory
         self._refs[b"refs/heads/blah"] = b"42d06bd4b77fed026b154d16493e5deab78f02ec"

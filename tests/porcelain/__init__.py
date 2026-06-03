@@ -12488,6 +12488,11 @@ index 1234567..abcdefg 100644
             result = f.read()
         self.assertEqual(result, b"line 1\nline two\nline 3\n")
 
+        # The index entry must keep a valid file mode, otherwise native git
+        # aborts with "unsupported ce_mode: 0" (see issue #2218).
+        index = self.repo.open_index()
+        self.assertEqual(index[b"test.txt"].mode, 0o100644)
+
     def test_apply_new_file(self) -> None:
         """Test applying a patch that creates a new file."""
         # Create an initial commit with a dummy file

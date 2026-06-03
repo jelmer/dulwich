@@ -15,6 +15,10 @@
    ``git range-diff``. Requires the ``munkres`` package, installable via the
    ``dulwich[range_diff]`` extra. (Jelmer Vernooĳ, #1828)
 
+ * Fix ``apply_patch`` writing index entries with mode ``0``, which made
+   native git abort with ``unsupported ce_mode: 0``. The file mode is now
+   derived from the work-tree file. (Jelmer Vernooĳ, #2218)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

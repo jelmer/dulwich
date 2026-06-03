@@ -1470,7 +1470,7 @@ def _apply_rename_or_copy(
 
     if not cached and os.path.exists(dst_fs_path):
         st = os.stat(dst_fs_path)
-        entry = index_entry_from_stat(st, blob.id, 0)
+        entry = index_entry_from_stat(st, blob.id)
     else:
         entry = IndexEntry(
             ctime=(0, 0),
@@ -1634,7 +1634,7 @@ def apply_patches(
 
                 if not cached and os.path.exists(fs_path):
                     st = os.stat(fs_path)
-                    entry = index_entry_from_stat(st, blob.id, 0)
+                    entry = index_entry_from_stat(st, blob.id)
                 else:
                     entry = IndexEntry(
                         ctime=(0, 0),
@@ -1803,7 +1803,7 @@ def apply_patches(
             # Get file stat for index entry
             if not cached and os.path.exists(fs_path):
                 st = os.stat(fs_path)
-                entry = index_entry_from_stat(st, blob.id, 0)
+                entry = index_entry_from_stat(st, blob.id)
             else:
                 # Create a minimal index entry for cached-only changes
                 entry = IndexEntry(

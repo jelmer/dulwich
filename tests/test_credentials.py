@@ -45,6 +45,19 @@ class TestCredentialHelpersUtils(TestCase):
         non_matching = urlparse("https://git.sr.ht/")
         self.assertFalse(match_urls(url, non_matching))
 
+    def test_match_urls_path_boundary(self) -> None:
+        prefix = urlparse("https://example.com/private")
+        self.assertTrue(match_urls(urlparse("https://example.com/private"), prefix))
+        self.assertTrue(
+            match_urls(urlparse("https://example.com/private/repo"), prefix)
+        )
+        # A sibling path that merely shares a string prefix must not match,
+        # otherwise path-scoped credentials leak to it.
+        self.assertFalse(
+            match_urls(urlparse("https://example.com/private-evil"), prefix)
+        )
+        self.assertFalse(match_urls(urlparse("https://example.com/priv"), prefix))
+
     def test_match_partial_url(self) -> None:
         url = urlparse("https://github.com/jelmer/dulwich/")
         self.assertTrue(match_partial_url(url, "github.com"))

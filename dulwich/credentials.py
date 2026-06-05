@@ -55,7 +55,11 @@ def match_urls(url: ParseResult, url_prefix: ParseResult) -> bool:
         and url.port == url_prefix.port
     )
     user_match = url.username == url_prefix.username if url_prefix.username else True
-    path_match = url.path.rstrip("/").startswith(url_prefix.path.rstrip())
+    # Match the path on path-segment boundaries, like git's urlmatch: a config
+    # path scopes the entry to that path and anything below it, so "/foo"
+    # matches "/foo" and "/foo/bar" but not "/foobar".
+    prefix_path = url_prefix.path.rstrip("/")
+    path_match = url.path == prefix_path or url.path.startswith(prefix_path + "/")
     return base_match and user_match and path_match
 
 

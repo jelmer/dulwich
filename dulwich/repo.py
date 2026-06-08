@@ -1804,15 +1804,23 @@ class Repo(BaseRepo):
             control dir.
         Returns: An open file object, or None if the file does not exist.
         """
-        # TODO(dborowitz): sanitize filenames, since this is used directly by
-        # the dumb web serving code.
         if basedir is None:
             basedir = self.controldir()
         if isinstance(path, bytes):
             path = path.decode("utf-8")
         path = path.lstrip(os.path.sep)
+        full_path = os.path.join(basedir, path)
+        # The dumb HTTP server passes request-derived names straight through
+        # here, so refuse any name that resolves outside basedir (e.g.
+        # "../../config"). Treat an escaping path as a missing file.
+        normcase_base = os.path.normcase(os.path.abspath(basedir))
+        normcase_full = os.path.normcase(os.path.abspath(full_path))
+        if normcase_full != normcase_base and not normcase_full.startswith(
+            normcase_base + os.path.sep
+        ):
+            return None
         try:
-            return open(os.path.join(basedir, path), "rb")
+            return open(full_path, "rb")
         except FileNotFoundError:
             return None
 

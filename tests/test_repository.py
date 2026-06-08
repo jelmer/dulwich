@@ -1175,6 +1175,20 @@ class BuildRepoRootTests(TestCase):
             self._repo.get_shallow(),
         )
 
+    def test_get_named_file_rejects_path_traversal(self) -> None:
+        # The dumb HTTP server hands request-derived names to get_named_file,
+        # so a name that escapes the control dir must not return a file.
+        outside = os.path.join(os.path.dirname(self._repo_dir), "outside-secret")
+        with open(outside, "wb") as f:
+            f.write(b"secret")
+        self.addCleanup(os.remove, outside)
+        # <controldir>/../../outside-secret resolves to the file above.
+        traversal = os.path.join("..", "..", "outside-secret")
+        self.assertIsNone(self._repo.get_named_file(traversal))
+        # Legitimate names under the control dir still resolve.
+        with self._repo.get_named_file("HEAD") as f:
+            self.assertTrue(f.read().startswith(b"ref: "))
+
     def test_update_shallow(self) -> None:
         self._repo.update_shallow(None, None)  # no op
         self.assertEqual(set(), self._repo.get_shallow())

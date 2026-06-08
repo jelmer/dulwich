@@ -311,6 +311,49 @@ class GPGCliSignatureVendorTests(unittest.TestCase):
         self.assertIsInstance(result, bool)
 
 
+class KeyIDMatchingTests(unittest.TestCase):
+    """Tests for trusted key ID matching, independent of an installed gpg."""
+
+    def _run_with_stderr(self, vendor, stderr: str) -> None:
+        from unittest import mock
+
+        completed = subprocess.CompletedProcess(
+            ["gpg"], 0, stdout=b"", stderr=stderr.encode()
+        )
+        with mock.patch("subprocess.run", return_value=completed):
+            vendor.verify(b"data", b"signature")
+
+    def test_gpg_rejects_keyid_embedded_in_fingerprint(self) -> None:
+        """A trusted ID buried inside an untrusted fingerprint is not a match."""
+        from dulwich.signature import UntrustedSignature
+
+        vendor = GPGCliSignatureVendor(keyids=["DEADBEEF"])
+        stderr = (
+            "gpg: Good signature\n"
+            "Primary key fingerprint: 1111 1111 1111 1111 1111  "
+            "1111 1111 DEAD BEEF 1111\n"
+        )
+        with self.assertRaises(UntrustedSignature):
+            self._run_with_stderr(vendor, stderr)
+
+    def test_gpg_accepts_short_keyid_suffix(self) -> None:
+        """A short key ID reported by gpg matches a trusted full fingerprint."""
+        trusted = "AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555"
+        vendor = GPGCliSignatureVendor(keyids=[trusted])
+        stderr = f"gpg: Good signature\ngpg: using RSA key {trusted[-16:]}\n"
+        # Should not raise.
+        self._run_with_stderr(vendor, stderr)
+
+    def test_x509_rejects_keyid_embedded_in_fingerprint(self) -> None:
+        """Same suffix rule applies to the gpgsm/X.509 path."""
+        from dulwich.signature import UntrustedSignature, X509SignatureVendor
+
+        vendor = X509SignatureVendor(keyids=["DEADBEEF"])
+        stderr = "gpgsm: Good signature from 1111DEADBEEF1111\n"
+        with self.assertRaises(UntrustedSignature):
+            self._run_with_stderr(vendor, stderr)
+
+
 class X509SignatureVendorTests(unittest.TestCase):
     """Tests for X509SignatureVendor."""
 

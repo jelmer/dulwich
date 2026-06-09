@@ -313,12 +313,14 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Protocol as TypingProtocol,
     TextIO,
     TypedDict,
     TypeVar,
     cast,
     overload,
+)
+from typing import (
+    Protocol as TypingProtocol,
 )
 
 if sys.version_info >= (3, 12):
@@ -7354,7 +7356,7 @@ def range_diff(
             # Form: rev1...rev2 -> rev2..rev1 and rev1..rev2
             if not has_range_syntax(range1, b"..."):
                 raise Error("A single argument must be of the form <rev1>...<rev2>")
-            assert isinstance(range1, (str, bytes))
+            assert isinstance(range1, str | bytes)
             range1 = range1.encode() if isinstance(range1, str) else range1
             left, right = range1.split(b"...", 1)
             left_id = parse_commit(r, left).id
@@ -7369,8 +7371,8 @@ def range_diff(
             new_tip = right_id
         else:
             # Form: A..B C..D
-            if not isinstance(range1, (str, bytes)) or not isinstance(
-                range2, (str, bytes)
+            if not isinstance(range1, str | bytes) or not isinstance(
+                range2, str | bytes
             ):
                 raise Error(
                     "Both arguments must be commit ranges of the form <base>..<tip>"

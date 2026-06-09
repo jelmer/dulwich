@@ -65,19 +65,18 @@ __all__ = [
     "write_midx",
 ]
 
+import mmap
 import os
 import struct
 from collections.abc import Iterator
 from io import UnsupportedOperation
 from typing import IO, Any
 
-import mmap
-
-has_mmap = True
-
 from .file import GitFile, _GitFile
 from .objects import ObjectID, RawObjectID
 from .pack import SHA1Writer
+
+has_mmap = True
 
 # MIDX signature
 MIDX_SIGNATURE = b"MIDX"

@@ -7005,9 +7005,7 @@ class cmd_bundle(Command):
             logger.error("%s", msg)
 
         progress: Callable[..., None] | None = (
-            _progress_impl
-            if parsed_args.progress and not parsed_args.quiet
-            else None
+            _progress_impl if parsed_args.progress and not parsed_args.quiet else None
         )
 
         refs_to_include: list[Ref] = []

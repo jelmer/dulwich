@@ -136,20 +136,6 @@ else:
 
 import mmap
 
-has_mmap = True
-
-if TYPE_CHECKING:
-    from _hashlib import HASH as HashObject
-
-    from .bitmap import PackBitmap
-    from .commit_graph import CommitGraph
-    from .object_store import BaseObjectStore
-    from .refs import Ref
-
-# Some platforms (e.g. plan9) don't support mmap properly
-if sys.platform == "Plan9":
-    has_mmap = False
-
 from .errors import ApplyDeltaError, ChecksumMismatch
 from .file import GitFile, _GitFile
 from .lru_cache import LRUSizeCache
@@ -162,6 +148,17 @@ from .objects import (
     object_header,
     sha_to_hex,
 )
+
+if TYPE_CHECKING:
+    from _hashlib import HASH as HashObject
+
+    from .bitmap import PackBitmap
+    from .commit_graph import CommitGraph
+    from .object_store import BaseObjectStore
+    from .refs import Ref
+
+# Some platforms (e.g. plan9) don't support mmap properly
+has_mmap = sys.platform != "Plan9"
 
 OFS_DELTA = 6
 REF_DELTA = 7

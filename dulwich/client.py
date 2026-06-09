@@ -928,11 +928,12 @@ def _handle_upload_pack_head(
     proto.write_pkt_line(wantcmd)
     for want in wants[1:]:
         proto.write_pkt_line(COMMAND_WANT + b" " + want + b"\n")
+    walker_shallow = getattr(graph_walker, "shallow", None)
     if (
         depth not in (0, None)
         or shallow_since is not None
         or shallow_exclude
-        or (hasattr(graph_walker, "shallow") and graph_walker.shallow)
+        or walker_shallow
     ):
         if protocol_version == 2:
             if not find_capability(capabilities, CAPABILITY_FETCH, CAPABILITY_SHALLOW):
@@ -943,8 +944,8 @@ def _handle_upload_pack_head(
             raise GitProtocolError(
                 "server does not support shallow capability required for depth"
             )
-        if hasattr(graph_walker, "shallow"):
-            for sha in graph_walker.shallow:
+        if walker_shallow is not None:
+            for sha in walker_shallow:
                 proto.write_pkt_line(COMMAND_SHALLOW + b" " + sha + b"\n")
         if depth is not None:
             proto.write_pkt_line(

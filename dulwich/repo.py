@@ -864,17 +864,21 @@ class BaseRepo:
             assert depth is not None
             shallow, not_shallow = find_shallow(self.object_store, wants, depth)
             # Only update if graph_walker has shallow attribute
-            if hasattr(graph_walker, "shallow"):
+            walker_shallow: set[ObjectID] | None = getattr(
+                graph_walker, "shallow", None
+            )
+            if walker_shallow is not None:
                 unshallow = not_shallow & current_shallow
                 # Commits that were a shallow boundary but are now being
                 # deepened past must drop out of the boundary, otherwise their
                 # parents stay unreachable and never get transferred.
-                graph_walker.shallow.update(shallow - not_shallow)
-                graph_walker.shallow.difference_update(unshallow)
-                new_shallow = graph_walker.shallow - current_shallow
+                walker_shallow.update(shallow - not_shallow)
+                walker_shallow.difference_update(unshallow)
+                new_shallow = walker_shallow - current_shallow
                 setattr(graph_walker, "unshallow", unshallow)
-                if hasattr(graph_walker, "update_shallow"):
-                    graph_walker.update_shallow(new_shallow, unshallow)
+                update_shallow = getattr(graph_walker, "update_shallow", None)
+                if update_shallow is not None:
+                    update_shallow(new_shallow, unshallow)
         else:
             unshallow = getattr(graph_walker, "unshallow", set())
 

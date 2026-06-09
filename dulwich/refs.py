@@ -1700,9 +1700,12 @@ def _set_head(
     if head_ref.startswith(LOCAL_TAG_PREFIX):
         # detach HEAD at specified tag
         head = refs[Ref(head_ref)]
-        if isinstance(head, Tag):
-            _cls, obj = head.object
-            head = obj.get_object(obj).id
+        # TODO: refs[...] returns an ObjectID, not a Tag object - this branch
+        # is dead code, but kept for now until the tag-peeling code path is
+        # rewritten properly.
+        if isinstance(head, Tag):  # type: ignore[unreachable,unused-ignore]
+            _cls, obj = head.object  # pyright: ignore[reportGeneralTypeIssues]
+            head = obj.get_object(obj).id  # pyright: ignore[reportAttributeAccessIssue]
         del refs[HEADREF]
         refs.set_if_equals(HEADREF, None, head, message=ref_message)
     else:

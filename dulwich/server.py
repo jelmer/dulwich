@@ -2014,16 +2014,14 @@ def serve_command(
     if backend is None:
         backend = FileSystemBackend()
 
-    if inf is None:
-        inf = sys.stdin.buffer
-    if outf is None:
-        outf = sys.stdout.buffer
+    in_stream: IO[bytes] = inf if inf is not None else sys.stdin.buffer
+    out_stream: IO[bytes] = outf if outf is not None else sys.stdout.buffer
 
     def send_fn(data: bytes) -> None:
-        outf.write(data)
-        outf.flush()
+        out_stream.write(data)
+        out_stream.flush()
 
-    proto = Protocol(inf.read, send_fn)
+    proto = Protocol(in_stream.read, send_fn)
     handler = handler_cls(backend, argv[1:], proto)  # type: ignore[arg-type]
     # FIXME: Catch exceptions and write a single-line summary to outf.
     handler.handle()

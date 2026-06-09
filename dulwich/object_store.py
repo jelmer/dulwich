@@ -473,7 +473,7 @@ class BaseObjectStore:
         raise NotImplementedError(self.add_objects)
 
     def get_reachability_provider(
-        self, prefer_bitmap: bool = True
+        self, prefer_bitmaps: bool = True
     ) -> ObjectReachabilityProvider:
         """Get a reachability provider for this object store.
 
@@ -482,7 +482,7 @@ class BaseObjectStore:
         optimized implementations (e.g., using bitmap indexes).
 
         Args:
-            prefer_bitmap: Whether to prefer bitmap-based reachability if
+            prefer_bitmaps: Whether to prefer bitmap-based reachability if
                 available.
 
         Returns:

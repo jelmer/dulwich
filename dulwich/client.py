@@ -105,6 +105,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    cast,
 )
 from urllib.parse import ParseResult, urljoin, urlparse, urlunparse, urlunsplit
 from urllib.parse import quote as urlquote
@@ -2106,7 +2107,9 @@ class TraditionalGitClient(GitClient):
 
             if new_refs is None:
                 proto.write_pkt_line(None)
-                return SendPackResult(old_refs, agent=agent, ref_status={})
+                return SendPackResult(
+                    _to_optional_dict(old_refs), agent=agent, ref_status={}
+                )
 
             if len(new_refs) == 0 and orig_new_refs:
                 # NOOP - Original new refs filtered out by policy
@@ -2800,19 +2803,19 @@ class SubprocessGitClient(TraditionalGitClient):
 
     def _connect(
         self,
-        service: bytes,
+        cmd: bytes,
         path: bytes | str,
         protocol_version: int | None = None,
     ) -> tuple[Protocol, Callable[[], bool], IO[bytes] | None]:
-        if not isinstance(service, bytes):
-            raise TypeError(service)
+        if not isinstance(cmd, bytes):
+            raise TypeError(cmd)
         if isinstance(path, bytes):
             path = path.decode(self._remote_path_encoding)
         if self.git_command is None:
             git_command = find_git_command()
         else:
             git_command = self.git_command
-        argv = [*git_command, service.decode("ascii"), path]
+        argv = [*git_command, cmd.decode("ascii"), path]
         p = subprocess.Popen(
             argv,
             bufsize=0,
@@ -3124,7 +3127,7 @@ class LocalGitClient(GitClient):
             # Note that the client still expects a 0-object pack in most cases.
             if object_ids is None:
                 return FetchPackResult(
-                    None, symrefs, agent, object_format=r.object_format.name
+                    {}, symrefs, agent, object_format=r.object_format.name
                 )
             write_pack_from_container(
                 pack_data,  # type: ignore[arg-type]
@@ -4602,7 +4605,14 @@ class AbstractHttpGitClient(GitClient):
                         )
                         if ref_prefix is not None:
                             refs = filter_ref_prefix(refs, ref_prefix)
-                    return refs, server_capabilities, base_url, symrefs, peeled
+                    refs_dict: dict[Ref, ObjectID | None] = dict(refs)
+                    return (
+                        refs_dict,
+                        server_capabilities,
+                        base_url,
+                        symrefs,
+                        peeled,
+                    )
             else:
                 self.protocol_version = 0  # dumb servers only support protocol v0
                 # Read all the response data
@@ -4612,8 +4622,6 @@ class AbstractHttpGitClient(GitClient):
                     if not chunk:
                         break
                     data += chunk
-                from typing import cast
-
                 info_refs = read_info_refs(BytesIO(data))
                 (refs_nonopt, peeled) = split_peeled_refs(info_refs)
                 if ref_prefix is not None:

@@ -326,7 +326,7 @@ class FileSystemBackend(Backend):
         normcase_root = os.path.normcase(self.root)
         if not normcase_abspath.startswith(normcase_root):
             raise NotGitRepository(f"Path {path!r} not inside root {self.root!r}")
-        return Repo(abspath)
+        return Repo(abspath)  # type: ignore[return-value,unused-ignore]
 
 
 class Handler:

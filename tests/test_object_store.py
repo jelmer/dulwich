@@ -965,10 +965,10 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         else:
             commit()
 
-        # Access b1 — this triggers mmap and eviction due to tiny limit
+        # Access b1: this triggers mmap and eviction due to tiny limit
         self.assertEqual((Blob.type_num, b"data for pack one"), store.get_raw(b1.id))
 
-        # Access b2 — the first pack should have been evicted, but b2 is still
+        # Access b2: the first pack should have been evicted, but b2 is still
         # accessible because _update_pack_cache will re-open it if needed
         self.assertEqual((Blob.type_num, b"data for pack two"), store.get_raw(b2.id))
 
@@ -977,7 +977,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.addCleanup(store.close)
         self.assertIsNone(store.packed_git_limit)
 
-        # Add and access objects — no eviction should happen
+        # Add and access objects; no eviction should happen
         b1 = make_object(Blob, data=b"data one")
         f, commit, abort = store.add_pack()
         try:

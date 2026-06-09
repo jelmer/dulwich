@@ -861,7 +861,7 @@ class BranchCommandTest(DulwichCliTestCase):
         # Collect branches from the output
         branches = [line.strip() for line in stdout.splitlines()]
 
-        # Expected branches — exactly those matching the pattern
+        # Expected branches: exactly those matching the pattern
         expected_branches = ["feature-1", "feature-2"]
 
         self.assertEqual(branches, expected_branches)

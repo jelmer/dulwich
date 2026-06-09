@@ -159,7 +159,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Upgrade packging to avoid a bug in twine.
+          # Upgrade packaging to avoid a bug in twine.
           # See https://github.com/pypa/twine/issues/1216
           pip install "twine>=6.1.0" "packaging>=24.2"
       - name: Download sdist

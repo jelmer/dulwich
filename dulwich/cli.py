@@ -1026,10 +1026,8 @@ class _StreamContextAdapter:
     def __init__(self, stream: TextIO | BinaryIO) -> None:
         self.stream = stream
         # Expose buffer if it exists
-        if hasattr(stream, "buffer"):
-            self.buffer = stream.buffer
-        else:
-            self.buffer = stream
+        buffer = getattr(stream, "buffer", None)
+        self.buffer = buffer if buffer is not None else stream
 
     def __enter__(self) -> TextIO:
         # We only use this with sys.stdout which is TextIO
@@ -1146,7 +1144,7 @@ def enable_pager() -> None:
 class Command:
     """A Dulwich subcommand."""
 
-    def run(self, args: Sequence[str]) -> int | None:
+    def run(self, args: Sequence[str], /) -> int | None:
         """Run the command."""
         raise NotImplementedError(self.run)
 
@@ -6308,14 +6306,14 @@ class cmd_filter_branch(Command):
             return result.stdout
 
         # Create filter functions based on arguments
-        filter_message = None
+        filter_message: Callable[[bytes], bytes] | None = None
         if parsed_args.msg_filter:
 
             def filter_message(message: bytes) -> bytes:
                 result = run_filter(parsed_args.msg_filter, input_data=message)
                 return result if result is not None else message
 
-        tree_filter = None
+        tree_filter: Callable[[ObjectID, str], ObjectID] | None = None
         if parsed_args.tree_filter:
 
             def tree_filter(tree_sha: ObjectID, tmpdir: str) -> ObjectID:
@@ -6366,7 +6364,7 @@ class cmd_filter_branch(Command):
 
                     return build_tree_from_dir(tmpdir)
 
-        index_filter = None
+        index_filter: Callable[[ObjectID, str], ObjectID | None] | None = None
         if parsed_args.index_filter:
 
             def index_filter(tree_sha: ObjectID, index_path: str) -> ObjectID | None:
@@ -6375,7 +6373,7 @@ class cmd_filter_branch(Command):
                 )
                 return None  # Read back from index
 
-        parent_filter = None
+        parent_filter: Callable[[Sequence[ObjectID]], list[ObjectID]] | None = None
         if parsed_args.parent_filter:
 
             def parent_filter(parents: Sequence[ObjectID]) -> list[ObjectID]:
@@ -6396,7 +6394,7 @@ class cmd_filter_branch(Command):
                         new_parents.append(ObjectID(sha_bytes))
                 return new_parents
 
-        commit_filter = None
+        commit_filter: Callable[[Commit, ObjectID], ObjectID | None] | None = None
         if parsed_args.commit_filter:
 
             def commit_filter(
@@ -6423,7 +6421,7 @@ class cmd_filter_branch(Command):
                     return ObjectID(output.encode())
                 return None
 
-        tag_name_filter = None
+        tag_name_filter: Callable[[bytes], bytes] | None = None
         if parsed_args.tag_name_filter:
 
             def tag_name_filter(tag_name: bytes) -> bytes:
@@ -6987,7 +6985,7 @@ class cmd_bundle(Command):
 
         repo = Repo(".")
 
-        progress = None
+        progress: Callable[..., None] | None = None
         if parsed_args.progress and not parsed_args.quiet:
 
             def progress(*args: str | int) -> None:
@@ -7133,7 +7131,7 @@ class cmd_bundle(Command):
 
         repo = Repo(".")
 
-        progress = None
+        progress: Callable[..., None] | None = None
         if parsed_args.progress:
 
             def progress(*args: str | int | bytes) -> None:

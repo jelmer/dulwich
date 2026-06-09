@@ -280,6 +280,7 @@ class GPGSignatureVendor(SignatureSigner, SignatureVerifier):
                     data,
                     signature=signature,
                 )
+                assert result is not None
 
                 # Check that we actually got valid signatures
                 if not result.signatures:

@@ -5237,6 +5237,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
                 resp = self.pool_manager.request("POST", url, **request_kwargs)  # type: ignore[arg-type]
         except urllib3.exceptions.HTTPError as e:
             raise GitProtocolError(str(e)) from e
+        assert resp is not None
 
         if raise_for_status:
             if resp.status == 404:

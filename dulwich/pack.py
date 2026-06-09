@@ -3713,7 +3713,9 @@ def _encode_copy_operation(start: int, length: int) -> bytes:
     return bytes(scratch)
 
 
-def _create_delta_py(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
+def _create_delta_py(
+    base_buf: bytes | list[bytes], target_buf: bytes | list[bytes]
+) -> Iterator[bytes]:
     """Use python difflib to work out how to transform base_buf to target_buf.
 
     Args:
@@ -3724,8 +3726,6 @@ def _create_delta_py(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
         base_buf = b"".join(base_buf)
     if isinstance(target_buf, list):
         target_buf = b"".join(target_buf)
-    assert isinstance(base_buf, bytes)
-    assert isinstance(target_buf, bytes)
     # write delta header
     yield _delta_encode_size(len(base_buf))
     yield _delta_encode_size(len(target_buf))
@@ -4646,8 +4646,14 @@ except ImportError:
     pass
 else:
     # Wrap the Rust version to match the Python API (returns bytes instead of Iterator)
-    def _create_delta_rs_wrapper(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
+    def _create_delta_rs_wrapper(
+        base_buf: bytes | list[bytes], target_buf: bytes | list[bytes]
+    ) -> Iterator[bytes]:
         """Wrapper for Rust create_delta to match Python API."""
+        if isinstance(base_buf, list):
+            base_buf = b"".join(base_buf)
+        if isinstance(target_buf, list):
+            target_buf = b"".join(target_buf)
         yield _create_delta_rs(base_buf, target_buf)
 
     create_delta = _create_delta_rs_wrapper

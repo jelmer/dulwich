@@ -625,7 +625,7 @@ class BuildIndexTests(TestCase):
     def test_ntfs_malicious_entries_dropped(self) -> None:
         # A malicious tree authored on POSIX containing NTFS-hostile
         # entries must not materialize any of them under the NTFS
-        # validator — the combination would let an attacker plant
+        # validator; the combination would let an attacker plant
         # ``.git\hooks\pre-commit.exe`` or ``.git::$INDEX_ALLOCATION``
         # on a Windows clone.
         from dulwich.index import validate_path_element_ntfs
@@ -1559,7 +1559,7 @@ class TestValidatePathElement(TestCase):
                 validate_path_element_ntfs(name),
                 f"{name!r} should be rejected on NTFS",
             )
-        # Trailing ``.``/space is stripped by NTFS — same names.
+        # Trailing ``.``/space is stripped by NTFS, so these are the same names.
         self.assertFalse(validate_path_element_ntfs(b"git~1."))
         self.assertFalse(validate_path_element_ntfs(b"git~1 "))
         # Names that merely contain ``git~`` are still accepted.
@@ -1597,7 +1597,7 @@ class TestValidatePathElement(TestCase):
             )
 
     def test_ntfs_rejects_reserved_device_names_with_extension(self) -> None:
-        # Extensions do not make a reserved name safe on Windows —
+        # Extensions do not make a reserved name safe on Windows:
         # ``NUL.txt`` still opens the NUL device.
         self.assertFalse(validate_path_element_ntfs(b"NUL.txt"))
         self.assertFalse(validate_path_element_ntfs(b"aux.foo"))
@@ -1658,7 +1658,7 @@ class TestDecodeUTF8WithFallback(TestCase):
         self.assertEqual("9f", _decode_utf8_with_fallback(b"\x9f"))
 
     def test_latin1_mixed(self) -> None:
-        # Latin-1 "café" is 63 61 66 e9 — the trailing e9 is invalid UTF-8
+        # Latin-1 "café" is 63 61 66 e9; the trailing e9 is invalid UTF-8
         # alone and should fall through as U+00E9.
         self.assertEqual("café", _decode_utf8_with_fallback(b"caf\xe9"))
 
@@ -1695,7 +1695,7 @@ class TestDecodeUTF8WithFallback(TestCase):
 
     def test_roundtrip_through_fsencode(self) -> None:
         # The decoder's output must be a real str that os.fsencode can
-        # handle — that's what _tree_to_fs_path relies on.
+        # handle; that's what _tree_to_fs_path relies on.
         decoded = _decode_utf8_with_fallback(b"caf\xe9/foo")
         self.assertIsInstance(decoded, str)
         os.fsencode(decoded)
@@ -1753,18 +1753,18 @@ class TestTreeFSPathConversion(TestCase):
 
     def test_tree_to_fs_path_windows_invalid_utf8(self) -> None:
         # On Windows, invalid UTF-8 in a tree path must not raise and must
-        # not fall back to raw bytes — it should go through the
+        # not fall back to raw bytes; it should go through the
         # xutftowcsn-style mapping (matching git-for-windows behaviour).
         original_platform = sys.platform
         sys.platform = "win32"
         self.addCleanup(setattr, sys, "platform", original_platform)
 
-        # b"caf\xe9" — latin-1 "café". The 0xe9 is invalid UTF-8 and should
+        # b"caf\xe9" is latin-1 "café". The 0xe9 is invalid UTF-8 and should
         # map 1:1 to U+00E9.
         fs_path = _tree_to_fs_path(b"/prefix", b"caf\xe9")
         self.assertEqual(fs_path, os.path.join(b"/prefix", os.fsencode("café")))
 
-        # b"\x80" — invalid low byte, should expand to two hex digits.
+        # b"\x80" is an invalid low byte, and should expand to two hex digits.
         fs_path = _tree_to_fs_path(b"/prefix", b"\x80")
         self.assertEqual(fs_path, os.path.join(b"/prefix", os.fsencode("80")))
 
@@ -1795,7 +1795,7 @@ class TestTreeFSPathConversion(TestCase):
     def test_fs_to_tree_path_windows_invalid_utf8_is_one_way(self) -> None:
         # Document C git's one-way semantics: a tree path with invalid UTF-8
         # produces a file with a lossy name on disk, and reading that
-        # filename back yields the lossy form — NOT the original bytes.
+        # filename back yields the lossy form, NOT the original bytes.
         original_platform = sys.platform
         sys.platform = "win32"
         self.addCleanup(setattr, sys, "platform", original_platform)
@@ -3596,8 +3596,8 @@ class TestUpdateWorkingTree(TestCase):
         self.assertTrue(os.path.isdir(link_path))
         self.assertTrue(os.path.exists(os.path.join(link_path, "newfile.txt")))
 
-    def test_update_working_tree_comprehensive_transitions(self):
-        """Test all possible file type transitions comprehensively."""
+    def test_update_working_tree_all_type_transitions(self):
+        """Test all possible file type transitions."""
         # Skip on Windows where symlinks might not be supported
         if sys.platform == "win32":
             self.skipTest("Symlinks not fully supported on Windows")

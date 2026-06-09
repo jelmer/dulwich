@@ -150,7 +150,7 @@ class GraphWalker(Protocol):
         """Return the next object SHA to visit."""
         ...
 
-    def ack(self, sha: ObjectID) -> None:
+    def ack(self, sha: ObjectID, /) -> None:
         """Acknowledge that an object has been received."""
         ...
 

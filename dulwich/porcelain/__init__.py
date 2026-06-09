@@ -313,6 +313,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
+    Protocol as TypingProtocol,
     TextIO,
     TypedDict,
     TypeVar,
@@ -330,6 +331,7 @@ from .._typing import Buffer
 if TYPE_CHECKING:
     import urllib3
 
+    from ..diff import ColorizedDiffStream
     from ..filter_branch import CommitData
     from ..gc import GCStats
     from ..maintenance import MaintenanceResult
@@ -2004,10 +2006,16 @@ def commit_encode(
     return contents.encode(encoding)
 
 
+class _TextStream(TypingProtocol):
+    """Minimal write-only text stream protocol used for human-readable output."""
+
+    def write(self, data: str, /) -> int: ...
+
+
 def print_commit(
     commit: Commit,
     decode: Callable[[bytes], str],
-    outstream: TextIO = sys.stdout,
+    outstream: _TextStream = sys.stdout,
     abbrev_commit: bool = False,
 ) -> None:
     """Write a human-readable commit log entry.
@@ -2084,7 +2092,7 @@ def show_commit(
     repo: RepoPath,
     commit: Commit,
     decode: Callable[[bytes], str],
-    outstream: TextIO = sys.stdout,
+    outstream: "_TextStream | ColorizedDiffStream" = sys.stdout,
 ) -> None:
     """Show a commit to a stream.
 
@@ -2096,17 +2104,15 @@ def show_commit(
     """
     from ..diff import ColorizedDiffStream
 
-    # Create a wrapper for ColorizedDiffStream to handle string/bytes conversion
+    # Adapter that lets print_commit (which writes str) feed a
+    # ColorizedDiffStream (which writes bytes).
     class _StreamWrapper:
         def __init__(self, stream: "ColorizedDiffStream") -> None:
             self.stream = stream
 
-        def write(self, data: str | bytes) -> None:
-            if isinstance(data, str):
-                # Convert string to bytes for ColorizedDiffStream
-                self.stream.write(data.encode("utf-8"))
-            else:
-                self.stream.write(data)
+        def write(self, data: str) -> int:
+            self.stream.write(data.encode("utf-8"))
+            return len(data)
 
     with open_repo_closing(repo) as r:
         # Use wrapper for ColorizedDiffStream, direct stream for others

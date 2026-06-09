@@ -874,8 +874,6 @@ class Blob(ShaFile):
     type_name = b"blob"
     type_num = 3
 
-    _chunked_text: list[bytes]
-
     def __init__(self) -> None:
         """Initialize a new Blob object."""
         super().__init__()
@@ -894,6 +892,7 @@ class Blob(ShaFile):
     @property
     def chunked(self) -> list[bytes]:
         """The text in the blob object, as chunks (not necessarily lines)."""
+        assert self._chunked_text is not None
         return self._chunked_text
 
     @chunked.setter
@@ -901,6 +900,7 @@ class Blob(ShaFile):
         self._chunked_text = chunks
 
     def _serialize(self) -> list[bytes]:
+        assert self._chunked_text is not None
         return self._chunked_text
 
     def _deserialize(self, chunks: list[bytes]) -> None:

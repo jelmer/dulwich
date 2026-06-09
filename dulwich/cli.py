@@ -6314,120 +6314,125 @@ class cmd_filter_branch(Command):
             _msg_filter_impl if parsed_args.msg_filter else None
         )
 
-        tree_filter = None
-        if parsed_args.tree_filter:
+        def _tree_filter_impl(tree_sha: ObjectID, tmpdir: str) -> ObjectID:
+            from dulwich.objects import Blob, Tree
 
-            def tree_filter(tree_sha: ObjectID, tmpdir: str) -> ObjectID:
-                from dulwich.objects import Blob, Tree
+            # Export tree to tmpdir
+            with Repo(".") as r:
+                tree = r.object_store[tree_sha]
+                assert isinstance(tree, Tree)
+                for entry in tree.iteritems():
+                    assert entry.path is not None
+                    assert entry.sha is not None
+                    path = Path(tmpdir) / entry.path.decode()
+                    obj = r.object_store[entry.sha]
+                    if isinstance(obj, Tree):
+                        path.mkdir(exist_ok=True)
+                    else:
+                        assert isinstance(obj, Blob)
+                        path.write_bytes(obj.data)
 
-                # Export tree to tmpdir
-                with Repo(".") as r:
-                    tree = r.object_store[tree_sha]
-                    assert isinstance(tree, Tree)
-                    for entry in tree.iteritems():
-                        assert entry.path is not None
-                        assert entry.sha is not None
-                        path = Path(tmpdir) / entry.path.decode()
-                        obj = r.object_store[entry.sha]
-                        if isinstance(obj, Tree):
-                            path.mkdir(exist_ok=True)
+                # Run the filter command in the temp directory
+                run_filter(parsed_args.tree_filter, cwd=tmpdir)
+
+                # Rebuild tree from modified temp directory
+                def build_tree_from_dir(dir_path: str) -> ObjectID:
+                    tree = Tree()
+                    for name in sorted(os.listdir(dir_path)):
+                        if name.startswith("."):
+                            continue
+                        path = os.path.join(dir_path, name)
+                        if os.path.isdir(path):
+                            subtree_sha = build_tree_from_dir(path)
+                            tree.add(name.encode(), 0o040000, subtree_sha)
                         else:
-                            assert isinstance(obj, Blob)
-                            path.write_bytes(obj.data)
-
-                    # Run the filter command in the temp directory
-                    run_filter(parsed_args.tree_filter, cwd=tmpdir)
-
-                    # Rebuild tree from modified temp directory
-                    def build_tree_from_dir(dir_path: str) -> ObjectID:
-                        tree = Tree()
-                        for name in sorted(os.listdir(dir_path)):
-                            if name.startswith("."):
-                                continue
-                            path = os.path.join(dir_path, name)
-                            if os.path.isdir(path):
-                                subtree_sha = build_tree_from_dir(path)
-                                tree.add(name.encode(), 0o040000, subtree_sha)
+                            with open(path, "rb") as f:
+                                data = f.read()
+                            blob = Blob.from_string(data)
+                            r.object_store.add_object(blob)
+                            # Use appropriate file mode
+                            mode = os.stat(path).st_mode
+                            if mode & 0o100:
+                                file_mode = 0o100755
                             else:
-                                with open(path, "rb") as f:
-                                    data = f.read()
-                                blob = Blob.from_string(data)
-                                r.object_store.add_object(blob)
-                                # Use appropriate file mode
-                                mode = os.stat(path).st_mode
-                                if mode & 0o100:
-                                    file_mode = 0o100755
-                                else:
-                                    file_mode = 0o100644
-                                tree.add(name.encode(), file_mode, blob.id)
-                        r.object_store.add_object(tree)
-                        return tree.id
+                                file_mode = 0o100644
+                            tree.add(name.encode(), file_mode, blob.id)
+                    r.object_store.add_object(tree)
+                    return tree.id
 
-                    return build_tree_from_dir(tmpdir)
+                return build_tree_from_dir(tmpdir)
 
-        index_filter = None
-        if parsed_args.index_filter:
+        tree_filter: Callable[[ObjectID, str], ObjectID] | None = (
+            _tree_filter_impl if parsed_args.tree_filter else None
+        )
 
-            def index_filter(tree_sha: ObjectID, index_path: str) -> ObjectID | None:
-                run_filter(
-                    parsed_args.index_filter, extra_env={"GIT_INDEX_FILE": index_path}
-                )
-                return None  # Read back from index
+        def _index_filter_impl(tree_sha: ObjectID, index_path: str) -> ObjectID | None:
+            run_filter(
+                parsed_args.index_filter, extra_env={"GIT_INDEX_FILE": index_path}
+            )
+            return None  # Read back from index
 
-        parent_filter = None
-        if parsed_args.parent_filter:
+        index_filter: Callable[[ObjectID, str], ObjectID | None] | None = (
+            _index_filter_impl if parsed_args.index_filter else None
+        )
 
-            def parent_filter(parents: Sequence[ObjectID]) -> list[ObjectID]:
-                parent_str = " ".join(p.hex() for p in parents)
-                result = run_filter(
-                    parsed_args.parent_filter, input_data=parent_str.encode()
-                )
-                if result is None:
-                    return list(parents)
+        def _parent_filter_impl(parents: Sequence[ObjectID]) -> list[ObjectID]:
+            parent_str = " ".join(p.hex() for p in parents)
+            result = run_filter(
+                parsed_args.parent_filter, input_data=parent_str.encode()
+            )
+            if result is None:
+                return list(parents)
 
-                output = result.decode().strip()
-                if not output:
-                    return []
-                new_parents = []
-                for sha in output.split():
-                    sha_bytes = sha.encode()
-                    if valid_hexsha(sha_bytes):
-                        new_parents.append(ObjectID(sha_bytes))
-                return new_parents
+            output = result.decode().strip()
+            if not output:
+                return []
+            new_parents = []
+            for sha in output.split():
+                sha_bytes = sha.encode()
+                if valid_hexsha(sha_bytes):
+                    new_parents.append(ObjectID(sha_bytes))
+            return new_parents
 
-        commit_filter = None
-        if parsed_args.commit_filter:
+        parent_filter: Callable[[Sequence[ObjectID]], list[ObjectID]] | None = (
+            _parent_filter_impl if parsed_args.parent_filter else None
+        )
 
-            def commit_filter(
-                commit_obj: Commit, tree_sha: ObjectID
-            ) -> ObjectID | None:
-                # The filter receives: tree parent1 parent2...
-                cmd_input = tree_sha.hex()
-                for parent in commit_obj.parents:
-                    cmd_input += " " + parent.hex()
+        def _commit_filter_impl(
+            commit_obj: Commit, tree_sha: ObjectID
+        ) -> ObjectID | None:
+            # The filter receives: tree parent1 parent2...
+            cmd_input = tree_sha.hex()
+            for parent in commit_obj.parents:
+                cmd_input += " " + parent.hex()
 
-                result = run_filter(
-                    parsed_args.commit_filter,
-                    input_data=cmd_input.encode(),
-                    extra_env={"GIT_COMMIT": commit_obj.id.hex()},
-                )
-                if result is None:
-                    return None
-
-                output = result.decode().strip()
-                if not output:
-                    return None  # Skip commit
-
-                if valid_hexsha(output):
-                    return ObjectID(output.encode())
+            result = run_filter(
+                parsed_args.commit_filter,
+                input_data=cmd_input.encode(),
+                extra_env={"GIT_COMMIT": commit_obj.id.hex()},
+            )
+            if result is None:
                 return None
 
-        tag_name_filter = None
-        if parsed_args.tag_name_filter:
+            output = result.decode().strip()
+            if not output:
+                return None  # Skip commit
 
-            def tag_name_filter(tag_name: bytes) -> bytes:
-                result = run_filter(parsed_args.tag_name_filter, input_data=tag_name)
-                return result if result is not None else tag_name
+            if valid_hexsha(output):
+                return ObjectID(output.encode())
+            return None
+
+        commit_filter: Callable[[Commit, ObjectID], ObjectID | None] | None = (
+            _commit_filter_impl if parsed_args.commit_filter else None
+        )
+
+        def _tag_name_filter_impl(tag_name: bytes) -> bytes:
+            result = run_filter(parsed_args.tag_name_filter, input_data=tag_name)
+            return result if result is not None else tag_name
+
+        tag_name_filter: Callable[[bytes], bytes] | None = (
+            _tag_name_filter_impl if parsed_args.tag_name_filter else None
+        )
 
         # Open repo once
         with Repo(".") as r:
@@ -6986,21 +6991,24 @@ class cmd_bundle(Command):
 
         repo = Repo(".")
 
-        progress = None
-        if parsed_args.progress and not parsed_args.quiet:
+        def _progress_impl(*args: str | int) -> None:
+            # Handle both progress(msg) and progress(count, msg) signatures
+            if len(args) == 1:
+                msg = args[0]
+            elif len(args) == 2:
+                _count, msg = args
+            else:
+                msg = str(args)
+            # Convert bytes to string if needed
+            if isinstance(msg, bytes):
+                msg = msg.decode("utf-8", "replace")
+            logger.error("%s", msg)
 
-            def progress(*args: str | int) -> None:
-                # Handle both progress(msg) and progress(count, msg) signatures
-                if len(args) == 1:
-                    msg = args[0]
-                elif len(args) == 2:
-                    _count, msg = args
-                else:
-                    msg = str(args)
-                # Convert bytes to string if needed
-                if isinstance(msg, bytes):
-                    msg = msg.decode("utf-8", "replace")
-                logger.error("%s", msg)
+        progress: Callable[..., None] | None = (
+            _progress_impl
+            if parsed_args.progress and not parsed_args.quiet
+            else None
+        )
 
         refs_to_include: list[Ref] = []
         prerequisites = []
@@ -7132,23 +7140,24 @@ class cmd_bundle(Command):
 
         repo = Repo(".")
 
-        progress = None
-        if parsed_args.progress:
+        def _unbundle_progress_impl(*args: str | int | bytes) -> None:
+            # Handle both progress(msg) and progress(count, msg) signatures
+            if len(args) == 1:
+                msg = args[0]
+            elif len(args) == 2:
+                _count, msg = args
+            else:
+                msg = str(args)
+            # Convert bytes to string if needed
+            if isinstance(msg, bytes):
+                msg = msg.decode("utf-8", "replace")
+            elif not isinstance(msg, str):
+                msg = str(msg)
+            logger.error("%s", msg)
 
-            def progress(*args: str | int | bytes) -> None:
-                # Handle both progress(msg) and progress(count, msg) signatures
-                if len(args) == 1:
-                    msg = args[0]
-                elif len(args) == 2:
-                    _count, msg = args
-                else:
-                    msg = str(args)
-                # Convert bytes to string if needed
-                if isinstance(msg, bytes):
-                    msg = msg.decode("utf-8", "replace")
-                elif not isinstance(msg, str):
-                    msg = str(msg)
-                logger.error("%s", msg)
+        progress: Callable[..., None] | None = (
+            _unbundle_progress_impl if parsed_args.progress else None
+        )
 
         if parsed_args.file == "-":
             bundle = read_bundle(sys.stdin.buffer)

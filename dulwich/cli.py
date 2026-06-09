@@ -6306,14 +6306,15 @@ class cmd_filter_branch(Command):
             return result.stdout
 
         # Create filter functions based on arguments
-        filter_message: Callable[[bytes], bytes] | None = None
-        if parsed_args.msg_filter:
+        def _msg_filter_impl(message: bytes) -> bytes:
+            result = run_filter(parsed_args.msg_filter, input_data=message)
+            return result if result is not None else message
 
-            def filter_message(message: bytes) -> bytes:
-                result = run_filter(parsed_args.msg_filter, input_data=message)
-                return result if result is not None else message
+        filter_message: Callable[[bytes], bytes] | None = (
+            _msg_filter_impl if parsed_args.msg_filter else None
+        )
 
-        tree_filter: Callable[[ObjectID, str], ObjectID] | None = None
+        tree_filter = None
         if parsed_args.tree_filter:
 
             def tree_filter(tree_sha: ObjectID, tmpdir: str) -> ObjectID:
@@ -6364,7 +6365,7 @@ class cmd_filter_branch(Command):
 
                     return build_tree_from_dir(tmpdir)
 
-        index_filter: Callable[[ObjectID, str], ObjectID | None] | None = None
+        index_filter = None
         if parsed_args.index_filter:
 
             def index_filter(tree_sha: ObjectID, index_path: str) -> ObjectID | None:
@@ -6373,7 +6374,7 @@ class cmd_filter_branch(Command):
                 )
                 return None  # Read back from index
 
-        parent_filter: Callable[[Sequence[ObjectID]], list[ObjectID]] | None = None
+        parent_filter = None
         if parsed_args.parent_filter:
 
             def parent_filter(parents: Sequence[ObjectID]) -> list[ObjectID]:
@@ -6394,7 +6395,7 @@ class cmd_filter_branch(Command):
                         new_parents.append(ObjectID(sha_bytes))
                 return new_parents
 
-        commit_filter: Callable[[Commit, ObjectID], ObjectID | None] | None = None
+        commit_filter = None
         if parsed_args.commit_filter:
 
             def commit_filter(
@@ -6421,7 +6422,7 @@ class cmd_filter_branch(Command):
                     return ObjectID(output.encode())
                 return None
 
-        tag_name_filter: Callable[[bytes], bytes] | None = None
+        tag_name_filter = None
         if parsed_args.tag_name_filter:
 
             def tag_name_filter(tag_name: bytes) -> bytes:
@@ -6985,7 +6986,7 @@ class cmd_bundle(Command):
 
         repo = Repo(".")
 
-        progress: Callable[..., None] | None = None
+        progress = None
         if parsed_args.progress and not parsed_args.quiet:
 
             def progress(*args: str | int) -> None:
@@ -7131,7 +7132,7 @@ class cmd_bundle(Command):
 
         repo = Repo(".")
 
-        progress: Callable[..., None] | None = None
+        progress = None
         if parsed_args.progress:
 
             def progress(*args: str | int | bytes) -> None:

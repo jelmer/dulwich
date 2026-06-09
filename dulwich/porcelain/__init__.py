@@ -2112,10 +2112,10 @@ def show_commit(
         # Use wrapper for ColorizedDiffStream, direct stream for others
         if isinstance(outstream, ColorizedDiffStream):
             wrapped_stream = _StreamWrapper(outstream)
-            print_commit(commit, decode=decode, outstream=wrapped_stream)
+            print_commit(commit, decode=decode, outstream=wrapped_stream)  # type: ignore[arg-type,unused-ignore]
             # Write diff directly to the ColorizedDiffStream as bytes
             write_tree_diff(
-                outstream,
+                outstream,  # type: ignore[arg-type,unused-ignore]
                 r.object_store,
                 commit.parents[0] if commit.parents else None,
                 commit.tree,
@@ -2198,8 +2198,9 @@ def print_name_status(changes: Iterator[TreeChange]) -> Iterator[str]:
     for change in changes:
         if not change:
             continue
+        change_item: TreeChange
         if isinstance(change, list):
-            change_item: TreeChange = change[0]
+            change_item = cast(TreeChange, change[0])
         else:
             change_item = change
         if change_item.type == CHANGE_ADD:
@@ -2259,8 +2260,9 @@ def print_name_only(changes: Iterator[TreeChange]) -> Iterator[str]:
     for change in changes:
         if not change:
             continue
+        change_item: TreeChange
         if isinstance(change, list):
-            change_item: TreeChange = change[0]
+            change_item = cast(TreeChange, change[0])
         else:
             change_item = change
         if change_item.type == CHANGE_DELETE:
@@ -9510,6 +9512,7 @@ def am(
     Returns:
         List of commit SHAs (bytes) created
     """
+    import email.message
     import email.parser
     import mailbox
     import tempfile

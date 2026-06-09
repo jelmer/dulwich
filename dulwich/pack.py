@@ -994,7 +994,7 @@ class FilePackIndex(PackIndex):
         raise NotImplementedError(self._unpack_offset)
 
     def _unpack_crc32_checksum(self, i: int) -> int | None:
-        """Unpack the crc32 checksum for the ith object from the index file."""
+        """Unpack the crc32 checksum for the i-th object from the index file."""
         raise NotImplementedError(self._unpack_crc32_checksum)
 
     def _itersha(self) -> Iterator[bytes]:

@@ -2271,7 +2271,7 @@ class AddTests(PorcelainTestCase):
         # path coming from an NFD-returning filesystem listing).
         nfd_path = os.path.join(self.repo.path, nfd_name)
         if os.path.exists(nfd_path):
-            # Filesystem collapses NFC/NFD — nothing meaningful to test.
+            # Filesystem collapses NFC/NFD, so nothing meaningful to test.
             return
         with open(nfd_path, "w") as f:
             f.write("nfd")
@@ -7970,7 +7970,7 @@ class StatusTests(PorcelainTestCase):
 
         # macOS git ships with core.precomposeunicode=true in the system
         # config. Override it at the repo level so open_index() below does
-        # not apply NFC normalization to lookups — that would mask the
+        # not apply NFC normalization to lookups; that would mask the
         # "NFD present, NFC in index" assertion we are exercising.
         config = self.repo.get_config()
         config.set((b"core",), b"precomposeunicode", False)
@@ -7998,7 +7998,7 @@ class StatusTests(PorcelainTestCase):
             try:
                 os.rename(fullpath, nfd_path)
             except OSError:
-                # Filesystem normalizes names (e.g., macOS) — skip rename test
+                # Filesystem normalizes names (e.g., macOS); skip rename test
                 return
 
             if not os.path.exists(nfd_path):

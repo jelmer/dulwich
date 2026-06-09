@@ -3312,7 +3312,7 @@ def _fs_to_tree_path(fs_path: str | bytes, tree_encoding: str = "utf-8") -> byte
     # us either str (already decoded) or bytes encoded via the filesystem
     # codec. Normalise to str, then encode under the tree encoding so the
     # resulting tree path is plain UTF-8. This matches C git's xwcstoutf,
-    # which is just WideCharToMultiByte(CP_UTF8) — it makes no attempt to
+    # which is just WideCharToMultiByte(CP_UTF8); it makes no attempt to
     # reverse the xutftowcsn fallbacks, so a file that was checked out from
     # a tree path with invalid UTF-8 will read back as the lossy form (the
     # same divergence C git exhibits, documented as a one-way mapping).

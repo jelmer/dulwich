@@ -482,7 +482,7 @@ class WalkerTest(TestCase):
         # with a timestamp older than every commit in the chain (simulates
         # rebase/auto-stash clock skew). exclude=[y] must exclude c1..c10,
         # even though c1..c10 get popped from the date-ordered PQ long before
-        # y — too long for the small "extra commits" buffer to paper over.
+        # y, which is too long for the small "extra commits" buffer to paper over.
         n = 20
         spec = [[1]] + [[i, i - 1] for i in range(2, n + 1)]
         times = [100 + i for i in range(1, n + 1)]

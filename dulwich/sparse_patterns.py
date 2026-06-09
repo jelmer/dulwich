@@ -100,9 +100,9 @@ def compute_included_paths_cone(index: Index, lines: Sequence[str]) -> set[str]:
     """Implement a simplified 'cone' approach for sparse-checkout.
 
     By default, this can include top-level files, exclude all subdirectories,
-    and re-include specified directories. The logic is less comprehensive than
-    Git's built-in cone mode (recursive vs parent) and is essentially an implementation
-    of the recursive cone mode.
+    and re-include specified directories. The logic is simpler than Git's
+    built-in cone mode (recursive vs parent) and is essentially an
+    implementation of the recursive cone mode.
 
     Args:
       index: An Index object containing the repository's index.

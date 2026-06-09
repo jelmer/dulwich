@@ -362,7 +362,7 @@ class WorkTreeResetTests(WorkTreeTestCase):
         later, so the NTFS validator must be on by default
         regardless of os.name (matching Git's PROTECT_NTFS_DEFAULT=1).
         """
-        # No core.protectNTFS set — rely on the built-in default.
+        # No core.protectNTFS set; rely on the built-in default.
         evil = Blob.from_string(b"evil")
         good = Blob.from_string(b"ok")
         tree = Tree()

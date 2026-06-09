@@ -321,7 +321,7 @@ def _win32_peek_avail(handle: int) -> int:
     """Wrapper around PeekNamedPipe to check how many bytes are available."""
     from ctypes import (  # type: ignore[attr-defined,unused-ignore]
         byref,
-        windll,
+        windll,  # pyright: ignore[reportAttributeAccessIssue]
         wintypes,
     )
 

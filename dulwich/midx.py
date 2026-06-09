@@ -130,6 +130,7 @@ class MultiPackIndex:
         self.pack_count: int
         self.pack_names: list[str]
         self.object_count: int
+        self._contents: bytes | Any
         self._chunks: dict[bytes, int]
         self._fanout_table: list[int]
         self._oidl_offset: int

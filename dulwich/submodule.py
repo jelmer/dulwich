@@ -88,8 +88,7 @@ def ensure_submodule_placeholder(
         os.makedirs(full_path)
 
     # Create .git file pointing to the submodule's git directory
-    git_filename = b".git" if isinstance(full_path, bytes) else ".git"
-    git_file_path = os.path.join(full_path, git_filename)
+    git_file_path = os.path.join(full_path, b".git")
     if not os.path.exists(git_file_path):
         # Submodule git directories are typically stored in .git/modules/<name>
         # The relative path from the submodule to the parent's .git directory

@@ -134,12 +134,9 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
-try:
-    import mmap
-except ImportError:
-    has_mmap = False
-else:
-    has_mmap = True
+import mmap
+
+has_mmap = True
 
 if TYPE_CHECKING:
     from _hashlib import HASH as HashObject
@@ -147,9 +144,9 @@ if TYPE_CHECKING:
     from .bitmap import PackBitmap
     from .commit_graph import CommitGraph
     from .object_store import BaseObjectStore
-    from .ref import Ref
+    from .refs import Ref
 
-# For some reason the above try, except fails to set has_mmap = False for plan9
+# Some platforms (e.g. plan9) don't support mmap properly
 if sys.platform == "Plan9":
     has_mmap = False
 
@@ -288,9 +285,11 @@ class ObjectContainer(Protocol):
 
     def __contains__(self, sha1: "ObjectID") -> bool:
         """Check if a hex sha is present."""
+        ...
 
     def __getitem__(self, sha1: "ObjectID | RawObjectID") -> ShaFile:
         """Retrieve an object."""
+        ...
 
     def get_commit_graph(self) -> "CommitGraph | None":
         """Get the commit graph for this object store.
@@ -879,9 +878,9 @@ class MemoryPackIndex(PackIndex):
             lookup_sha = RawObjectID(sha)
         return self._by_sha[lookup_sha]
 
-    def object_sha1(self, offset: int) -> bytes:
+    def object_sha1(self, index: int) -> bytes:
         """Return the SHA1 for the object at the given offset."""
-        return self._by_offset[offset]
+        return self._by_offset[index]
 
     def _itersha(self) -> Iterator[bytes]:
         """Iterate over all SHA1s in the index."""
@@ -4494,6 +4493,8 @@ class Pack:
                 base_offset = base_offset_temp
                 if base_offset == prev_offset:  # object is based on itself
                     raise UnresolvedDeltas([basename])
+            else:
+                raise AssertionError(f"Unexpected delta type: {base_type}")
             delta_stack.append((prev_offset, base_type, delta))
 
         # Now grab the base object (mustn't be a delta) and apply the

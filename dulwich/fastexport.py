@@ -81,8 +81,9 @@ class GitFastExporter:
         Args:
             cmd: Command object to print
         """
-        if hasattr(cmd, "__bytes__"):
-            output = cmd.__bytes__()
+        bytes_method = getattr(cmd, "__bytes__", None)
+        if bytes_method is not None:
+            output = bytes_method()
         else:
             output = cmd.__repr__().encode("utf-8")
         self.outf.write(output + b"\n")
@@ -384,7 +385,7 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
         tag.message = cmd.message
         tag.name = cmd.from_
         self.repo.object_store.add_object(tag)
-        self.repo.refs["refs/tags/" + tag.name] = tag.id
+        self.repo.refs[Ref(b"refs/tags/" + tag.name)] = tag.id
 
     def feature_handler(self, cmd: commands.FeatureCommand) -> None:
         """Process a FeatureCommand."""

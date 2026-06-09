@@ -2198,36 +2198,42 @@ def print_name_status(changes: Iterator[TreeChange]) -> Iterator[str]:
         if not change:
             continue
         if isinstance(change, list):
-            change = change[0]
-        if change.type == CHANGE_ADD:
-            assert change.new is not None
-            path1 = change.new.path
+            change_item: TreeChange = change[0]
+        else:
+            change_item = change
+        if change_item.type == CHANGE_ADD:
+            assert change_item.new is not None
+            path1 = change_item.new.path
             assert path1 is not None
-            path2 = b""
+            path2: bytes = b""
             kind = "A"
-        elif change.type == CHANGE_DELETE:
-            assert change.old is not None
-            path1 = change.old.path
+        elif change_item.type == CHANGE_DELETE:
+            assert change_item.old is not None
+            path1 = change_item.old.path
             assert path1 is not None
             path2 = b""
             kind = "D"
-        elif change.type == CHANGE_MODIFY:
-            assert change.new is not None
-            path1 = change.new.path
+        elif change_item.type == CHANGE_MODIFY:
+            assert change_item.new is not None
+            path1 = change_item.new.path
             assert path1 is not None
             path2 = b""
             kind = "M"
-        elif change.type in RENAME_CHANGE_TYPES:
-            assert change.old is not None and change.new is not None
-            path1 = change.old.path
+        elif change_item.type in RENAME_CHANGE_TYPES:
+            assert change_item.old is not None and change_item.new is not None
+            path1 = change_item.old.path
             assert path1 is not None
-            path2_opt = change.new.path
+            path2_opt = change_item.new.path
             assert path2_opt is not None
             path2 = path2_opt
-            if change.type == CHANGE_RENAME:
+            if change_item.type == CHANGE_RENAME:
                 kind = "R"
-            elif change.type == CHANGE_COPY:
+            elif change_item.type == CHANGE_COPY:
                 kind = "C"
+            else:
+                kind = "?"
+        else:
+            raise ValueError(f"Unknown change type: {change_item.type}")
         path1_str = (
             path1.decode("utf-8", errors="replace")
             if isinstance(path1, bytes)
@@ -2253,13 +2259,15 @@ def print_name_only(changes: Iterator[TreeChange]) -> Iterator[str]:
         if not change:
             continue
         if isinstance(change, list):
-            change = change[0]
-        if change.type == CHANGE_DELETE:
-            assert change.old is not None
-            path = change.old.path
+            change_item: TreeChange = change[0]
         else:
-            assert change.new is not None
-            path = change.new.path
+            change_item = change
+        if change_item.type == CHANGE_DELETE:
+            assert change_item.old is not None
+            path = change_item.old.path
+        else:
+            assert change_item.new is not None
+            path = change_item.new.path
         assert path is not None
         path_str = (
             path.decode("utf-8", errors="replace") if isinstance(path, bytes) else path

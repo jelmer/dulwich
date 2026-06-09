@@ -27,7 +27,7 @@ from unittest import TestCase
 from unittest.mock import Mock
 
 from dulwich.dumb import DumbHTTPObjectStore, DumbRemoteHTTPRepo
-from dulwich.errors import NotGitRepository
+from dulwich.errors import NotGitRepository, ObjectFormatException
 from dulwich.objects import ZERO_SHA, Blob, Commit, ShaFile, Tag, Tree, sha_to_hex
 
 
@@ -159,6 +159,34 @@ P pack-abcdef1234567890abcdef1234567890abcdef12.pack
         type_num, content = self.store.get_raw(sha)
         self.assertEqual(Blob.type_num, type_num)
         self.assertEqual(b"cached content", content)
+
+    def test_get_raw_verifies_loose_object_sha(self) -> None:
+        # Server serves a different object's content under the requested sha.
+        trusted = Blob()
+        trusted.data = b"trusted content"
+        trusted_sha = trusted.id
+
+        evil = Blob()
+        evil.data = b"attacker controlled content"
+
+        path = f"objects/{trusted_sha[:2].decode('ascii')}/{trusted_sha[2:].decode('ascii')}"
+        self._add_response(path, self._make_object(evil))
+
+        self.assertRaises(
+            ObjectFormatException, self.store.get_raw, trusted_sha
+        )
+
+    def test_get_raw_loose_object_ok(self) -> None:
+        blob = Blob()
+        blob.data = b"Hello, world!"
+        hex_sha = blob.id
+
+        path = f"objects/{hex_sha[:2].decode('ascii')}/{hex_sha[2:].decode('ascii')}"
+        self._add_response(path, self._make_object(blob))
+
+        type_num, content = self.store.get_raw(hex_sha)
+        self.assertEqual(Blob.type_num, type_num)
+        self.assertEqual(b"Hello, world!", content)
 
     def test_contains_loose(self) -> None:
         # Create a blob object

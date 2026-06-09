@@ -269,6 +269,29 @@ class DumbHTTPObjectStore(BaseObjectStore):
 
         raise KeyError(sha)
 
+    def _check_object_sha(
+        self, sha: "RawObjectID | ObjectID", type_num: int, content: bytes
+    ) -> None:
+        """Verify that fetched content hashes to the requested object id.
+
+        The remote serves both the loose object bytes and the pack index that
+        maps a sha to an offset, so without this check a malicious or MITM'd
+        dumb server can return content that does not match the requested sha.
+        """
+        obj = ShaFile.from_raw_string(
+            type_num, content, object_format=self.object_format
+        )
+        actual = obj.get_id(self.object_format)
+        if len(sha) == self.object_format.oid_length:
+            expected = sha_to_hex(RawObjectID(sha))
+        else:
+            expected = bytes(sha)
+        if actual != expected:
+            raise ObjectFormatException(
+                f"Object {expected.decode('ascii')} has wrong contents "
+                f"(hashes to {actual.decode('ascii')})"
+            )
+
     def get_raw(self, sha: RawObjectID | ObjectID) -> tuple[int, bytes]:
         """Obtain the raw text for an object.
 
@@ -284,13 +307,11 @@ class DumbHTTPObjectStore(BaseObjectStore):
         # Try packs first
         try:
             result = self._fetch_from_pack(sha)
-            self._cached_objects[sha] = result
-            return result
         except KeyError:
-            pass
+            # Try loose object
+            result = self._fetch_loose_object(sha)
 
-        # Try loose object
-        result = self._fetch_loose_object(sha)
+        self._check_object_sha(sha, result[0], result[1])
         self._cached_objects[sha] = result
         return result
 

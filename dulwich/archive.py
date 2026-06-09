@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from .object_store import BaseObjectStore
     from .objects import TreeEntry
 
-from .objects import Tree
+from .objects import Blob, Tree
 
 
 class UnsafeArchivePathError(ValueError):
@@ -194,7 +194,7 @@ def tar_stream(
                 # Entry probably refers to a submodule, which we don't yet
                 # support.
                 continue
-            if hasattr(blob, "chunked"):
+            if isinstance(blob, Blob):
                 data = ChunkedBytesIO(blob.chunked)
             else:
                 # Fallback for objects without chunked attribute

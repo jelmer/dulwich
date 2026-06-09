@@ -1686,13 +1686,15 @@ class cmd_diff(Command):
             config = repo.get_config_stack()
             with get_pager(config=config, cmd_name="diff") as outstream:
                 # For --stat mode, capture the diff in a BytesIO buffer
+                import io
+
+                from .diffstat import diffstat
+
+                diff_buffer: io.BytesIO | None = None
+                output_stream: BinaryIO
                 if parsed_args.stat:
-                    import io
-
-                    from .diffstat import diffstat
-
-                    diff_buffer: BinaryIO = io.BytesIO()
-                    output_stream: BinaryIO = diff_buffer
+                    diff_buffer = io.BytesIO()
+                    output_stream = diff_buffer
                 else:
                     output_stream = _create_output_stream(outstream)
 
@@ -1736,9 +1738,8 @@ class cmd_diff(Command):
                     sys.stderr.write(f"fatal: {e}\n")
                     sys.exit(1)
 
-                if parsed_args.stat:
+                if diff_buffer is not None:
                     # Generate and output diffstat from captured diff
-                    assert isinstance(diff_buffer, io.BytesIO)
                     diff_data = diff_buffer.getvalue()
                     lines = diff_data.split(b"\n")
                     stat_output = diffstat(lines)

@@ -71,12 +71,9 @@ from collections.abc import Iterator
 from io import UnsupportedOperation
 from typing import IO, Any
 
-try:
-    import mmap
-except ImportError:
-    has_mmap = False
-else:
-    has_mmap = True
+import mmap
+
+has_mmap = True
 
 from .file import GitFile, _GitFile
 from .objects import ObjectID, RawObjectID

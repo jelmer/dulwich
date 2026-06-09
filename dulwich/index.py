@@ -833,14 +833,12 @@ def write_cache_entry(
     write_cache_time(f, entry.ctime)
     write_cache_time(f, entry.mtime)
 
+    compressed_path = b""
     if version >= 4:
         # Version 4: use compression but set name_len to actual filename length
         # This matches how C Git implements index v4 flags
         compressed_path = _compress_path(entry.name, previous_path)
-        flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
-    else:
-        # Versions < 4: include actual name length
-        flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
+    flags = len(entry.name) | (entry.flags & ~FLAG_NAMEMASK)
 
     if entry.extended_flags:
         flags |= FLAG_EXTENDED
@@ -1386,7 +1384,7 @@ class Index:
 
         def lookup_entry(path: bytes) -> tuple[bytes, int]:
             entry = self[path]
-            if hasattr(entry, "sha") and hasattr(entry, "mode"):
+            if isinstance(entry, IndexEntry):
                 return entry.sha, cleanup_mode(entry.mode)
             else:
                 # Handle ConflictedIndexEntry case

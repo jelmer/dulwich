@@ -1802,6 +1802,7 @@ class UploadArchiveHandler(Handler):
         format = "tar"
         i = 0
         store: BaseObjectStore = self.repo.object_store
+        tree: Tree | None = None
         while i < len(arguments):
             argument = arguments[i]
             if argument == b"--prefix":
@@ -1818,6 +1819,8 @@ class UploadArchiveHandler(Handler):
                 assert isinstance(tree_obj, Tree)
                 tree = tree_obj
             i += 1
+        if tree is None:
+            raise GitProtocolError("upload-archive missing tree argument")
         self.proto.write_pkt_line(b"ACK")
         self.proto.write_pkt_line(None)
         for chunk in tar_stream(

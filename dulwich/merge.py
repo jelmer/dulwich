@@ -735,6 +735,7 @@ def octopus_merge(
 
     # Start with the head commit's tree as our current state
     current_commit = head_commit
+    merged_tree: Tree = Tree()
 
     # Merge each commit sequentially
     for i, other_commit in enumerate(other_commits):

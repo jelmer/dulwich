@@ -1249,17 +1249,15 @@ def _handle_upload_pack_tail(
                 break
         pkt = proto.read_pkt_line()
     if CAPABILITY_SIDE_BAND_64K in capabilities or protocol_version == 2:
-        if progress is None:
-            # Just ignore progress data
-
-            def progress(x: bytes) -> None:
-                pass
+        _progress: Callable[[bytes], None] = (
+            progress if progress is not None else lambda _x: None
+        )
 
         for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
             if chan == SIDE_BAND_CHANNEL_DATA:
                 pack_data(data)
             elif chan == SIDE_BAND_CHANNEL_PROGRESS:
-                progress(data)
+                _progress(data)
             else:
                 raise AssertionError(f"Invalid sideband channel {chan}")
     else:
@@ -1866,10 +1864,9 @@ class GitClient:
             None if it was updated successfully
         """
         if CAPABILITY_SIDE_BAND_64K in capabilities or self.protocol_version == 2:
-            if progress is None:
-
-                def progress(x: bytes) -> None:
-                    pass
+            _progress: Callable[[bytes], None] = (
+                progress if progress is not None else lambda _x: None
+            )
 
             pktline_parser: PktLineParser | None
             if CAPABILITY_REPORT_STATUS in capabilities:
@@ -1883,7 +1880,7 @@ class GitClient:
                         assert pktline_parser is not None
                         pktline_parser.parse(data)
                 elif chan == SIDE_BAND_CHANNEL_PROGRESS:
-                    progress(data)
+                    _progress(data)
                 else:
                     raise AssertionError(f"Invalid sideband channel {chan}")
         else:
@@ -2954,10 +2951,9 @@ class LocalGitClient(GitClient):
           SendPackError: if server rejects the pack data
 
         """
-        if not progress:
-
-            def progress(x: bytes) -> None:
-                pass
+        _progress: Callable[[bytes], None] = (
+            progress if progress is not None else lambda _x: None
+        )
 
         with self._open_repo(path) as target:
             old_refs = target.get_refs()
@@ -3012,11 +3008,11 @@ class LocalGitClient(GitClient):
                 if new_sha1 != ZERO_SHA:
                     if not target.refs.set_if_equals(refname, old_sha1, new_sha1):
                         msg = f"unable to set {refname!r} to {new_sha1!r}"
-                        progress(msg.encode())
+                        _progress(msg.encode())
                         ref_status[refname] = msg
                 else:
                     if not target.refs.remove_if_equals(refname, old_sha1):
-                        progress(f"unable to remove {refname!r}".encode())
+                        _progress(f"unable to remove {refname!r}".encode())
                         ref_status[refname] = "unable to remove"
 
         return SendPackResult(_to_optional_dict(new_refs), ref_status=ref_status)

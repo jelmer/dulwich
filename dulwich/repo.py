@@ -859,6 +859,7 @@ class BaseRepo:
 
         current_shallow = set(getattr(graph_walker, "shallow", set()))
 
+        unshallow: set[ObjectID] = set()
         if depth not in (None, 0):
             assert depth is not None
             shallow, not_shallow = find_shallow(self.object_store, wants, depth)
@@ -1952,9 +1953,11 @@ class Repo(BaseRepo):
 
                 head_chain, origin_sha = self.refs.follow(HEADREF)
                 origin_head = head_chain[-1] if head_chain else None
+                head: ObjectID | None = None
                 if origin_sha and not origin_head:
                     # set detached HEAD
                     target.refs[HEADREF] = origin_sha
+                    head = origin_sha
                 else:
                     _set_origin_head(target.refs, origin, origin_head)
                     head_ref = _set_default_branch(

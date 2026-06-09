@@ -1173,13 +1173,9 @@ class ConfigFile(ConfigDict):
         # Load and merge the included file
         try:
             # Use provided file opener or default to GitFile
-            opener: FileOpener
-            if file_opener is None:
-
-                def opener(path: str | os.PathLike[str]) -> IO[bytes]:
-                    return GitFile(path, "rb")
-            else:
-                opener = file_opener
+            opener: FileOpener = (
+                file_opener if file_opener is not None else lambda p: GitFile(p, "rb")
+            )
 
             f = opener(include_path)
         except (OSError, ValueError) as e:
@@ -1336,13 +1332,9 @@ class ConfigFile(ConfigDict):
         config_dir = os.path.dirname(abs_path)
 
         # Use provided file opener or default to GitFile
-        opener: FileOpener
-        if file_opener is None:
-
-            def opener(p: str | os.PathLike[str]) -> IO[bytes]:
-                return GitFile(p, "rb")
-        else:
-            opener = file_opener
+        opener: FileOpener = (
+            file_opener if file_opener is not None else lambda p: GitFile(p, "rb")
+        )
 
         with opener(abs_path) as f:
             ret = cls.from_file(

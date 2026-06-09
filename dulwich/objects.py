@@ -874,7 +874,7 @@ class Blob(ShaFile):
     type_name = b"blob"
     type_num = 3
 
-    _chunked_text: list[bytes]  # type: ignore[assignment,unused-ignore]
+    _chunked_text: list[bytes]
 
     def __init__(self) -> None:
         """Initialize a new Blob object."""

@@ -630,6 +630,7 @@ class ConfigDict(Config):
             Iterator of configuration values
         """
         section, name = self._check_section_and_name(section, name)
+        assert len(section) >= 1
 
         if len(section) > 1:
             try:
@@ -657,6 +658,7 @@ class ConfigDict(Config):
             KeyError: if the value is not set
         """
         section, name = self._check_section_and_name(section, name)
+        assert len(section) >= 1
 
         if len(section) > 1:
             try:

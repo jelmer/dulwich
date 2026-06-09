@@ -424,7 +424,7 @@ class LRUSizeCache(LRUCache[K, V]):
         self._value_size -= node.size
         LRUCache._remove_node(self, node)
 
-    def resize(  # type: ignore[override,unused-ignore]
+    def resize(
         self, max_size: int, after_cleanup_size: int | None = None
     ) -> None:
         """Change the number of bytes that will be cached."""

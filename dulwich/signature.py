@@ -242,12 +242,12 @@ class GPGSignatureVendor(SignatureSigner, SignatureVerifier):
                 with gpg.Context(armor=True, signers=[key]) as ctx:
                     signature, _unused_result = ctx.sign(
                         data,
-                        mode=gpg.constants.sig.mode.DETACH,  # pyright: ignore[reportAttributeAccessIssue]
+                        mode=gpg.constants.sig.mode.DETACH,
                     )
             else:
                 signature, _unused_result = c.sign(
                     data,
-                    mode=gpg.constants.sig.mode.DETACH,  # pyright: ignore[reportAttributeAccessIssue]
+                    mode=gpg.constants.sig.mode.DETACH,
                 )
         assert isinstance(signature, bytes)
         return signature
@@ -268,11 +268,11 @@ class GPGSignatureVendor(SignatureSigner, SignatureVerifier):
 
         # Map trust level names to GPGME validity values
         trust_level_map = {
-            "undefined": gpg.constants.validity.UNDEFINED,  # pyright: ignore[reportAttributeAccessIssue]
-            "never": gpg.constants.validity.NEVER,  # pyright: ignore[reportAttributeAccessIssue]
-            "marginal": gpg.constants.validity.MARGINAL,  # pyright: ignore[reportAttributeAccessIssue]
-            "fully": gpg.constants.validity.FULL,  # pyright: ignore[reportAttributeAccessIssue]
-            "ultimate": gpg.constants.validity.ULTIMATE,  # pyright: ignore[reportAttributeAccessIssue]
+            "undefined": gpg.constants.validity.UNDEFINED,
+            "never": gpg.constants.validity.NEVER,
+            "marginal": gpg.constants.validity.MARGINAL,
+            "fully": gpg.constants.validity.FULL,
+            "ultimate": gpg.constants.validity.ULTIMATE,
         }
 
         try:

@@ -2112,10 +2112,10 @@ def show_commit(
         # Use wrapper for ColorizedDiffStream, direct stream for others
         if isinstance(outstream, ColorizedDiffStream):
             wrapped_stream = _StreamWrapper(outstream)
-            print_commit(commit, decode=decode, outstream=wrapped_stream)  # type: ignore[arg-type,unused-ignore]
+            print_commit(commit, decode=decode, outstream=wrapped_stream)
             # Write diff directly to the ColorizedDiffStream as bytes
             write_tree_diff(
-                outstream,  # type: ignore[arg-type,unused-ignore]
+                outstream,
                 r.object_store,
                 commit.parents[0] if commit.parents else None,
                 commit.tree,

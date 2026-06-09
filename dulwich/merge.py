@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import merge3
-    from merge3 import SequenceMatcherProtocol  # type: ignore[attr-defined,unused-ignore]
+    from merge3 import SequenceMatcherProtocol
 else:
     try:
         import merge3
@@ -56,7 +56,7 @@ def make_merge3(
     b: Sequence[bytes],
     is_cherrypick: bool = False,
     sequence_matcher: "type[SequenceMatcherProtocol[bytes]] | None" = None,
-) -> "merge3.Merge3[bytes]":  # type: ignore[type-arg,unused-ignore]
+) -> "merge3.Merge3[bytes]":
     """Return a Merge3 object, or raise ImportError if merge3 is not installed."""
     if merge3 is None:
         raise ImportError(
@@ -97,7 +97,7 @@ def _can_merge_lines(
 
 if merge3 is not None:
 
-    def _merge3_to_bytes(m: "merge3.Merge3[bytes]") -> bytes:  # type: ignore[type-arg,unused-ignore]
+    def _merge3_to_bytes(m: "merge3.Merge3[bytes]") -> bytes:
         """Convert merge3 result to bytes with conflict markers.
 
         Args:

@@ -40,7 +40,7 @@ from .lfs import LFSStore
 class LFSRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler for LFS operations."""
 
-    server: "LFSServer"  # type: ignore[assignment,unused-ignore]
+    server: "LFSServer"  # Type annotation for the server attribute
 
     def send_json_response(
         self, status_code: int, data: Mapping[str, typing.Any]

@@ -282,7 +282,7 @@ class DictBackend(Backend):
             try:
                 alt_path = path.decode("utf-8")
                 if alt_path in self.repos:
-                    return self.repos[alt_path]  # type: ignore[index,unused-ignore]
+                    return self.repos[alt_path]
             except UnicodeDecodeError:
                 pass
         else:
@@ -326,7 +326,7 @@ class FileSystemBackend(Backend):
         normcase_root = os.path.normcase(self.root)
         if not normcase_abspath.startswith(normcase_root):
             raise NotGitRepository(f"Path {path!r} not inside root {self.root!r}")
-        return Repo(abspath)  # type: ignore[return-value,unused-ignore]
+        return Repo(abspath)
 
 
 class Handler:

@@ -6594,12 +6594,16 @@ def find_unique_abbrev(
 def describe(repo: str | os.PathLike[str] | Repo, abbrev: int | None = None) -> str:
     """Describe the repository version.
 
+    The commit hash is prefixed with a literal "g" (for "git"), matching
+    git's own behaviour. The "g" is not counted towards abbrev.
+
     Args:
       repo: git repository
-      abbrev: number of characters of commit to take, default is 7
+      abbrev: number of hex characters of the commit hash to take (not
+        counting the "g" prefix), default is 7
     Returns: a string description of the current git revision
 
-    Examples: "gabcdefh", "v0.1" or "v0.1-5-gabcdefh".
+    Examples: "gabcdefg", "v0.1" or "v0.1-5-gabcdefa".
     """
     abbrev_slice = slice(0, abbrev if abbrev is not None else 7)
     # Get the repository

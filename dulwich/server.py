@@ -282,7 +282,7 @@ class DictBackend(Backend):
             try:
                 alt_path = path.decode("utf-8")
                 if alt_path in self.repos:
-                    return self.repos[alt_path]
+                    return self.repos[alt_path]  # type: ignore[index,unused-ignore]
             except UnicodeDecodeError:
                 pass
         else:

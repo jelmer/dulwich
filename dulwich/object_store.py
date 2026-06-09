@@ -138,7 +138,13 @@ _T = TypeVar("_T")
 
 
 class GraphWalker(Protocol):
-    """Protocol for graph walker objects."""
+    """Protocol for graph walker objects.
+
+    Implementations may also expose a ``shallow`` set, an ``unshallow`` set,
+    and an ``update_shallow`` callable for shallow-clone negotiation. These
+    are not part of the minimal protocol and callers must use ``hasattr`` or
+    ``getattr`` to access them.
+    """
 
     def __next__(self) -> ObjectID | None:
         """Return the next object SHA to visit."""
@@ -374,6 +380,7 @@ class PackContainer(Protocol):
 
     def add_pack(self) -> tuple[BytesIO, Callable[[], None], Callable[[], None]]:
         """Add a new pack."""
+        ...
 
 
 class BaseObjectStore:
@@ -582,6 +589,7 @@ class BaseObjectStore:
     def iter_unpacked_subset(
         self,
         shas: Iterable[ObjectID | RawObjectID],
+        *,
         include_comp: bool = False,
         allow_missing: bool = False,
         convert_ofs_delta: bool = True,
@@ -1386,6 +1394,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
     def iter_unpacked_subset(
         self,
         shas: Iterable[ObjectID | RawObjectID],
+        *,
         include_comp: bool = False,
         allow_missing: bool = False,
         convert_ofs_delta: bool = True,
@@ -3348,18 +3357,18 @@ class OverlayObjectStore(BaseObjectStore):
         self.bases = bases
         self.add_store = add_store
 
-    def add_object(self, object: ShaFile) -> None:
+    def add_object(self, obj: ShaFile) -> None:
         """Add a single object to the store.
 
         Args:
-          object: Object to add
+          obj: Object to add
 
         Raises:
           NotImplementedError: If no add_store was provided
         """
         if self.add_store is None:
             raise NotImplementedError(self.add_object)
-        return self.add_store.add_object(object)
+        return self.add_store.add_object(obj)
 
     def add_objects(
         self,
@@ -3438,6 +3447,7 @@ class OverlayObjectStore(BaseObjectStore):
     def iter_unpacked_subset(
         self,
         shas: Iterable[ObjectID | RawObjectID],
+        *,
         include_comp: bool = False,
         allow_missing: bool = False,
         convert_ofs_delta: bool = True,
@@ -3469,11 +3479,11 @@ class OverlayObjectStore(BaseObjectStore):
         if todo and not allow_missing:
             raise KeyError(next(iter(todo)))
 
-    def get_raw(self, sha_id: ObjectID | RawObjectID) -> tuple[int, bytes]:
+    def get_raw(self, name: ObjectID | RawObjectID) -> tuple[int, bytes]:
         """Get the raw object data from the overlaid stores.
 
         Args:
-          sha_id: SHA of the object
+          name: SHA of the object
 
         Returns:
           Tuple of (type_num, raw_data)
@@ -3483,10 +3493,10 @@ class OverlayObjectStore(BaseObjectStore):
         """
         for b in self.bases:
             try:
-                return b.get_raw(sha_id)
+                return b.get_raw(name)
             except KeyError:
                 pass
-        raise KeyError(sha_id)
+        raise KeyError(name)
 
     def contains_packed(self, sha: ObjectID | RawObjectID) -> bool:
         """Check if an object is packed in any base store.

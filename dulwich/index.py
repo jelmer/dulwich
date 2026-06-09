@@ -1361,7 +1361,7 @@ class Index:
     def changes_from_tree(
         self,
         object_store: ObjectContainer,
-        tree: ObjectID,
+        tree: ObjectID | None,
         want_unchanged: bool = False,
     ) -> Generator[
         tuple[

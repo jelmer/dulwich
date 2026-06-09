@@ -823,9 +823,9 @@ class ServerHandlerLogger(ServerHandler):
         """Log message using dulwich logger."""
         logger.info(format, *args)
 
-    def log_error(self, *args: object) -> None:
+    def log_error(self, format: str, *args: object) -> None:
         """Log error using dulwich logger."""
-        logger.error(*args)
+        logger.error(format, *args)
 
 
 class WSGIRequestHandlerLogger(WSGIRequestHandler):
@@ -847,9 +847,9 @@ class WSGIRequestHandlerLogger(WSGIRequestHandler):
         """Log message using dulwich logger."""
         logger.info(format, *args)
 
-    def log_error(self, *args: object) -> None:
+    def log_error(self, format: str, *args: object) -> None:
         """Log error using dulwich logger."""
-        logger.error(*args)
+        logger.error(format, *args)
 
     def handle(self) -> None:
         """Handle a single HTTP request."""

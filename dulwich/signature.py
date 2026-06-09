@@ -236,7 +236,6 @@ class GPGSignatureVendor(SignatureSigner, SignatureVerifier):
         """
         import gpg
 
-        signature: bytes
         with gpg.Context(armor=True) as c:
             if keyid is not None:
                 key = c.get_key(keyid)
@@ -249,6 +248,7 @@ class GPGSignatureVendor(SignatureSigner, SignatureVerifier):
                 signature, _unused_result = c.sign(
                     data, mode=gpg.constants.sig.mode.DETACH
                 )
+        assert isinstance(signature, bytes)
         return signature
 
     def verify(self, data: bytes, signature: bytes) -> None:

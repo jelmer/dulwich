@@ -200,6 +200,41 @@ V = TypeVar("V")  # Value type
 _T = TypeVar("_T")  # For get() default parameter
 
 
+class _UniqueKeysView(KeysView[K]):
+    """KeysView backed by an explicit list of keys (used to deduplicate)."""
+
+    def __init__(self, keys: list[K]) -> None:
+        self._keys = keys
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._keys
+
+    def __iter__(self) -> Iterator[K]:
+        return iter(self._keys)
+
+    def __len__(self) -> int:
+        return len(self._keys)
+
+
+class _OrderedItemsView(ItemsView[K, V]):
+    """Items view backed by the underlying ordered list of a multi-dict."""
+
+    def __init__(self, mapping: "CaseInsensitiveOrderedMultiDict[K, V]") -> None:
+        self._mapping = mapping
+
+    def __iter__(self) -> Iterator[tuple[K, V]]:
+        return iter(self._mapping._real)
+
+    def __len__(self) -> int:
+        return len(self._mapping._real)
+
+    def __contains__(self, item: object) -> bool:
+        if not isinstance(item, tuple) or len(item) != 2:
+            return False
+        key, value = item
+        return any(k == key and v == value for k, v in self._mapping._real)
+
+
 class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
     """A case-insensitive ordered dictionary that can store multiple values per key.
 
@@ -266,46 +301,11 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
             if lower not in seen:
                 seen.add(lower)
                 unique_keys.append(k)
-        from collections.abc import KeysView as ABCKeysView
-
-        class UniqueKeysView(ABCKeysView[K]):
-            def __init__(self, keys: list[K]):
-                self._keys = keys
-
-            def __contains__(self, key: object) -> bool:
-                return key in self._keys
-
-            def __iter__(self) -> Iterator[K]:
-                return iter(self._keys)
-
-            def __len__(self) -> int:
-                return len(self._keys)
-
-        return UniqueKeysView(unique_keys)
+        return _UniqueKeysView(unique_keys)
 
     def items(self) -> ItemsView[K, V]:
         """Return a view of the dictionary's (key, value) pairs in insertion order."""
-
-        # Return a view that iterates over the real list to preserve order
-        class OrderedItemsView(ItemsView[K, V]):
-            """Items view that preserves insertion order."""
-
-            def __init__(self, mapping: CaseInsensitiveOrderedMultiDict[K, V]):
-                self._mapping = mapping
-
-            def __iter__(self) -> Iterator[tuple[K, V]]:
-                return iter(self._mapping._real)
-
-            def __len__(self) -> int:
-                return len(self._mapping._real)
-
-            def __contains__(self, item: object) -> bool:
-                if not isinstance(item, tuple) or len(item) != 2:
-                    return False
-                key, value = item
-                return any(k == key and v == value for k, v in self._mapping._real)
-
-        return OrderedItemsView(self)
+        return _OrderedItemsView(self)
 
     def __iter__(self) -> Iterator[K]:
         """Iterate over the dictionary's keys."""

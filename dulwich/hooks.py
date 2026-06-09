@@ -200,7 +200,7 @@ class PostReceiveShellHook(ShellHook):
         filepath = os.path.join(controldir, "hooks", "post-receive")
         ShellHook.__init__(self, "post-receive", path=filepath, numparam=0)
 
-    def execute(
+    def execute(  # type: ignore[override,unused-ignore]
         self, client_refs: Sequence[tuple[bytes, bytes, bytes]]
     ) -> bytes | None:
         """Execute the post-receive hook.
@@ -261,7 +261,7 @@ class PreReceiveShellHook(ShellHook):
         filepath = os.path.join(controldir, "hooks", "pre-receive")
         ShellHook.__init__(self, "pre-receive", path=filepath, numparam=0)
 
-    def execute(
+    def execute(  # type: ignore[override,unused-ignore]
         self, client_refs: Sequence[tuple[bytes, bytes, bytes]]
     ) -> tuple[bytes, bytes]:
         """Execute the pre-receive hook.
@@ -319,7 +319,7 @@ class UpdateShellHook(ShellHook):
         filepath = os.path.join(controldir, "hooks", "update")
         ShellHook.__init__(self, "update", path=filepath, numparam=3)
 
-    def execute(
+    def execute(  # type: ignore[override,unused-ignore]
         self, ref_name: bytes, old_sha: bytes, new_sha: bytes
     ) -> tuple[bytes, bytes]:
         """Execute the update hook for a single ref.

@@ -2057,7 +2057,7 @@ def filter_ref_prefix(refs: T, prefixes: Iterable[bytes]) -> T:
       prefixes: The prefixes to filter by.
     """
     filtered = {k: v for k, v in refs.items() if any(k.startswith(p) for p in prefixes)}
-    return filtered
+    return filtered  # type: ignore[return-value,unused-ignore]
 
 
 def is_per_worktree_ref(ref: bytes) -> bool:

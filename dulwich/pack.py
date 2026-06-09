@@ -3142,9 +3142,8 @@ def write_pack_header(
     write: Callable[[bytes], int] | IO[bytes], num_objects: int
 ) -> None:
     """Write a pack header for the given number of objects."""
-    write_fn: Callable[[bytes], int]
-    if hasattr(write, "write"):
-        write_fn = write.write
+    if not callable(write):
+        write_fn: Callable[[bytes], int] = write.write
         warnings.warn(
             "write_pack_header() now takes a write rather than file argument",
             DeprecationWarning,

@@ -269,29 +269,29 @@ class DumbHTTPObjectStore(BaseObjectStore):
 
         raise KeyError(sha)
 
-    def get_raw(self, sha: RawObjectID | ObjectID) -> tuple[int, bytes]:
+    def get_raw(self, name: RawObjectID | ObjectID) -> tuple[int, bytes]:
         """Obtain the raw text for an object.
 
         Args:
-          sha: SHA1 of the object
+          name: SHA1 of the object
         Returns:
           Tuple with numeric type and object contents
         """
         # Check cache first
-        if sha in self._cached_objects:
-            return self._cached_objects[sha]
+        if name in self._cached_objects:
+            return self._cached_objects[name]
 
         # Try packs first
         try:
-            result = self._fetch_from_pack(sha)
-            self._cached_objects[sha] = result
+            result = self._fetch_from_pack(name)
+            self._cached_objects[name] = result
             return result
         except KeyError:
             pass
 
         # Try loose object
-        result = self._fetch_loose_object(sha)
-        self._cached_objects[sha] = result
+        result = self._fetch_loose_object(name)
+        self._cached_objects[name] = result
         return result
 
     def contains_loose(self, sha: RawObjectID | ObjectID) -> bool:

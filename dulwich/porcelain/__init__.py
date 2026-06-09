@@ -375,6 +375,7 @@ from ..objects import (
     Blob,
     Commit,
     ObjectID,
+    ShaFile,
     Tag,
     Tree,
     TreeEntry,
@@ -2505,21 +2506,17 @@ def show(
         objects = ["HEAD"]
     if isinstance(objects, str | bytes):
         objects = [objects]
+
+    def _make_decode(obj: ShaFile) -> Callable[[bytes], str]:
+        if isinstance(obj, Commit):
+            return lambda x: commit_decode(obj, x, default_encoding)
+        return lambda x: x.decode(default_encoding)
+
     with open_repo_closing(repo) as r:
         for objectish in objects:
             o = parse_object(r, objectish, config=r.get_config_stack())
-            if isinstance(o, Commit):
-
-                def decode(x: bytes) -> str:
-                    return commit_decode(o, x, default_encoding)
-
-            else:
-
-                def decode(x: bytes) -> str:
-                    return x.decode(default_encoding)
-
             assert isinstance(o, Tree | Blob | Commit | Tag)
-            show_object(r, o, decode, outstream)
+            show_object(r, o, _make_decode(o), outstream)
 
 
 def diff_tree(
@@ -4139,10 +4136,11 @@ def branch_delete(repo: RepoPath, name: str | bytes | Sequence[str | bytes]) -> 
       name: Name of the branch
     """
     with open_repo_closing(repo) as r:
-        if isinstance(name, list | tuple):
-            names = name
-        else:
+        names: Sequence[str | bytes]
+        if isinstance(name, str | bytes):
             names = [name]
+        else:
+            names = name
         for branch_name in names:
             del r.refs[_make_branch_ref(branch_name)]
 
@@ -5360,10 +5358,10 @@ def check_ignore(
 
             if ignore_manager.is_ignored(test_path):
                 # Return relative path (like git does) when absolute path was provided
-                if os.path.isabs(original_path):
+                if os.path.isabs(original_path_str):
                     output_path = path
                 else:
-                    output_path = original_path  # type: ignore[assignment]
+                    output_path = original_path_str
                 yield _quote_path(output_path) if quote_path else output_path
 
 

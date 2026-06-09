@@ -182,7 +182,7 @@ class _CommitTimeQueue:
         # When there are excludes, we drain the PQ into _out before yielding
         # anything. This lets an exclude commit popped late (e.g. due to
         # clock skew from rebases / auto-stash) flag earlier buffered commits
-        # as excluded before they are emitted — git's two-phase limit_list +
+        # as excluded before they are emitted, matching git's two-phase limit_list +
         # get_revision model. Without excludes, _out stays None and we stream.
         self._buffered = bool(walker.excluded)
         self._out: deque[Commit] | None = None

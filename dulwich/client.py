@@ -1776,7 +1776,6 @@ class GitClient:
         determine_wants: "DetermineWantsFunc",
         graph_walker: GraphWalker,
         pack_data: Callable[[bytes], int],
-        *,
         progress: Callable[[bytes], None] | None = None,
         depth: int | None = None,
         ref_prefix: Sequence[bytes] | None = None,

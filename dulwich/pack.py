@@ -134,24 +134,7 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
-try:
-    import mmap
-except ImportError:
-    has_mmap = False
-else:
-    has_mmap = True
-
-if TYPE_CHECKING:
-    from _hashlib import HASH as HashObject
-
-    from .bitmap import PackBitmap
-    from .commit_graph import CommitGraph
-    from .object_store import BaseObjectStore
-    from .ref import Ref
-
-# For some reason the above try, except fails to set has_mmap = False for plan9
-if sys.platform == "Plan9":
-    has_mmap = False
+import mmap
 
 from .errors import ApplyDeltaError, ChecksumMismatch
 from .file import GitFile, _GitFile
@@ -165,6 +148,17 @@ from .objects import (
     object_header,
     sha_to_hex,
 )
+
+if TYPE_CHECKING:
+    from _hashlib import HASH as HashObject
+
+    from .bitmap import PackBitmap
+    from .commit_graph import CommitGraph
+    from .object_store import BaseObjectStore
+    from .refs import Ref
+
+# Some platforms (e.g. plan9) don't support mmap properly
+has_mmap = sys.platform != "Plan9"
 
 OFS_DELTA = 6
 REF_DELTA = 7
@@ -288,9 +282,11 @@ class ObjectContainer(Protocol):
 
     def __contains__(self, sha1: "ObjectID") -> bool:
         """Check if a hex sha is present."""
+        ...
 
     def __getitem__(self, sha1: "ObjectID | RawObjectID") -> ShaFile:
         """Retrieve an object."""
+        ...
 
     def get_commit_graph(self) -> "CommitGraph | None":
         """Get the commit graph for this object store.
@@ -879,9 +875,9 @@ class MemoryPackIndex(PackIndex):
             lookup_sha = RawObjectID(sha)
         return self._by_sha[lookup_sha]
 
-    def object_sha1(self, offset: int) -> bytes:
+    def object_sha1(self, index: int) -> bytes:
         """Return the SHA1 for the object at the given offset."""
-        return self._by_offset[offset]
+        return self._by_offset[index]
 
     def _itersha(self) -> Iterator[bytes]:
         """Iterate over all SHA1s in the index."""
@@ -3143,9 +3139,8 @@ def write_pack_header(
     write: Callable[[bytes], int] | IO[bytes], num_objects: int
 ) -> None:
     """Write a pack header for the given number of objects."""
-    write_fn: Callable[[bytes], int]
-    if hasattr(write, "write"):
-        write_fn = write.write
+    if not callable(write):
+        write_fn: Callable[[bytes], int] = write.write
         warnings.warn(
             "write_pack_header() now takes a write rather than file argument",
             DeprecationWarning,
@@ -3715,7 +3710,9 @@ def _encode_copy_operation(start: int, length: int) -> bytes:
     return bytes(scratch)
 
 
-def _create_delta_py(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
+def _create_delta_py(
+    base_buf: bytes | list[bytes], target_buf: bytes | list[bytes]
+) -> Iterator[bytes]:
     """Use python difflib to work out how to transform base_buf to target_buf.
 
     Args:
@@ -3726,8 +3723,6 @@ def _create_delta_py(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
         base_buf = b"".join(base_buf)
     if isinstance(target_buf, list):
         target_buf = b"".join(target_buf)
-    assert isinstance(base_buf, bytes)
-    assert isinstance(target_buf, bytes)
     # write delta header
     yield _delta_encode_size(len(base_buf))
     yield _delta_encode_size(len(target_buf))
@@ -4494,6 +4489,8 @@ class Pack:
                 base_offset = base_offset_temp
                 if base_offset == prev_offset:  # object is based on itself
                     raise UnresolvedDeltas([basename])
+            else:
+                raise AssertionError(f"Unexpected delta type: {base_type}")
             delta_stack.append((prev_offset, base_type, delta))
 
         # Now grab the base object (mustn't be a delta) and apply the
@@ -4646,8 +4643,14 @@ except ImportError:
     pass
 else:
     # Wrap the Rust version to match the Python API (returns bytes instead of Iterator)
-    def _create_delta_rs_wrapper(base_buf: bytes, target_buf: bytes) -> Iterator[bytes]:
+    def _create_delta_rs_wrapper(
+        base_buf: bytes | list[bytes], target_buf: bytes | list[bytes]
+    ) -> Iterator[bytes]:
         """Wrapper for Rust create_delta to match Python API."""
+        if isinstance(base_buf, list):
+            base_buf = b"".join(base_buf)
+        if isinstance(target_buf, list):
+            target_buf = b"".join(target_buf)
         yield _create_delta_rs(base_buf, target_buf)
 
     create_delta = _create_delta_rs_wrapper

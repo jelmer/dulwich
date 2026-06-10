@@ -492,13 +492,13 @@ class BlobNormalizer(FilterBlobNormalizer):
         self.fallback_read_filter = smudge_filter
         self.fallback_write_filter = clean_filter
 
-    def checkin_normalize(self, blob: Blob, tree_path: bytes) -> Blob:
+    def checkin_normalize(self, blob: Blob, path: bytes) -> Blob:
         """Normalize a blob during a checkin operation."""
         # First try to get filter from gitattributes (handled by parent)
-        result = super().checkin_normalize(blob, tree_path)
+        result = super().checkin_normalize(blob, path)
 
         # Check if gitattributes explicitly disabled text conversion
-        attrs = self.gitattributes.match_path(tree_path)
+        attrs = self.gitattributes.match_path(path)
         if b"text" in attrs and attrs[b"text"] is False:
             # Explicitly marked as binary, no conversion
             return blob
@@ -509,12 +509,9 @@ class BlobNormalizer(FilterBlobNormalizer):
             # Apply the clean filter with binary detection
             # Get safecrlf from config
             safecrlf = b"false"
-            if hasattr(self, "filter_registry") and hasattr(
-                self.filter_registry, "config_stack"
-            ):
-                safecrlf = self.filter_registry.config_stack.get(
-                    b"core", b"safecrlf", b"false"
-                )
+            config_stack = getattr(self.filter_registry, "config_stack", None)
+            if config_stack is not None:
+                safecrlf = config_stack.get(b"core", b"safecrlf", b"false")
                 if hasattr(safecrlf, "encode"):
                     safecrlf = safecrlf.encode("utf-8")
 
@@ -524,7 +521,7 @@ class BlobNormalizer(FilterBlobNormalizer):
                 binary_detection=True,
                 safecrlf=safecrlf,
             )
-            filtered_data = line_ending_filter.clean(blob.data, tree_path)
+            filtered_data = line_ending_filter.clean(blob.data, path)
             if filtered_data != blob.data:
                 new_blob = Blob()
                 new_blob.data = filtered_data
@@ -532,13 +529,13 @@ class BlobNormalizer(FilterBlobNormalizer):
 
         return result
 
-    def checkout_normalize(self, blob: Blob, tree_path: bytes) -> Blob:
+    def checkout_normalize(self, blob: Blob, path: bytes) -> Blob:
         """Normalize a blob during a checkout operation."""
         # First try to get filter from gitattributes (handled by parent)
-        result = super().checkout_normalize(blob, tree_path)
+        result = super().checkout_normalize(blob, path)
 
         # Check if gitattributes explicitly disabled text conversion
-        attrs = self.gitattributes.match_path(tree_path)
+        attrs = self.gitattributes.match_path(path)
         if b"text" in attrs and attrs[b"text"] is False:
             # Explicitly marked as binary, no conversion
             return blob
@@ -549,12 +546,9 @@ class BlobNormalizer(FilterBlobNormalizer):
             # Apply the smudge filter with binary detection
             # Get safecrlf from config
             safecrlf = b"false"
-            if hasattr(self, "filter_registry") and hasattr(
-                self.filter_registry, "config_stack"
-            ):
-                safecrlf = self.filter_registry.config_stack.get(
-                    b"core", b"safecrlf", b"false"
-                )
+            config_stack = getattr(self.filter_registry, "config_stack", None)
+            if config_stack is not None:
+                safecrlf = config_stack.get(b"core", b"safecrlf", b"false")
                 if hasattr(safecrlf, "encode"):
                     safecrlf = safecrlf.encode("utf-8")
 
@@ -564,7 +558,7 @@ class BlobNormalizer(FilterBlobNormalizer):
                 binary_detection=True,
                 safecrlf=safecrlf,
             )
-            filtered_data = line_ending_filter.smudge(blob.data, tree_path)
+            filtered_data = line_ending_filter.smudge(blob.data, path)
             if filtered_data != blob.data:
                 new_blob = Blob()
                 new_blob.data = filtered_data
@@ -618,7 +612,7 @@ class TreeBlobNormalizer(BlobNormalizer):
         else:
             self.existing_paths = set()
 
-    def checkin_normalize(self, blob: Blob, tree_path: bytes) -> Blob:
+    def checkin_normalize(self, blob: Blob, path: bytes) -> Blob:
         """Normalize blob for checkin, considering existing tree state."""
         # Existing files should only be normalized on checkin if:
         # 1. They were previously normalized on checkout (autocrlf=true), OR
@@ -627,7 +621,7 @@ class TreeBlobNormalizer(BlobNormalizer):
         if (
             self.fallback_read_filter is not None
             or self.fallback_write_filter is not None
-            or tree_path not in self.existing_paths
+            or path not in self.existing_paths
         ):
-            return super().checkin_normalize(blob, tree_path)
+            return super().checkin_normalize(blob, path)
         return blob

@@ -596,6 +596,7 @@ class HTTPLFSClient(LFSClient):
         # Use urllib3 pool manager with git config applied
         pool_manager = self._get_pool_manager()
         response = pool_manager.request(method, url, headers=req_headers, body=data)
+        assert response is not None
         if response.status >= 400:
             raise ValueError(
                 f"HTTP {response.status}: {response.data.decode('utf-8', errors='ignore')}"
@@ -705,6 +706,7 @@ class HTTPLFSClient(LFSClient):
 
         pool_manager = self._get_pool_manager()
         response = pool_manager.request("GET", download_url, headers=download_headers)
+        assert response is not None
         content = response.data
 
         # Verify size

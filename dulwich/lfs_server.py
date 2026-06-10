@@ -40,7 +40,11 @@ from .lfs import LFSStore
 class LFSRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler for LFS operations."""
 
-    server: "LFSServer"  # Type annotation for the server attribute
+    @property
+    def lfs_server(self) -> "LFSServer":
+        """Return the owning LFSServer instance."""
+        assert isinstance(self.server, LFSServer)
+        return self.server
 
     def send_json_response(
         self, status_code: int, data: Mapping[str, typing.Any]
@@ -152,7 +156,7 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
         oid = path_parts[1]
 
         try:
-            with self.server.lfs_store.open_object(oid) as f:
+            with self.lfs_server.lfs_store.open_object(oid) as f:
                 content = f.read()
 
             self.send_response(200)
@@ -197,7 +201,7 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
         # Check if object already exists
         if not self._object_exists(oid):
             # Store the object only if it doesn't exist
-            self.server.lfs_store.write_object(chunks)
+            self.lfs_server.lfs_store.write_object(chunks)
 
         self.send_response(200)
         self.end_headers()
@@ -235,14 +239,14 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
         """Check if an object exists in the store."""
         try:
             # Try to open the object - if it exists, close it immediately
-            with self.server.lfs_store.open_object(oid):
+            with self.lfs_server.lfs_store.open_object(oid):
                 return True
         except KeyError:
             return False
 
     def log_message(self, format: str, *args: object) -> None:
         """Override to suppress request logging during tests."""
-        if self.server.log_requests:
+        if self.lfs_server.log_requests:
             super().log_message(format, *args)
 
 

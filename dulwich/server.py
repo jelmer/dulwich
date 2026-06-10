@@ -256,7 +256,9 @@ class DictBackend(Backend):
         """Initialize a DictBackend.
 
         Args:
-          repos: Dictionary mapping repository paths to BackendRepo instances
+          repos: Dictionary mapping repository paths to BackendRepo instances.
+            Keys may be either str or bytes; both forms are accepted on
+            lookup.
         """
         self.repos = repos
 
@@ -273,22 +275,29 @@ class DictBackend(Backend):
           NotGitRepository: If no repository found at path
         """
         logger.debug("Opening repository at %s", path)
-        # Handle both str and bytes keys for backward compatibility
-        if path in self.repos:
-            return self.repos[path]  # type: ignore
-
-        # Try converting between str and bytes
-        if isinstance(path, bytes):
-            try:
-                alt_path = path.decode("utf-8")
-                if alt_path in self.repos:
-                    return self.repos[alt_path]
-            except UnicodeDecodeError:
-                pass
-        else:
-            alt_path_bytes = path.encode("utf-8")
-            if alt_path_bytes in self.repos:
-                return self.repos[alt_path_bytes]  # type: ignore
+        # repos may be keyed by either str or bytes (or both, since
+        # the constructor accepts a union of dict types and callers
+        # may also mutate it after construction). Walk the items so we
+        # don't have to index into the union and so we transparently
+        # match str and bytes representations of the same path.
+        path_bytes: bytes | None
+        try:
+            path_bytes = path.encode("utf-8") if isinstance(path, str) else path
+        except UnicodeEncodeError:
+            path_bytes = None
+        try:
+            path_str: str | None = (
+                path if isinstance(path, str) else path.decode("utf-8")
+            )
+        except UnicodeDecodeError:
+            path_str = None
+        for key, repo in self.repos.items():
+            if isinstance(key, bytes):
+                if key == path_bytes:
+                    return repo
+            else:
+                if key == path_str:
+                    return repo
 
         raise NotGitRepository(
             "No git repository was found at {path}".format(**dict(path=path))
@@ -1023,7 +1032,8 @@ class _ProtocolGraphWalker:
             return None
         return self._cache[self._cache_index]
 
-    __next__ = next
+    def __next__(self) -> ObjectID | None:
+        return self.next()
 
     def read_proto_line(
         self, allowed: Iterable[bytes | None] | None
@@ -1802,6 +1812,7 @@ class UploadArchiveHandler(Handler):
         format = "tar"
         i = 0
         store: BaseObjectStore = self.repo.object_store
+        tree: Tree | None = None
         while i < len(arguments):
             argument = arguments[i]
             if argument == b"--prefix":
@@ -1818,6 +1829,8 @@ class UploadArchiveHandler(Handler):
                 assert isinstance(tree_obj, Tree)
                 tree = tree_obj
             i += 1
+        if tree is None:
+            raise GitProtocolError("upload-archive missing tree argument")
         self.proto.write_pkt_line(b"ACK")
         self.proto.write_pkt_line(None)
         for chunk in tar_stream(
@@ -2011,16 +2024,14 @@ def serve_command(
     if backend is None:
         backend = FileSystemBackend()
 
-    if inf is None:
-        inf = sys.stdin.buffer
-    if outf is None:
-        outf = sys.stdout.buffer
+    in_stream: IO[bytes] = inf if inf is not None else sys.stdin.buffer
+    out_stream: IO[bytes] = outf if outf is not None else sys.stdout.buffer
 
     def send_fn(data: bytes) -> None:
-        outf.write(data)
-        outf.flush()
+        out_stream.write(data)
+        out_stream.flush()
 
-    proto = Protocol(inf.read, send_fn)
+    proto = Protocol(in_stream.read, send_fn)
     handler = handler_cls(backend, argv[1:], proto)  # type: ignore[arg-type]
     # FIXME: Catch exceptions and write a single-line summary to outf.
     handler.handle()

@@ -200,6 +200,41 @@ V = TypeVar("V")  # Value type
 _T = TypeVar("_T")  # For get() default parameter
 
 
+class _UniqueKeysView(KeysView[K]):
+    """KeysView backed by an explicit list of keys (used to deduplicate)."""
+
+    def __init__(self, keys: list[K]) -> None:
+        self._keys = keys
+
+    def __contains__(self, key: object) -> bool:
+        return key in self._keys
+
+    def __iter__(self) -> Iterator[K]:
+        return iter(self._keys)
+
+    def __len__(self) -> int:
+        return len(self._keys)
+
+
+class _OrderedItemsView(ItemsView[K, V]):
+    """Items view backed by the underlying ordered list of a multi-dict."""
+
+    def __init__(self, mapping: "CaseInsensitiveOrderedMultiDict[K, V]") -> None:
+        self._mapping = mapping
+
+    def __iter__(self) -> Iterator[tuple[K, V]]:
+        return iter(self._mapping._real)
+
+    def __len__(self) -> int:
+        return len(self._mapping._real)
+
+    def __contains__(self, item: object) -> bool:
+        if not isinstance(item, tuple) or len(item) != 2:
+            return False
+        key, value = item
+        return any(k == key and v == value for k, v in self._mapping._real)
+
+
 class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
     """A case-insensitive ordered dictionary that can store multiple values per key.
 
@@ -266,46 +301,11 @@ class CaseInsensitiveOrderedMultiDict(MutableMapping[K, V], Generic[K, V]):
             if lower not in seen:
                 seen.add(lower)
                 unique_keys.append(k)
-        from collections.abc import KeysView as ABCKeysView
-
-        class UniqueKeysView(ABCKeysView[K]):
-            def __init__(self, keys: list[K]):
-                self._keys = keys
-
-            def __contains__(self, key: object) -> bool:
-                return key in self._keys
-
-            def __iter__(self) -> Iterator[K]:
-                return iter(self._keys)
-
-            def __len__(self) -> int:
-                return len(self._keys)
-
-        return UniqueKeysView(unique_keys)
+        return _UniqueKeysView(unique_keys)
 
     def items(self) -> ItemsView[K, V]:
         """Return a view of the dictionary's (key, value) pairs in insertion order."""
-
-        # Return a view that iterates over the real list to preserve order
-        class OrderedItemsView(ItemsView[K, V]):
-            """Items view that preserves insertion order."""
-
-            def __init__(self, mapping: CaseInsensitiveOrderedMultiDict[K, V]):
-                self._mapping = mapping
-
-            def __iter__(self) -> Iterator[tuple[K, V]]:
-                return iter(self._mapping._real)
-
-            def __len__(self) -> int:
-                return len(self._mapping._real)
-
-            def __contains__(self, item: object) -> bool:
-                if not isinstance(item, tuple) or len(item) != 2:
-                    return False
-                key, value = item
-                return any(k == key and v == value for k, v in self._mapping._real)
-
-        return OrderedItemsView(self)
+        return _OrderedItemsView(self)
 
     def __iter__(self) -> Iterator[K]:
         """Iterate over the dictionary's keys."""
@@ -630,6 +630,7 @@ class ConfigDict(Config):
             Iterator of configuration values
         """
         section, name = self._check_section_and_name(section, name)
+        assert len(section) >= 1
 
         if len(section) > 1:
             try:
@@ -657,6 +658,7 @@ class ConfigDict(Config):
             KeyError: if the value is not set
         """
         section, name = self._check_section_and_name(section, name)
+        assert len(section) >= 1
 
         if len(section) > 1:
             try:
@@ -1173,13 +1175,9 @@ class ConfigFile(ConfigDict):
         # Load and merge the included file
         try:
             # Use provided file opener or default to GitFile
-            opener: FileOpener
-            if file_opener is None:
-
-                def opener(path: str | os.PathLike[str]) -> IO[bytes]:
-                    return GitFile(path, "rb")
-            else:
-                opener = file_opener
+            opener: FileOpener = (
+                file_opener if file_opener is not None else lambda p: GitFile(p, "rb")
+            )
 
             f = opener(include_path)
         except (OSError, ValueError) as e:
@@ -1336,13 +1334,9 @@ class ConfigFile(ConfigDict):
         config_dir = os.path.dirname(abs_path)
 
         # Use provided file opener or default to GitFile
-        opener: FileOpener
-        if file_opener is None:
-
-            def opener(p: str | os.PathLike[str]) -> IO[bytes]:
-                return GitFile(p, "rb")
-        else:
-            opener = file_opener
+        opener: FileOpener = (
+            file_opener if file_opener is not None else lambda p: GitFile(p, "rb")
+        )
 
         with opener(abs_path) as f:
             ret = cls.from_file(

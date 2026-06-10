@@ -1,5 +1,9 @@
 1.2.7	UNRELEASED
 
+ * Reject pack names containing path separators in the dumb HTTP transport,
+   so a malicious server can no longer escape the temporary directory.
+   (Jelmer Vernooĳ, #2213)
+
  * SECURITY: Don't expand config ``include`` directives when parsing
    ``.gitmodules``, so a crafted ``.gitmodules`` in a cloned repository can
    no longer make ``clone --recurse-submodules`` read arbitrary files.

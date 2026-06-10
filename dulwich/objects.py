@@ -874,8 +874,6 @@ class Blob(ShaFile):
     type_name = b"blob"
     type_num = 3
 
-    _chunked_text: list[bytes]
-
     def __init__(self) -> None:
         """Initialize a new Blob object."""
         super().__init__()
@@ -894,6 +892,7 @@ class Blob(ShaFile):
     @property
     def chunked(self) -> list[bytes]:
         """The text in the blob object, as chunks (not necessarily lines)."""
+        assert self._chunked_text is not None
         return self._chunked_text
 
     @chunked.setter
@@ -901,6 +900,7 @@ class Blob(ShaFile):
         self._chunked_text = chunks
 
     def _serialize(self) -> list[bytes]:
+        assert self._chunked_text is not None
         return self._chunked_text
 
     def _deserialize(self, chunks: list[bytes]) -> None:
@@ -1078,7 +1078,7 @@ class Tag(ShaFile):
     @classmethod
     def from_path(
         cls,
-        filename: str | bytes,
+        path: str | bytes,
         sha: ObjectID | None = None,
         *,
         object_format: ObjectFormat | None = None,
@@ -1086,7 +1086,7 @@ class Tag(ShaFile):
         """Read a tag from a file on disk.
 
         Args:
-          filename: Path to the tag file
+          path: Path to the tag file
           sha: Optional known SHA for the object
           object_format: Optional object format to use
 
@@ -1096,9 +1096,9 @@ class Tag(ShaFile):
         Raises:
           NotTagError: If the file is not a tag
         """
-        tag = ShaFile.from_path(filename, sha, object_format=object_format)
+        tag = ShaFile.from_path(path, sha, object_format=object_format)
         if not isinstance(tag, cls):
-            raise NotTagError(_path_to_bytes(filename))
+            raise NotTagError(_path_to_bytes(path))
         return tag
 
     def check(self) -> None:
@@ -1463,7 +1463,7 @@ class Tree(ShaFile):
     @classmethod
     def from_path(
         cls,
-        filename: str | bytes,
+        path: str | bytes,
         sha: ObjectID | None = None,
         *,
         object_format: ObjectFormat | None = None,
@@ -1471,7 +1471,7 @@ class Tree(ShaFile):
         """Read a tree from a file on disk.
 
         Args:
-          filename: Path to the tree file
+          path: Path to the tree file
           sha: Optional known SHA for the object
           object_format: Optional object format to use
 
@@ -1481,9 +1481,9 @@ class Tree(ShaFile):
         Raises:
           NotTreeError: If the file is not a tree
         """
-        tree = ShaFile.from_path(filename, sha, object_format=object_format)
+        tree = ShaFile.from_path(path, sha, object_format=object_format)
         if not isinstance(tree, cls):
-            raise NotTreeError(_path_to_bytes(filename))
+            raise NotTreeError(_path_to_bytes(path))
         return tree
 
     def __contains__(self, name: bytes) -> bool:

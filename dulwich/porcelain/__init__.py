@@ -319,6 +319,9 @@ from typing import (
     cast,
     overload,
 )
+from typing import (
+    Protocol as TypingProtocol,
+)
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -330,6 +333,7 @@ from .._typing import Buffer
 if TYPE_CHECKING:
     import urllib3
 
+    from ..diff import ColorizedDiffStream
     from ..filter_branch import CommitData
     from ..gc import GCStats
     from ..maintenance import MaintenanceResult
@@ -375,6 +379,7 @@ from ..objects import (
     Blob,
     Commit,
     ObjectID,
+    ShaFile,
     Tag,
     Tree,
     TreeEntry,
@@ -2003,10 +2008,16 @@ def commit_encode(
     return contents.encode(encoding)
 
 
+class _TextStream(TypingProtocol):
+    """Minimal write-only text stream protocol used for human-readable output."""
+
+    def write(self, data: str, /) -> int: ...
+
+
 def print_commit(
     commit: Commit,
     decode: Callable[[bytes], str],
-    outstream: TextIO = sys.stdout,
+    outstream: _TextStream = sys.stdout,
     abbrev_commit: bool = False,
 ) -> None:
     """Write a human-readable commit log entry.
@@ -2083,7 +2094,7 @@ def show_commit(
     repo: RepoPath,
     commit: Commit,
     decode: Callable[[bytes], str],
-    outstream: TextIO = sys.stdout,
+    outstream: "_TextStream | ColorizedDiffStream" = sys.stdout,
 ) -> None:
     """Show a commit to a stream.
 
@@ -2095,17 +2106,15 @@ def show_commit(
     """
     from ..diff import ColorizedDiffStream
 
-    # Create a wrapper for ColorizedDiffStream to handle string/bytes conversion
+    # Adapter that lets print_commit (which writes str) feed a
+    # ColorizedDiffStream (which writes bytes).
     class _StreamWrapper:
         def __init__(self, stream: "ColorizedDiffStream") -> None:
             self.stream = stream
 
-        def write(self, data: str | bytes) -> None:
-            if isinstance(data, str):
-                # Convert string to bytes for ColorizedDiffStream
-                self.stream.write(data.encode("utf-8"))
-            else:
-                self.stream.write(data)
+        def write(self, data: str) -> int:
+            self.stream.write(data.encode("utf-8"))
+            return len(data)
 
     with open_repo_closing(repo) as r:
         # Use wrapper for ColorizedDiffStream, direct stream for others
@@ -2197,37 +2206,44 @@ def print_name_status(changes: Iterator[TreeChange]) -> Iterator[str]:
     for change in changes:
         if not change:
             continue
+        change_item: TreeChange
         if isinstance(change, list):
-            change = change[0]
-        if change.type == CHANGE_ADD:
-            assert change.new is not None
-            path1 = change.new.path
+            change_item = cast(TreeChange, change[0])
+        else:
+            change_item = change
+        if change_item.type == CHANGE_ADD:
+            assert change_item.new is not None
+            path1 = change_item.new.path
             assert path1 is not None
-            path2 = b""
+            path2: bytes = b""
             kind = "A"
-        elif change.type == CHANGE_DELETE:
-            assert change.old is not None
-            path1 = change.old.path
+        elif change_item.type == CHANGE_DELETE:
+            assert change_item.old is not None
+            path1 = change_item.old.path
             assert path1 is not None
             path2 = b""
             kind = "D"
-        elif change.type == CHANGE_MODIFY:
-            assert change.new is not None
-            path1 = change.new.path
+        elif change_item.type == CHANGE_MODIFY:
+            assert change_item.new is not None
+            path1 = change_item.new.path
             assert path1 is not None
             path2 = b""
             kind = "M"
-        elif change.type in RENAME_CHANGE_TYPES:
-            assert change.old is not None and change.new is not None
-            path1 = change.old.path
+        elif change_item.type in RENAME_CHANGE_TYPES:
+            assert change_item.old is not None and change_item.new is not None
+            path1 = change_item.old.path
             assert path1 is not None
-            path2_opt = change.new.path
+            path2_opt = change_item.new.path
             assert path2_opt is not None
             path2 = path2_opt
-            if change.type == CHANGE_RENAME:
+            if change_item.type == CHANGE_RENAME:
                 kind = "R"
-            elif change.type == CHANGE_COPY:
+            elif change_item.type == CHANGE_COPY:
                 kind = "C"
+            else:
+                kind = "?"
+        else:
+            raise ValueError(f"Unknown change type: {change_item.type}")
         path1_str = (
             path1.decode("utf-8", errors="replace")
             if isinstance(path1, bytes)
@@ -2252,14 +2268,17 @@ def print_name_only(changes: Iterator[TreeChange]) -> Iterator[str]:
     for change in changes:
         if not change:
             continue
+        change_item: TreeChange
         if isinstance(change, list):
-            change = change[0]
-        if change.type == CHANGE_DELETE:
-            assert change.old is not None
-            path = change.old.path
+            change_item = cast(TreeChange, change[0])
         else:
-            assert change.new is not None
-            path = change.new.path
+            change_item = change
+        if change_item.type == CHANGE_DELETE:
+            assert change_item.old is not None
+            path = change_item.old.path
+        else:
+            assert change_item.new is not None
+            path = change_item.new.path
         assert path is not None
         path_str = (
             path.decode("utf-8", errors="replace") if isinstance(path, bytes) else path
@@ -2497,21 +2516,17 @@ def show(
         objects = ["HEAD"]
     if isinstance(objects, str | bytes):
         objects = [objects]
+
+    def _make_decode(obj: ShaFile) -> Callable[[bytes], str]:
+        if isinstance(obj, Commit):
+            return lambda x: commit_decode(obj, x, default_encoding)
+        return lambda x: x.decode(default_encoding)
+
     with open_repo_closing(repo) as r:
         for objectish in objects:
             o = parse_object(r, objectish, config=r.get_config_stack())
-            if isinstance(o, Commit):
-
-                def decode(x: bytes) -> str:
-                    return commit_decode(o, x, default_encoding)
-
-            else:
-
-                def decode(x: bytes) -> str:
-                    return x.decode(default_encoding)
-
             assert isinstance(o, Tree | Blob | Commit | Tag)
-            show_object(r, o, decode, outstream)
+            show_object(r, o, _make_decode(o), outstream)
 
 
 def diff_tree(
@@ -4131,10 +4146,11 @@ def branch_delete(repo: RepoPath, name: str | bytes | Sequence[str | bytes]) -> 
       name: Name of the branch
     """
     with open_repo_closing(repo) as r:
-        if isinstance(name, list | tuple):
-            names = name
-        else:
+        names: Sequence[str | bytes]
+        if isinstance(name, str | bytes):
             names = [name]
+        else:
+            names = name
         for branch_name in names:
             del r.refs[_make_branch_ref(branch_name)]
 
@@ -5352,10 +5368,10 @@ def check_ignore(
 
             if ignore_manager.is_ignored(test_path):
                 # Return relative path (like git does) when absolute path was provided
-                if os.path.isabs(original_path):
+                if os.path.isabs(original_path_str):
                     output_path = path
                 else:
-                    output_path = original_path  # type: ignore[assignment]
+                    output_path = original_path_str
                 yield _quote_path(output_path) if quote_path else output_path
 
 
@@ -7340,7 +7356,7 @@ def range_diff(
             # Form: rev1...rev2 -> rev2..rev1 and rev1..rev2
             if not has_range_syntax(range1, b"..."):
                 raise Error("A single argument must be of the form <rev1>...<rev2>")
-            assert isinstance(range1, (str, bytes))
+            assert isinstance(range1, str | bytes)
             range1 = range1.encode() if isinstance(range1, str) else range1
             left, right = range1.split(b"...", 1)
             left_id = parse_commit(r, left).id
@@ -7355,8 +7371,8 @@ def range_diff(
             new_tip = right_id
         else:
             # Form: A..B C..D
-            if not isinstance(range1, (str, bytes)) or not isinstance(
-                range2, (str, bytes)
+            if not isinstance(range1, str | bytes) or not isinstance(
+                range2, str | bytes
             ):
                 raise Error(
                     "Both arguments must be commit ranges of the form <base>..<tip>"
@@ -9504,6 +9520,7 @@ def am(
     Returns:
         List of commit SHAs (bytes) created
     """
+    import email.message
     import email.parser
     import mailbox
     import tempfile

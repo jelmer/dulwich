@@ -22,7 +22,7 @@
 """Tests for the object store interface."""
 
 from collections.abc import Callable, Iterator, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -56,10 +56,13 @@ if TYPE_CHECKING:
 testobject = make_object(Blob, data=b"yummy data")
 
 
-class ObjectStoreTests:
+_StoreT = TypeVar("_StoreT", bound="BaseObjectStore")
+
+
+class ObjectStoreTests(Generic[_StoreT]):
     """Base class for testing object store implementations."""
 
-    store: "BaseObjectStore"
+    store: _StoreT
 
     assertEqual: Callable[[object, object], None]
     # For type checker purposes - actual implementation supports both styles
@@ -322,10 +325,8 @@ class ObjectStoreTests:
         self.assertEqual([], list(self.store.iter_prefix(b"1" * 40)))
 
 
-class PackBasedObjectStoreTests(ObjectStoreTests):
+class PackBasedObjectStoreTests(ObjectStoreTests[PackBasedObjectStore]):
     """Tests for pack-based object stores."""
-
-    store: PackBasedObjectStore
 
     def tearDown(self) -> None:
         """Clean up by closing all packs."""

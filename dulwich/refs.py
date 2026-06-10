@@ -67,7 +67,7 @@ from typing import (
     Any,
     BinaryIO,
     NewType,
-    TypeVar,
+    overload,
 )
 
 if sys.version_info >= (3, 11):
@@ -80,11 +80,9 @@ if TYPE_CHECKING:
 
 from .errors import PackedRefsException, RefFormatError
 from .file import GitFile, ensure_dir_exists
-from .objects import ZERO_SHA, ObjectID, Tag, git_line, valid_hexsha
+from .objects import ZERO_SHA, ObjectID, git_line, valid_hexsha
 
 Ref = NewType("Ref", bytes)
-
-T = TypeVar("T", dict[Ref, ObjectID], dict[Ref, ObjectID | None])
 
 HEADREF = Ref(b"HEAD")
 SYMREF = b"ref: "
@@ -1700,9 +1698,6 @@ def _set_head(
     if head_ref.startswith(LOCAL_TAG_PREFIX):
         # detach HEAD at specified tag
         head = refs[Ref(head_ref)]
-        if isinstance(head, Tag):
-            _cls, obj = head.object
-            head = obj.get_object(obj).id
         del refs[HEADREF]
         refs.set_if_equals(HEADREF, None, head, message=ref_message)
     else:
@@ -2049,15 +2044,29 @@ class NamespacedRefsContainer(RefsContainer):
         self._refs.pack_refs(all=all)
 
 
-def filter_ref_prefix(refs: T, prefixes: Iterable[bytes]) -> T:
+@overload
+def filter_ref_prefix(
+    refs: dict[Ref, ObjectID], prefixes: Iterable[bytes]
+) -> dict[Ref, ObjectID]: ...
+
+
+@overload
+def filter_ref_prefix(
+    refs: dict[Ref, ObjectID | None], prefixes: Iterable[bytes]
+) -> dict[Ref, ObjectID | None]: ...
+
+
+def filter_ref_prefix(
+    refs: dict[Ref, ObjectID] | dict[Ref, ObjectID | None],
+    prefixes: Iterable[bytes],
+) -> dict[Ref, ObjectID] | dict[Ref, ObjectID | None]:
     """Filter refs to only include those with a given prefix.
 
     Args:
       refs: A dictionary of refs.
       prefixes: The prefixes to filter by.
     """
-    filtered = {k: v for k, v in refs.items() if any(k.startswith(p) for p in prefixes)}
-    return filtered
+    return {k: v for k, v in refs.items() if any(k.startswith(p) for p in prefixes)}
 
 
 def is_per_worktree_ref(ref: bytes) -> bool:

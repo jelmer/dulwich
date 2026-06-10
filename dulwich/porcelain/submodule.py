@@ -246,7 +246,7 @@ def submodule_update(
 
                     # Build the index and checkout files
                     tree = sub_repo[target_sha]
-                    if hasattr(tree, "tree"):  # If it's a commit, get the tree
+                    if isinstance(tree, Commit):  # If it's a commit, get the tree
                         tree_id = tree.tree
                     else:
                         tree_id = target_sha

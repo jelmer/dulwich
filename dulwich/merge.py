@@ -36,7 +36,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import merge3
-    from merge3 import SequenceMatcherProtocol
 else:
     try:
         import merge3
@@ -55,7 +54,7 @@ def make_merge3(
     a: Sequence[bytes],
     b: Sequence[bytes],
     is_cherrypick: bool = False,
-    sequence_matcher: "type[SequenceMatcherProtocol[bytes]] | None" = None,
+    sequence_matcher: "type[merge3.SequenceMatcherProtocol[bytes]] | None" = None,
 ) -> "merge3.Merge3[bytes]":
     """Return a Merge3 object, or raise ImportError if merge3 is not installed."""
     if merge3 is None:
@@ -735,6 +734,7 @@ def octopus_merge(
 
     # Start with the head commit's tree as our current state
     current_commit = head_commit
+    merged_tree: Tree = Tree()
 
     # Merge each commit sequentially
     for i, other_commit in enumerate(other_commits):

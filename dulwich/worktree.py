@@ -819,6 +819,7 @@ class WorkTree:
 
             assert isinstance(head, Commit)
             tree = head.tree
+        assert tree is not None
         config = self._repo.get_config()
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
         validate_path_element = get_path_element_validator(config)

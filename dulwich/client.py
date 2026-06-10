@@ -105,6 +105,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    cast,
 )
 from urllib.parse import ParseResult, urljoin, urlparse, urlunparse, urlunsplit
 from urllib.parse import quote as urlquote
@@ -928,11 +929,12 @@ def _handle_upload_pack_head(
     proto.write_pkt_line(wantcmd)
     for want in wants[1:]:
         proto.write_pkt_line(COMMAND_WANT + b" " + want + b"\n")
+    walker_shallow = getattr(graph_walker, "shallow", None)
     if (
         depth not in (0, None)
         or shallow_since is not None
         or shallow_exclude
-        or (hasattr(graph_walker, "shallow") and graph_walker.shallow)
+        or walker_shallow
     ):
         if protocol_version == 2:
             if not find_capability(capabilities, CAPABILITY_FETCH, CAPABILITY_SHALLOW):
@@ -943,8 +945,8 @@ def _handle_upload_pack_head(
             raise GitProtocolError(
                 "server does not support shallow capability required for depth"
             )
-        if hasattr(graph_walker, "shallow"):
-            for sha in graph_walker.shallow:
+        if walker_shallow is not None:
+            for sha in walker_shallow:
                 proto.write_pkt_line(COMMAND_SHALLOW + b" " + sha + b"\n")
         if depth is not None:
             proto.write_pkt_line(
@@ -1249,17 +1251,15 @@ def _handle_upload_pack_tail(
                 break
         pkt = proto.read_pkt_line()
     if CAPABILITY_SIDE_BAND_64K in capabilities or protocol_version == 2:
-        if progress is None:
-            # Just ignore progress data
-
-            def progress(x: bytes) -> None:
-                pass
+        _progress: Callable[[bytes], None] = (
+            progress if progress is not None else lambda _x: None
+        )
 
         for chan, data in _read_side_band64k_data(proto.read_pkt_seq()):
             if chan == SIDE_BAND_CHANNEL_DATA:
                 pack_data(data)
             elif chan == SIDE_BAND_CHANNEL_PROGRESS:
-                progress(data)
+                _progress(data)
             else:
                 raise AssertionError(f"Invalid sideband channel {chan}")
     else:
@@ -1778,7 +1778,6 @@ class GitClient:
         determine_wants: "DetermineWantsFunc",
         graph_walker: GraphWalker,
         pack_data: Callable[[bytes], int],
-        *,
         progress: Callable[[bytes], None] | None = None,
         depth: int | None = None,
         ref_prefix: Sequence[bytes] | None = None,
@@ -1866,10 +1865,9 @@ class GitClient:
             None if it was updated successfully
         """
         if CAPABILITY_SIDE_BAND_64K in capabilities or self.protocol_version == 2:
-            if progress is None:
-
-                def progress(x: bytes) -> None:
-                    pass
+            _progress: Callable[[bytes], None] = (
+                progress if progress is not None else lambda _x: None
+            )
 
             pktline_parser: PktLineParser | None
             if CAPABILITY_REPORT_STATUS in capabilities:
@@ -1883,7 +1881,7 @@ class GitClient:
                         assert pktline_parser is not None
                         pktline_parser.parse(data)
                 elif chan == SIDE_BAND_CHANNEL_PROGRESS:
-                    progress(data)
+                    _progress(data)
                 else:
                     raise AssertionError(f"Invalid sideband channel {chan}")
         else:
@@ -2109,7 +2107,9 @@ class TraditionalGitClient(GitClient):
 
             if new_refs is None:
                 proto.write_pkt_line(None)
-                return SendPackResult(old_refs, agent=agent, ref_status={})
+                return SendPackResult(
+                    _to_optional_dict(old_refs), agent=agent, ref_status={}
+                )
 
             if len(new_refs) == 0 and orig_new_refs:
                 # NOOP - Original new refs filtered out by policy
@@ -2803,19 +2803,19 @@ class SubprocessGitClient(TraditionalGitClient):
 
     def _connect(
         self,
-        service: bytes,
+        cmd: bytes,
         path: bytes | str,
         protocol_version: int | None = None,
     ) -> tuple[Protocol, Callable[[], bool], IO[bytes] | None]:
-        if not isinstance(service, bytes):
-            raise TypeError(service)
+        if not isinstance(cmd, bytes):
+            raise TypeError(cmd)
         if isinstance(path, bytes):
             path = path.decode(self._remote_path_encoding)
         if self.git_command is None:
             git_command = find_git_command()
         else:
             git_command = self.git_command
-        argv = [*git_command, service.decode("ascii"), path]
+        argv = [*git_command, cmd.decode("ascii"), path]
         p = subprocess.Popen(
             argv,
             bufsize=0,
@@ -2954,10 +2954,9 @@ class LocalGitClient(GitClient):
           SendPackError: if server rejects the pack data
 
         """
-        if not progress:
-
-            def progress(x: bytes) -> None:
-                pass
+        _progress: Callable[[bytes], None] = (
+            progress if progress is not None else lambda _x: None
+        )
 
         with self._open_repo(path) as target:
             old_refs = target.get_refs()
@@ -3012,11 +3011,11 @@ class LocalGitClient(GitClient):
                 if new_sha1 != ZERO_SHA:
                     if not target.refs.set_if_equals(refname, old_sha1, new_sha1):
                         msg = f"unable to set {refname!r} to {new_sha1!r}"
-                        progress(msg.encode())
+                        _progress(msg.encode())
                         ref_status[refname] = msg
                 else:
                     if not target.refs.remove_if_equals(refname, old_sha1):
-                        progress(f"unable to remove {refname!r}".encode())
+                        _progress(f"unable to remove {refname!r}".encode())
                         ref_status[refname] = "unable to remove"
 
         return SendPackResult(_to_optional_dict(new_refs), ref_status=ref_status)
@@ -3128,7 +3127,7 @@ class LocalGitClient(GitClient):
             # Note that the client still expects a 0-object pack in most cases.
             if object_ids is None:
                 return FetchPackResult(
-                    None, symrefs, agent, object_format=r.object_format.name
+                    {}, symrefs, agent, object_format=r.object_format.name
                 )
             write_pack_from_container(
                 pack_data,  # type: ignore[arg-type]
@@ -4606,7 +4605,14 @@ class AbstractHttpGitClient(GitClient):
                         )
                         if ref_prefix is not None:
                             refs = filter_ref_prefix(refs, ref_prefix)
-                    return refs, server_capabilities, base_url, symrefs, peeled
+                    refs_dict: dict[Ref, ObjectID | None] = dict(refs)
+                    return (
+                        refs_dict,
+                        server_capabilities,
+                        base_url,
+                        symrefs,
+                        peeled,
+                    )
             else:
                 self.protocol_version = 0  # dumb servers only support protocol v0
                 # Read all the response data
@@ -4616,8 +4622,6 @@ class AbstractHttpGitClient(GitClient):
                     if not chunk:
                         break
                     data += chunk
-                from typing import cast
-
                 info_refs = read_info_refs(BytesIO(data))
                 (refs_nonopt, peeled) = split_peeled_refs(info_refs)
                 if ref_prefix is not None:
@@ -5241,6 +5245,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
                 resp = self.pool_manager.request("POST", url, **request_kwargs)  # type: ignore[arg-type]
         except urllib3.exceptions.HTTPError as e:
             raise GitProtocolError(str(e)) from e
+        assert resp is not None
 
         if raise_for_status:
             if resp.status == 404:

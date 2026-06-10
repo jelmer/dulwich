@@ -282,8 +282,9 @@ def find_subtree_splits(
 
         # Check for subtree metadata
         metadata = parse_subtree_metadata(current_commit)
-        if metadata.get("dir") == prefix and metadata.get("split"):
-            splits.append((commit_id, metadata["split"]))
+        split = metadata.get("split")
+        if metadata.get("dir") == prefix and split:
+            splits.append((commit_id, split))
 
         # Add parents to queue
         queue.extend(current_commit.parents)

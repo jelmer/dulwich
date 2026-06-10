@@ -929,7 +929,7 @@ def build_reachability_bitmap(
                 # Add parents and tree
                 queue.append(obj.tree)
                 queue.extend(obj.parents)
-            elif hasattr(obj, "items"):
+            elif isinstance(obj, Tree):
                 # Tree object - add all entries
                 for item in obj.items():
                     queue.append(item.sha)

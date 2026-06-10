@@ -32,7 +32,6 @@ __all__ = [
 ]
 
 from collections.abc import Sequence
-from difflib import SequenceMatcher
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -55,8 +54,8 @@ def make_merge3(
     a: Sequence[bytes],
     b: Sequence[bytes],
     is_cherrypick: bool = False,
-    sequence_matcher: "type[SequenceMatcher[bytes]] | None" = None,
-) -> "merge3.Merge3":
+    sequence_matcher: "type[merge3.SequenceMatcherProtocol[bytes]] | None" = None,
+) -> "merge3.Merge3[bytes]":
     """Return a Merge3 object, or raise ImportError if merge3 is not installed."""
     if merge3 is None:
         raise ImportError(
@@ -97,7 +96,7 @@ def _can_merge_lines(
 
 if merge3 is not None:
 
-    def _merge3_to_bytes(m: "merge3.Merge3") -> bytes:
+    def _merge3_to_bytes(m: "merge3.Merge3[bytes]") -> bytes:
         """Convert merge3 result to bytes with conflict markers.
 
         Args:

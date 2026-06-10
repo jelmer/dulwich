@@ -33,7 +33,7 @@ import warnings
 from collections.abc import Callable, Sequence
 from typing import TypedDict
 
-from .index import Index, build_index_from_tree
+from .index import Index, build_index_from_tree, validate_path_element_ntfs
 from .object_store import BaseObjectStore
 from .objects import Commit, ObjectID, Tag, Tree
 from .refs import Ref, RefsContainer, local_tag_name
@@ -209,7 +209,13 @@ class CommitFilter:
 
         try:
             # Build index from tree
-            build_index_from_tree(".", tmp_index_path, self.object_store, tree_sha)
+            build_index_from_tree(
+                ".",
+                tmp_index_path,
+                self.object_store,
+                tree_sha,
+                validate_path_element=validate_path_element_ntfs,
+            )
 
             # Run index filter
             new_tree_sha = self.index_filter(tree_sha, tmp_index_path)

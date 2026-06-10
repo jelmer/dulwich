@@ -19,6 +19,11 @@
    native git abort with ``unsupported ce_mode: 0``. The file mode is now
    derived from the work-tree file. (Jelmer Vernooĳ, #2218)
 
+ * Fix deepening of a local shallow fetch. Re-fetching with a larger
+   ``depth`` moved the shallow boundary but did not transfer the
+   newly-uncovered commits, because the parents provider still used the
+   old boundary. (Jelmer Vernooĳ)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

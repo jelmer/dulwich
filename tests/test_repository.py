@@ -1198,6 +1198,46 @@ class BuildRepoRootTests(TestCase):
             os.path.exists(os.path.join(self._repo.controldir(), "shallow")),
         )
 
+    def test_fetch_deepen_local(self) -> None:
+        r = self._repo
+
+        def commit(message):
+            return r.get_worktree().commit(
+                message=message,
+                committer=b"Test Committer <test@nodomain.com>",
+                author=b"Test Author <test@nodomain.com>",
+                commit_timestamp=12345,
+                commit_timezone=0,
+                author_timestamp=12345,
+                author_timezone=0,
+            )
+
+        rev2 = commit(b"msg2")
+        rev3 = commit(b"msg3")
+        rev1 = self._root_commit
+
+        target = Repo.init(os.path.join(tempfile.mkdtemp(), "target"), mkdir=True)
+        self.addCleanup(tear_down_repo, target)
+
+        def determine_wants(refs, depth=None):
+            return [rev3]
+
+        r.fetch(target, determine_wants=determine_wants, depth=1)
+        self.assertEqual(
+            {rev3},
+            {sha for sha in (rev1, rev2, rev3) if sha in target.object_store},
+        )
+        self.assertEqual({rev3}, target.get_shallow())
+
+        # Deepening to depth 2 must transfer the newly-uncovered parent and
+        # move the shallow boundary back to it.
+        r.fetch(target, determine_wants=determine_wants, depth=2)
+        self.assertEqual(
+            {rev2, rev3},
+            {sha for sha in (rev1, rev2, rev3) if sha in target.object_store},
+        )
+        self.assertEqual({rev2}, target.get_shallow())
+
     def test_build_repo(self) -> None:
         r = self._repo
         self.assertEqual(b"ref: refs/heads/master", r.refs.read_ref(b"HEAD"))

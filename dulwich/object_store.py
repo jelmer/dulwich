@@ -228,6 +228,22 @@ PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
 DEFAULT_TEMPFILE_GRACE_PERIOD = 14 * 24 * 60 * 60  # 2 weeks
 
 
+def _remove_readonly(path: str) -> None:
+    """Remove a file, clearing the read-only attribute first on Windows.
+
+    git stores pack files and loose objects read-only. Unix lets you unlink a
+    read-only file in a writable directory, but Windows refuses with
+    PermissionError, so clear the attribute and retry there.
+    """
+    try:
+        os.remove(path)
+    except PermissionError:
+        if sys.platform != "win32":
+            raise
+        os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+        os.remove(path)
+
+
 class PackInputTooLarge(OSError):
     """Raised when a received pack exceeds the configured input size cap.
 
@@ -1966,7 +1982,7 @@ class DiskObjectStore(PackBasedObjectStore):
         Raises:
           FileNotFoundError: If the object file doesn't exist
         """
-        os.remove(self._get_shafile_path(sha))
+        _remove_readonly(self._get_shafile_path(sha))
 
     def get_object_mtime(self, sha: ObjectID) -> float:
         """Get the modification time of an object.
@@ -2018,9 +2034,9 @@ class DiskObjectStore(PackBasedObjectStore):
         data_path = pack._data_path
         idx_path = pack._idx_path
         pack.close()
-        os.remove(data_path)
+        _remove_readonly(data_path)
         if os.path.exists(idx_path):
-            os.remove(idx_path)
+            _remove_readonly(idx_path)
 
     def _get_pack_basepath(
         self, entries: Iterable[tuple[bytes, int, int | None]]

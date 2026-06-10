@@ -35,6 +35,7 @@ def test_suite() -> unittest.TestSuite:
         "client",
         "commit_graph",
         "dumb",
+        "gc",
         "index",
         "lfs",
         "midx",

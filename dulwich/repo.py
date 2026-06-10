@@ -864,9 +864,13 @@ class BaseRepo:
             shallow, not_shallow = find_shallow(self.object_store, wants, depth)
             # Only update if graph_walker has shallow attribute
             if hasattr(graph_walker, "shallow"):
-                graph_walker.shallow.update(shallow - not_shallow)
-                new_shallow = graph_walker.shallow - current_shallow
                 unshallow = not_shallow & current_shallow
+                # Commits that were a shallow boundary but are now being
+                # deepened past must drop out of the boundary, otherwise their
+                # parents stay unreachable and never get transferred.
+                graph_walker.shallow.update(shallow - not_shallow)
+                graph_walker.shallow.difference_update(unshallow)
+                new_shallow = graph_walker.shallow - current_shallow
                 setattr(graph_walker, "unshallow", unshallow)
                 if hasattr(graph_walker, "update_shallow"):
                     graph_walker.update_shallow(new_shallow, unshallow)
@@ -900,7 +904,10 @@ class BaseRepo:
             # commits aren't missing.
             haves = []
 
-        parents_provider = ParentsProvider(self.object_store, shallows=current_shallow)
+        parents_provider = ParentsProvider(
+            self.object_store,
+            shallows=getattr(graph_walker, "shallow", current_shallow),
+        )
 
         def get_parents(commit: Commit) -> list[ObjectID]:
             """Get parents for a commit using the parents provider.

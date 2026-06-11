@@ -206,8 +206,8 @@ async def get_pack_file(request: web.Request) -> web.StreamResponse:
     """
     headers = {"Content-Type": "application/x-git-packed-objects"}
     headers.update(cache_forever_headers())
-    sha = request.match_info["sha"]
-    path = f"objects/pack/pack-{sha}.pack"
+    name = request.match_info["name"]
+    path = f"objects/pack/{name}.pack"
     logger.info("Sending pack file %s", path)
     return await send_file(
         request,
@@ -225,11 +225,11 @@ async def get_index_file(request: web.Request) -> web.StreamResponse:
     """
     headers = {"Content-Type": "application/x-git-packed-objects-toc"}
     headers.update(cache_forever_headers())
-    sha = request.match_info["sha"]
-    path = f"objects/pack/pack-{sha}.idx"
+    name = request.match_info["name"]
+    path = f"objects/pack/{name}.idx"
     logger.info("Sending pack file %s", path)
     return await send_file(
-        request, request.app["repo"].get_named_file(path), headers=headers
+        request, request.app[REPO_KEY].get_named_file(path), headers=headers
     )
 
 
@@ -324,11 +324,18 @@ def create_repo_app(
         app.router.add_get(
             "/objects/{dir:[0-9a-f]{2}}/{file:[0-9a-f]{38}}", get_loose_object
         )
+        # Match any "<prefix>-<hash>" pack basename, not just "pack-". ``git
+        # maintenance`` writes "loose-<hash>" packs, which get_info_packs
+        # advertises. The prefix is restricted to word characters and the
+        # hash to hex so the matched name can never contain a path separator
+        # (get_named_file joins it under the control dir unsanitised).
         app.router.add_get(
-            "/objects/pack/pack-{sha:[0-9a-f]{40}}\\.pack", get_pack_file
+            r"/objects/pack/{name:\w+-(?:[0-9a-f]{40}|[0-9a-f]{64})}.pack",
+            get_pack_file,
         )
         app.router.add_get(
-            "/objects/pack/pack-{sha:[0-9a-f]{40}}\\.idx", get_index_file
+            r"/objects/pack/{name:\w+-(?:[0-9a-f]{40}|[0-9a-f]{64})}.idx",
+            get_index_file,
         )
     return app
 

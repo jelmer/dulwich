@@ -53,6 +53,11 @@
    pack is deduplicated, instead of leaking it into the pack directory.
    (Jelmer Vernooĳ)
 
+ * Serve packs with non-``pack-`` names (e.g. ``loose-<hash>``) and SHA-256
+   packs over the dumb HTTP transport, which previously advertised them in
+   ``objects/info/packs`` but returned 404 for the pack itself.
+   (Jelmer Vernooĳ)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

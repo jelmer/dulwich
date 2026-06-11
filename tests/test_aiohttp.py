@@ -127,3 +127,23 @@ class AiohttpDumbAppTestCase(AioHTTPTestCase):  # type: ignore
         """Test GET /objects/{dir}/{file} for non-existent object."""
         resp = await self.client.request("GET", "/objects/ab/cdef" + "0" * 36)
         self.assertEqual(resp.status, 404)
+
+    async def test_get_pack_file(self):
+        """A "pack-<hash>" pack must be servable over dumb HTTP."""
+        sha = "1" * 40
+        self.repo._put_named_file(f"objects/pack/pack-{sha}.pack", b"pack data")
+        resp = await self.client.request("GET", f"/objects/pack/pack-{sha}.pack")
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(b"pack data", await resp.read())
+
+    async def test_get_loose_named_pack_file(self):
+        """A "loose-<hash>" pack (from git maintenance) must be servable.
+
+        get_info_packs advertises every pack in the store; the serving route
+        must match the "loose-<hash>" names too, not just "pack-<hash>".
+        """
+        sha = "2" * 40
+        self.repo._put_named_file(f"objects/pack/loose-{sha}.idx", b"idx data")
+        resp = await self.client.request("GET", f"/objects/pack/loose-{sha}.idx")
+        self.assertEqual(resp.status, 200)
+        self.assertEqual(b"idx data", await resp.read())

@@ -2454,6 +2454,11 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         if not pack_name.endswith(".idx"):
             raise KeyError(f"unexpected MIDX pack name {pack_name!r}")
+        # The name is joined under pack_dir below, so reject any path
+        # separators that a corrupt or hostile MIDX could use to traverse
+        # directories (backslash matters on Windows).
+        if "/" in pack_name or "\\" in pack_name:
+            raise KeyError(f"unexpected MIDX pack name {pack_name!r}")
         basename = pack_name[: -len(".idx")]
 
         # _pack_cache is keyed by full basename and _update_pack_cache

@@ -22,6 +22,7 @@
 import base64
 import os
 import shutil
+import stat
 import sys
 import tempfile
 import time
@@ -1255,6 +1256,38 @@ class LocalGitClientTests(TestCase):
         expected[b"refs/remotes/origin/HEAD"] = expected[b"HEAD"]
         expected[b"refs/remotes/origin/master"] = expected[b"refs/heads/master"]
         self.assertEqual(expected, result_repo.get_refs())
+
+    def test_clone_invalid_path_keeps_repo(self) -> None:
+        # A tree entry with an invalid path aborts the checkout, but the
+        # clone itself is kept (objects, refs and HEAD), matching git.
+        from dulwich.index import InvalidPathError
+
+        source_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, source_path)
+        source = Repo.init(source_path)
+        self.addCleanup(source.close)
+        blob = Blob.from_string(b"payload\n")
+        tree = Tree()
+        tree.add(b".git/config", stat.S_IFREG | 0o644, blob.id)
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = commit.committer = b"Test <test@example.com>"
+        commit.author_time = commit.commit_time = 0
+        commit.author_timezone = commit.commit_timezone = 0
+        commit.message = b"evil\n"
+        source.object_store.add_objects([(blob, None), (tree, None), (commit, None)])
+        source.refs[b"refs/heads/master"] = commit.id
+        source.refs.set_symbolic_ref(b"HEAD", b"refs/heads/master")
+
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        c = LocalGitClient()
+        self.assertRaises(InvalidPathError, c.clone, source.path, target, mkdir=False)
+
+        # The clone is preserved: HEAD resolves and the work tree is empty.
+        with Repo(target) as cloned:
+            self.assertEqual(commit.id, cloned.head())
+        self.assertEqual([".git"], os.listdir(target))
 
     def test_clone_sha256_local(self) -> None:
         """Test that cloning a SHA-256 local repo creates a SHA-256 clone."""

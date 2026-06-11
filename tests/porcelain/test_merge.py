@@ -28,6 +28,7 @@ import tempfile
 import unittest
 
 from dulwich import porcelain
+from dulwich.index import InvalidPathError
 from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.repo import Repo
 
@@ -511,14 +512,15 @@ class PorcelainMergeTests(TestCase):
                 repo.object_store.add_object(payload)
                 attack_tree = Tree()
                 attack_tree.add(b"ok.txt", stat.S_IFREG | 0o644, blob.id)
-                # ``git~2`` is an NTFS 8.3 short-name alias for ``.git``.
-                attack_tree.add(b"git~2", stat.S_IFREG | 0o755, payload.id)
+                # ``git~1`` is the NTFS 8.3 short-name alias for ``.git``.
+                attack_tree.add(b"git~1", stat.S_IFREG | 0o755, payload.id)
                 attack = self._commit_tree(repo, attack_tree, [base])
 
-                porcelain.merge(repo, attack)
-
+                # The alias aborts the merge checkout rather than being
+                # silently skipped.
+                self.assertRaises(InvalidPathError, porcelain.merge, repo, attack)
                 self.assertFalse(
-                    os.path.exists(os.path.join(tmpdir, "git~2")),
+                    os.path.exists(os.path.join(tmpdir, "git~1")),
                     "merge materialized an NTFS .git alias despite protectNTFS",
                 )
 

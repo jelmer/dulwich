@@ -271,6 +271,19 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         # this does not change iteration on loose objects though
         self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
 
+    def test_getitem_verifies_sha(self) -> None:
+        """Retrieving a loose object stored under a wrong sha is rejected."""
+        from dulwich.errors import ChecksumMismatch
+        from dulwich.file import GitFile
+
+        self.store.add_object(testobject)
+        wrong_sha = b"1" * 40
+        path = self.store._get_shafile_path(wrong_sha)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with GitFile(path, "wb") as f:
+            f.write(testobject.as_legacy_object())
+        self.assertRaises(ChecksumMismatch, self.store.__getitem__, wrong_sha)
+
     def test_tempfile_in_loose_store(self) -> None:
         self.store.add_object(testobject)
         self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))

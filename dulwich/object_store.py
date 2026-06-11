@@ -76,7 +76,7 @@ from typing import (
 if TYPE_CHECKING:
     from .object_format import ObjectFormat
 
-from .errors import NotTreeError
+from .errors import ChecksumMismatch, NotTreeError
 from .file import GitFile, _GitFile
 from .midx import MultiPackIndex, load_midx
 from .objects import (
@@ -461,11 +461,24 @@ class BaseObjectStore:
         raise NotImplementedError(self.get_raw)
 
     def __getitem__(self, sha1: ObjectID | RawObjectID) -> ShaFile:
-        """Obtain an object by SHA1."""
+        """Obtain an object by SHA1.
+
+        Raises:
+          ChecksumMismatch: if the stored contents do not hash to the
+            requested object id.
+        """
+        if len(sha1) == self.object_format.oid_length:
+            hexsha = sha_to_hex(RawObjectID(sha1))
+        else:
+            hexsha = ObjectID(sha1)
         type_num, uncomp = self.get_raw(sha1)
-        return ShaFile.from_raw_string(
-            type_num, uncomp, sha=sha1, object_format=self.object_format
+        obj = ShaFile.from_raw_string(
+            type_num, uncomp, object_format=self.object_format
         )
+        got = obj.get_id(self.object_format)
+        if got != hexsha:
+            raise ChecksumMismatch(hexsha, got)
+        return obj
 
     def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs that are present in this store."""

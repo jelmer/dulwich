@@ -100,10 +100,12 @@ class PackTests(TestCase):
 
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha."""
-        return load_pack_index(
+        idx = load_pack_index(
             os.path.join(self.datadir, "pack-{}.idx".format(sha.decode("ascii"))),
             DEFAULT_OBJECT_FORMAT,
         )
+        self.addCleanup(idx.close)
+        return idx
 
     def get_pack_data(self, sha):
         """Returns a PackData object from the datadir with the given sha."""
@@ -188,6 +190,23 @@ class PackIndexTests(PackTests):
     def test_iter(self) -> None:
         p = self.get_pack_index(pack1_sha)
         self.assertEqual({tree_sha, commit_sha, a_sha}, set(p))
+
+    def test_file_open_until_close(self) -> None:
+        p = self.get_pack_index(pack1_sha)
+        self.assertFalse(p._file.closed)
+        p.close()
+        self.assertTrue(p._file.closed)
+
+    def test_idx_deletable_after_close(self) -> None:
+        idx_name = "pack-{}.idx".format(pack1_sha.decode("ascii"))
+        idx_path = os.path.join(self.tempdir, idx_name)
+        shutil.copy(os.path.join(self.datadir, idx_name), idx_path)
+
+        p = load_pack_index(idx_path, DEFAULT_OBJECT_FORMAT)
+        self.assertEqual(3, len(p))
+        p.close()
+        os.remove(idx_path)
+        self.assertFalse(os.path.exists(idx_path))
 
 
 class TestPackDeltas(TestCase):

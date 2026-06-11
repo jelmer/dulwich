@@ -630,8 +630,16 @@ def load_pack_index(
       object_format: Hash algorithm used by the repository
     Returns: A PackIndex loaded from the given path
     """
-    with GitFile(path, "rb") as f:
+    # Ownership of the file is transferred to the returned index, which mmaps
+    # it and closes it in PackIndex.close(). It must not be closed here: on
+    # Windows an mmap keeps the file locked, so closing the handle out from
+    # under a live mapping leaves the .idx undeletable until the index is GCed.
+    f = GitFile(path, "rb")
+    try:
         return load_pack_index_file(path, f, object_format)
+    except BaseException:
+        f.close()
+        raise
 
 
 def _load_file_contents(
@@ -964,10 +972,42 @@ class FilePackIndex(PackIndex):
 
     def close(self) -> None:
         """Close the underlying file and any mmap."""
-        self._file.close()
+        # Close the mmap before the file: on Windows the mapping holds a lock
+        # on the file, so the handle cannot be released while it is alive.
         close_fn = getattr(self._contents, "close", None)
         if close_fn is not None:
             close_fn()
+        self._file.close()
+
+    def __del__(self) -> None:
+        """Ensure the file and mmap are closed when GCed."""
+        if not getattr(self._file, "closed", True):
+            import warnings
+
+            warnings.warn(
+                f"unclosed pack index {self!r}",
+                ResourceWarning,
+                stacklevel=2,
+                source=self,
+            )
+            try:
+                self.close()
+            except Exception:
+                # Ignore errors during cleanup
+                pass
+
+    def __enter__(self) -> Self:
+        """Enter context manager."""
+        return self
+
+    def __exit__(
+        self,
+        type: type | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Exit context manager."""
+        self.close()
 
     def __len__(self) -> int:
         """Return the number of entries in this pack index."""

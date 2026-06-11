@@ -100,10 +100,12 @@ class PackTests(TestCase):
 
     def get_pack_index(self, sha):
         """Returns a PackIndex from the datadir with the given sha."""
-        return load_pack_index(
+        idx = load_pack_index(
             os.path.join(self.datadir, "pack-{}.idx".format(sha.decode("ascii"))),
             DEFAULT_OBJECT_FORMAT,
         )
+        self.addCleanup(idx.close)
+        return idx
 
     def get_pack_data(self, sha):
         """Returns a PackData object from the datadir with the given sha."""
@@ -196,17 +198,13 @@ class PackIndexTests(PackTests):
         self.assertTrue(p._file.closed)
 
     def test_idx_deletable_after_close(self) -> None:
-        tmp_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, tmp_dir)
         idx_name = "pack-{}.idx".format(pack1_sha.decode("ascii"))
-        idx_path = os.path.join(tmp_dir, idx_name)
+        idx_path = os.path.join(self.tempdir, idx_name)
         shutil.copy(os.path.join(self.datadir, idx_name), idx_path)
 
         p = load_pack_index(idx_path, DEFAULT_OBJECT_FORMAT)
-        # Touch the mmap so the index is fully materialised.
         self.assertEqual(3, len(p))
         p.close()
-        # On Windows this raises PermissionError if the handle/mmap leaked.
         os.remove(idx_path)
         self.assertFalse(os.path.exists(idx_path))
 

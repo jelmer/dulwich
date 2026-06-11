@@ -286,7 +286,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertEqual([testobject.id], list(self.store._iter_loose_objects()))
 
     def test_repack_identical_does_not_leak_tempfile(self) -> None:
-        pack_dir = os.path.join(self.store_dir, "pack")
+        pack_dir = self.store.pack_dir
         b = make_object(Blob, data=b"yummy data")
         self.store.add_objects([(b, None)])
         self.assertEqual(1, len(self.store.packs))

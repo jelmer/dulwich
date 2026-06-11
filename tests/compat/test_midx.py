@@ -255,8 +255,8 @@ class MIDXCompatTests(CompatTestCase):
 
         # Add a loose object, then let git pack it into a "loose-<hash>" pack
         # and index it in a MIDX. --no-quiet keeps the pack around.
-        with open(os.path.join(work_dir, "loose.txt"), "w") as f:
-            f.write("loose object content\n")
+        with open(os.path.join(work_dir, "loose.txt"), "wb") as f:
+            f.write(b"loose object content\n")
         run_git_or_fail(["add", "loose.txt"], cwd=work_dir)
         result = run_git_or_fail(["rev-parse", ":loose.txt"], cwd=work_dir)
         blob_sha = result.decode("utf-8").strip().encode("ascii")

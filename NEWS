@@ -1,5 +1,8 @@
 1.2.7	UNRELEASED
 
+ * Verify that an object retrieved by id actually hashes to the requested
+   id, raising ``ChecksumMismatch`` otherwise. (Jelmer Vernooĳ, #2223)
+
  * Reject pack names containing path separators in the dumb HTTP transport,
    so a malicious server can no longer escape the temporary directory.
    (Jelmer Vernooĳ, #2213)

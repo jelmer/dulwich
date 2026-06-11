@@ -243,6 +243,45 @@ class MIDXCompatTests(CompatTestCase):
         finally:
             repo.close()
 
+    def test_read_git_loose_objects_pack(self):
+        """Dulwich must read packs named "loose-<hash>" written by git.
+
+        ``git maintenance run --task=loose-objects`` packs loose objects into
+        a pack named "loose-<hash>.pack" and references it from the MIDX as
+        "loose-<hash>.idx". Regression for issue #2229, where the MIDX read
+        path asserted every pack name began with "pack-".
+        """
+        work_dir = self.create_test_repo_with_packs()
+
+        # Add a loose object, then let git pack it into a "loose-<hash>" pack
+        # and index it in a MIDX. --no-quiet keeps the pack around.
+        with open(os.path.join(work_dir, "loose.txt"), "wb") as f:
+            f.write(b"loose object content\n")
+        run_git_or_fail(["add", "loose.txt"], cwd=work_dir)
+        result = run_git_or_fail(["rev-parse", ":loose.txt"], cwd=work_dir)
+        blob_sha = result.decode("utf-8").strip().encode("ascii")
+
+        run_git_or_fail(["maintenance", "run", "--task=loose-objects"], cwd=work_dir)
+        # Drop the loose copy so the object lives only in the loose-* pack.
+        run_git_or_fail(["prune-packed"], cwd=work_dir)
+        run_git_or_fail(["multi-pack-index", "write"], cwd=work_dir)
+
+        pack_dir = os.path.join(self.repo_path, "objects", "pack")
+        loose_packs = [
+            n
+            for n in os.listdir(pack_dir)
+            if n.startswith("loose-") and n.endswith(".pack")
+        ]
+        self.assertNotEqual([], loose_packs, "git did not write a loose-* pack")
+
+        repo = Repo(self.repo_path)
+        try:
+            obj = repo.object_store[blob_sha]
+            self.assertEqual(b"blob", obj.type_name)
+            self.assertEqual(b"loose object content\n", obj.data)
+        finally:
+            repo.close()
+
     def test_repack_with_midx(self):
         """Test that repacking works correctly with MIDX present."""
         work_dir = self.create_test_repo_with_packs()

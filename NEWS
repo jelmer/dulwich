@@ -41,6 +41,23 @@
    file in use) when removing a pack whose index had been loaded.
    (Jelmer Vernooĳ)
 
+ * Discover packs named ``loose-<hash>.pack`` (as written by ``git
+   maintenance run --task=loose-objects``), not just ``pack-<hash>.pack``.
+   Objects living only in such a pack were previously invisible, and
+   reading them through a multi-pack-index raised ``AssertionError:
+   unexpected MIDX pack name``. (Jelmer Vernooĳ, #2229)
+
+ * Dedup packs by content when completing a pack, so repacking a store whose
+   objects already live in a pack with a non-``pack-`` name no longer writes
+   a duplicate pack. Also remove the temporary pack file when an incoming
+   pack is deduplicated, instead of leaking it into the pack directory.
+   (Jelmer Vernooĳ)
+
+ * Serve packs with non-``pack-`` names (e.g. ``loose-<hash>``) and SHA-256
+   packs over the dumb HTTP transport, which previously advertised them in
+   ``objects/info/packs`` but returned 404 for the pack itself.
+   (Jelmer Vernooĳ)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

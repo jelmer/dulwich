@@ -515,6 +515,42 @@ class HTTPGitApplicationTestCase(TestCase):
         app = HTTPGitApplication("backend", fallback_app=test_app)
         self.assertEqual("output", app(self._environ, None))
 
+    def _route_handler(self, method, path):
+        for (smethod, spath), handler in HTTPGitApplication.services.items():
+            if smethod == method and spath.search(path):
+                return handler
+        return None
+
+    def test_route_loose_named_pack(self) -> None:
+        """The pack routes must match "loose-<hash>" packs, not just "pack-".
+
+        ``git maintenance`` writes "loose-<hash>" packs which get_info_packs
+        advertises; the serving routes must be able to match them.
+        """
+        sha = "1" * 40
+        self.assertIs(
+            get_pack_file,
+            self._route_handler("GET", f"/objects/pack/loose-{sha}.pack"),
+        )
+        self.assertIs(
+            get_idx_file,
+            self._route_handler("GET", f"/objects/pack/loose-{sha}.idx"),
+        )
+
+    def test_route_sha256_pack(self) -> None:
+        sha = "a" * 64
+        self.assertIs(
+            get_pack_file,
+            self._route_handler("GET", f"/objects/pack/pack-{sha}.pack"),
+        )
+
+    def test_route_rejects_pack_path_traversal(self) -> None:
+        # A name with a path separator must not match the pack routes.
+        self.assertIsNone(self._route_handler("GET", "/objects/pack/../../config.pack"))
+        self.assertIsNone(
+            self._route_handler("GET", f"/objects/pack/pack-{'1' * 40}/x.pack")
+        )
+
 
 class GunzipTestCase(HTTPGitApplicationTestCase):
     __doc__ = """TestCase for testing the GunzipFilter, ensuring the wsgi.input

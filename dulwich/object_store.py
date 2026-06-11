@@ -1879,26 +1879,27 @@ class DiskObjectStore(PackBasedObjectStore):
     def _update_pack_cache(self) -> list[Pack]:
         """Read and iterate over new pack files and cache them."""
         try:
-            pack_dir_contents = os.listdir(self.pack_dir)
+            pack_dir_contents = set(os.listdir(self.pack_dir))
         except FileNotFoundError:
             return []
         pack_files = set()
         for name in pack_dir_contents:
-            if name.startswith("pack-") and name.endswith(".pack"):
-                # verify that idx exists first (otherwise the pack was not yet
-                # fully written)
-                idx_name = os.path.splitext(name)[0] + ".idx"
-                if idx_name in pack_dir_contents:
-                    # Extract just the hash (remove "pack-" prefix and ".pack" suffix)
-                    pack_hash = name[len("pack-") : -len(".pack")]
-                    pack_files.add(pack_hash)
+            # Index any ".pack" file with a matching ".idx", not just
+            # "pack-<hash>". ``git maintenance`` writes packs named
+            # "loose-<hash>.pack"; these are ordinary packs and Git indexes
+            # any .pack file present. The matching ".idx" also confirms the
+            # pack is fully written.
+            if name.endswith(".pack"):
+                basename = name[: -len(".pack")]
+                if basename + ".idx" in pack_dir_contents:
+                    pack_files.add(basename)
 
         # Open newly appeared pack files
         new_packs = []
-        for pack_hash in pack_files:
-            if pack_hash not in self._pack_cache:
+        for basename in pack_files:
+            if basename not in self._pack_cache:
                 pack = Pack(
-                    os.path.join(self.pack_dir, "pack-" + pack_hash),
+                    os.path.join(self.pack_dir, basename),
                     object_format=self.object_format,
                     delta_window_size=self.pack_delta_window_size,
                     window_memory=self.pack_window_memory,
@@ -1909,8 +1910,8 @@ class DiskObjectStore(PackBasedObjectStore):
                     delta_base_cache_limit=self.delta_base_cache_limit,
                 )
                 new_packs.append(pack)
-                self._pack_cache[pack_hash] = pack
-                self._mark_pack_used(pack_hash)
+                self._pack_cache[basename] = pack
+                self._mark_pack_used(basename)
         # Remove disappeared pack files
         for f in set(self._pack_cache) - pack_files:
             self._pack_cache.pop(f).close()
@@ -2020,14 +2021,12 @@ class DiskObjectStore(PackBasedObjectStore):
         raise KeyError(sha)
 
     def _remove_pack(self, pack: Pack) -> None:
-        # _pack_cache is keyed by bare pack hash; pack._basename ends in
-        # "pack-<hash>", so drop the "pack-" prefix to match.
+        # _pack_cache is keyed by the full pack basename (e.g. "pack-<hash>"
+        # or "loose-<hash>"), matching pack._basename.
         basename = os.path.basename(pack._basename)
-        assert basename.startswith("pack-"), f"unexpected pack basename {basename!r}"
-        pack_hash = basename[len("pack-") :]
-        self._pack_cache.pop(pack_hash, None)
+        self._pack_cache.pop(basename, None)
         try:
-            self._pack_access_order.remove(pack_hash)
+            self._pack_access_order.remove(basename)
         except ValueError:
             pass
         # Store paths before closing to avoid re-opening files on Windows
@@ -2098,10 +2097,16 @@ class DiskObjectStore(PackBasedObjectStore):
         entries.sort()
         pack_base_name = self._get_pack_basepath(entries)
 
+        # A pack's identity is the SHA over its object SHAs, which is the
+        # "<hash>" suffix _get_pack_basepath builds the name from. Compare by
+        # that rather than by basename so an existing pack holding the same
+        # objects under a different prefix (e.g. a "loose-<hash>" pack written
+        # by git maintenance) is recognised and not duplicated.
+        pack_name = os.path.basename(pack_base_name)[len("pack-") :].encode("ascii")
         for pack in self.packs:
-            if pack._basename == pack_base_name:
-                # An identical pack already exists; drop the temporary file
-                # we just wrote rather than leaking it into the pack dir.
+            if pack.name() == pack_name:
+                # The objects are already packed; drop the temporary pack we
+                # were about to move in rather than leaking it into pack_dir.
                 _remove_readonly(path)
                 return pack
 
@@ -2195,9 +2200,8 @@ class DiskObjectStore(PackBasedObjectStore):
                 with suppress(FileNotFoundError):
                     os.remove(pack_base_name + ".bitmap")
             raise
-        # Extract just the hash from pack_base_name (/path/to/pack-HASH -> HASH)
-        pack_hash = os.path.basename(pack_base_name)[len("pack-") :]
-        self._add_cached_pack(pack_hash, final_pack)
+        # _pack_cache is keyed by the full basename (/path/to/pack-HASH -> pack-HASH)
+        self._add_cached_pack(os.path.basename(pack_base_name), final_pack)
         return final_pack
 
     def add_thin_pack(
@@ -2437,8 +2441,10 @@ class DiskObjectStore(PackBasedObjectStore):
         """Get a pack referenced by a multi-pack-index entry.
 
         Args:
-            pack_name: Pack file name as stored in the MIDX, of the form
-                ``pack-<hash>.idx``.
+            pack_name: Pack index file name as stored in the MIDX. Usually
+                ``pack-<hash>.idx``, but ``git maintenance`` writes packs
+                named ``loose-<hash>.idx``, so any ``.idx`` basename is
+                accepted.
 
         Returns:
             Pack object
@@ -2446,17 +2452,25 @@ class DiskObjectStore(PackBasedObjectStore):
         Raises:
             KeyError: If pack doesn't exist
         """
-        assert pack_name.startswith("pack-") and pack_name.endswith(".idx"), (
-            f"unexpected MIDX pack name {pack_name!r}"
-        )
-        pack_hash = pack_name[len("pack-") : -len(".idx")]
+        if not pack_name.endswith(".idx"):
+            raise KeyError(f"unexpected MIDX pack name {pack_name!r}")
+        # The name is joined under pack_dir below, so reject any path
+        # separators that a corrupt or hostile MIDX could use to traverse
+        # directories (backslash matters on Windows).
+        if "/" in pack_name or "\\" in pack_name:
+            raise KeyError(f"unexpected MIDX pack name {pack_name!r}")
+        basename = pack_name[: -len(".idx")]
 
+        # _pack_cache is keyed by full basename and _update_pack_cache
+        # discovers every "<name>-<hash>.pack" file (including the
+        # "loose-<hash>" packs that git maintenance writes and the MIDX
+        # references), so a referenced pack is normally already cached.
         try:
-            return self._pack_cache[pack_hash]
+            return self._pack_cache[basename]
         except KeyError:
             pass
 
-        pack_path = os.path.join(self.pack_dir, "pack-" + pack_hash)
+        pack_path = os.path.join(self.pack_dir, basename)
         if not os.path.exists(pack_path + ".pack"):
             raise KeyError(f"Pack {pack_name} not found")
 
@@ -2471,8 +2485,8 @@ class DiskObjectStore(PackBasedObjectStore):
             big_file_threshold=self.pack_big_file_threshold,
             delta_base_cache_limit=self.delta_base_cache_limit,
         )
-        self._pack_cache[pack_hash] = pack
-        self._mark_pack_used(pack_hash)
+        self._pack_cache[basename] = pack
+        self._mark_pack_used(basename)
         return pack
 
     def contains_packed(self, sha: ObjectID | RawObjectID) -> bool:

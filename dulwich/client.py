@@ -1580,8 +1580,6 @@ class GitClient:
                 else:
                     head = None
 
-            if checkout and head is not None:
-                target.get_worktree().reset_index(config=target.get_config_stack())
         except BaseException:
             if target is not None:
                 target.close()
@@ -1590,6 +1588,11 @@ class GitClient:
 
                 shutil.rmtree(target_path)
             raise
+
+        # Checkout runs after the clone is complete, so a checkout failure
+        # leaves the fetched repository in place rather than deleting it.
+        if checkout and head is not None:
+            target.get_worktree().reset_index(config=target.get_config_stack())
         return target
 
     def fetch(
@@ -3272,8 +3275,6 @@ class LocalGitClient(GitClient):
                 else:
                     head = None
 
-            if checkout and head is not None:
-                target.get_worktree().reset_index(config=target.get_config_stack())
         except BaseException:
             if target is not None:
                 target.close()
@@ -3282,6 +3283,11 @@ class LocalGitClient(GitClient):
 
                 shutil.rmtree(target_path)
             raise
+
+        # Checkout runs after the clone is complete, so a checkout failure
+        # leaves the fetched repository in place rather than deleting it.
+        if checkout and head is not None:
+            target.get_worktree().reset_index(config=target.get_config_stack())
         return target
 
 

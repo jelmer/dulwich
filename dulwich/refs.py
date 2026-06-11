@@ -1049,6 +1049,11 @@ class DiskRefsContainer(RefsContainer):
         Raises:
           IOError: if any other error occurs
         """
+        # Validate the name before turning it into a path.
+        try:
+            self._check_refname(name)
+        except RefFormatError:
+            return None
         filename = self.refpath(name)
         try:
             with GitFile(filename, "rb") as f:

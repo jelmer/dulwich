@@ -9,6 +9,12 @@
    no longer make ``clone --recurse-submodules`` read arbitrary files.
    (netliomax25-code)
 
+ * SECURITY: Validate ref names before resolving them to a path, so a
+   client-supplied name like ``../../secret`` can no longer read a file
+   outside the ref store. This closes a traversal via git-upload-archive's
+   ``argument`` and other lookup paths.
+   (reported by netliomax25-code, Jelmer Vernooĳ, #2212)
+
  * Add ``porcelain.request_pull`` and a ``dulwich request-pull`` command
    that generate a summary of pending changes between repositories,
    suitable for emailing to a maintainer, like ``git request-pull``.

@@ -37,6 +37,10 @@
    the pack directory (``prune`` only removes ``tmp_pack_*``) and could
    collide with later pack writes on Windows. (Jelmer Vernooĳ)
 
+ * Fix ``repack`` on Windows raising ``PermissionError`` (``WinError 32``,
+   file in use) when removing a pack whose index had been loaded.
+   (Jelmer Vernooĳ)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

@@ -2129,37 +2129,36 @@ class DiskObjectStore(PackBasedObjectStore):
         # Generate bitmap if configured and refs are available
         if self.pack_write_bitmaps and refs:
             from .bitmap import generate_bitmap, write_bitmap
-            from .pack import load_pack_index_file
+            from .pack import load_pack_index
 
             if progress:
                 progress("Generating bitmap index\r".encode("ascii"))
 
-            # Load the index we just wrote
-            with open(target_index_path, "rb") as idx_file:
-                pack_index = load_pack_index_file(
-                    os.path.basename(target_index_path),
-                    idx_file,
-                    self.object_format,
+            # Load the index we just wrote. load_pack_index keeps the file
+            # open for the lifetime of the index (it mmaps it), so close the
+            # index explicitly once the bitmap is generated rather than
+            # leaving the .idx mapped, which would lock it on Windows.
+            pack_index = load_pack_index(target_index_path, self.object_format)
+            try:
+                bitmap = generate_bitmap(
+                    pack_index=pack_index,
+                    object_store=self,
+                    refs=refs,
+                    pack_checksum=pack_sha,
+                    include_hash_cache=self.pack_write_bitmap_hash_cache,
+                    include_lookup_table=self.pack_write_bitmap_lookup_table,
+                    progress=lambda msg: (
+                        progress(msg.encode("ascii"))
+                        if progress and isinstance(msg, str)
+                        else None
+                    ),
                 )
 
-            # Generate the bitmap
-            bitmap = generate_bitmap(
-                pack_index=pack_index,
-                object_store=self,
-                refs=refs,
-                pack_checksum=pack_sha,
-                include_hash_cache=self.pack_write_bitmap_hash_cache,
-                include_lookup_table=self.pack_write_bitmap_lookup_table,
-                progress=lambda msg: (
-                    progress(msg.encode("ascii"))
-                    if progress and isinstance(msg, str)
-                    else None
-                ),
-            )
-
-            # Write the bitmap
-            target_bitmap_path = pack_base_name + ".bitmap"
-            write_bitmap(target_bitmap_path, bitmap)
+                # Write the bitmap
+                target_bitmap_path = pack_base_name + ".bitmap"
+                write_bitmap(target_bitmap_path, bitmap)
+            finally:
+                pack_index.close()
 
             if progress:
                 progress("Bitmap index written\r".encode("ascii"))

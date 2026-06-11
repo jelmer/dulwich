@@ -189,6 +189,27 @@ class PackIndexTests(PackTests):
         p = self.get_pack_index(pack1_sha)
         self.assertEqual({tree_sha, commit_sha, a_sha}, set(p))
 
+    def test_file_open_until_close(self) -> None:
+        p = self.get_pack_index(pack1_sha)
+        self.assertFalse(p._file.closed)
+        p.close()
+        self.assertTrue(p._file.closed)
+
+    def test_idx_deletable_after_close(self) -> None:
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        idx_name = "pack-{}.idx".format(pack1_sha.decode("ascii"))
+        idx_path = os.path.join(tmp_dir, idx_name)
+        shutil.copy(os.path.join(self.datadir, idx_name), idx_path)
+
+        p = load_pack_index(idx_path, DEFAULT_OBJECT_FORMAT)
+        # Touch the mmap so the index is fully materialised.
+        self.assertEqual(3, len(p))
+        p.close()
+        # On Windows this raises PermissionError if the handle/mmap leaked.
+        os.remove(idx_path)
+        self.assertFalse(os.path.exists(idx_path))
+
 
 class TestPackDeltas(TestCase):
     test_string1 = b"The answer was flailing in the wind"

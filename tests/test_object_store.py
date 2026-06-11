@@ -1393,6 +1393,49 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertEqual([new_base + ".idx"], midx.pack_names)
         self.assertEqual((Blob.type_num, b"midx loose pack"), store.get_raw(b.id))
 
+    def test_repack_does_not_duplicate_loose_named_pack(self) -> None:
+        """repack must reuse an existing loose-<hash> pack, not duplicate it.
+
+        _complete_pack dedups by content (pack.name()), so repacking a store
+        whose objects already live in a loose-<hash> pack recognises that
+        pack instead of writing a second pack-<hash> with identical objects.
+        """
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+        b = self._add_blob_in_pack(store, b"repack dedup")
+        store.close()
+
+        self._rename_pack_to_loose(DiskObjectStore(self.store_dir))
+
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+        store.repack()
+        store.repack()
+
+        pack_dir = os.path.join(self.store_dir, "pack")
+        packs = sorted(n for n in os.listdir(pack_dir) if n.endswith(".pack"))
+        self.assertEqual(1, len(packs), packs)
+        self.assertTrue(packs[0].startswith("loose-"), packs[0])
+        self.assertEqual((Blob.type_num, b"repack dedup"), store.get_raw(b.id))
+
+    def test_add_pack_dedup_removes_temp_pack(self) -> None:
+        """A deduplicated add_pack must not leave its temp pack in pack_dir.
+
+        _complete_pack returns the existing pack early when the objects are
+        already packed; it must drop the temporary "tmp*.pack" it was about
+        to move in.
+        """
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+        b = make_object(Blob, data=b"temp pack cleanup")
+        self._add_blob_in_pack(store, b.data)
+        # Adding the same object again hits the dedup early-return.
+        self._add_blob_in_pack(store, b.data)
+
+        pack_dir = os.path.join(self.store_dir, "pack")
+        leftovers = [n for n in os.listdir(pack_dir) if n.startswith("tmp")]
+        self.assertEqual([], leftovers)
+
 
 class TreeLookupPathTests(TestCase):
     def setUp(self) -> None:

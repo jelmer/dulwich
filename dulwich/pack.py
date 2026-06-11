@@ -979,6 +979,36 @@ class FilePackIndex(PackIndex):
             close_fn()
         self._file.close()
 
+    def __del__(self) -> None:
+        """Ensure the file and mmap are closed when GCed."""
+        if not getattr(self._file, "closed", True):
+            import warnings
+
+            warnings.warn(
+                f"unclosed pack index {self!r}",
+                ResourceWarning,
+                stacklevel=2,
+                source=self,
+            )
+            try:
+                self.close()
+            except Exception:
+                # Ignore errors during cleanup
+                pass
+
+    def __enter__(self) -> Self:
+        """Enter context manager."""
+        return self
+
+    def __exit__(
+        self,
+        type: type | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Exit context manager."""
+        self.close()
+
     def __len__(self) -> int:
         """Return the number of entries in this pack index."""
         return self._fan_out_table[-1]

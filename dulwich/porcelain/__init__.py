@@ -6463,8 +6463,8 @@ def show_index(
     from ..pack import load_pack_index
 
     with open_repo_closing(repo) as r:
-        idx = load_pack_index(index_path, r.object_format)
-        return [(offset, sha, crc32) for sha, offset, crc32 in idx.iterentries()]
+        with closing(load_pack_index(index_path, r.object_format)) as idx:
+            return [(offset, sha, crc32) for sha, offset, crc32 in idx.iterentries()]
 
 
 def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:

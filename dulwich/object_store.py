@@ -62,7 +62,7 @@ import sys
 import time
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Set
-from contextlib import suppress
+from contextlib import closing, suppress
 from io import BytesIO
 from pathlib import Path
 from typing import (
@@ -2135,11 +2135,12 @@ class DiskObjectStore(PackBasedObjectStore):
                 progress("Generating bitmap index\r".encode("ascii"))
 
             # Load the index we just wrote. load_pack_index keeps the file
-            # open for the lifetime of the index (it mmaps it), so close the
-            # index explicitly once the bitmap is generated rather than
-            # leaving the .idx mapped, which would lock it on Windows.
-            pack_index = load_pack_index(target_index_path, self.object_format)
-            try:
+            # open for the lifetime of the index (it mmaps it), so close it
+            # once the bitmap is generated rather than leaving the .idx
+            # mapped, which would lock it on Windows.
+            with closing(
+                load_pack_index(target_index_path, self.object_format)
+            ) as pack_index:
                 bitmap = generate_bitmap(
                     pack_index=pack_index,
                     object_store=self,
@@ -2157,8 +2158,6 @@ class DiskObjectStore(PackBasedObjectStore):
                 # Write the bitmap
                 target_bitmap_path = pack_base_name + ".bitmap"
                 write_bitmap(target_bitmap_path, bitmap)
-            finally:
-                pack_index.close()
 
             if progress:
                 progress("Bitmap index written\r".encode("ascii"))

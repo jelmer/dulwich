@@ -76,7 +76,7 @@ from typing import (
 if TYPE_CHECKING:
     from .object_format import ObjectFormat
 
-from .errors import ChecksumMismatch, NotTreeError
+from .errors import NotTreeError
 from .file import GitFile, _GitFile
 from .midx import MultiPackIndex, load_midx
 from .objects import (
@@ -472,13 +472,9 @@ class BaseObjectStore:
         else:
             hexsha = ObjectID(sha1)
         type_num, uncomp = self.get_raw(sha1)
-        obj = ShaFile.from_raw_string(
-            type_num, uncomp, object_format=self.object_format
+        return ShaFile.from_raw_string(
+            type_num, uncomp, verify_sha=hexsha, object_format=self.object_format
         )
-        got = obj.get_id(self.object_format)
-        if got != hexsha:
-            raise ChecksumMismatch(hexsha, got)
-        return obj
 
     def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs that are present in this store."""

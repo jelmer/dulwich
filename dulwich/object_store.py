@@ -1879,17 +1879,17 @@ class DiskObjectStore(PackBasedObjectStore):
     def _update_pack_cache(self) -> list[Pack]:
         """Read and iterate over new pack files and cache them."""
         try:
-            pack_dir_contents = os.listdir(self.pack_dir)
+            pack_dir_contents = set(os.listdir(self.pack_dir))
         except FileNotFoundError:
             return []
         pack_files = set()
         for name in pack_dir_contents:
-            # Index any "<name>-<hash>.pack" file, not just "pack-<hash>".
-            # ``git maintenance`` writes packs named "loose-<hash>.pack"; these
-            # are ordinary packs and Git indexes any .pack file present.
-            if name.endswith(".pack") and "-" in name:
-                # verify that idx exists first (otherwise the pack was not yet
-                # fully written)
+            # Index any ".pack" file with a matching ".idx", not just
+            # "pack-<hash>". ``git maintenance`` writes packs named
+            # "loose-<hash>.pack"; these are ordinary packs and Git indexes
+            # any .pack file present. The matching ".idx" also confirms the
+            # pack is fully written.
+            if name.endswith(".pack"):
                 basename = name[: -len(".pack")]
                 if basename + ".idx" in pack_dir_contents:
                     pack_files.add(basename)
@@ -2097,10 +2097,16 @@ class DiskObjectStore(PackBasedObjectStore):
         entries.sort()
         pack_base_name = self._get_pack_basepath(entries)
 
+        # A pack's identity is the SHA over its object SHAs, which is the
+        # "<hash>" suffix _get_pack_basepath builds the name from. Compare by
+        # that rather than by basename so an existing pack holding the same
+        # objects under a different prefix (e.g. a "loose-<hash>" pack written
+        # by git maintenance) is recognised and not duplicated.
+        pack_name = os.path.basename(pack_base_name)[len("pack-") :].encode("ascii")
         for pack in self.packs:
-            if pack._basename == pack_base_name:
-                # An identical pack already exists; drop the temporary file
-                # we just wrote rather than leaking it into the pack dir.
+            if pack.name() == pack_name:
+                # The objects are already packed; drop the temporary pack we
+                # were about to move in rather than leaking it into pack_dir.
                 _remove_readonly(path)
                 return pack
 

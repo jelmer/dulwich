@@ -32,6 +32,11 @@
    removing read-only pack files (as written by git). The read-only
    attribute is now cleared before unlinking. (Jelmer Vernooĳ)
 
+ * Fix ``repack`` leaking a temporary pack file when the consolidated pack
+   was identical to one already on disk. The orphaned file accumulated in
+   the pack directory (``prune`` only removes ``tmp_pack_*``) and could
+   collide with later pack writes on Windows. (Jelmer Vernooĳ)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

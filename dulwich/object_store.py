@@ -2100,6 +2100,9 @@ class DiskObjectStore(PackBasedObjectStore):
 
         for pack in self.packs:
             if pack._basename == pack_base_name:
+                # An identical pack already exists; drop the temporary file
+                # we just wrote rather than leaking it into the pack dir.
+                _remove_readonly(path)
                 return pack
 
         target_pack_path = pack_base_name + ".pack"

@@ -241,17 +241,18 @@ class UploadPackHandlerTestCase(TestCase):
     def test_nothing_to_do_but_wants(self) -> None:
         # Just the fact that the client claims to want an object is enough
         # for sending a pack. Even if there turns out to be nothing.
-        refs = {b"refs/tags/tag1": ONE}
         tree = Tree()
         self._repo.object_store.add_object(tree)
-        self._repo.object_store.add_object(make_commit(id=ONE, tree=tree))
+        commit = make_commit(tree=tree.id)
+        self._repo.object_store.add_object(commit)
+        refs = {b"refs/tags/tag1": commit.id}
         for name, sha in refs.items():
             self._repo.refs[name] = sha
         self._handler.proto.set_output(
             [
-                b"want " + ONE + b" side-band-64k thin-pack ofs-delta",
+                b"want " + commit.id + b" side-band-64k thin-pack ofs-delta",
                 None,
-                b"have " + ONE,
+                b"have " + commit.id,
                 b"done",
                 None,
             ]
@@ -262,10 +263,11 @@ class UploadPackHandlerTestCase(TestCase):
 
     def test_nothing_to_do_no_wants(self) -> None:
         # Don't send a pack if the client didn't ask for anything.
-        refs = {b"refs/tags/tag1": ONE}
         tree = Tree()
         self._repo.object_store.add_object(tree)
-        self._repo.object_store.add_object(make_commit(id=ONE, tree=tree))
+        commit = make_commit(tree=tree.id)
+        self._repo.object_store.add_object(commit)
+        refs = {b"refs/tags/tag1": commit.id}
         for ref, sha in refs.items():
             self._repo.refs[ref] = sha
         self._handler.proto.set_output([None])

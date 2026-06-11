@@ -1418,6 +1418,36 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertTrue(packs[0].startswith("loose-"), packs[0])
         self.assertEqual((Blob.type_num, b"repack dedup"), store.get_raw(b.id))
 
+    def test_get_pack_by_name_rejects_path_separators(self) -> None:
+        """A MIDX pack name with a path separator must not be joined as a path.
+
+        The MIDX is read from disk; a corrupt or hostile PNAM entry like
+        "../evil.idx" must be rejected rather than being resolved relative to
+        pack_dir and escaping it. Plant a real pack one level above pack_dir
+        and confirm the traversal name does not reach it.
+        """
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+        self._add_blob_in_pack(store, b"traversal target")
+        store.close()
+
+        # Move the pack up one directory (into the objects dir) so that a
+        # "../<name>" traversal from pack_dir would resolve onto it.
+        pack_dir = os.path.join(self.store_dir, "pack")
+        new_base = self._rename_pack_to_loose(DiskObjectStore(self.store_dir))
+        for ext in (".pack", ".idx"):
+            os.rename(
+                os.path.join(pack_dir, new_base + ext),
+                os.path.join(self.store_dir, new_base + ext),
+            )
+
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+        # Without the separator check this would resolve to ../<new_base>.pack
+        # (which exists) and open a pack outside pack_dir.
+        self.assertRaises(KeyError, store._get_pack_by_name, "../" + new_base + ".idx")
+        self.assertRaises(KeyError, store._get_pack_by_name, "..\\" + new_base + ".idx")
+
     def test_add_pack_dedup_removes_temp_pack(self) -> None:
         """A deduplicated add_pack must not leave its temp pack in pack_dir.
 

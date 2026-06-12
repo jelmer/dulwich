@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.dependencies]
-pyo3 = ">=0.25, <0.29"
+pyo3 = ">=0.25, <0.30"
 
 [workspace.package]
 version = "1.2.5"

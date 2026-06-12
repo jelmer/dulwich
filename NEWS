@@ -1,4 +1,4 @@
-1.2.7	UNRELEASED
+1.2.7	2026-06-12
 
  * Verify that an object retrieved by id actually hashes to the requested
    id, raising ``ChecksumMismatch`` otherwise. (Jelmer Vernooĳ, #2223)

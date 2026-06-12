@@ -34,6 +34,7 @@ from .diff_tree import tree_changes
 from .file import GitFile
 from .index import (
     IndexEntry,
+    InvalidPathError,
     _tree_to_fs_path,
     build_file_from_blob,
     commit_tree,
@@ -205,7 +206,7 @@ class Stash:
                     and tree_entry.sha is not None
                 )
                 if not validate_path(tree_entry.path, validate_path_element):
-                    continue
+                    raise InvalidPathError(tree_entry.path)
 
                 # Add to index with stage 0 (normal)
                 # Get file stats for the entry
@@ -226,7 +227,7 @@ class Stash:
                 and tree_entry2.sha is not None
             )
             if not validate_path(tree_entry2.path, validate_path_element):
-                continue
+                raise InvalidPathError(tree_entry2.path)
 
             full_path = _tree_to_fs_path(repo_path, tree_entry2.path)
 

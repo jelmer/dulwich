@@ -3,6 +3,15 @@
  * Verify that an object retrieved by id actually hashes to the requested
    id, raising ``ChecksumMismatch`` otherwise. (Jelmer Vernooĳ, #2223)
 
+ * Check out files whose names contain a colon or backslash. The NTFS path
+   validator rejected any element containing ``:`` or ``\``, so such files
+   were silently dropped on clone. It now rejects only the ``.git``/``git~1``
+   alternate-data-stream spellings, like git. (Jelmer Vernooĳ, #2205)
+
+ * Abort the checkout when a tree entry has an invalid path (e.g. a ``.git``
+   alias) instead of silently skipping it.
+   (Jelmer Vernooĳ, #2205)
+
  * Reject pack names containing path separators in the dumb HTTP transport,
    so a malicious server can no longer escape the temporary directory.
    (Jelmer Vernooĳ, #2213)

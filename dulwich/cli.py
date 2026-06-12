@@ -3367,7 +3367,7 @@ class cmd_reset(Command):
 class cmd_revert(Command):
     """Revert some existing commits."""
 
-    def run(self, args: Sequence[str]) -> None:
+    def run(self, args: Sequence[str]) -> int | None:
         """Execute the revert command.
 
         Args:
@@ -3384,15 +3384,20 @@ class cmd_revert(Command):
         parser.add_argument("commits", nargs="+", help="Commits to revert")
         parsed_args = parser.parse_args(args)
 
-        result = porcelain.revert(
-            ".",
-            commits=parsed_args.commits,
-            no_commit=parsed_args.no_commit,
-            message=parsed_args.message,
-        )
+        try:
+            result = porcelain.revert(
+                ".",
+                commits=parsed_args.commits,
+                no_commit=parsed_args.no_commit,
+                message=parsed_args.message,
+            )
+        except InvalidPathError as e:
+            logger.exception("unable to checkout working tree: %s", e)
+            return 1
 
         if result and not parsed_args.no_commit:
             logger.info("[%s] Revert completed", result.decode("ascii")[:7])
+        return None
 
 
 class cmd_daemon(Command):
@@ -3793,7 +3798,7 @@ class cmd_prune(Command):
 class cmd_pull(Command):
     """Fetch from and integrate with another repository or a local branch."""
 
-    def run(self, args: Sequence[str]) -> None:
+    def run(self, args: Sequence[str]) -> int | None:
         """Execute the pull command.
 
         Args:
@@ -3805,14 +3810,19 @@ class cmd_pull(Command):
         parser.add_argument("--filter", type=str, nargs=1)
         parser.add_argument("--protocol", type=int)
         parsed_args = parser.parse_args(args)
-        porcelain.pull(
-            ".",
-            remote_location=parsed_args.from_location or None,
-            refspecs=parsed_args.refspec or None,
-            filter_spec=parsed_args.filter,
-            protocol_version=parsed_args.protocol or _protocol_version_from_env(),
-            ssh_command=_ssh_command_from_env(),
-        )
+        try:
+            porcelain.pull(
+                ".",
+                remote_location=parsed_args.from_location or None,
+                refspecs=parsed_args.refspec or None,
+                filter_spec=parsed_args.filter,
+                protocol_version=parsed_args.protocol or _protocol_version_from_env(),
+                ssh_command=_ssh_command_from_env(),
+            )
+        except InvalidPathError as e:
+            logger.exception("unable to checkout working tree: %s", e)
+            return 1
+        return None
 
 
 class cmd_push(Command):
@@ -4758,7 +4768,7 @@ class cmd_stash_push(Command):
 class cmd_stash_pop(Command):
     """Apply a stash and remove it from the stash list."""
 
-    def run(self, args: Sequence[str]) -> None:
+    def run(self, args: Sequence[str]) -> int | None:
         """Execute the stash-pop command.
 
         Args:
@@ -4766,8 +4776,13 @@ class cmd_stash_pop(Command):
         """
         parser = argparse.ArgumentParser()
         parser.parse_args(args)
-        porcelain.stash_pop(".")
+        try:
+            porcelain.stash_pop(".")
+        except InvalidPathError as e:
+            logger.exception("unable to checkout working tree: %s", e)
+            return 1
         logger.info("Restored working directory and index state")
+        return None
 
 
 class cmd_bisect(SuperCommand):
@@ -5209,6 +5224,9 @@ class cmd_merge(Command):
                         merge_commit_id.decode(),
                     )
             return 0
+        except InvalidPathError as e:
+            logger.exception("unable to checkout working tree: %s", e)
+            return 1
         except porcelain.Error as e:
             logger.error("%s", e)
             return 1
@@ -5711,6 +5729,9 @@ class cmd_cherry_pick(Command):
                 logger.info("Cherry-pick successful: %s", result.decode())
 
             return None
+        except InvalidPathError as e:
+            logger.exception("unable to checkout working tree: %s", e)
+            return 1
         except porcelain.Error as e:
             logger.error("%s", e)
             return 1

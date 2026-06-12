@@ -438,6 +438,59 @@ class CLIMergeTests(TestCase):
             finally:
                 os.chdir(old_cwd)
 
+    def test_merge_invalid_path_returns_error(self):
+        """An invalid path in the merged tree returns exit code 1, not a crash."""
+        import stat
+
+        from dulwich.objects import Blob, Commit, Tree
+        from dulwich.repo import Repo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with Repo.init(tmpdir) as repo:
+                repo.get_config().set((b"core",), b"protectNTFS", b"true")
+                repo.get_config().write_to_path()
+
+                blob = Blob.from_string(b"base\n")
+                repo.object_store.add_object(blob)
+                base_tree = Tree()
+                base_tree.add(b"ok.txt", stat.S_IFREG | 0o644, blob.id)
+                repo.object_store.add_object(base_tree)
+                base = Commit()
+                base.tree = base_tree.id
+                base.author = base.committer = b"Test <test@example.com>"
+                base.author_time = base.commit_time = 0
+                base.author_timezone = base.commit_timezone = 0
+                base.message = b"base\n"
+                repo.object_store.add_object(base)
+                repo.refs[b"refs/heads/master"] = base.id
+                repo.refs.set_symbolic_ref(b"HEAD", b"refs/heads/master")
+                repo.get_worktree().reset_index(base_tree.id)
+
+                payload = Blob.from_string(b"payload\n")
+                repo.object_store.add_object(payload)
+                attack_tree = Tree()
+                attack_tree.add(b"ok.txt", stat.S_IFREG | 0o644, blob.id)
+                # ``git~1`` is the NTFS 8.3 short-name alias for ``.git``.
+                attack_tree.add(b"git~1", stat.S_IFREG | 0o755, payload.id)
+                repo.object_store.add_object(attack_tree)
+                attack = Commit()
+                attack.tree = attack_tree.id
+                attack.parents = [base.id]
+                attack.author = attack.committer = b"Test <test@example.com>"
+                attack.author_time = attack.commit_time = 0
+                attack.author_timezone = attack.commit_timezone = 0
+                attack.message = b"attack\n"
+                repo.object_store.add_object(attack)
+
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(tmpdir)
+                with self.assertLogs("dulwich.cli", level="ERROR"):
+                    ret = main(["merge", attack.id.decode()])
+                self.assertEqual(ret, 1)
+            finally:
+                os.chdir(old_cwd)
+
 
 if __name__ == "__main__":
     unittest.main()

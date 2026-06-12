@@ -118,10 +118,10 @@ class BisectStateTests(TestCase):
     def test_bisect_workflow(self) -> None:
         """Test a complete bisect workflow."""
         # Create some commits
-        c1 = make_commit(id=b"1" * 40, message=b"good commit 1")
-        c2 = make_commit(id=b"2" * 40, message=b"good commit 2", parents=[b"1" * 40])
-        c3 = make_commit(id=b"3" * 40, message=b"bad commit", parents=[b"2" * 40])
-        c4 = make_commit(id=b"4" * 40, message=b"bad commit 2", parents=[b"3" * 40])
+        c1 = make_commit(message=b"good commit 1")
+        c2 = make_commit(message=b"good commit 2", parents=[c1.id])
+        c3 = make_commit(message=b"bad commit", parents=[c2.id])
+        c4 = make_commit(message=b"bad commit 2", parents=[c3.id])
 
         # Add commits to object store
         for commit in [c1, c2, c3, c4]:

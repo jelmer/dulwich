@@ -45,15 +45,15 @@ class BisectPorcelainTests(TestCase):
         self.repo.object_store.add_object(tree)
 
         # Create some commits with proper trees
-        self.c1 = make_commit(id=b"1" * 40, message=b"initial commit", tree=tree.id)
+        self.c1 = make_commit(message=b"initial commit", tree=tree.id)
         self.c2 = make_commit(
-            id=b"2" * 40, message=b"second commit", parents=[b"1" * 40], tree=tree.id
+            message=b"second commit", parents=[self.c1.id], tree=tree.id
         )
         self.c3 = make_commit(
-            id=b"3" * 40, message=b"third commit", parents=[b"2" * 40], tree=tree.id
+            message=b"third commit", parents=[self.c2.id], tree=tree.id
         )
         self.c4 = make_commit(
-            id=b"4" * 40, message=b"fourth commit", parents=[b"3" * 40], tree=tree.id
+            message=b"fourth commit", parents=[self.c3.id], tree=tree.id
         )
 
         # Add commits to object store

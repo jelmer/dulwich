@@ -461,10 +461,19 @@ class BaseObjectStore:
         raise NotImplementedError(self.get_raw)
 
     def __getitem__(self, sha1: ObjectID | RawObjectID) -> ShaFile:
-        """Obtain an object by SHA1."""
+        """Obtain an object by SHA1.
+
+        Raises:
+          ChecksumMismatch: if the stored contents do not hash to the
+            requested object id.
+        """
+        if len(sha1) == self.object_format.oid_length:
+            hexsha = sha_to_hex(RawObjectID(sha1))
+        else:
+            hexsha = ObjectID(sha1)
         type_num, uncomp = self.get_raw(sha1)
         return ShaFile.from_raw_string(
-            type_num, uncomp, sha=sha1, object_format=self.object_format
+            type_num, uncomp, verify_sha=hexsha, object_format=self.object_format
         )
 
     def __iter__(self) -> Iterator[ObjectID]:

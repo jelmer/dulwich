@@ -3066,7 +3066,7 @@ class MktagCommandTest(DulwichCliTestCase):
         # Verify the tag object exists and has correct content
         from dulwich.objects import Tag
 
-        tag_obj = self.repo.object_store[tag_sha]
+        tag_obj = self.repo.object_store[tag_sha.encode("ascii")]
         self.assertIsInstance(tag_obj, Tag)
         self.assertEqual(tag_obj.object[1], commit_sha)
         self.assertEqual(tag_obj.name, b"v1.0")

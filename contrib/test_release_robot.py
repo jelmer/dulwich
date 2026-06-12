@@ -89,11 +89,12 @@ class GetRecentTagsTest(unittest.TestCase):
     test_repo = os.path.join(BASEDIR, "dulwich_test_repo.zip")
     committer = b"Mark Mikofski <mark.mikofski@sunpowercorp.com>"
     test_tags: ClassVar[list[bytes]] = [b"v0.1a", b"v0.1"]
-    tag_test_data: ClassVar[
-        dict[bytes, tuple[int, bytes, tuple[int, bytes] | None]]
-    ] = {
-        test_tags[0]: (1484788003, b"3" * 40, None),
-        test_tags[1]: (1484788314, b"1" * 40, (1484788401, b"2" * 40)),
+    # Commit times and tag times per tag. Object ids are filled in by
+    # setUpClass once the objects have been created, since the contents (and
+    # thus the ids) are computed from the commit/tag data.
+    tag_test_data: ClassVar[dict[bytes, list]] = {
+        test_tags[0]: [1484788003, None, None],
+        test_tags[1]: [1484788314, None, [1484788401, None]],
     }
 
     # Class attributes set in setUpClass
@@ -111,35 +112,35 @@ class GetRecentTagsTest(unittest.TestCase):
         obj_store = cls.repo.object_store  # test repo object store
         # commit 1 ('2017-01-19T01:06:43')
         cls.c1 = make_commit(
-            id=cls.tag_test_data[cls.test_tags[0]][1],
             commit_time=cls.tag_test_data[cls.test_tags[0]][0],
             message=b"unannotated tag",
             author=cls.committer,
         )
         obj_store.add_object(cls.c1)
+        cls.tag_test_data[cls.test_tags[0]][1] = cls.c1.id
         # tag 1: unannotated
         cls.t1 = cls.test_tags[0]
         cls.repo[b"refs/tags/" + cls.t1] = cls.c1.id  # add unannotated tag
         # commit 2 ('2017-01-19T01:11:54')
         cls.c2 = make_commit(
-            id=cls.tag_test_data[cls.test_tags[1]][1],
             commit_time=cls.tag_test_data[cls.test_tags[1]][0],
             message=b"annotated tag",
             parents=[cls.c1.id],
             author=cls.committer,
         )
         obj_store.add_object(cls.c2)
+        cls.tag_test_data[cls.test_tags[1]][1] = cls.c2.id
         # tag 2: annotated ('2017-01-19T01:13:21')
         tag_data = cls.tag_test_data[cls.test_tags[1]][2]
         if tag_data is None:
             raise AssertionError("test_tags[1] should have annotated tag data")
         cls.t2 = make_tag(
             cls.c2,
-            id=tag_data[1],
             name=cls.test_tags[1],
             tag_time=tag_data[0],
         )
         obj_store.add_object(cls.t2)
+        tag_data[1] = cls.t2.id
         cls.repo[b"refs/heads/master"] = cls.c2.id
         cls.repo[b"refs/tags/" + cls.t2.name] = cls.t2.id  # add annotated tag
 

@@ -1556,10 +1556,12 @@ class TestValidatePathElement(TestCase):
         # rejected when actually running on Windows).
         self.assertFalse(validate_path_element_ntfs(b".git\\hooks\\pre-commit"))
         self.assertFalse(validate_path_element_ntfs(b"a\\.git::$INDEX_ALLOCATION"))
-        # A backslash in an ordinary filename is accepted on POSIX, matching
-        # C git (``..\outside`` becomes a literal file inside the work tree).
-        self.assertTrue(validate_path_element_ntfs(b"..\\outside"))
-        self.assertTrue(validate_path_element_ntfs(b"a\\b"))
+        # A backslash in an ordinary filename is a literal byte on POSIX, but
+        # an actual path separator on Windows, where it is rejected so a tree
+        # authored on POSIX cannot escape the work tree.
+        bare_backslash_ok = os.name != "nt"
+        self.assertEqual(bare_backslash_ok, validate_path_element_ntfs(b"..\\outside"))
+        self.assertEqual(bare_backslash_ok, validate_path_element_ntfs(b"a\\b"))
 
     def test_non_ntfs_validators_accept_backslash(self) -> None:
         # On POSIX/HFS a backslash is a valid filename byte. The

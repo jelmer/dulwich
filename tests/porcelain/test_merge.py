@@ -519,8 +519,12 @@ class PorcelainMergeTests(TestCase):
                 # The alias aborts the merge checkout rather than being
                 # silently skipped.
                 self.assertRaises(InvalidPathError, porcelain.merge, repo, attack)
-                self.assertFalse(
-                    os.path.exists(os.path.join(tmpdir, "git~1")),
+                # Check the directory listing rather than os.path.exists: on
+                # Windows the latter resolves the ``git~1`` 8.3 short name onto
+                # the real ``.git`` directory and would report a phantom hit.
+                self.assertNotIn(
+                    "git~1",
+                    os.listdir(tmpdir),
                     "merge materialized an NTFS .git alias despite protectNTFS",
                 )
 

@@ -102,6 +102,18 @@ class TranslateTests(TestCase):
                 f"orig pattern: {pattern!r}, regex: {translate(pattern)!r}, expected: {regex!r}",
             )
 
+    def test_collapses_consecutive_stars(self) -> None:
+        # A run of '*' in a segment is redundant and must collapse to a
+        # single quantifier so the regex does not contain adjacent
+        # unbounded quantifiers that backtrack catastrophically.
+        self.assertEqual(b"(?ms)(.*/)?[^/]*x/?\\Z", translate(b"****x"))
+
+    def test_consecutive_stars_no_redos(self) -> None:
+        # A pattern of many '*' matched against a long non-matching path
+        # used to backtrack exponentially; it must now return promptly.
+        pattern = Pattern(b"*" * 50 + b"x", False)
+        self.assertFalse(pattern.match(b"a" * 80))
+
 
 class ReadIgnorePatterns(TestCase):
     def test_read_file(self) -> None:

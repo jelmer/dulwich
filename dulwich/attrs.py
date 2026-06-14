@@ -124,18 +124,22 @@ def _translate_pattern(pattern: bytes) -> bytes:
         i += 1
 
         if c == b"*":
-            if i < n and pattern[i : i + 1] == b"*":
-                # Double asterisk
+            # Consume the whole run of '*' so consecutive stars collapse to
+            # a single wildcard. Emitting one quantifier per star produces
+            # adjacent unbounded quantifiers (e.g. '.*.*.*') that backtrack
+            # catastrophically on non-matching input (ReDoS); collapsing is
+            # also semantically correct since repeated '*' are redundant.
+            double = i < n and pattern[i : i + 1] == b"*"
+            while i < n and pattern[i : i + 1] == b"*":
                 i += 1
+            if double:
+                # Double asterisk - matches across directory separators
                 if i < n and pattern[i : i + 1] == b"/":
                     # **/ - match zero or more directories
                     res += b"(?:.*/)??"
                     i += 1
-                elif i == n:
-                    # ** at end - match everything
-                    res += b".*"
                 else:
-                    # ** in middle
+                    # ** at end or in the middle
                     res += b".*"
             else:
                 # Single * - match any character except /

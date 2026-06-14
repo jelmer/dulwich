@@ -41,6 +41,7 @@ from dulwich.config import (
     apply_instead_of,
     env_config,
     get_git_proxy_command,
+    match_glob_pattern,
     parse_submodules,
     read_submodules,
 )
@@ -1584,3 +1585,21 @@ class ConfigFileSetTests(TestCase):
         self.assertEqual(1, content.count(b"sshCommand"))
         self.assertIn(b"sshCommand = ssh -i ~/.ssh/id_rsa2", content)
         self.assertNotIn(b"id_rsa1", content)
+
+
+class MatchGlobPatternTests(TestCase):
+    """Tests for match_glob_pattern."""
+
+    def test_single_star(self) -> None:
+        self.assertTrue(match_glob_pattern("foo", "*"))
+        self.assertFalse(match_glob_pattern("a/b", "*"))
+
+    def test_double_star(self) -> None:
+        self.assertTrue(match_glob_pattern("a/b", "**"))
+        self.assertTrue(match_glob_pattern("a/x/b", "a**b"))
+
+    def test_consecutive_stars_no_redos(self) -> None:
+        # A run of '*' collapses to a single quantifier so the regex does
+        # not contain adjacent unbounded quantifiers that backtrack
+        # exponentially on non-matching input.
+        self.assertFalse(match_glob_pattern("a" * 80, "*" * 50 + "x"))

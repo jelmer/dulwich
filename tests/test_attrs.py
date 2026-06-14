@@ -267,6 +267,15 @@ class PatternTests(TestCase):
         self.assertTrue(pattern.match(b"/README.txt"))
         self.assertFalse(pattern.match(b"src/README.txt"))
 
+    def test_consecutive_stars_no_redos(self):
+        """A run of '*' must not produce a catastrophically backtracking regex."""
+        # Many single '*' collapse to one [^/]* ...
+        pattern = Pattern(b"*" * 50 + b"x")
+        self.assertFalse(pattern.match(b"a" * 80))
+        # ... and a run of '**' collapses to a single cross-slash wildcard.
+        pattern = Pattern(b"**" * 25 + b"x")
+        self.assertFalse(pattern.match(b"a" * 80))
+
 
 class MatchPathTests(TestCase):
     """Test the match_path function."""

@@ -153,6 +153,11 @@ def match_glob_pattern(value: str, pattern: str) -> bool:
     Raises:
         ValueError: If the pattern is invalid
     """
+    # Collapse a run of consecutive '*' to at most '**'. Repeated stars are
+    # redundant, and translating each into its own quantifier would emit
+    # adjacent unbounded quantifiers (e.g. '.*.*') that backtrack
+    # catastrophically on non-matching input (ReDoS).
+    pattern = re.sub(r"\*\*+", "**", pattern)
     # Convert glob pattern to regex
     pattern_escaped = re.escape(pattern)
     # Replace escaped \*\* with .* (match anything)

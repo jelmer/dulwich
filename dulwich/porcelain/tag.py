@@ -67,7 +67,10 @@ def verify_tag(
       gpg.errors.MissingSignatures: if tag was not signed by a key
         specified in keyids
     """
-    from dulwich.signature import get_signature_vendor_for_signature
+    from dulwich.signature import (
+        UntrustedSignature,
+        get_signature_vendor_for_signature,
+    )
 
     from . import Error, open_repo_closing
 
@@ -82,6 +85,12 @@ def verify_tag(
 
         payload, signature, _sig_type = tag_obj.extract_signature()
         if signature is None:
+            if keyids:
+                raise UntrustedSignature(
+                    "tag is not signed by any of the trusted keys: "
+                    "no signature present",
+                    trusted_keys=list(keyids),
+                )
             return
 
         vendor = get_signature_vendor_for_signature(

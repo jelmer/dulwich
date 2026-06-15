@@ -2729,12 +2729,21 @@ def verify_commit(
       gpg.errors.MissingSignatures: if commit was not signed by a key
         specified in keyids
     """
-    from dulwich.signature import get_signature_vendor_for_signature
+    from dulwich.signature import (
+        UntrustedSignature,
+        get_signature_vendor_for_signature,
+    )
 
     with open_repo_closing(repo) as r:
         commit = parse_commit(r, committish)
         payload, signature, _sig_type = commit.extract_signature()
         if signature is None:
+            if keyids:
+                raise UntrustedSignature(
+                    "commit is not signed by any of the trusted keys: "
+                    "no signature present",
+                    trusted_keys=list(keyids),
+                )
             return
 
         vendor = get_signature_vendor_for_signature(

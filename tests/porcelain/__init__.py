@@ -1021,6 +1021,32 @@ class VerifyCommitTests(PorcelainGpgTestCase):
         # Verify should not raise for unsigned commits
         porcelain.verify_commit(self.repo.path, sha)
 
+    def test_verify_commit_unsigned_with_keyids(self) -> None:
+        """Test that an unsigned commit is rejected when trusted keyids are required."""
+        from dulwich.signature import UntrustedSignature
+
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        sha = porcelain.commit(
+            self.repo.path,
+            message="Unsigned commit",
+            author="Joe <joe@example.com>",
+            committer="Bob <bob@example.com>",
+            sign=False,
+        )
+
+        # Caller demands a trusted signer; an unsigned commit satisfies none.
+        self.assertRaises(
+            UntrustedSignature,
+            porcelain.verify_commit,
+            self.repo.path,
+            sha,
+            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        )
+
 
 @skipIf(
     platform.python_implementation() == "PyPy" or sys.platform == "win32",
@@ -1103,6 +1129,33 @@ class VerifyTagTests(PorcelainGpgTestCase):
 
         # Verify should not raise for unsigned tags
         porcelain.verify_tag(self.repo.path, b"unsigned-tag")
+
+    def test_verify_tag_unsigned_with_keyids(self) -> None:
+        """Test that an unsigned tag is rejected when trusted keyids are required."""
+        from dulwich.signature import UntrustedSignature
+
+        _c1, _c2, c3 = build_commit_graph(
+            self.repo.object_store, [[1], [2, 1], [3, 1, 2]]
+        )
+        self.repo.refs[b"HEAD"] = c3.id
+
+        porcelain.tag_create(
+            self.repo.path,
+            b"unsigned-tag",
+            b"Tagger <tagger@example.com>",
+            b"Unsigned tag message",
+            annotated=True,
+            sign=False,
+        )
+
+        # Caller demands a trusted signer; an unsigned tag satisfies none.
+        self.assertRaises(
+            UntrustedSignature,
+            porcelain.verify_tag,
+            self.repo.path,
+            b"unsigned-tag",
+            keyids=[PorcelainGpgTestCase.DEFAULT_KEY_ID],
+        )
 
 
 class TimezoneTests(PorcelainTestCase):

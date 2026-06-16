@@ -2656,6 +2656,13 @@ class TCPGitClient(TraditionalGitClient):
         assert self._proxy_command is not None
         import shlex
 
+        # The host comes from the URL (e.g. a submodule's git:// URL) and is
+        # passed to the proxy command as an argument. Reject a host that looks
+        # like a command-line option so the proxy program can't be tricked into
+        # interpreting it as one, matching the SubprocessSSHVendor guard.
+        if self._host.startswith("-"):
+            raise StrangeHostname(hostname=self._host)
+
         argv = [*shlex.split(self._proxy_command), self._host, str(self._port)]
         p = subprocess.Popen(
             argv,

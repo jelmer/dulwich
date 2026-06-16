@@ -2518,6 +2518,18 @@ class TCPGitClientTests(TestCase):
         c = TCPGitClient("example.com", proxy_command="my-proxy")
         self.assertEqual("my-proxy", c._proxy_command)
 
+    def test_connect_via_proxy_rejects_dashed_host(self) -> None:
+        c = TCPGitClient("-oProxyCommand=evil", proxy_command="my-proxy")
+        with patch.object(
+            client.subprocess, "Popen", side_effect=AssertionError("spawned")
+        ):
+            self.assertRaises(
+                StrangeHostname,
+                c._connect_via_proxy,
+                b"upload-pack",
+                b"/repo",
+            )
+
     def test_from_parsedurl_with_proxy_config(self) -> None:
         from io import BytesIO
         from urllib.parse import urlparse

@@ -1081,6 +1081,42 @@ diff --git a/file.txt b/file.txt
         self.assertIn("Keep this part", result.message)
         self.assertNotIn("Ignore this part", result.message)
 
+    def test_scissors_formats(self):
+        """Recognized scissors line formats keep matching after the rewrite."""
+        from dulwich.patch import _find_scissors_line
+
+        for marker in [
+            b"-- >8 --",
+            b"--- 8< ---",
+            b"-->8--",
+            b"-- cut here --",
+            b"-- scissors --",
+            b"------------",
+        ]:
+            self.assertEqual(
+                0, _find_scissors_line([marker]), f"should match {marker!r}"
+            )
+        for non_marker in [b"", b"plain text", b"> quoted reply"]:
+            self.assertIsNone(
+                _find_scissors_line([non_marker]), f"should not match {non_marker!r}"
+            )
+
+    def test_scissors_line_not_quadratic(self):
+        """A long perforation-like line must not backtrack quadratically.
+
+        The previous pattern split one run of dashes between two unbounded
+        ``-+`` groups, so a non-matching line of N dashes took O(N**2) time
+        through ``git am --scissors`` on an untrusted mailbox.
+        """
+        import time
+
+        from dulwich.patch import _find_scissors_line
+
+        line = b"-" * 200000 + b"x"
+        start = time.monotonic()
+        self.assertIsNone(_find_scissors_line([line]))
+        self.assertLess(time.monotonic() - start, 2.0)
+
     def test_message_id(self):
         """Test -m flag (include Message-ID)."""
         from io import BytesIO

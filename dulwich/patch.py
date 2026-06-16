@@ -956,8 +956,18 @@ def _find_scissors_line(lines: list[bytes]) -> int | None:
     Returns:
         Index of scissors line, or None if not found
     """
+    # The perforation alternatives are written so no two unbounded ``-+``
+    # quantifiers are separated by an optional/empty subpattern. The earlier
+    # form ``(?:>?\s*-+\s*)?(?:8<|>8)?\s*-+\s*`` let a single run of dashes be
+    # split between two ``-+`` groups, so a long non-matching line of dashes
+    # backtracked quadratically (ReDoS) when fed through ``mailinfo`` /
+    # ``git am --scissors`` on an untrusted mailbox. Here a marker is the
+    # mandatory pivot between the two dash runs, and the marker-less case uses a
+    # bounded ``(?:\s+-+)?`` second run, keeping the match linear.
     scissors_pattern = re.compile(
-        rb"^(?:>?\s*-+\s*)?(?:8<|>8)?\s*-+\s*$|^(?:>?\s*-+\s*)(?:cut here|scissors)(?:\s*-+)?$",
+        rb"^>?\s*-+(?:\s+-+)?\s*$"
+        rb"|^>?\s*(?:-+\s*)?(?:8<|>8)\s*-+\s*$"
+        rb"|^(?:>?\s*-+\s*)(?:cut here|scissors)(?:\s*-+)?$",
         re.IGNORECASE,
     )
 

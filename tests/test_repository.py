@@ -32,8 +32,11 @@ import sys
 import tempfile
 import time
 import warnings
+from pathlib import Path
 
 from dulwich import errors, objects
+from dulwich.attrs import GitAttributes
+from dulwich.client import LocalGitClient
 from dulwich.config import Config
 from dulwich.errors import NotGitRepository
 from dulwich.index import get_unstaged_changes as _get_unstaged_changes
@@ -135,8 +138,6 @@ class CreateRepositoryTests(TestCase):
         self._check_repo_contents(repo, True)
 
     def test_create_disk_bare_pathlib(self) -> None:
-        from pathlib import Path
-
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo_path = Path(tmp_dir)
@@ -150,8 +151,6 @@ class CreateRepositoryTests(TestCase):
         self.assertEqual(ref_path, expected_path)
 
     def test_create_disk_non_bare_pathlib(self) -> None:
-        from pathlib import Path
-
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
         repo_path = Path(tmp_dir)
@@ -160,8 +159,6 @@ class CreateRepositoryTests(TestCase):
         self._check_repo_contents(repo, False)
 
     def test_open_repo_pathlib(self) -> None:
-        from pathlib import Path
-
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
         # First create a repo
@@ -175,8 +172,6 @@ class CreateRepositoryTests(TestCase):
         repo2.close()
 
     def test_create_disk_bare_mkdir_pathlib(self) -> None:
-        from pathlib import Path
-
         tmp_dir = tempfile.mkdtemp()
         target_path = Path(tmp_dir) / "target"
         self.addCleanup(shutil.rmtree, tmp_dir)
@@ -200,10 +195,6 @@ class MemoryRepoTests(TestCase):
 
     def test_fetch_from_git_cloned_repo(self) -> None:
         """Test fetching from a git-cloned repo into MemoryRepo (issue #1179)."""
-        import tempfile
-
-        from dulwich.client import LocalGitClient
-
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create initial repo using dulwich
             initial_path = os.path.join(tmpdir, "initial")
@@ -368,7 +359,6 @@ class RepositoryRootTests(TestCase):
         # Test when no .gitattributes file exists
         r = self.open_repo("a.git")
         attrs = r.get_gitattributes()
-        from dulwich.attrs import GitAttributes
 
         self.assertIsInstance(attrs, GitAttributes)
         self.assertEqual(len(attrs), 0)
@@ -1987,10 +1977,6 @@ class RepoConfigIncludeIfTests(TestCase):
 
     def test_repo_config_includeif_gitdir(self) -> None:
         """Test that includeIf gitdir conditions work when loading repo config."""
-        import tempfile
-
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a repository
             repo_path = os.path.join(tmpdir, "myrepo")
@@ -2023,10 +2009,6 @@ class RepoConfigIncludeIfTests(TestCase):
 
     def test_repo_config_includeif_gitdir_pattern(self) -> None:
         """Test includeIf gitdir pattern matching in repository config."""
-        import tempfile
-
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a repository under "work" directory
             work_dir = os.path.join(tmpdir, "work", "project1")
@@ -2057,10 +2039,6 @@ class RepoConfigIncludeIfTests(TestCase):
 
     def test_repo_config_includeif_no_match(self) -> None:
         """Test that includeIf doesn't include when condition doesn't match."""
-        import tempfile
-
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a repository
             repo_path = os.path.join(tmpdir, "personal", "project")
@@ -2091,10 +2069,6 @@ class RepoConfigIncludeIfTests(TestCase):
 
     def test_bare_repo_config_includeif(self) -> None:
         """Test includeIf in bare repository."""
-        import tempfile
-
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a bare repository
             repo_path = os.path.join(tmpdir, "bare.git")
@@ -2127,10 +2101,6 @@ class RepoConfigIncludeIfTests(TestCase):
 
     def test_repo_config_includeif_hasconfig(self) -> None:
         """Test includeIf hasconfig conditions in repository config."""
-        import tempfile
-
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a repository
             repo_path = os.path.join(tmpdir, "myrepo")
@@ -2163,10 +2133,6 @@ class RepoConfigIncludeIfTests(TestCase):
 
     def test_repo_config_includeif_onbranch(self) -> None:
         """Test includeIf onbranch conditions in repository config."""
-        import tempfile
-
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a repository
             repo_path = os.path.join(tmpdir, "myrepo")

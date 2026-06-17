@@ -17,6 +17,7 @@
 """Tests for the range-diff implementation."""
 
 import importlib.util
+import shutil
 import sys
 import tempfile
 import unittest
@@ -120,8 +121,6 @@ class RangeDiffTestCase(TestCase):
         self._commit_time = 0
 
     def _cleanup(self):
-        import shutil
-
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def commit(self, message, files):

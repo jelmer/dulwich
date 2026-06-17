@@ -18,6 +18,7 @@
 
 """Tests for annotate support."""
 
+import shutil
 import tempfile
 from typing import Any
 from unittest import TestCase
@@ -126,8 +127,6 @@ class AnnotateLinesTestCase(TestCase):
 
     def tearDown(self) -> None:
         self.repo.close()
-        import shutil
-
         shutil.rmtree(self.temp_dir)
 
     def _make_commit(

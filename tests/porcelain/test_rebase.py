@@ -22,6 +22,7 @@
 """Tests for porcelain rebase functions."""
 
 import os
+import shutil
 import tempfile
 
 from dulwich import porcelain
@@ -52,8 +53,6 @@ class RebasePorcelainTestCase(TestCase):
 
     def tearDown(self):
         """Clean up test directory."""
-        import shutil
-
         shutil.rmtree(self.test_dir)
 
     def test_porcelain_rebase(self):

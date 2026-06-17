@@ -21,6 +21,7 @@
 
 """Tests for dulwich.maintenance."""
 
+import shutil
 import tempfile
 
 from dulwich.maintenance import (
@@ -50,8 +51,6 @@ class MaintenanceTaskTestCase(TestCase):
         self.addCleanup(self.repo.close)
 
     def _cleanup_test_dir(self):
-        import shutil
-
         shutil.rmtree(self.test_dir)
 
     def _create_commit(self):

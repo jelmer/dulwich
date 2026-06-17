@@ -26,6 +26,7 @@ import os
 import shutil
 import sys
 import tempfile
+import types
 import zlib
 from hashlib import sha1
 from io import BytesIO
@@ -37,12 +38,14 @@ from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, Commit, Tree, hex_to_sha, sha_to_hex
 from dulwich.pack import (
+    DEFAULT_PACK_INDEX_VERSION,
     OFS_DELTA,
     REF_DELTA,
     DeltaChainIterator,
     MemoryPackIndex,
     Pack,
     PackData,
+    PackFileDisappeared,
     PackIndex3,
     PackStreamReader,
     UnpackedObject,
@@ -59,6 +62,7 @@ from dulwich.pack import (
     unpack_object,
     write_pack,
     write_pack_header,
+    write_pack_index,
     write_pack_index_v1,
     write_pack_index_v2,
     write_pack_index_v3,
@@ -339,7 +343,6 @@ class TestPackDeltas(TestCase):
 
     def _do_test_create_delta_various_cases(self, create_delta_func):
         """Test create_delta with various input cases for both Python and Rust versions."""
-        import types
 
         # Helper to normalize delta output (Rust returns bytes, Python returns Iterator[bytes])
         def get_delta(base, target):
@@ -423,7 +426,6 @@ class TestPackDeltas(TestCase):
 
     def _do_test_create_delta_output_consistency(self, create_delta_func):
         """Test that create_delta produces consistent and valid output."""
-        import types
 
         # Helper to normalize delta output
         def get_delta(base, target):
@@ -465,7 +467,6 @@ class TestPackDeltas(TestCase):
 
     def _do_test_create_delta_produces_valid_deltas(self, create_delta_func):
         """Test that deltas produced are valid Git delta format."""
-        import types
 
         # Helper to normalize delta output
         def get_delta(base, target):
@@ -896,8 +897,6 @@ class TestPack(PackTests):
 
     def test_index_missing_file_raises_pack_disappeared(self) -> None:
         """A missing .idx surfaces as PackFileDisappeared, not FileNotFoundError."""
-        from dulwich.pack import PackFileDisappeared
-
         basename = os.path.join(self.tempdir, "vanished-pack")
         pack = Pack(basename, object_format=DEFAULT_OBJECT_FORMAT)
         self.addCleanup(pack.close)
@@ -907,8 +906,6 @@ class TestPack(PackTests):
 
     def test_data_missing_file_raises_pack_disappeared(self) -> None:
         """A missing .pack surfaces as PackFileDisappeared, not FileNotFoundError."""
-        from dulwich.pack import PackFileDisappeared
-
         basename = os.path.join(self.tempdir, "vanished-pack")
         pack = Pack(basename, object_format=DEFAULT_OBJECT_FORMAT)
         self.addCleanup(pack.close)
@@ -1166,8 +1163,6 @@ class TestMemoryIndexWriting(TestCase, BaseTestPackIndexWriting):
         self._supports_large = True
 
     def index(self, filename, entries, pack_checksum):
-        from dulwich.object_format import DEFAULT_OBJECT_FORMAT
-
         return MemoryPackIndex(entries, DEFAULT_OBJECT_FORMAT, pack_checksum)
 
     def tearDown(self) -> None:
@@ -1274,20 +1269,10 @@ class WritePackIndexTests(TestCase):
     """Tests for the configurable write_pack_index function."""
 
     def test_default_pack_index_version_constant(self) -> None:
-        from dulwich.pack import DEFAULT_PACK_INDEX_VERSION
-
         # Ensure the constant is set to version 2 (current Git default)
         self.assertEqual(2, DEFAULT_PACK_INDEX_VERSION)
 
     def test_write_pack_index_defaults_to_v2(self) -> None:
-        import tempfile
-
-        from dulwich.pack import (
-            DEFAULT_PACK_INDEX_VERSION,
-            load_pack_index,
-            write_pack_index,
-        )
-
         tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tempdir)
 
@@ -1301,10 +1286,6 @@ class WritePackIndexTests(TestCase):
         self.assertEqual(DEFAULT_PACK_INDEX_VERSION, idx.version)
 
     def test_write_pack_index_version_1(self) -> None:
-        import tempfile
-
-        from dulwich.pack import load_pack_index, write_pack_index
-
         tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tempdir)
 
@@ -1318,10 +1299,6 @@ class WritePackIndexTests(TestCase):
         self.assertEqual(1, idx.version)
 
     def test_write_pack_index_version_3(self) -> None:
-        import tempfile
-
-        from dulwich.pack import load_pack_index, write_pack_index
-
         tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tempdir)
 
@@ -1335,10 +1312,6 @@ class WritePackIndexTests(TestCase):
         self.assertEqual(3, idx.version)
 
     def test_write_pack_index_invalid_version(self) -> None:
-        import tempfile
-
-        from dulwich.pack import write_pack_index
-
         tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tempdir)
 

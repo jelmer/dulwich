@@ -23,13 +23,17 @@
 
 import errno
 import os
+import platform
 import shutil
 import stat
 import struct
 import sys
 import tempfile
+import unicodedata
 from io import BytesIO
+from pathlib import Path
 
+import dulwich.index
 from dulwich.config import ConfigDict, ConfigFile
 from dulwich.diff_tree import (
     CHANGE_ADD,
@@ -41,15 +45,22 @@ from dulwich.diff_tree import (
     tree_changes,
 )
 from dulwich.index import (
+    EXTENDED_FLAG_SKIP_WORKTREE,
+    SDIR_EXTENSION,
+    ConflictedIndexEntry,
     Index,
     IndexEntry,
+    InvalidPathError,
     SerializedIndexEntry,
+    SparseDirExtension,
     _compress_path,
     _decode_utf8_with_fallback,
     _decode_varint,
     _decompress_path,
     _encode_varint,
+    _ensure_parent_dir_exists,
     _fs_to_tree_path,
+    _has_directory_changed,
     _tree_to_fs_path,
     build_index_from_tree,
     cleanup_mode,
@@ -61,16 +72,20 @@ from dulwich.index import (
     index_entry_from_stat,
     iter_fresh_entries,
     make_path_normalizer,
+    read_cache_entry,
     read_index,
     read_index_dict,
+    read_submodule_head,
     update_working_tree,
     validate_path_element_default,
     validate_path_element_hfs,
     validate_path_element_ntfs,
+    write_cache_entry,
     write_cache_time,
     write_index,
     write_index_dict,
 )
+from dulwich.line_ending import BlobNormalizer
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, Tree, TreeEntry
 from dulwich.repo import Repo
@@ -149,9 +164,6 @@ class SimpleIndexTestCase(IndexTestCase):
         self.assertEqual(b"e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", newsha)
 
     def test_index_pathlib(self) -> None:
-        import tempfile
-        from pathlib import Path
-
         # Create a temporary index file
         with tempfile.NamedTemporaryFile(suffix=".index", delete=False) as f:
             temp_path = f.name
@@ -319,8 +331,6 @@ class MakePathNormalizerTests(TestCase):
         self.assertEqual(b"foo.txt", normalize(b"Foo.TXT"))
 
     def test_precomposeunicode(self) -> None:
-        import unicodedata
-
         normalize = make_path_normalizer(self._config(precomposeunicode=b"true"))
         self.assertIsNotNone(normalize)
         assert normalize is not None
@@ -329,8 +339,6 @@ class MakePathNormalizerTests(TestCase):
         self.assertEqual(nfc, normalize(nfd))
 
     def test_both(self) -> None:
-        import unicodedata
-
         normalize = make_path_normalizer(
             self._config(ignorecase=b"true", precomposeunicode=b"true")
         )
@@ -592,7 +600,6 @@ class BuildIndexTests(TestCase):
         # A ``.git/`` path is invalid and must abort the whole checkout
         # rather than being silently skipped while other entries are
         # written.
-        from dulwich.index import InvalidPathError
 
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -628,7 +635,6 @@ class BuildIndexTests(TestCase):
         # otherwise an attacker could plant ``.git\hooks\pre-commit.exe`` on
         # a Windows clone. Each is checked on its own so a single benign
         # entry alongside it never gets written.
-        from dulwich.index import InvalidPathError, validate_path_element_ntfs
 
         evil_names = [
             b".git\\hooks\\pre-commit.exe",
@@ -664,7 +670,6 @@ class BuildIndexTests(TestCase):
         # character in general, but not a ``.git`` alternate-data-stream
         # form) must still be checked out, matching C git which only
         # rejects the ``.git``/``git~1`` ADS spellings. See issue #2205.
-        from dulwich.index import validate_path_element_ntfs
 
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -924,7 +929,6 @@ class BuildIndexTests(TestCase):
             if sys.platform == "win32":
                 # On Windows, test that _tree_to_fs_path and _fs_to_tree_path
                 # handle UTF-8 encoded tree paths correctly
-                from dulwich.index import _fs_to_tree_path, _tree_to_fs_path
 
                 repo_path_bytes = os.fsencode(repo.path)
 
@@ -1098,8 +1102,6 @@ class BuildIndexTests(TestCase):
         """Test that build_index_from_tree applies line-ending normalization."""
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
-
-        from dulwich.line_ending import BlobNormalizer
 
         with Repo.init(repo_dir) as repo:
             # Set up autocrlf config
@@ -1736,7 +1738,6 @@ class TestTreeFSPathConversion(TestCase):
         original_sep = os.sep.encode("ascii")
         # Temporarily modify os_sep_bytes to test Windows path conversion
         # This simulates Windows behavior on all platforms for testing
-        import dulwich.index
 
         dulwich.index.os_sep_bytes = b"\\"
         self.addCleanup(setattr, dulwich.index, "os_sep_bytes", original_sep)
@@ -1764,7 +1765,6 @@ class TestTreeFSPathConversion(TestCase):
         fs_path = b"path\\with\\backslash"
         original_sep = os.sep.encode("ascii")
         # Temporarily modify os_sep_bytes to test Windows path conversion
-        import dulwich.index
 
         dulwich.index.os_sep_bytes = b"\\"
         self.addCleanup(setattr, dulwich.index, "os_sep_bytes", original_sep)
@@ -1976,8 +1976,6 @@ class TestIndexEntryFromPath(TestCase):
 
     def test_read_submodule_head(self) -> None:
         """Test reading the HEAD of a submodule."""
-        from dulwich.index import read_submodule_head
-
         # Create a test repo that will be our "submodule"
         sub_repo_dir = os.path.join(self.tempdir, "subrepo")
         os.mkdir(sub_repo_dir)
@@ -2013,8 +2011,6 @@ class TestIndexEntryFromPath(TestCase):
 
     def test_has_directory_changed(self) -> None:
         """Test checking if a directory has changed."""
-        from dulwich.index import IndexEntry, _has_directory_changed
-
         # Setup mock IndexEntry
         mock_entry = IndexEntry(
             (1230680220, 0),
@@ -2094,13 +2090,6 @@ class TestIndexEntryFromPath(TestCase):
 
     def test_get_unstaged_changes(self) -> None:
         """Test detecting unstaged changes in a working tree."""
-        from dulwich.index import (
-            ConflictedIndexEntry,
-            Index,
-            IndexEntry,
-            get_unstaged_changes,
-        )
-
         # Create a test repo
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)
@@ -2109,7 +2098,6 @@ class TestIndexEntryFromPath(TestCase):
         index = Index(os.path.join(repo_dir, "index"))
 
         # Create an actual hash of our test content
-        from dulwich.objects import Blob
 
         test_blob = Blob()
         test_blob.data = b"initial content"
@@ -2366,7 +2354,6 @@ class TestManyFilesFeature(TestCase):
 
         # Test version 2 (with padding, full paths)
         buf_v2 = BytesIO()
-        from dulwich.index import write_cache_entry
 
         previous_path = b""
         for entry in entries:
@@ -2402,7 +2389,6 @@ class TestManyFilesFeature(TestCase):
 
         # Both should parse correctly
         buf_v2.seek(0)
-        from dulwich.index import read_cache_entry
 
         previous_path = b""
         parsed_v2_entries = []
@@ -2864,8 +2850,6 @@ class TestUpdateWorkingTree(TestCase):
 
             def remove_readonly(func, path, excinfo):
                 """Error handler for Windows read-only files."""
-                import stat
-
                 if sys.platform == "win32" and excinfo[0] is PermissionError:
                     os.chmod(path, stat.S_IWRITE)
                     func(path)
@@ -3270,8 +3254,6 @@ class TestUpdateWorkingTree(TestCase):
 
     def test_update_working_tree_submodule_with_untracked_files(self):
         """Test that submodules with untracked files are not removed."""
-        from dulwich.objects import S_IFGITLINK, Tree
-
         # Create tree with submodule
         submodule_sha = b"a" * 40
         tree1 = Tree()
@@ -3772,8 +3754,6 @@ class TestUpdateWorkingTree(TestCase):
 
     def test_ensure_parent_dir_exists_windows_drive(self):
         """Test that _ensure_parent_dir_exists handles Windows drive letters correctly."""
-        from dulwich.index import _ensure_parent_dir_exists
-
         # Create a temporary directory to work with
         with tempfile.TemporaryDirectory() as tmpdir:
             # Test normal case (creates directory)
@@ -3802,7 +3782,6 @@ class TestUpdateWorkingTree(TestCase):
             # Test that various path formats are handled correctly by os.path.dirname
             # This includes Windows drive letters, UNC paths, etc.
             # The key is that we're using os.path.dirname which handles these correctly
-            import platform
 
             if platform.system() == "Windows":
                 # Test Windows-specific paths only on Windows
@@ -3823,8 +3802,6 @@ class TestSparseIndex(TestCase):
 
     def test_serialized_index_entry_is_sparse_dir(self):
         """Test SerializedIndexEntry.is_sparse_dir() method."""
-        from dulwich.index import EXTENDED_FLAG_SKIP_WORKTREE
-
         # Regular file entry - not sparse
         regular_entry = SerializedIndexEntry(
             name=b"file.txt",
@@ -3895,8 +3872,6 @@ class TestSparseIndex(TestCase):
 
     def test_index_entry_is_sparse_dir(self):
         """Test IndexEntry.is_sparse_dir() method."""
-        from dulwich.index import EXTENDED_FLAG_SKIP_WORKTREE
-
         # Regular file - not sparse
         regular = IndexEntry(
             ctime=0,
@@ -3930,8 +3905,6 @@ class TestSparseIndex(TestCase):
 
     def test_sparse_dir_extension(self):
         """Test SparseDirExtension serialization."""
-        from dulwich.index import SDIR_EXTENSION, SparseDirExtension
-
         ext = SparseDirExtension()
         self.assertEqual(ext.signature, SDIR_EXTENSION)
         self.assertEqual(ext.to_bytes(), b"")
@@ -3943,8 +3916,6 @@ class TestSparseIndex(TestCase):
 
     def test_index_is_sparse(self):
         """Test Index.is_sparse() method."""
-        from dulwich.index import SparseDirExtension
-
         with tempfile.TemporaryDirectory() as tmpdir:
             index_path = os.path.join(tmpdir, "index")
             idx = Index(index_path, read=False)
@@ -3958,10 +3929,6 @@ class TestSparseIndex(TestCase):
 
     def test_index_expansion(self):
         """Test Index.ensure_full_index() expands sparse directories."""
-        from dulwich.index import EXTENDED_FLAG_SKIP_WORKTREE, SparseDirExtension
-        from dulwich.object_store import MemoryObjectStore
-        from dulwich.objects import Blob, Tree
-
         # Create a tree structure
         store = MemoryObjectStore()
 
@@ -4019,9 +3986,6 @@ class TestSparseIndex(TestCase):
 
     def test_index_collapse(self):
         """Test Index.convert_to_sparse() collapses directories."""
-        from dulwich.object_store import MemoryObjectStore
-        from dulwich.objects import Blob, Tree
-
         # Create a tree structure
         store = MemoryObjectStore()
 

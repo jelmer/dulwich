@@ -22,6 +22,8 @@
 """Compatibility tests for git check-ignore functionality."""
 
 import os
+import shutil
+import sys
 import tempfile
 from collections.abc import Sequence
 
@@ -44,8 +46,6 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
         self.addCleanup(self.repo.close)
 
     def _cleanup_test_dir(self) -> None:
-        import shutil
-
         shutil.rmtree(self.test_dir)
 
     def _write_gitignore(self, content: str) -> None:
@@ -976,8 +976,6 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
 
     def test_asterisk_escaping_and_special_chars(self) -> None:
         """Test asterisk patterns with special characters and potential escaping."""
-        import sys
-
         self._write_gitignore(
             "\\*literal\n**/*.\\*\n[*]bracket\n*\\[escape\\]\n*.{tmp,log}\n"
         )

@@ -25,7 +25,7 @@ import shutil
 import tempfile
 
 from dulwich.errors import ObjectFormatException
-from dulwich.objects import Tree
+from dulwich.objects import Commit, Tree
 from dulwich.repo import MemoryRepo, Repo, parse_graftpoints, serialize_graftpoints
 
 from . import TestCase
@@ -211,8 +211,6 @@ class GraftsInMemoryRepoTests(GraftsInRepositoryBase, TestCase):
         }
 
         # Create commits directly for MemoryRepo since it doesn't support worktree
-        from dulwich.objects import Commit
-
         for i in range(3):
             c = Commit()
             c.message = b"empty commit"

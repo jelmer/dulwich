@@ -39,7 +39,11 @@ except ImportError:
     web = None  # type: ignore
     aiohttp_missing = True
 
-from dulwich.server import ReceivePackHandler
+from dulwich.server import (
+    DEFAULT_HANDLERS,
+    ReceivePackHandler,
+    UploadPackHandler,
+)
 
 from .. import SkipTest, skipIf
 from .server_utils import NoSideBand64kReceivePackHandler, ServerTests
@@ -116,8 +120,6 @@ class SmartAiohttpTestCase(AiohttpServerTests, CompatTestCase):
         return {b"git-receive-pack": NoSideBand64kReceivePackHandler}
 
     def _make_app(self, repo):
-        from dulwich.server import DEFAULT_HANDLERS
-
         handlers = dict(DEFAULT_HANDLERS)
         handlers.update(self._handlers())
         return create_repo_app(repo, handlers=handlers)
@@ -147,15 +149,11 @@ class SmartAiohttpSideBand64kTestCase(SmartAiohttpTestCase):
     min_git_version = (1, 7, 0, 2)
 
     def setUp(self) -> None:
-        from dulwich.server import UploadPackHandler
-
         self.o_uph_cap = patch_capabilities(UploadPackHandler, (b"no-done",))
         self.o_rph_cap = patch_capabilities(ReceivePackHandler, (b"no-done",))
         super().setUp()
 
     def tearDown(self) -> None:
-        from dulwich.server import UploadPackHandler
-
         super().tearDown()
         UploadPackHandler.capabilities = self.o_uph_cap
         ReceivePackHandler.capabilities = self.o_rph_cap

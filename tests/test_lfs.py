@@ -978,9 +978,9 @@ class LFSServerTests(TestCase):
 
     def test_server_upload_oid_mismatch(self) -> None:
         """Test upload with OID mismatch."""
-        # Upload with wrong OID
+        # Upload with a well-formed OID that does not match the content
         upload_req = Request(
-            f"{self.server_url}/objects/wrongoid123",
+            f"{self.server_url}/objects/{'0' * 64}",
             data=b"test content",
             headers={"Content-Type": "application/octet-stream"},
             method="PUT",
@@ -1124,9 +1124,9 @@ class LFSClientTests(TestCase):
             )
         self.assertIn("Object not found", str(cm.exception))
 
-        # Test uploading with wrong OID
+        # Test uploading with a well-formed OID that does not match the content
         with self.assertRaises(HTTPError) as cm:
-            self.client.upload("wrong_oid", 5, b"hello")
+            self.client.upload("0" * 64, 5, b"hello")
         # Server should reject due to OID mismatch
         self.assertIn("OID mismatch", str(cm.exception))
 

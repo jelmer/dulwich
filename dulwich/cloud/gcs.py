@@ -29,7 +29,7 @@ __all__ = [
 import posixpath
 import tempfile
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, BinaryIO, cast
 
 from ..object_store import BucketBasedObjectStore
 from ..pack import (
@@ -80,8 +80,6 @@ class GcsObjectStore(BucketBasedObjectStore):
 
     def _load_pack_data(self, name: str) -> PackData:
         b = self.bucket.blob(posixpath.join(self.subpath, name + ".pack"))
-        from typing import cast
-
         from ..file import _GitFile
 
         with tempfile.SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE) as f:

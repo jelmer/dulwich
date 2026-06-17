@@ -34,6 +34,7 @@ __all__ = [
 
 import mailbox
 import os
+import tempfile
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, TextIO
@@ -214,8 +215,6 @@ def _parse_mbox_from_file(file_obj: BinaryIO) -> Iterator[mailbox.mboxMessage]:
     Yields:
         Individual mboxMessage objects
     """
-    import tempfile
-
     # Create a temporary file to hold the mbox data
     with tempfile.NamedTemporaryFile(mode="wb", delete=False) as tmp:
         tmp.write(file_obj.read())

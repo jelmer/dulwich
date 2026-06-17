@@ -53,9 +53,10 @@ import os
 import tempfile
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
 from urllib.parse import urljoin, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import Request, url2pathname, urlopen
 
 logger = logging.getLogger(__name__)
 
@@ -516,8 +517,6 @@ class LFSClient:
             if not parsed.scheme or is_windows_path:
                 local_path = remote_url
             elif parsed.scheme == "file":
-                from urllib.request import url2pathname
-
                 local_path = url2pathname(parsed.path)
             else:
                 local_path = None
@@ -527,8 +526,6 @@ class LFSClient:
                 # Worktrees keep LFS data under <remote>/.git/lfs; bare repos
                 # keep it under <remote>/lfs. Probe for an existing layout and
                 # fall back to the worktree layout if neither exists yet.
-                from pathlib import Path
-
                 candidates = [
                     os.path.join(local_path, ".git", "lfs"),
                     os.path.join(local_path, "lfs"),

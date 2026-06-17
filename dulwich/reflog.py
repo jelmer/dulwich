@@ -32,7 +32,9 @@ __all__ = [
 ]
 
 import collections
+import os
 from collections.abc import Callable, Generator
+from pathlib import Path
 from typing import IO, BinaryIO
 
 from .file import _GitFile
@@ -298,9 +300,6 @@ def iter_reflogs(logs_dir: str) -> Generator[bytes, None, None]:
     Yields:
         Reference names (as bytes) that have reflogs
     """
-    import os
-    from pathlib import Path
-
     if not os.path.exists(logs_dir):
         return
 

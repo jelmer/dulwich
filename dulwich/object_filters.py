@@ -48,6 +48,7 @@ __all__ = [
     "parse_filter_spec",
 ]
 
+import stat
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -494,8 +495,6 @@ def filter_pack_objects_with_paths(
     Returns:
         Filtered list of object IDs that should be included in the pack
     """
-    import stat
-
     included_objects: set[ObjectID] = set()
     # Track (oid, path, depth) tuples to process
     to_process: list[tuple[ObjectID, str, int]] = []

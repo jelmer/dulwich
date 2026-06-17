@@ -32,6 +32,7 @@ __all__ = [
 import sys
 import types
 from collections.abc import Callable, Iterator, Sequence
+from io import BytesIO
 from typing import (
     TYPE_CHECKING,
     BinaryIO,
@@ -48,7 +49,7 @@ else:
 if TYPE_CHECKING:
     from .object_format import ObjectFormat
 
-from .objects import ObjectID
+from .objects import ObjectID, ShaFile
 from .pack import PackData, UnpackedObject, write_pack_data
 from .refs import Ref
 
@@ -154,8 +155,6 @@ class Bundle:
             object_store: The object store to add objects to
             progress: Optional progress callback function
         """
-        from .objects import ShaFile
-
         if self.pack_data is None:
             raise ValueError("pack_data is not loaded")
         count = 0
@@ -204,8 +203,6 @@ def _read_bundle(f: BinaryIO, version: int) -> Bundle:
     pack_bytes = f.read()
     if not pack_bytes:
         raise ValueError("Bundle file contains no pack data")
-
-    from io import BytesIO
 
     from .object_format import DEFAULT_OBJECT_FORMAT
 

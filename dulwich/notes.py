@@ -33,10 +33,11 @@ __all__ = [
 ]
 
 import stat
+import time
 from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING
 
-from .objects import Blob, ObjectID, Tree
+from .objects import Blob, Commit, ObjectID, Tree
 from .refs import Ref
 
 if TYPE_CHECKING:
@@ -669,8 +670,6 @@ class Notes:
         notes_obj = self._object_store[notes_commit_sha]
 
         # If it's a commit, get the tree from it
-        from .objects import Commit
-
         if isinstance(notes_obj, Commit):
             notes_tree = self._object_store[notes_obj.tree]
         else:
@@ -707,9 +706,6 @@ class Notes:
         Returns:
             SHA of the new notes commit
         """
-        import time
-
-        from .objects import Commit
         from .repo import get_user_identity
 
         notes_ref = self.get_notes_ref(notes_ref, config)
@@ -790,9 +786,6 @@ class Notes:
         Returns:
             SHA of the new notes commit, or None if no note existed
         """
-        import time
-
-        from .objects import Commit
         from .repo import get_user_identity
 
         notes_ref = self.get_notes_ref(notes_ref, config)
@@ -871,8 +864,6 @@ class Notes:
             return []
 
         # Get the commit object
-        from .objects import Commit
-
         notes_obj = self._object_store[notes_commit_sha]
 
         # If it's a commit, get the tree from it

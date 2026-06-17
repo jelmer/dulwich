@@ -33,6 +33,7 @@ __all__ = [
 ]
 
 import logging
+import os
 import shlex
 import subprocess
 import threading
@@ -322,8 +323,6 @@ class ProcessFilterDriver:
 
     def clean(self, data: bytes) -> bytes:
         """Apply clean filter using external process."""
-        import os
-
         # Try process filter first (much faster)
         if self.process_cmd:
             try:
@@ -363,8 +362,6 @@ class ProcessFilterDriver:
 
     def smudge(self, data: bytes, path: bytes = b"") -> bytes:
         """Apply smudge filter using external process."""
-        import os
-
         path_str = path.decode("utf-8", errors="replace")
 
         # Try process filter first (much faster)
@@ -431,8 +428,6 @@ class ProcessFilterDriver:
                         self._process.wait(timeout=3)
                     except subprocess.TimeoutExpired:
                         # On Windows, sometimes we need to be more aggressive
-                        import os
-
                         if os.name == "nt":
                             try:
                                 subprocess.run(

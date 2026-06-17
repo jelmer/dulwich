@@ -30,7 +30,9 @@ __all__ = [
 ]
 
 import os
+import sys
 import time
+from io import StringIO
 from typing import TYPE_CHECKING
 
 from dulwich.errors import NotCommitError
@@ -38,7 +40,7 @@ from dulwich.graph import find_merge_base
 from dulwich.merge import three_way_merge
 from dulwich.objects import Commit, ObjectID, Tag, Tree
 from dulwich.objectspec import parse_commit
-from dulwich.refs import LOCAL_BRANCH_PREFIX
+from dulwich.refs import LOCAL_BRANCH_PREFIX, Ref
 from dulwich.repo import Repo
 from dulwich.subtree import (
     add_subtree_metadata,
@@ -150,13 +152,9 @@ def subtree_add(
                 ref = ref.encode("utf-8")
 
             # Fetch from remote (fetches all refs)
-            from io import StringIO
-
             fetch_result = fetch(r, repository, outstream=StringIO())
 
             # Get the fetched commit
-            from dulwich.refs import Ref
-
             if ref.startswith(b"refs/"):
                 ref_key = Ref(ref)
             else:
@@ -335,8 +333,6 @@ def subtree_merge(
 
         if conflicts and not squash:
             # Report conflicts but continue - user will need to resolve
-            import sys
-
             for path in conflicts:
                 prefix_str = prefix.decode("utf-8", "replace")
                 path_str = path.decode("utf-8", "replace")
@@ -497,8 +493,6 @@ def subtree_split(
 
         # Create branch if requested
         if branch:
-            from dulwich.refs import Ref
-
             ref_name = Ref(LOCAL_BRANCH_PREFIX + branch)
             r.refs[ref_name] = split_commit_id
 
@@ -560,10 +554,6 @@ def subtree_pull(
 
     with open_repo_closing(repo) as r:
         # Fetch from remote
-        from io import StringIO
-
-        from dulwich.refs import Ref
-
         fetch_result = fetch(r, repository, outstream=StringIO())
 
         # Get the fetched commit

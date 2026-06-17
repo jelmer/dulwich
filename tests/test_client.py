@@ -20,6 +20,8 @@
 #
 
 import base64
+import hashlib
+import logging
 import os
 import shutil
 import stat
@@ -27,12 +29,13 @@ import sys
 import tempfile
 import time
 import warnings
+import zlib
 from io import BytesIO
 from struct import pack
 from typing import NoReturn
 from unittest.mock import MagicMock, Mock, patch
 from urllib.parse import quote as urlquote
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import dulwich
 from dulwich import client, errors
@@ -56,7 +59,10 @@ from dulwich.client import (
     TCPGitClient,
     TraditionalGitClient,
     Urllib3HttpGitClient,
+    _download_packfile_from_uri,
     _extract_symrefs_and_agent,
+    _handle_upload_pack_head,
+    _handle_upload_pack_tail,
     _remote_error_from_stderr,
     _win32_url_to_path,
     build_fetch_request_v2,
@@ -69,15 +75,23 @@ from dulwich.client import (
     get_transport_and_path_from_url,
     parse_rsync_url,
 )
-from dulwich.config import ConfigDict
+from dulwich.config import ConfigDict, ConfigFile
+from dulwich.index import InvalidPathError
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
-from dulwich.pack import pack_objects_to_data, write_pack_data, write_pack_objects
+from dulwich.pack import (
+    pack_objects_to_data,
+    verify_and_read,
+    write_pack_data,
+    write_pack_objects,
+)
 from dulwich.protocol import (
+    CAPABILITY_SIDE_BAND_64K,
     DEFAULT_GIT_PROTOCOL_VERSION_FETCH,
     TCP_GIT_PORT,
     Protocol,
     agent_string,
+    pkt_line,
 )
 from dulwich.repo import MemoryRepo, Repo
 from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
@@ -205,7 +219,6 @@ class GitClientTests(TestCase):
 
     def test_handle_upload_pack_head_deepen_since(self) -> None:
         # Test that deepen-since command is properly sent
-        from dulwich.client import _handle_upload_pack_head
 
         self.rin.write(b"0008NAK\n0000")
         self.rin.seek(0)
@@ -239,7 +252,6 @@ class GitClientTests(TestCase):
 
     def test_handle_upload_pack_head_deepen_not(self) -> None:
         # Test that deepen-not command is properly sent
-        from dulwich.client import _handle_upload_pack_head
 
         self.rin.write(b"0008NAK\n0000")
         self.rin.seek(0)
@@ -273,7 +285,6 @@ class GitClientTests(TestCase):
 
     def test_handle_upload_pack_head_deepen_not_multiple(self) -> None:
         # Test that multiple deepen-not commands are properly sent
-        from dulwich.client import _handle_upload_pack_head
 
         self.rin.write(b"0008NAK\n0000")
         self.rin.seek(0)
@@ -308,7 +319,6 @@ class GitClientTests(TestCase):
 
     def test_handle_upload_pack_head_deepen_since_and_not(self) -> None:
         # Test that deepen-since and deepen-not can be used together
-        from dulwich.client import _handle_upload_pack_head
 
         self.rin.write(b"0008NAK\n0000")
         self.rin.seek(0)
@@ -523,8 +533,6 @@ class GitClientTests(TestCase):
 
         f = BytesIO()
         count, records = generate_pack_data(None, None)
-        from dulwich.object_format import DEFAULT_OBJECT_FORMAT
-
         write_pack_data(
             f.write, records, num_records=count, object_format=DEFAULT_OBJECT_FORMAT
         )
@@ -1260,8 +1268,6 @@ class LocalGitClientTests(TestCase):
     def test_clone_invalid_path_keeps_repo(self) -> None:
         # A tree entry with an invalid path aborts the checkout, but the
         # clone itself is kept (objects, refs and HEAD), matching git.
-        from dulwich.index import InvalidPathError
-
         source_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, source_path)
         source = Repo.init(source_path)
@@ -1422,8 +1428,6 @@ class LocalGitClientTests(TestCase):
 
     def test_fetch_object_format_mismatch_sha256_to_sha1(self) -> None:
         """Test that fetching from SHA-256 to non-empty SHA-1 repository fails."""
-        from dulwich.objects import Blob
-
         client = LocalGitClient()
 
         # Create SHA-256 source repository
@@ -1451,8 +1455,6 @@ class LocalGitClientTests(TestCase):
 
     def test_fetch_object_format_mismatch_sha1_to_sha256(self) -> None:
         """Test that fetching from SHA-1 to non-empty SHA-256 repository fails."""
-        from dulwich.objects import Blob
-
         client = LocalGitClient()
 
         # Create SHA-1 source repository
@@ -2009,8 +2011,6 @@ class HttpGitClientTests(TestCase):
             client.fetch_pack(b"/", check_heads, None, None)
 
     def test_fetch_pack_dumb_http(self) -> None:
-        import zlib
-
         from urllib3.response import HTTPResponse
 
         # Mock responses for dumb HTTP
@@ -2065,8 +2065,6 @@ class HttpGitClientTests(TestCase):
                 preload_content=True,
             ):
                 # Extract path from URL
-                from urllib.parse import urlparse
-
                 parsed = urlparse(url)
                 path = parsed.path.rstrip("/")
 
@@ -2168,8 +2166,6 @@ class HttpGitClientTests(TestCase):
 
     def test_http_extra_headers_from_config(self) -> None:
         """Test that http.extraHeader config values are applied."""
-        from dulwich.config import ConfigDict
-
         url = "https://github.com/jelmer/dulwich"
         config = ConfigDict()
         # Set a single extra header
@@ -2182,8 +2178,6 @@ class HttpGitClientTests(TestCase):
 
     def test_http_multiple_extra_headers_from_config(self) -> None:
         """Test that multiple http.extraHeader config values are applied."""
-        from dulwich.config import ConfigDict
-
         url = "https://github.com/jelmer/dulwich"
         config = ConfigDict()
         # Set multiple extra headers
@@ -2202,8 +2196,6 @@ class HttpGitClientTests(TestCase):
 
     def test_http_extra_headers_per_url_config(self) -> None:
         """Test that per-URL http.extraHeader config values are applied (issue #882)."""
-        from dulwich.config import ConfigDict
-
         url = "https://github.com/jelmer/dulwich"
         config = ConfigDict()
         # Set URL-specific extra header
@@ -2220,8 +2212,6 @@ class HttpGitClientTests(TestCase):
 
     def test_http_extra_headers_url_specificity(self) -> None:
         """Test that more specific URL configs override less specific ones."""
-        from dulwich.config import ConfigDict
-
         url = "https://github.com/jelmer/dulwich"
         config = ConfigDict()
         # Set global header
@@ -2243,8 +2233,6 @@ class HttpGitClientTests(TestCase):
 
     def test_http_extra_headers_multiple_url_configs(self) -> None:
         """Test that different URLs can have different extra headers."""
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         # Set different headers for different URLs
         config.set(
@@ -2272,8 +2260,6 @@ class HttpGitClientTests(TestCase):
 
     def test_http_extra_headers_no_match(self) -> None:
         """Test that non-matching URL configs don't apply."""
-        from dulwich.config import ConfigDict
-
         url = "https://example.com/repo"
         config = ConfigDict()
         # Set header only for GitHub
@@ -2289,10 +2275,6 @@ class HttpGitClientTests(TestCase):
 
     def test_http_extra_headers_invalid_format(self) -> None:
         """Test that invalid extra headers trigger warnings."""
-        import logging
-
-        from dulwich.config import ConfigDict
-
         url = "https://github.com/jelmer/dulwich"
         config = ConfigDict()
         # Set valid header
@@ -2374,8 +2356,6 @@ class HttpGitClientTests(TestCase):
         self.assertIn(quoted_password, reconstructed_url)
         # Verify the URL is valid by parsing it back
         parsed = urlparse(reconstructed_url)
-        from urllib.parse import unquote
-
         self.assertEqual(unquote(parsed.username), original_username)
         self.assertEqual(unquote(parsed.password), original_password)
 
@@ -2437,8 +2417,6 @@ class HttpGitClientTests(TestCase):
 
         # Test with AbstractHttpGitClient.from_parsedurl directly
         # This is how subclasses use the client
-        from urllib.parse import urlparse
-
         parsed = urlparse("https://github.com/jelmer/dulwich")
         config = ConfigDict()
 
@@ -2531,11 +2509,6 @@ class TCPGitClientTests(TestCase):
             )
 
     def test_from_parsedurl_with_proxy_config(self) -> None:
-        from io import BytesIO
-        from urllib.parse import urlparse
-
-        from dulwich.config import ConfigFile
-
         config = ConfigFile.from_file(
             BytesIO(
                 b"[core]\n"
@@ -2552,8 +2525,6 @@ class TCPGitClientTests(TestCase):
         self.assertEqual("default-proxy", c._proxy_command)
 
     def test_from_parsedurl_no_config(self) -> None:
-        from urllib.parse import urlparse
-
         parsed = urlparse("git://example.com/repo")
         c = TCPGitClient.from_parsedurl(parsed)
         self.assertIsNone(c._proxy_command)
@@ -2697,8 +2668,6 @@ class DefaultUrllib3ManagerTest(TestCase):
         self.assertEqual(manager._proxy_auth_callback, proxy_auth_callback)
 
     def test_proxy_auth_method_unsupported(self) -> None:
-        import os
-
         # Test with config
         config = ConfigDict()
         config.set((b"http",), b"proxy", b"http://user@proxy.example.com:8080")
@@ -3557,12 +3526,8 @@ class TestPackfileUris(TestCase):
         self.rout = BytesIO()
 
     def test_download_packfile_from_uri_success(self) -> None:
-        from dulwich.client import _download_packfile_from_uri
-
         # Create a mock packfile content
         packfile_data = b"PACK\x00\x00\x00\x02\x00\x00\x00\x00" + b"test data" * 100
-        import hashlib
-
         expected_hash = hashlib.sha1(packfile_data).hexdigest().encode("ascii")
 
         # Mock HTTP response
@@ -3601,8 +3566,6 @@ class TestPackfileUris(TestCase):
         mock_response.close.assert_called_once()
 
     def test_download_packfile_from_uri_hash_mismatch(self) -> None:
-        from dulwich.client import _download_packfile_from_uri
-
         packfile_data = b"PACK\x00\x00\x00\x02\x00\x00\x00\x00"
         wrong_hash = b"0000000000000000000000000000000000000000"
 
@@ -3646,8 +3609,6 @@ class TestPackfileUris(TestCase):
         This is the critical security test - we must ensure corrupted data
         never reaches the repository even if downloaded.
         """
-        from dulwich.client import _download_packfile_from_uri
-
         packfile_data = b"MALICIOUS DATA THAT SHOULD NOT BE WRITTEN"
         wrong_hash = b"0000000000000000000000000000000000000000"
 
@@ -3699,8 +3660,6 @@ class TestPackfileUris(TestCase):
         )
 
     def test_download_packfile_from_uri_non_https(self) -> None:
-        from dulwich.client import _download_packfile_from_uri
-
         def mock_http_request(url):
             pass
 
@@ -3721,13 +3680,8 @@ class TestPackfileUris(TestCase):
         self.assertIn("HTTPS", str(cm.exception))
 
     def test_handle_upload_pack_tail_with_packfile_uris(self) -> None:
-        from dulwich.client import _handle_upload_pack_tail
-        from dulwich.protocol import CAPABILITY_SIDE_BAND_64K, Protocol, pkt_line
-
         # Create mock packfile data
         packfile_data = b"PACK\x00\x00\x00\x02\x00\x00\x00\x00"
-        import hashlib
-
         expected_hash = hashlib.sha1(packfile_data).hexdigest().encode("ascii")
 
         # Build protocol response with packfile-uris using proper pkt-line format
@@ -3787,9 +3741,6 @@ class TestPackfileUris(TestCase):
         mock_response.close.assert_called_once()
 
     def test_handle_upload_pack_tail_packfile_uris_without_http_request(self) -> None:
-        from dulwich.client import _handle_upload_pack_tail
-        from dulwich.protocol import CAPABILITY_SIDE_BAND_64K, Protocol, pkt_line
-
         # Build protocol response with packfile-uris using proper pkt-line format
         self.rin.write(
             pkt_line(b"packfile-uris\n")
@@ -3827,11 +3778,7 @@ class TestPackfileUris(TestCase):
 
     def test_verify_and_read_sha256(self) -> None:
         """Test verify_and_read() with SHA-256 hash algorithm."""
-        from dulwich.pack import verify_and_read
-
         data = b"test data for sha256"
-        import hashlib
-
         expected_hash = hashlib.sha256(data).hexdigest().encode("ascii")
 
         # Create a read function
@@ -3852,7 +3799,6 @@ class TestPackfileUris(TestCase):
 
     def test_verify_and_read_unsupported_algorithm(self) -> None:
         """Test verify_and_read() with unsupported hash algorithm."""
-        from dulwich.pack import verify_and_read
 
         def read_func(size):
             return b"data"

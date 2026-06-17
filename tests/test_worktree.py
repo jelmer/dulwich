@@ -32,7 +32,7 @@ from dulwich.index import InvalidPathError
 from dulwich.index import get_unstaged_changes as _get_unstaged_changes
 from dulwich.object_store import tree_lookup_path
 from dulwich.objects import Blob, Tree
-from dulwich.repo import Repo
+from dulwich.repo import GITDIR, WORKTREES, Repo
 from dulwich.worktree import (
     WorkTree,
     add_worktree,
@@ -833,8 +833,6 @@ class WorkTreeOperationsTests(WorkTreeTestCase):
         self.assertEqual(repaired[0], new_path)
 
         # Verify the gitdir pointer was updated
-        from dulwich.repo import GITDIR, WORKTREES
-
         worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
         for entry in os.listdir(worktrees_dir):
             gitdir_path = os.path.join(worktrees_dir, entry, GITDIR)
@@ -869,8 +867,6 @@ class WorkTreeOperationsTests(WorkTreeTestCase):
         add_worktree(self.repo, wt_path)
 
         # Find and remove the gitdir pointer file
-        from dulwich.repo import GITDIR, WORKTREES
-
         worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
         for entry in os.listdir(worktrees_dir):
             gitdir_path = os.path.join(worktrees_dir, entry, GITDIR)
@@ -909,8 +905,6 @@ class WorkTreeOperationsTests(WorkTreeTestCase):
         self.assertEqual(config.get(("extensions",), "relativeworktrees"), b"true")
 
         # Verify paths are relative
-        from dulwich.repo import GITDIR, WORKTREES
-
         worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
         for entry in os.listdir(worktrees_dir):
             gitdir_path_file = os.path.join(worktrees_dir, entry, GITDIR)
@@ -937,8 +931,6 @@ class WorkTreeOperationsTests(WorkTreeTestCase):
         self.assertEqual(config.get(("extensions",), "relativeworktrees"), b"true")
 
         # Verify paths are relative
-        from dulwich.repo import GITDIR, WORKTREES
-
         worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
         for entry in os.listdir(worktrees_dir):
             gitdir_path_file = os.path.join(worktrees_dir, entry, GITDIR)
@@ -960,8 +952,6 @@ class WorkTreeOperationsTests(WorkTreeTestCase):
         move_worktree(self.repo, wt_path, new_path, relative_paths=True)
 
         # Verify paths are still relative
-        from dulwich.repo import GITDIR, WORKTREES
-
         worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
         for entry in os.listdir(worktrees_dir):
             gitdir_path_file = os.path.join(worktrees_dir, entry, GITDIR)
@@ -993,8 +983,6 @@ class WorkTreeOperationsTests(WorkTreeTestCase):
         self.assertEqual(config.get(("extensions",), "relativeworktrees"), b"true")
 
         # Verify paths are relative
-        from dulwich.repo import GITDIR, WORKTREES
-
         worktrees_dir = os.path.join(self.repo.controldir(), WORKTREES)
         for entry in os.listdir(worktrees_dir):
             gitdir_path_file = os.path.join(worktrees_dir, entry, GITDIR)

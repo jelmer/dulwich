@@ -44,8 +44,6 @@ class LFSPorcelainTestCase(TestCase):
 
     def _cleanup_test_dir(self):
         """Clean up test directory recursively."""
-        import shutil
-
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_lfs_init(self):
@@ -348,8 +346,6 @@ class LFSPorcelainTestCase(TestCase):
 
     def _cleanup_test_dir_path(self, path):
         """Clean up a test directory by path."""
-        import shutil
-
         shutil.rmtree(path, ignore_errors=True)
 
     def test_add_applies_clean_filter(self):

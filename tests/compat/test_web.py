@@ -31,6 +31,7 @@ import threading
 from typing import NoReturn
 from wsgiref import simple_server
 
+from dulwich.protocol import Protocol
 from dulwich.server import DictBackend, ReceivePackHandler, UploadPackHandler
 from dulwich.web import (
     HTTPGitApplication,
@@ -85,8 +86,6 @@ class SmartWebTestCase(WebTests, CompatTestCase):
         return {b"git-receive-pack": NoSideBand64kReceivePackHandler}
 
     def _check_app(self, app) -> None:
-        from dulwich.protocol import Protocol
-
         receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
         # Create a handler instance to check capabilities
         handler = receive_pack_handler_cls(
@@ -143,8 +142,6 @@ class SmartWebSideBand64kTestCase(SmartWebTestCase):
         return None  # default handlers include side-band-64k
 
     def _check_app(self, app) -> None:
-        from dulwich.protocol import Protocol
-
         receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
         # Create a handler instance to check capabilities
         handler = receive_pack_handler_cls(
@@ -169,8 +166,6 @@ class SmartWebSideBand64kNoDoneTestCase(SmartWebTestCase):
         return None  # default handlers include side-band-64k
 
     def _check_app(self, app) -> None:
-        from dulwich.protocol import Protocol
-
         receive_pack_handler_cls = app.handlers[b"git-receive-pack"]
         # Create a handler instance to check capabilities
         handler = receive_pack_handler_cls(

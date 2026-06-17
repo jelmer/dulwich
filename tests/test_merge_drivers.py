@@ -21,9 +21,12 @@
 """Tests for merge driver support."""
 
 import importlib.util
+import os
 import sys
+import tempfile
 import unittest
 
+from dulwich import merge_drivers
 from dulwich.attrs import GitAttributes, Pattern
 from dulwich.config import ConfigDict
 from dulwich.merge import merge_blobs
@@ -214,9 +217,6 @@ class ProcessMergeDriverTests(unittest.TestCase):
         (path comes from a git tree and is therefore attacker-controllable
         when merging an untrusted branch).
         """
-        import os
-        import tempfile
-
         with tempfile.TemporaryDirectory() as tmpdir:
             sentinel = os.path.join(tmpdir, "pwned")
             # Path that would, without proper quoting, terminate the echo
@@ -247,8 +247,6 @@ class MergeBlobsWithDriversTests(unittest.TestCase):
 
         # Reset global registry
         global _merge_driver_registry
-        from dulwich import merge_drivers
-
         merge_drivers._merge_driver_registry = None
 
     def test_merge_blobs_without_driver(self):
@@ -366,8 +364,6 @@ class GlobalRegistryTests(unittest.TestCase):
     def setUp(self):
         """Reset global registry before each test."""
         global _merge_driver_registry
-        from dulwich import merge_drivers
-
         merge_drivers._merge_driver_registry = None
 
     def test_get_merge_driver_registry_singleton(self):

@@ -20,7 +20,7 @@ from dulwich.commit_graph import find_commit_graph_file, read_commit_graph
 from dulwich.graph import can_fast_forward, find_merge_base
 from dulwich.repo import Repo
 
-from .utils import CompatTestCase, run_git_or_fail
+from .utils import CompatTestCase, remove_ro, rmtree_ro, run_git, run_git_or_fail
 
 
 class CommitGraphCompatTests(CompatTestCase):
@@ -41,8 +41,6 @@ class CommitGraphCompatTests(CompatTestCase):
         self.overrideEnv("GIT_AUTHOR_EMAIL", "test@example.com")
 
     def tearDown(self):
-        from .utils import rmtree_ro
-
         rmtree_ro(self.test_dir)
 
     def create_test_repo_with_history(self):
@@ -238,8 +236,6 @@ class CommitGraphCompatTests(CompatTestCase):
         )
 
         # Compare with C Git (check if commit1 is ancestor of commit2)
-        from .utils import run_git
-
         returncode, _stdout, _stderr = run_git(
             ["merge-base", "--is-ancestor", commit1.decode(), commit2.decode()],
             cwd=work_dir,
@@ -322,8 +318,6 @@ class CommitGraphCompatTests(CompatTestCase):
                         os.remove(graph_path)
                     except PermissionError:
                         # On Windows, handle read-only files
-                        from .utils import remove_ro
-
                         remove_ro(graph_path)
 
                 if strategy == ["--stdin-commits"]:

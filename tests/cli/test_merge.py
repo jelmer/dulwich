@@ -23,11 +23,14 @@
 
 import importlib.util
 import os
+import stat
 import tempfile
 import unittest
 
 from dulwich import porcelain
 from dulwich.cli import main
+from dulwich.objects import Blob, Commit, Tree
+from dulwich.repo import Repo
 
 from .. import DependencyMissing, TestCase
 
@@ -440,11 +443,6 @@ class CLIMergeTests(TestCase):
 
     def test_merge_invalid_path_returns_error(self):
         """An invalid path in the merged tree returns exit code 1, not a crash."""
-        import stat
-
-        from dulwich.objects import Blob, Commit, Tree
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             with Repo.init(tmpdir) as repo:
                 repo.get_config().set((b"core",), b"protectNTFS", b"true")

@@ -21,9 +21,14 @@
 
 """Tests for signature vendors."""
 
+import io
+import os
 import shutil
 import subprocess
+import tempfile
+import time
 import unittest
+from unittest import mock
 
 from dulwich.config import ConfigDict
 from dulwich.signature import (
@@ -35,6 +40,7 @@ from dulwich.signature import (
     GPGSignatureVendor,
     SSHCliSignatureVendor,
     SSHSigSignatureVendor,
+    UntrustedSignature,
     X509SignatureVendor,
     detect_signature_format,
     get_signature_vendor,
@@ -199,8 +205,6 @@ class GPGCliSignatureVendorTests(unittest.TestCase):
 
     def test_verify_invalid_signature(self) -> None:
         """Test that verify raises an error for invalid signatures."""
-        from dulwich.signature import BadSignature
-
         vendor = GPGCliSignatureVendor()
         test_data = b"test data"
         invalid_signature = b"this is not a valid signature"
@@ -243,8 +247,6 @@ class GPGCliSignatureVendorTests(unittest.TestCase):
 
     def test_verify_with_keyids(self) -> None:
         """Test verifying with specific trusted key IDs."""
-        from dulwich.signature import UntrustedSignature
-
         signer = GPGCliSignatureVendor()
         test_data = b"test data to sign"
 
@@ -315,8 +317,6 @@ class KeyIDMatchingTests(unittest.TestCase):
     """Tests for trusted key ID matching, independent of an installed gpg."""
 
     def _run_with_stderr(self, vendor, stderr: str) -> None:
-        from unittest import mock
-
         completed = subprocess.CompletedProcess(
             ["gpg"], 0, stdout=b"", stderr=stderr.encode()
         )
@@ -325,8 +325,6 @@ class KeyIDMatchingTests(unittest.TestCase):
 
     def test_gpg_rejects_keyid_embedded_in_fingerprint(self) -> None:
         """A trusted ID buried inside an untrusted fingerprint is not a match."""
-        from dulwich.signature import UntrustedSignature
-
         vendor = GPGCliSignatureVendor(keyids=["DEADBEEF"])
         stderr = (
             "gpg: Good signature\n"
@@ -346,8 +344,6 @@ class KeyIDMatchingTests(unittest.TestCase):
 
     def test_x509_rejects_keyid_embedded_in_fingerprint(self) -> None:
         """Same suffix rule applies to the gpgsm/X.509 path."""
-        from dulwich.signature import UntrustedSignature, X509SignatureVendor
-
         vendor = X509SignatureVendor(keyids=["DEADBEEF"])
         stderr = "gpgsm: Good signature from 1111DEADBEEF1111\n"
         with self.assertRaises(UntrustedSignature):
@@ -486,8 +482,6 @@ class SSHSigSignatureVendorTests(unittest.TestCase):
 
     def test_verify_without_config_raises(self) -> None:
         """Test that verify without config or keyids raises UntrustedSignature."""
-        from dulwich.signature import UntrustedSignature
-
         vendor = SSHSigSignatureVendor()
         with self.assertRaises(UntrustedSignature) as cm:
             vendor.verify(b"test data", b"fake signature")
@@ -510,9 +504,6 @@ class SSHSigSignatureVendorTests(unittest.TestCase):
 
     def test_verify_with_cli_generated_signature(self) -> None:
         """Test verifying a signature created by SSH CLI vendor."""
-        import os
-        import tempfile
-
         if shutil.which("ssh-keygen") is None:
             self.skipTest("ssh-keygen not available")
 
@@ -572,8 +563,6 @@ class SSHSigSignatureVendorTests(unittest.TestCase):
         from allowed_signers files, so this test verifies the code is in place
         but will be skipped until the library adds support.
         """
-        import io
-
         # Check if sshsig library supports parsing options
         import sshsig.allowed_signers
 
@@ -587,12 +576,6 @@ class SSHSigSignatureVendorTests(unittest.TestCase):
             )
 
         # If we get here, the library supports options, so we can test
-        import os
-        import tempfile
-        import time
-
-        from dulwich.signature import UntrustedSignature
-
         if shutil.which("ssh-keygen") is None:
             self.skipTest("ssh-keygen not available")
 
@@ -652,11 +635,6 @@ class SSHSigSignatureVendorTests(unittest.TestCase):
 
     def test_revocation_checking(self) -> None:
         """Test SSH key revocation checking."""
-        import os
-        import tempfile
-
-        from dulwich.signature import UntrustedSignature
-
         if shutil.which("ssh-keygen") is None:
             self.skipTest("ssh-keygen not available")
 
@@ -766,8 +744,6 @@ class SSHCliSignatureVendorTests(unittest.TestCase):
 
     def test_verify_without_allowed_signers_raises(self) -> None:
         """Test that verify without allowedSignersFile raises UntrustedSignature."""
-        from dulwich.signature import UntrustedSignature
-
         vendor = SSHCliSignatureVendor()
         with self.assertRaises(UntrustedSignature) as cm:
             vendor.verify(b"test data", b"fake signature")
@@ -775,9 +751,6 @@ class SSHCliSignatureVendorTests(unittest.TestCase):
 
     def test_sign_and_verify_with_ssh_key(self) -> None:
         """Test sign and verify cycle with SSH key."""
-        import os
-        import tempfile
-
         # Generate a test SSH key
         with tempfile.TemporaryDirectory() as tmpdir:
             private_key = os.path.join(tmpdir, "test_key")
@@ -828,9 +801,6 @@ class SSHCliSignatureVendorTests(unittest.TestCase):
 
     def test_default_key_command(self) -> None:
         """Test gpg.ssh.defaultKeyCommand support."""
-        import os
-        import tempfile
-
         # Generate a test SSH key
         with tempfile.TemporaryDirectory() as tmpdir:
             private_key = os.path.join(tmpdir, "test_key")

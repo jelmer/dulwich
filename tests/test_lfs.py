@@ -21,15 +21,30 @@
 
 """Tests for LFS support."""
 
+import hashlib
 import json
+import logging
 import os
 import shutil
 import tempfile
+import threading
 from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 from dulwich.client import LocalGitClient
 from dulwich.config import ConfigFile
-from dulwich.lfs import FileLFSClient, LFSClient, LFSFilterDriver, LFSPointer, LFSStore
+from dulwich.lfs import (
+    FileLFSClient,
+    HTTPLFSClient,
+    LFSClient,
+    LFSError,
+    LFSFilterDriver,
+    LFSPointer,
+    LFSStore,
+)
+from dulwich.lfs_server import run_lfs_server
+from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import Repo
 
 from . import TestCase
@@ -39,8 +54,6 @@ class LFSTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
         # Suppress LFS warnings during these tests
-        import logging
-
         self._old_level = logging.getLogger("dulwich.lfs").level
         logging.getLogger("dulwich.lfs").setLevel(logging.ERROR)
         self.test_dir = tempfile.mkdtemp()
@@ -49,8 +62,6 @@ class LFSTests(TestCase):
 
     def tearDown(self) -> None:
         # Restore original logging level
-        import logging
-
         logging.getLogger("dulwich.lfs").setLevel(self._old_level)
         super().tearDown()
 
@@ -88,8 +99,6 @@ class LFSTests(TestCase):
 
     def test_create_lfs_dir(self) -> None:
         """Test creating an LFS directory when it doesn't exist."""
-        import os
-
         # Create a temporary directory for the test
         lfs_parent_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, lfs_parent_dir)
@@ -224,8 +233,6 @@ class LFSIntegrationTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
         # Suppress LFS warnings during these integration tests
-        import logging
-
         self._old_level = logging.getLogger("dulwich.lfs").level
         logging.getLogger("dulwich.lfs").setLevel(logging.ERROR)
 
@@ -234,23 +241,17 @@ class LFSIntegrationTests(TestCase):
         self.addCleanup(shutil.rmtree, self.test_dir)
 
         # Initialize repo
-        from dulwich.repo import Repo
-
         self.repo = Repo.init(self.test_dir)
         self.lfs_dir = os.path.join(self.test_dir, ".git", "lfs")
         self.lfs_store = LFSStore.create(self.lfs_dir)
 
     def tearDown(self) -> None:
         # Restore original logging level
-        import logging
-
         logging.getLogger("dulwich.lfs").setLevel(self._old_level)
         super().tearDown()
 
     def test_lfs_with_gitattributes(self) -> None:
         """Test LFS integration with .gitattributes."""
-        import os
-
         # Create .gitattributes file
         gitattributes_path = os.path.join(self.test_dir, ".gitattributes")
         with open(gitattributes_path, "wb") as f:
@@ -277,8 +278,6 @@ class LFSIntegrationTests(TestCase):
 
     def test_lfs_checkout_missing_object(self) -> None:
         """Test checkout behavior when LFS object is missing."""
-        from dulwich.objects import Blob, Commit, Tree
-
         # Create an LFS pointer blob
         pointer = LFSPointer(
             "0000000000000000000000000000000000000000000000000000000000000000", 1234
@@ -679,8 +678,6 @@ class LFSStoreEdgeCaseTests(TestCase):
 
     def test_partial_write_rollback(self) -> None:
         """Test that partial writes don't leave artifacts."""
-        import os
-
         # Count initial objects
         objects_dir = os.path.join(self.test_dir, "objects")
         initial_count = sum(len(files) for _, _, files in os.walk(objects_dir))
@@ -776,10 +773,6 @@ class LFSServerTests(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        import threading
-
-        from dulwich.lfs_server import run_lfs_server
-
         # Create temporary directory for LFS storage
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
@@ -799,8 +792,6 @@ class LFSServerTests(TestCase):
 
     def test_server_batch_endpoint(self) -> None:
         """Test the batch endpoint directly."""
-        from urllib.request import Request, urlopen
-
         # Create batch request
         batch_data = {
             "operation": "download",
@@ -828,9 +819,6 @@ class LFSServerTests(TestCase):
 
     def test_server_upload_download(self) -> None:
         """Test uploading and downloading an object."""
-        import hashlib
-        from urllib.request import Request, urlopen
-
         test_content = b"test server content"
         test_oid = hashlib.sha256(test_content).hexdigest()
 
@@ -901,10 +889,6 @@ class LFSServerTests(TestCase):
 
     def test_server_verify_endpoint(self) -> None:
         """Test the verify endpoint."""
-        import hashlib
-        from urllib.error import HTTPError
-        from urllib.request import Request, urlopen
-
         test_content = b"verify test"
         test_oid = hashlib.sha256(test_content).hexdigest()
 
@@ -940,9 +924,6 @@ class LFSServerTests(TestCase):
 
     def test_server_invalid_endpoints(self) -> None:
         """Test invalid endpoints return 404."""
-        from urllib.error import HTTPError
-        from urllib.request import Request, urlopen
-
         # Test invalid GET endpoint
         with self.assertRaises(HTTPError) as cm:
             with urlopen(f"{self.server_url}/invalid"):
@@ -959,9 +940,6 @@ class LFSServerTests(TestCase):
 
     def test_server_batch_invalid_operation(self) -> None:
         """Test batch endpoint with invalid operation."""
-        from urllib.error import HTTPError
-        from urllib.request import Request, urlopen
-
         batch_data = {"operation": "invalid", "transfers": ["basic"], "objects": []}
 
         req = Request(
@@ -978,8 +956,6 @@ class LFSServerTests(TestCase):
 
     def test_server_batch_missing_fields(self) -> None:
         """Test batch endpoint with missing required fields."""
-        from urllib.request import Request, urlopen
-
         # Missing oid
         batch_data = {
             "operation": "download",
@@ -1002,9 +978,6 @@ class LFSServerTests(TestCase):
 
     def test_server_upload_oid_mismatch(self) -> None:
         """Test upload with OID mismatch."""
-        from urllib.error import HTTPError
-        from urllib.request import Request, urlopen
-
         # Upload with wrong OID
         upload_req = Request(
             f"{self.server_url}/objects/wrongoid123",
@@ -1021,9 +994,6 @@ class LFSServerTests(TestCase):
 
     def test_server_download_non_existent(self) -> None:
         """Test downloading non-existent object."""
-        from urllib.error import HTTPError
-        from urllib.request import urlopen
-
         fake_oid = "0" * 64
 
         with self.assertRaises(HTTPError) as cm:
@@ -1033,9 +1003,6 @@ class LFSServerTests(TestCase):
 
     def test_server_invalid_json(self) -> None:
         """Test batch endpoint with invalid JSON."""
-        from urllib.error import HTTPError
-        from urllib.request import Request, urlopen
-
         req = Request(
             f"{self.server_url}/objects/batch",
             data=b"not json",
@@ -1054,11 +1021,6 @@ class LFSClientTests(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        import threading
-
-        from dulwich.lfs import HTTPLFSClient
-        from dulwich.lfs_server import run_lfs_server
-
         # Create temporary directory for LFS storage
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
@@ -1081,8 +1043,6 @@ class LFSClientTests(TestCase):
 
     def test_client_url_normalization(self) -> None:
         """Test that client URL is normalized correctly."""
-        from dulwich.lfs import LFSClient
-
         # Test with trailing slash
         client = LFSClient("https://example.com/repo.git/info/lfs/")
         self.assertEqual(client.url, "https://example.com/repo.git/info/lfs")
@@ -1110,10 +1070,6 @@ class LFSClientTests(TestCase):
 
     def test_download_with_verification(self) -> None:
         """Test download with size and hash verification."""
-        import hashlib
-
-        from dulwich.lfs import LFSError
-
         test_content = b"test content for download"
         test_oid = hashlib.sha256(test_content).hexdigest()
 
@@ -1132,8 +1088,6 @@ class LFSClientTests(TestCase):
 
     def test_upload_with_verify(self) -> None:
         """Test upload with verification step."""
-        import hashlib
-
         test_content = b"upload test content"
         test_oid = hashlib.sha256(test_content).hexdigest()
         test_size = len(test_content)
@@ -1148,8 +1102,6 @@ class LFSClientTests(TestCase):
 
     def test_upload_already_exists(self) -> None:
         """Test upload when object already exists on server."""
-        import hashlib
-
         test_content = b"existing content"
         test_oid = hashlib.sha256(test_content).hexdigest()
 
@@ -1165,10 +1117,6 @@ class LFSClientTests(TestCase):
 
     def test_error_handling(self) -> None:
         """Test error handling for various scenarios."""
-        from urllib.error import HTTPError
-
-        from dulwich.lfs import LFSError
-
         # Test downloading non-existent object
         with self.assertRaises(LFSError) as cm:
             self.client.download(
@@ -1184,9 +1132,6 @@ class LFSClientTests(TestCase):
 
     def test_from_config_validates_lfs_url(self) -> None:
         """Test that from_config validates lfs.url and raises error for invalid URLs."""
-        from dulwich.config import ConfigFile
-        from dulwich.lfs import LFSClient
-
         # Test with invalid lfs.url - no scheme/host
         config = ConfigFile()
         config.set((b"lfs",), b"url", b"objects")
@@ -1273,8 +1218,6 @@ class FileLFSClientTests(TestCase):
         self.addCleanup(shutil.rmtree, self.test_dir)
 
         # Create LFS store and populate with test data
-        from dulwich.lfs import FileLFSClient, LFSStore
-
         self.lfs_store = LFSStore.create(self.test_dir)
         self.test_content = b"Test file content for FileLFSClient"
         self.test_oid = self.lfs_store.write_object([self.test_content])
@@ -1291,8 +1234,6 @@ class FileLFSClientTests(TestCase):
 
     def test_download_missing_object(self) -> None:
         """Test downloading a non-existent object raises LFSError."""
-        from dulwich.lfs import LFSError
-
         fake_oid = "0" * 64
         with self.assertRaises(LFSError) as cm:
             self.client.download(fake_oid, 100)
@@ -1300,16 +1241,12 @@ class FileLFSClientTests(TestCase):
 
     def test_download_size_mismatch(self) -> None:
         """Test download with wrong size raises LFSError."""
-        from dulwich.lfs import LFSError
-
         with self.assertRaises(LFSError) as cm:
             self.client.download(self.test_oid, 999)  # Wrong size
         self.assertIn("Size mismatch", str(cm.exception))
 
     def test_upload_new_object(self) -> None:
         """Test uploading a new object to file:// URL."""
-        import hashlib
-
         new_content = b"New content to upload"
         new_oid = hashlib.sha256(new_content).hexdigest()
 
@@ -1323,8 +1260,6 @@ class FileLFSClientTests(TestCase):
 
     def test_upload_size_mismatch(self) -> None:
         """Test upload with mismatched size raises LFSError."""
-        from dulwich.lfs import LFSError
-
         content = b"test"
         oid = "0" * 64
 
@@ -1334,8 +1269,6 @@ class FileLFSClientTests(TestCase):
 
     def test_upload_oid_mismatch(self) -> None:
         """Test upload with mismatched OID raises LFSError."""
-        from dulwich.lfs import LFSError
-
         content = b"test"
         wrong_oid = "0" * 64  # Won't match actual SHA256
 
@@ -1345,9 +1278,6 @@ class FileLFSClientTests(TestCase):
 
     def test_from_config_creates_file_client(self) -> None:
         """Test that from_config creates FileLFSClient for file:// URLs."""
-        from dulwich.config import ConfigFile
-        from dulwich.lfs import FileLFSClient, LFSClient
-
         config = ConfigFile()
         file_url = Path(self.test_dir).as_uri()
         config.set((b"lfs",), b"url", file_url.encode())
@@ -1359,8 +1289,6 @@ class FileLFSClientTests(TestCase):
 
     def test_round_trip(self) -> None:
         """Test uploading and then downloading an object."""
-        import hashlib
-
         content = b"Round trip test content"
         oid = hashlib.sha256(content).hexdigest()
 
@@ -1378,8 +1306,6 @@ class LFSClientFromURLTests(TestCase):
 
     def test_from_url_http(self) -> None:
         """Test from_url with http:// URL returns HTTPLFSClient."""
-        from dulwich.lfs import HTTPLFSClient, LFSClient
-
         client = LFSClient.from_url("http://example.com/lfs")
         self.assertIsInstance(client, HTTPLFSClient)
         assert client is not None  # for mypy
@@ -1387,8 +1313,6 @@ class LFSClientFromURLTests(TestCase):
 
     def test_from_url_https(self) -> None:
         """Test from_url with https:// URL returns HTTPLFSClient."""
-        from dulwich.lfs import HTTPLFSClient, LFSClient
-
         client = LFSClient.from_url("https://example.com/repo.git/info/lfs")
         self.assertIsInstance(client, HTTPLFSClient)
         assert client is not None  # for mypy
@@ -1396,8 +1320,6 @@ class LFSClientFromURLTests(TestCase):
 
     def test_from_url_file(self) -> None:
         """Test from_url with file:// URL returns FileLFSClient."""
-        from dulwich.lfs import FileLFSClient, LFSClient
-
         client = LFSClient.from_url("file:///path/to/lfs")
         self.assertIsInstance(client, FileLFSClient)
         assert client is not None  # for mypy
@@ -1405,8 +1327,6 @@ class LFSClientFromURLTests(TestCase):
 
     def test_from_url_invalid_no_scheme(self) -> None:
         """Test from_url with URL missing scheme raises ValueError."""
-        from dulwich.lfs import LFSClient
-
         with self.assertRaises(ValueError) as cm:
             LFSClient.from_url("example.com/lfs")
         self.assertIn("Invalid LFS URL", str(cm.exception))
@@ -1414,8 +1334,6 @@ class LFSClientFromURLTests(TestCase):
 
     def test_from_url_invalid_unsupported_scheme(self) -> None:
         """Test from_url with unsupported scheme raises ValueError."""
-        from dulwich.lfs import LFSClient
-
         # git:// is not supported for LFS
         with self.assertRaises(ValueError) as cm:
             LFSClient.from_url("git://example.com/repo.git")
@@ -1428,8 +1346,6 @@ class LFSClientFromURLTests(TestCase):
 
     def test_from_url_invalid_http_no_host(self) -> None:
         """Test from_url with http:// but no host raises ValueError."""
-        from dulwich.lfs import LFSClient
-
         with self.assertRaises(ValueError) as cm:
             LFSClient.from_url("http://")
         self.assertIn("Invalid LFS URL", str(cm.exception))
@@ -1440,17 +1356,12 @@ class LFSClientFromURLTests(TestCase):
 
     def test_from_url_invalid_file_no_path(self) -> None:
         """Test from_url with file:// but no path raises ValueError."""
-        from dulwich.lfs import LFSClient
-
         with self.assertRaises(ValueError) as cm:
             LFSClient.from_url("file://")
         self.assertIn("Invalid LFS URL", str(cm.exception))
 
     def test_from_url_with_config(self) -> None:
         """Test from_url passes config to created client."""
-        from dulwich.config import ConfigFile
-        from dulwich.lfs import HTTPLFSClient, LFSClient
-
         config = ConfigFile()
         config.set((b"http",), b"useragent", b"test-agent/1.0")
 

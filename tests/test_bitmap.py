@@ -24,6 +24,7 @@
 import os
 import shutil
 import tempfile
+import time
 import unittest
 from io import BytesIO
 
@@ -37,10 +38,18 @@ from dulwich.bitmap import (
     EWAHBitmap,
     PackBitmap,
     _encode_ewah_words,
+    read_bitmap,
     read_bitmap_file,
+    write_bitmap,
     write_bitmap_file,
 )
-from dulwich.object_store import BitmapReachability, GraphTraversalReachability
+from dulwich.config import ConfigFile
+from dulwich.object_store import (
+    BitmapReachability,
+    DiskObjectStore,
+    GraphTraversalReachability,
+)
+from dulwich.objects import Blob, Commit, Tree
 
 
 class EWAHCompressionTests(unittest.TestCase):
@@ -516,13 +525,9 @@ class BitmapIntegrationTests(unittest.TestCase):
             bitmap.tree_bitmap.add(20)
 
             # Write to file
-            from dulwich.bitmap import write_bitmap
-
             write_bitmap(bitmap_path, bitmap)
 
             # Read back
-            from dulwich.bitmap import read_bitmap
-
             bitmap2 = read_bitmap(bitmap_path)
 
             self.assertEqual(bitmap.version, bitmap2.version)
@@ -611,13 +616,9 @@ class BitmapIntegrationTests(unittest.TestCase):
             ]
 
             # Write to file
-            from dulwich.bitmap import write_bitmap
-
             write_bitmap(bitmap_path, bitmap)
 
             # Read back
-            from dulwich.bitmap import read_bitmap
-
             bitmap2 = read_bitmap(bitmap_path)
 
             self.assertEqual(bitmap.flags, bitmap2.flags)
@@ -639,13 +640,9 @@ class BitmapIntegrationTests(unittest.TestCase):
             bitmap.name_hash_cache = [0x12345678, 0x9ABCDEF0, 0xFEDCBA98]
 
             # Write to file
-            from dulwich.bitmap import write_bitmap
-
             write_bitmap(bitmap_path, bitmap)
 
             # Read back
-            from dulwich.bitmap import read_bitmap
-
             bitmap2 = read_bitmap(bitmap_path)
 
             self.assertEqual(bitmap.flags, bitmap2.flags)
@@ -840,68 +837,50 @@ class BitmapConfigTests(unittest.TestCase):
 
     def test_pack_write_bitmaps_default(self):
         """Test pack.writeBitmaps defaults to false."""
-        from dulwich.config import ConfigFile
-
         config = ConfigFile()
         self.assertFalse(config.get_boolean((b"pack",), b"writeBitmaps", False))
 
     def test_pack_write_bitmaps_true(self):
         """Test pack.writeBitmaps = true."""
-        from dulwich.config import ConfigFile
-
         config = ConfigFile()
         config.set((b"pack",), b"writeBitmaps", b"true")
         self.assertTrue(config.get_boolean((b"pack",), b"writeBitmaps", False))
 
     def test_pack_write_bitmaps_false(self):
         """Test pack.writeBitmaps = false."""
-        from dulwich.config import ConfigFile
-
         config = ConfigFile()
         config.set((b"pack",), b"writeBitmaps", b"false")
         self.assertFalse(config.get_boolean((b"pack",), b"writeBitmaps", False))
 
     def test_pack_write_bitmap_hash_cache_default(self):
         """Test pack.writeBitmapHashCache defaults to true."""
-        from dulwich.config import ConfigFile
-
         config = ConfigFile()
         self.assertTrue(config.get_boolean((b"pack",), b"writeBitmapHashCache", True))
 
     def test_pack_write_bitmap_hash_cache_false(self):
         """Test pack.writeBitmapHashCache = false."""
-        from dulwich.config import ConfigFile
-
         config = ConfigFile()
         config.set((b"pack",), b"writeBitmapHashCache", b"false")
         self.assertFalse(config.get_boolean((b"pack",), b"writeBitmapHashCache", True))
 
     def test_pack_write_bitmap_lookup_table_default(self):
         """Test pack.writeBitmapLookupTable defaults to true."""
-        from dulwich.config import ConfigFile
-
         config = ConfigFile()
         self.assertTrue(config.get_boolean((b"pack",), b"writeBitmapLookupTable", True))
 
     def test_repack_write_bitmaps(self):
         """Test repack.writeBitmaps configuration."""
-        from dulwich.config import ConfigFile
-
         config = ConfigFile()
         config.set((b"repack",), b"writeBitmaps", b"true")
         self.assertTrue(config.get_boolean((b"repack",), b"writeBitmaps", False))
 
     def test_pack_use_bitmap_index_default(self):
         """Test pack.useBitmapIndex defaults to true."""
-        from dulwich.config import ConfigFile
-
         config = ConfigFile()
         self.assertTrue(config.get_boolean((b"pack",), b"useBitmapIndex", True))
 
     def test_pack_use_bitmap_index_false(self):
         """Test pack.useBitmapIndex = false."""
-        from dulwich.config import ConfigFile
-
         config = ConfigFile()
         config.set((b"pack",), b"useBitmapIndex", b"false")
         self.assertFalse(config.get_boolean((b"pack",), b"useBitmapIndex", True))
@@ -912,9 +891,6 @@ class ReachabilityProviderTests(unittest.TestCase):
 
     def setUp(self):
         """Set up test repository with commits."""
-        from dulwich.object_store import DiskObjectStore
-        from dulwich.objects import Blob, Commit, Tree
-
         self.test_dir = tempfile.mkdtemp()
         self.store = DiskObjectStore(self.test_dir)
 
@@ -979,16 +955,12 @@ class ReachabilityProviderTests(unittest.TestCase):
 
     def tearDown(self):
         """Clean up test directory."""
-        import shutil
-
         # Close store to release file handles on Windows
         self.store.close()
         shutil.rmtree(self.test_dir)
 
     def test_graph_traversal_reachability_single_commit(self):
         """Test GraphTraversalReachability with single commit."""
-        from dulwich.object_store import GraphTraversalReachability
-
         provider = GraphTraversalReachability(self.store)
 
         # Get reachable commits from commit1
@@ -1001,8 +973,6 @@ class ReachabilityProviderTests(unittest.TestCase):
 
     def test_graph_traversal_reachability_linear_history(self):
         """Test GraphTraversalReachability with linear history."""
-        from dulwich.object_store import GraphTraversalReachability
-
         provider = GraphTraversalReachability(self.store)
 
         # Get reachable commits from commit3
@@ -1016,8 +986,6 @@ class ReachabilityProviderTests(unittest.TestCase):
 
     def test_graph_traversal_reachability_with_exclusion(self):
         """Test GraphTraversalReachability with exclusion."""
-        from dulwich.object_store import GraphTraversalReachability
-
         provider = GraphTraversalReachability(self.store)
 
         # Get commits reachable from commit3 but not from commit1
@@ -1031,8 +999,6 @@ class ReachabilityProviderTests(unittest.TestCase):
 
     def test_graph_traversal_reachability_branching(self):
         """Test GraphTraversalReachability with branching history."""
-        from dulwich.object_store import GraphTraversalReachability
-
         provider = GraphTraversalReachability(self.store)
 
         # Get reachable commits from both commit3 and commit4
@@ -1046,8 +1012,6 @@ class ReachabilityProviderTests(unittest.TestCase):
 
     def test_graph_traversal_reachable_objects(self):
         """Test GraphTraversalReachability.get_reachable_objects()."""
-        from dulwich.object_store import GraphTraversalReachability
-
         provider = GraphTraversalReachability(self.store)
 
         # Get all objects reachable from commit3
@@ -1064,8 +1028,6 @@ class ReachabilityProviderTests(unittest.TestCase):
 
     def test_graph_traversal_reachable_objects_with_exclusion(self):
         """Test GraphTraversalReachability.get_reachable_objects() with exclusion."""
-        from dulwich.object_store import GraphTraversalReachability
-
         provider = GraphTraversalReachability(self.store)
 
         # Get objects reachable from commit3 but not from commit2
@@ -1081,8 +1043,6 @@ class ReachabilityProviderTests(unittest.TestCase):
 
     def test_get_reachability_provider_without_bitmaps(self):
         """Test get_reachability_provider returns GraphTraversalReachability when no bitmaps."""
-        from dulwich.object_store import GraphTraversalReachability
-
         provider = self.store.get_reachability_provider()
 
         # Should return GraphTraversalReachability when no bitmaps available
@@ -1090,8 +1050,6 @@ class ReachabilityProviderTests(unittest.TestCase):
 
     def test_get_reachability_provider_prefer_bitmaps_false(self):
         """Test get_reachability_provider with prefer_bitmaps=False."""
-        from dulwich.object_store import GraphTraversalReachability
-
         provider = self.store.get_reachability_provider(prefer_bitmaps=False)
 
         # Should return GraphTraversalReachability when prefer_bitmaps=False
@@ -1166,9 +1124,6 @@ class PackEnsureBitmapTests(unittest.TestCase):
 
     def setUp(self):
         """Set up test repository with a pack."""
-        from dulwich.object_store import DiskObjectStore
-        from dulwich.objects import Blob, Commit, Tree
-
         self.temp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.temp_dir)
 
@@ -1212,8 +1167,6 @@ class PackEnsureBitmapTests(unittest.TestCase):
         self.assertIsNotNone(bitmap)
         self.assertTrue(os.path.exists(self.pack._bitmap_path))
         # Verify it's a PackBitmap instance
-        from dulwich.bitmap import PackBitmap
-
         self.assertIsInstance(bitmap, PackBitmap)
 
     def test_ensure_bitmap_returns_existing(self):
@@ -1225,8 +1178,6 @@ class PackEnsureBitmapTests(unittest.TestCase):
         mtime1 = os.path.getmtime(self.pack._bitmap_path)
 
         # Ensure again - should return existing
-        import time
-
         time.sleep(0.01)  # Ensure time difference
         self.pack.ensure_bitmap(self.store, refs, commit_interval=1)
         mtime2 = os.path.getmtime(self.pack._bitmap_path)
@@ -1246,9 +1197,6 @@ class GeneratePackBitmapsTests(unittest.TestCase):
 
     def setUp(self):
         """Set up test repository."""
-        from dulwich.object_store import DiskObjectStore
-        from dulwich.objects import Blob, Commit, Tree
-
         self.temp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.temp_dir)
 
@@ -1308,8 +1256,6 @@ class GeneratePackBitmapsTests(unittest.TestCase):
         mtimes1 = [os.path.getmtime(p._bitmap_path) for p in self.store.packs]
 
         # Generate again
-        import time
-
         time.sleep(0.01)
         self.store.generate_pack_bitmaps(refs)
         mtimes2 = [os.path.getmtime(p._bitmap_path) for p in self.store.packs]

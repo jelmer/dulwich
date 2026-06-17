@@ -21,7 +21,9 @@
 
 """Tests for CLI cherry-pick command."""
 
+import io
 import os
+import sys
 import tempfile
 
 from dulwich import porcelain
@@ -120,9 +122,6 @@ class CherryPickCommandTests(TestCase):
 
     def test_cherry_pick_missing_argument(self):
         """Test cherry-pick without commit argument."""
-        import io
-        import sys
-
         with tempfile.TemporaryDirectory() as tmpdir:
             orig_cwd = os.getcwd()
             try:

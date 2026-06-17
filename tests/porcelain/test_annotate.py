@@ -22,6 +22,7 @@
 """Tests for porcelain annotate and blame functions."""
 
 import os
+import shutil
 import tempfile
 from unittest import TestCase
 
@@ -39,8 +40,6 @@ class PorcelainAnnotateTestCase(TestCase):
 
     def tearDown(self) -> None:
         self.repo.close()
-        import shutil
-
         shutil.rmtree(self.temp_dir)
 
     def _make_commit_with_file(
@@ -138,8 +137,6 @@ class IntegrationTestCase(TestCase):
 
     def tearDown(self) -> None:
         self.repo.close()
-        import shutil
-
         shutil.rmtree(self.temp_dir)
 
     def _create_file_commit(

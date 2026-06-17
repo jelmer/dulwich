@@ -26,25 +26,35 @@ import shutil
 import stat
 import sys
 import tempfile
+import time
 from contextlib import closing
 from io import BytesIO
+from unittest.mock import patch
 
-from dulwich.errors import NotTreeError, ObjectFormatException
+from dulwich.config import ConfigDict
+from dulwich.errors import ChecksumMismatch, NotTreeError, ObjectFormatException
+from dulwich.file import GitFile
+from dulwich.gc import garbage_collect
 from dulwich.index import commit_tree
+from dulwich.midx import write_midx_file
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import (
+    DEFAULT_TEMPFILE_GRACE_PERIOD,
     DiskObjectStore,
     MemoryObjectStore,
     ObjectStoreGraphWalker,
     OverlayObjectStore,
     PackInputTooLarge,
     commit_tree_changes,
+    find_shallow,
+    get_depth,
     read_packs_file,
     tree_lookup_path,
 )
 from dulwich.objects import (
     S_IFGITLINK,
     Blob,
+    Commit,
     EmptyFileException,
     SubmoduleEncountered,
     Tree,
@@ -52,7 +62,14 @@ from dulwich.objects import (
     hex_to_sha,
     sha_to_hex,
 )
-from dulwich.pack import REF_DELTA, write_pack_objects
+from dulwich.pack import (
+    DEFAULT_DELTA_BASE_CACHE_LIMIT,
+    REF_DELTA,
+    Pack,
+    load_pack_index,
+    write_pack_objects,
+)
+from dulwich.repo import Repo
 from dulwich.tests.test_object_store import ObjectStoreTests, PackBasedObjectStoreTests
 from dulwich.tests.utils import build_pack, make_object
 
@@ -125,8 +142,6 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         # otherwise a MemoryRepo non-thin fetch would silently accept
         # truncated network input. add_thin_pack already validates via
         # PackStreamCopier.verify().
-        from dulwich.errors import ChecksumMismatch
-
         o = MemoryObjectStore()
         f, commit, abort = o.add_pack()
         try:
@@ -273,9 +288,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_getitem_verifies_sha(self) -> None:
         """Retrieving a loose object stored under a wrong sha is rejected."""
-        from dulwich.errors import ChecksumMismatch
-        from dulwich.file import GitFile
-
         self.store.add_object(testobject)
         wrong_sha = b"1" * 40
         path = self.store._get_shafile_path(wrong_sha)
@@ -448,9 +460,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_pack_index_version_config(self) -> None:
         # Test that pack.indexVersion configuration is respected
-        from dulwich.config import ConfigDict
-        from dulwich.pack import load_pack_index
-
         # Create config with pack.indexVersion = 1
         config = ConfigDict()
         config[(b"pack",)] = {b"indexVersion": b"1"}
@@ -521,8 +530,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertEqual(3, idx2.version)
 
     def test_prune_orphaned_tempfiles(self) -> None:
-        import time
-
         # Create an orphaned temporary pack file in the repository directory
         tmp_pack_path = os.path.join(self.store_dir, "tmp_pack_test123")
         with open(tmp_pack_path, "wb") as f:
@@ -535,8 +542,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             f.write(b"orphaned pack data")
 
         # Make files appear old by modifying mtime (older than grace period)
-        from dulwich.object_store import DEFAULT_TEMPFILE_GRACE_PERIOD
-
         old_time = time.time() - (
             DEFAULT_TEMPFILE_GRACE_PERIOD + 3600
         )  # grace period + 1 hour
@@ -563,8 +568,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_prune_with_custom_grace_period(self) -> None:
         """Test that prune respects custom grace period."""
-        import time
-
         # Create a temporary file that's 1 hour old
         tmp_pack_path = os.path.join(self.store_dir, "tmp_pack_1hour")
         with open(tmp_pack_path, "wb") as f:
@@ -584,11 +587,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_gc_prunes_tempfiles(self) -> None:
         """Test that garbage collection prunes temporary files."""
-        import time
-
-        from dulwich.gc import garbage_collect
-        from dulwich.repo import Repo
-
         # Create a repository with the store
         repo = Repo.init(self.store_dir)
 
@@ -598,8 +596,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             f.write(b"old temporary data")
 
         # Make it old (older than grace period)
-        from dulwich.object_store import DEFAULT_TEMPFILE_GRACE_PERIOD
-
         old_time = time.time() - (
             DEFAULT_TEMPFILE_GRACE_PERIOD + 3600
         )  # grace period + 1 hour
@@ -613,8 +609,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_commit_graph_enabled_by_default(self) -> None:
         """Test that commit graph is enabled by default."""
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         store = DiskObjectStore.from_config(self.store_dir, config)
         self.addCleanup(store.close)
@@ -624,8 +618,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_commit_graph_disabled_by_config(self) -> None:
         """Test that commit graph can be disabled via config."""
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         config[(b"core",)] = {b"commitGraph": b"false"}
         store = DiskObjectStore.from_config(self.store_dir, config)
@@ -639,8 +631,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_commit_graph_enabled_by_config(self) -> None:
         """Test that commit graph can be explicitly enabled via config."""
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         config[(b"core",)] = {b"commitGraph": b"true"}
         store = DiskObjectStore.from_config(self.store_dir, config)
@@ -651,11 +641,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_commit_graph_usage_in_find_shallow(self) -> None:
         """Test that find_shallow uses commit graph when available."""
-        import time
-
-        from dulwich.object_store import find_shallow
-        from dulwich.objects import Commit
-
         # Create a simple commit chain: c1 -> c2 -> c3
         ts = int(time.time())
         c1 = make_object(
@@ -720,12 +705,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_commit_graph_end_to_end(self) -> None:
         """Test end-to-end commit graph generation and usage."""
-        import os
-        import time
-
-        from dulwich.object_store import get_depth
-        from dulwich.objects import Blob, Commit, Tree
-
         # Create a more complex commit history:
         #   c1 -- c2 -- c4
         #     \        /
@@ -874,8 +853,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_fsync_object_files_disabled_by_default(self) -> None:
         """Test that fsync is disabled by default for object files."""
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         store = DiskObjectStore.from_config(self.store_dir, config)
         self.addCleanup(store.close)
@@ -885,10 +862,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_fsync_object_files_enabled_by_config(self) -> None:
         """Test that fsync can be enabled via core.fsyncObjectFiles config."""
-        from unittest.mock import patch
-
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         config[(b"core",)] = {b"fsyncObjectFiles": b"true"}
         store = DiskObjectStore.from_config(self.store_dir, config)
@@ -906,10 +879,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_fsync_object_files_disabled_by_config(self) -> None:
         """Test that fsync can be explicitly disabled via config."""
-        from unittest.mock import patch
-
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         config[(b"core",)] = {b"fsyncObjectFiles": b"false"}
         store = DiskObjectStore.from_config(self.store_dir, config)
@@ -927,11 +896,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
     def test_fsync_object_files_for_pack_files(self) -> None:
         """Test that fsync config applies to pack files."""
-        from unittest.mock import patch
-
-        from dulwich.config import ConfigDict
-        from dulwich.pack import write_pack_objects
-
         # Test with fsync enabled
         config = ConfigDict()
         config[(b"core",)] = {b"fsyncObjectFiles": b"true"}
@@ -957,8 +921,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             self.assertGreater(mock_fsync.call_count, 0)
 
     def test_packed_git_limit_config(self) -> None:
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         config[(b"core",)] = {b"packedGitLimit": b"1048576"}
         store = DiskObjectStore.from_config(self.store_dir, config)
@@ -1022,8 +984,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertEqual((Blob.type_num, b"data one"), store.get_raw(b1.id))
 
     def test_pack_mmap_size(self) -> None:
-        from dulwich.pack import Pack
-
         store = DiskObjectStore(self.store_dir)
         self.addCleanup(store.close)
 
@@ -1048,8 +1008,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
                 self.assertGreater(pack.mmap_size, 0)
 
     def test_delta_base_cache_limit_config(self) -> None:
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         config[(b"core",)] = {b"deltaBaseCacheLimit": b"2097152"}
         store = DiskObjectStore.from_config(self.store_dir, config)
@@ -1157,8 +1115,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertEqual((Blob.type_num, b"eviction test"), store.get_raw(b.id))
 
     def test_delta_base_cache_limit_uses_default(self) -> None:
-        from dulwich.pack import DEFAULT_DELTA_BASE_CACHE_LIMIT
-
         store = DiskObjectStore(self.store_dir)
         self.addCleanup(store.close)
 
@@ -1378,9 +1334,6 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         MIDX pack name began with "pack-", crashing with AssertionError on
         the "loose-<hash>.idx" names git maintenance writes into the MIDX.
         """
-        from dulwich.midx import write_midx_file
-        from dulwich.pack import load_pack_index
-
         store = DiskObjectStore(self.store_dir)
         self.addCleanup(store.close)
         b = self._add_blob_in_pack(store, b"midx loose pack")

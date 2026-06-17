@@ -21,6 +21,7 @@
 """Tests for porcelain notes functions."""
 
 import os
+import shutil
 import tempfile
 from unittest import TestCase
 
@@ -49,8 +50,6 @@ class TestPorcelainNotes(TestCase):
         )
 
     def cleanup(self):
-        import shutil
-
         shutil.rmtree(self.test_dir)
 
     def test_notes_add_and_show(self):

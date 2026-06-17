@@ -23,17 +23,20 @@
 
 """Tests for dulwich.cli."""
 
+import glob
 import io
 import logging
 import os
+import re
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from unittest import skipIf
 from unittest.mock import MagicMock, patch
 
-from dulwich import cli
+from dulwich import cli, porcelain
 from dulwich.cli import (
     AutoFlushBinaryIOWrapper,
     AutoFlushTextIOWrapper,
@@ -43,8 +46,11 @@ from dulwich.cli import (
     detect_terminal_width,
     format_bytes,
     launch_editor,
+    parse_time_to_timestamp,
     write_columns,
 )
+from dulwich.objects import Blob, Tag, Tree
+from dulwich.porcelain import gc, rev_parse
 from dulwich.repo import Repo
 from dulwich.tests.utils import (
     build_commit_graph,
@@ -205,10 +211,6 @@ class HelperFunctionsTest(TestCase):
 
     def test_parse_time_to_timestamp(self):
         """Test parsing time specifications to Unix timestamps."""
-        import time
-
-        from dulwich.cli import parse_time_to_timestamp
-
         # Test special values
         self.assertEqual(0, parse_time_to_timestamp("never"))
         future_time = parse_time_to_timestamp("all")
@@ -2011,8 +2013,6 @@ class FormatPatchCommandTest(DulwichCliTestCase):
 
     def test_format_patch_single_commit(self):
         # Create a commit with actual content
-        from dulwich.objects import Blob, Tree
-
         # Initial commit
         tree1 = Tree()
         self.repo.object_store.add_object(tree1)
@@ -2058,8 +2058,6 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         os.remove(patch_file)
 
     def test_format_patch_multiple_commits(self):
-        from dulwich.objects import Blob, Tree
-
         # Initial commit
         tree1 = Tree()
         self.repo.object_store.add_object(tree1)
@@ -2116,8 +2114,6 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         os.remove(os.path.join(self.repo_path, "0002-Add-file2.txt.patch"))
 
     def test_format_patch_output_directory(self):
-        from dulwich.objects import Blob, Tree
-
         # Create a commit
         blob = Blob.from_string(b"Test content\n")
         self.repo.object_store.add_object(blob)
@@ -2148,8 +2144,6 @@ class FormatPatchCommandTest(DulwichCliTestCase):
             self.assertIn(b"+Test content", content)
 
     def test_format_patch_commit_range(self):
-        from dulwich.objects import Blob, Tree
-
         # Create commits with actual file changes
         commits = []
         trees = []
@@ -2214,8 +2208,6 @@ class FormatPatchCommandTest(DulwichCliTestCase):
         os.remove(os.path.join(self.repo_path, "0002-Add-file3.txt.patch"))
 
     def test_format_patch_stdout(self):
-        from dulwich.objects import Blob, Tree
-
         # Create a commit with modified file
         tree1 = Tree()
         blob1 = Blob.from_string(b"Original content\n")
@@ -2276,8 +2268,6 @@ class RequestPullCommandTest(DulwichCliTestCase):
     """Tests for request-pull command."""
 
     def _commit(self, filename, content, message):
-        from dulwich.objects import Blob, Tree
-
         blob = Blob.from_string(content)
         self.repo.object_store.add_object(blob)
         try:
@@ -2302,8 +2292,6 @@ class RequestPullCommandTest(DulwichCliTestCase):
         self.assertIn("1 files changed", stdout)
 
     def test_request_pull_no_common_ancestor(self):
-        from dulwich.objects import Tree
-
         tree = Tree()
         self.repo.object_store.add_object(tree)
         c1 = self.repo.get_worktree().commit(message=b"first root", tree=tree.id)
@@ -2877,8 +2865,6 @@ class HashObjectCommandTest(DulwichCliTestCase):
         self.assertTrue(all(c in "0123456789abcdef" for c in sha.lower()))
 
         # Verify object exists in database
-        from dulwich.objects import Blob
-
         obj = self.repo.object_store[sha.encode("utf-8")]
         self.assertIsInstance(obj, Blob)
         self.assertEqual(obj.data, test_content)
@@ -2904,8 +2890,6 @@ class RevParseCommandTest(DulwichCliTestCase):
         self.assertTrue(all(c in "0123456789abcdef" for c in sha.lower()))
 
         # Verify it matches the actual HEAD
-        from dulwich.porcelain import rev_parse
-
         expected_sha = rev_parse(self.repo_path, b"HEAD")
         self.assertEqual(sha, expected_sha.decode("utf-8"))
 
@@ -2942,8 +2926,6 @@ class UpdateRefCommandTest(DulwichCliTestCase):
         self._run_cli("commit", "-m", "Test commit")
 
         # Get the current HEAD SHA
-        from dulwich.porcelain import rev_parse
-
         head_sha = rev_parse(self.repo_path, b"HEAD")
 
         # Create a new ref pointing to HEAD
@@ -2964,8 +2946,6 @@ class UpdateRefCommandTest(DulwichCliTestCase):
             f.write(b"test content\n")
         self._run_cli("add", "test.txt")
         self._run_cli("commit", "-m", "First commit")
-
-        from dulwich.porcelain import rev_parse
 
         first_sha = rev_parse(self.repo_path, b"HEAD")
 
@@ -2999,8 +2979,6 @@ class UpdateRefCommandTest(DulwichCliTestCase):
         self._run_cli("add", "test.txt")
         self._run_cli("commit", "-m", "Test commit")
 
-        from dulwich.porcelain import rev_parse
-
         head_sha = rev_parse(self.repo_path, b"HEAD")
 
         # Create a ref
@@ -3032,8 +3010,6 @@ class MktagCommandTest(DulwichCliTestCase):
         self._run_cli("add", "test.txt")
         self._run_cli("commit", "-m", "Test commit")
 
-        from dulwich.porcelain import rev_parse
-
         commit_sha = rev_parse(self.repo_path, b"HEAD")
 
         # Create tag data
@@ -3047,9 +3023,6 @@ class MktagCommandTest(DulwichCliTestCase):
         )
 
         # Run mktag with tag data via stdin
-        import io
-        import sys
-
         old_stdin = sys.stdin
         try:
             sys.stdin = io.TextIOWrapper(io.BytesIO(tag_data))
@@ -3064,8 +3037,6 @@ class MktagCommandTest(DulwichCliTestCase):
         self.assertEqual(len(tag_sha), 40)
 
         # Verify the tag object exists and has correct content
-        from dulwich.objects import Tag
-
         tag_obj = self.repo.object_store[tag_sha.encode("ascii")]
         self.assertIsInstance(tag_obj, Tag)
         self.assertEqual(tag_obj.object[1], commit_sha)
@@ -3090,13 +3061,9 @@ class ShowIndexCommandTest(DulwichCliTestCase):
         self._run_cli("commit", "-m", "Second commit")
 
         # Run gc to create pack files
-        from dulwich.porcelain import gc
-
         gc(self.repo_path)
 
         # Find the pack index file
-        import glob
-
         pack_dir = os.path.join(self.repo_path, ".git", "objects", "pack")
         index_files = glob.glob(os.path.join(pack_dir, "*.idx"))
         self.assertTrue(len(index_files) > 0, "No pack index files found")
@@ -3106,8 +3073,6 @@ class ShowIndexCommandTest(DulwichCliTestCase):
         self.assertEqual(result, 0)
 
         # Verify output format: offset sha (crc32)
-        import re
-
         lines = stdout.strip().split("\n")
         self.assertTrue(len(lines) > 0)
         for line in lines:
@@ -3996,8 +3961,6 @@ class WorktreeCliTests(DulwichCliTestCase):
         # Just create initial commit
         with open(os.path.join(self.repo_path, "test.txt"), "w") as f:
             f.write("test content")
-        from dulwich import porcelain
-
         porcelain.add(self.repo_path, ["test.txt"])
         porcelain.commit(self.repo_path, message=b"Initial commit")
 
@@ -4370,8 +4333,6 @@ class GitFlushTest(TestCase):
 
     def test_text_wrapper_flushes_on_writelines(self):
         """Test that AutoFlushTextIOWrapper flushes after writelines."""
-        from dulwich.cli import AutoFlushTextIOWrapper
-
         mock_stream = MagicMock()
         wrapper = AutoFlushTextIOWrapper(mock_stream)
 

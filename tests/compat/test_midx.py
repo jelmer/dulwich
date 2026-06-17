@@ -21,7 +21,7 @@ from dulwich.midx import load_midx
 from dulwich.object_store import DiskObjectStore
 from dulwich.repo import Repo
 
-from .utils import CompatTestCase, run_git_or_fail
+from .utils import CompatTestCase, rmtree_ro, run_git_or_fail
 
 
 class MIDXCompatTests(CompatTestCase):
@@ -42,8 +42,6 @@ class MIDXCompatTests(CompatTestCase):
         self.overrideEnv("GIT_AUTHOR_EMAIL", "test@example.com")
 
     def tearDown(self):
-        from .utils import rmtree_ro
-
         rmtree_ro(self.test_dir)
 
     def create_test_repo_with_packs(self):

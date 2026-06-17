@@ -32,7 +32,7 @@ from collections.abc import Generator
 from contextlib import closing
 from io import BytesIO
 from os import SEEK_END
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
@@ -170,7 +170,6 @@ def tar_stream(
     """
     buf = BytesIO()
     mode = "w:" + format if format else "w"
-    from typing import Any, cast
 
     # The tarfile.open overloads are complex; cast to Any to avoid issues
     with closing(cast(Any, tarfile.open)(name=None, mode=mode, fileobj=buf)) as tar:

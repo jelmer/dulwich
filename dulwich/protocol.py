@@ -114,7 +114,7 @@ from typing import TYPE_CHECKING
 import dulwich
 
 from .errors import GitProtocolError, HangupException
-from .objects import ObjectID
+from .objects import ObjectID, Tag
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -1047,7 +1047,6 @@ def serialize_refs(
     import warnings
 
     from .object_store import peel_sha
-    from .objects import Tag
 
     ret: dict[bytes, ObjectID] = {}
     for ref, sha in refs.items():

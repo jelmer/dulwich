@@ -46,7 +46,7 @@ from .diff_tree import (
     tree_changes_for_merge,
 )
 from .errors import MissingCommitError
-from .objects import Commit, ObjectID, Tag
+from .objects import Commit, ObjectID, Tag, Tree
 
 ORDER_DATE = "date"
 ORDER_TOPO = "topo"
@@ -126,8 +126,6 @@ class WalkEntry:
                     parent = []
                     for p in parent_trees:
                         try:
-                            from .objects import Tree
-
                             assert isinstance(p, Tree)
                             _mode, st = p.lookup_path(
                                 self._store.__getitem__,
@@ -140,8 +138,6 @@ class WalkEntry:
             commit_tree_sha = commit.tree
             if path_prefix:
                 commit_tree = self._store[commit_tree_sha]
-                from .objects import Tree
-
                 assert isinstance(commit_tree, Tree)
                 _mode, commit_tree_sha = commit_tree.lookup_path(
                     self._store.__getitem__,

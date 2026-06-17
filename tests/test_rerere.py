@@ -2,9 +2,17 @@
 
 import importlib
 import os
+import shutil
 import tempfile
 import unittest
 
+from dulwich.config import ConfigDict
+from dulwich.diff_tree import tree_changes
+from dulwich.graph import find_merge_base
+from dulwich.index import update_working_tree
+from dulwich.merge import recursive_merge
+from dulwich.objects import Blob, Commit, Tree
+from dulwich.repo import Repo
 from dulwich.rerere import (
     RerereCache,
     _extract_conflict_regions,
@@ -13,6 +21,7 @@ from dulwich.rerere import (
     _remove_conflict_markers,
     is_rerere_autoupdate,
     is_rerere_enabled,
+    rerere_auto,
 )
 
 from . import DependencyMissing
@@ -160,7 +169,6 @@ class RerereCacheTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         """Clean up test fixtures."""
-        import shutil
 
         shutil.rmtree(self.tempdir, ignore_errors=True)
 
@@ -268,14 +276,12 @@ class ConfigTests(unittest.TestCase):
 
     def test_is_rerere_enabled_false_by_default(self) -> None:
         """Test that rerere is disabled by default."""
-        from dulwich.config import ConfigDict
 
         config = ConfigDict()
         self.assertFalse(is_rerere_enabled(config))
 
     def test_is_rerere_enabled_true(self) -> None:
         """Test rerere enabled config."""
-        from dulwich.config import ConfigDict
 
         config = ConfigDict()
         config.set((b"rerere",), b"enabled", b"true")
@@ -283,14 +289,12 @@ class ConfigTests(unittest.TestCase):
 
     def test_is_rerere_autoupdate_false_by_default(self) -> None:
         """Test that rerere.autoupdate is disabled by default."""
-        from dulwich.config import ConfigDict
 
         config = ConfigDict()
         self.assertFalse(is_rerere_autoupdate(config))
 
     def test_is_rerere_autoupdate_true(self) -> None:
         """Test rerere.autoupdate enabled config."""
-        from dulwich.config import ConfigDict
 
         config = ConfigDict()
         config.set((b"rerere",), b"autoupdate", b"true")
@@ -303,8 +307,6 @@ class RerereAutoTests(unittest.TestCase):
     def setUp(self) -> None:
         """Set up test fixtures."""
 
-        from dulwich.repo import Repo
-
         self.tempdir = tempfile.mkdtemp()
         self.repo = Repo.init(self.tempdir)
 
@@ -315,13 +317,11 @@ class RerereAutoTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         """Clean up test fixtures."""
-        import shutil
 
         shutil.rmtree(self.tempdir, ignore_errors=True)
 
     def test_rerere_auto_disabled(self) -> None:
         """Test that rerere_auto does nothing when disabled."""
-        from dulwich.rerere import rerere_auto
 
         # Disable rerere
         config = self.repo.get_config()
@@ -346,7 +346,6 @@ their change
 
     def test_rerere_auto_records_conflicts(self) -> None:
         """Test that rerere_auto records conflicts from working tree."""
-        from dulwich.rerere import rerere_auto
 
         # Create a conflicted file in the working tree
         conflict_file = os.path.join(self.tempdir, "test.txt")
@@ -372,7 +371,6 @@ line 2
 
     def test_rerere_auto_skips_non_conflicted_files(self) -> None:
         """Test that rerere_auto skips files without conflict markers."""
-        from dulwich.rerere import rerere_auto
 
         # Create a non-conflicted file
         file_path = os.path.join(self.tempdir, "test.txt")
@@ -385,7 +383,6 @@ line 2
 
     def test_rerere_auto_handles_missing_files(self) -> None:
         """Test that rerere_auto handles deleted files gracefully."""
-        from dulwich.rerere import rerere_auto
 
         # Don't create the file
         recorded, resolved = rerere_auto(self.repo, self.tempdir, [b"missing.txt"])
@@ -394,7 +391,6 @@ line 2
 
     def test_rerere_auto_applies_known_resolution(self) -> None:
         """Test that rerere_auto applies known resolutions when autoupdate is enabled."""
-        from dulwich.rerere import RerereCache, rerere_auto
 
         # Enable autoupdate
         config = self.repo.get_config()
@@ -443,7 +439,6 @@ line 2
 
     def test_rerere_auto_no_apply_without_autoupdate(self) -> None:
         """Test that rerere_auto doesn't apply resolutions when autoupdate is disabled."""
-        from dulwich.rerere import RerereCache, rerere_auto
 
         # autoupdate is disabled by default
 
@@ -490,9 +485,6 @@ class RerereEndToEndTests(unittest.TestCase):
     def setUp(self) -> None:
         """Set up test fixtures."""
 
-        from dulwich.objects import Blob, Commit, Tree
-        from dulwich.repo import Repo
-
         self.tempdir = tempfile.mkdtemp()
         self.repo = Repo.init(self.tempdir)
 
@@ -529,18 +521,11 @@ class RerereEndToEndTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         """Clean up test fixtures."""
-        import shutil
 
         shutil.rmtree(self.tempdir, ignore_errors=True)
 
     def test_rerere_full_workflow(self) -> None:
         """Test complete rerere workflow with real merge conflicts."""
-        from dulwich.diff_tree import tree_changes
-        from dulwich.graph import find_merge_base
-        from dulwich.index import update_working_tree
-        from dulwich.merge import recursive_merge
-        from dulwich.objects import Blob, Commit, Tree
-        from dulwich.rerere import rerere_auto
 
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:
@@ -637,7 +622,6 @@ class RerereEndToEndTests(unittest.TestCase):
             f.write(resolved_content)
 
         # Record the resolution
-        from dulwich.rerere import RerereCache
 
         cache = RerereCache.from_repo(self.repo)
         cache.record_resolution(conflict_id, resolved_content)
@@ -677,12 +661,6 @@ class RerereEndToEndTests(unittest.TestCase):
 
     def test_rerere_with_autoupdate(self) -> None:
         """Test rerere with autoupdate enabled."""
-        from dulwich.diff_tree import tree_changes
-        from dulwich.graph import find_merge_base
-        from dulwich.index import update_working_tree
-        from dulwich.merge import recursive_merge
-        from dulwich.objects import Blob, Commit, Tree
-        from dulwich.rerere import RerereCache, rerere_auto
 
         # Check if merge3 module is available
         if importlib.util.find_spec("merge3") is None:

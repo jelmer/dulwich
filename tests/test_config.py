@@ -21,10 +21,12 @@
 
 """Tests for reading and writing configuration files."""
 
+import logging
 import os
 import sys
 import tempfile
-from io import BytesIO
+from io import BytesIO, StringIO
+from pathlib import Path
 from unittest import skipIf
 from unittest.mock import patch
 
@@ -380,9 +382,6 @@ who\"
         )
 
     def test_from_path_pathlib(self) -> None:
-        import tempfile
-        from pathlib import Path
-
         # Create a temporary config file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".config", delete=False) as f:
             f.write("[core]\n    filemode = true\n")
@@ -396,9 +395,6 @@ who\"
         self.assertEqual(cf.get((b"core",), b"filemode"), b"true")
 
     def test_write_to_path_pathlib(self) -> None:
-        import tempfile
-        from pathlib import Path
-
         # Create a config
         cf = ConfigFile()
         cf.set((b"user",), b"name", b"Test User")
@@ -672,9 +668,6 @@ who\"
 
     def test_missing_include_file_logging(self) -> None:
         """Test that missing include files are logged but don't cause failure."""
-        import logging
-        from io import StringIO
-
         # Set up logging capture
         log_capture = StringIO()
         handler = logging.StreamHandler(log_capture)
@@ -705,9 +698,6 @@ who\"
 
     def test_invalid_include_path_logging(self) -> None:
         """Test that invalid include paths are logged but don't cause failure."""
-        import logging
-        from io import StringIO
-
         # Set up logging capture
         log_capture = StringIO()
         handler = logging.StreamHandler(log_capture)
@@ -738,9 +728,6 @@ who\"
 
     def test_unknown_includeif_condition_logging(self) -> None:
         """Test that unknown includeIf conditions are logged."""
-        import logging
-        from io import StringIO
-
         # Set up logging capture
         log_capture = StringIO()
         handler = logging.StreamHandler(log_capture)
@@ -989,8 +976,6 @@ class StackedConfigTests(TestCase):
 
     def test_debug_logging(self) -> None:
         """Test that debug logging outputs gitconfig paths."""
-        import logging
-
         # Set up a custom handler to capture log messages
         log_messages = []
         handler = logging.Handler()

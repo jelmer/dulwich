@@ -21,12 +21,14 @@
 
 """Integration tests for LFS with the filter system."""
 
+import logging
 import shutil
 import tempfile
 
+from dulwich.attrs import GitAttributes, Pattern
 from dulwich.config import ConfigDict
-from dulwich.filters import FilterBlobNormalizer, FilterRegistry
-from dulwich.lfs import LFSFilterDriver, LFSStore
+from dulwich.filters import FilterBlobNormalizer, FilterContext, FilterRegistry
+from dulwich.lfs import LFSFilterDriver, LFSPointer, LFSStore
 from dulwich.objects import Blob
 
 from . import TestCase
@@ -36,8 +38,6 @@ class LFSFilterIntegrationTests(TestCase):
     def setUp(self) -> None:
         super().setUp()
         # Suppress LFS warnings during these integration tests
-        import logging
-
         self._old_level = logging.getLogger("dulwich.lfs").level
         logging.getLogger("dulwich.lfs").setLevel(logging.ERROR)
         # Create temporary directory for LFS store
@@ -54,14 +54,10 @@ class LFSFilterIntegrationTests(TestCase):
         self.registry.register_driver("lfs", self.lfs_filter)
 
         # Set up gitattributes to use LFS for .bin files
-        from dulwich.attrs import GitAttributes, Pattern
-
         patterns = [
             (Pattern(b"*.bin"), {b"filter": b"lfs"}),
         ]
         self.gitattributes = GitAttributes(patterns)
-
-        from dulwich.filters import FilterContext
 
         filter_context = FilterContext(self.registry)
         self.normalizer = FilterBlobNormalizer(
@@ -70,8 +66,6 @@ class LFSFilterIntegrationTests(TestCase):
 
     def tearDown(self) -> None:
         # Restore original logging level
-        import logging
-
         logging.getLogger("dulwich.lfs").setLevel(self._old_level)
         super().tearDown()
 
@@ -114,8 +108,6 @@ class LFSFilterIntegrationTests(TestCase):
     def test_lfs_pointer_file(self) -> None:
         """Test handling of files that are already LFS pointers."""
         # Create an LFS pointer manually
-        from dulwich.lfs import LFSPointer
-
         # First store some content
         content = b"Content to be stored in LFS"
         sha = self.lfs_store.write_object([content])
@@ -135,8 +127,6 @@ class LFSFilterIntegrationTests(TestCase):
 
     def test_missing_lfs_object(self) -> None:
         """Test handling of LFS pointer with missing object."""
-        from dulwich.lfs import LFSPointer
-
         # Create pointer to non-existent object
         pointer = LFSPointer(
             "0000000000000000000000000000000000000000000000000000000000000000", 1234

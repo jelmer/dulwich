@@ -21,6 +21,8 @@
 
 """Tests for dulwich.mailmap."""
 
+import os
+import tempfile
 from io import BytesIO
 from unittest import TestCase
 
@@ -221,9 +223,6 @@ class MailmapTests(TestCase):
 
     def test_from_path(self) -> None:
         """Test creating Mailmap from a file path."""
-        import os
-        import tempfile
-
         # Create a temporary mailmap file
         with tempfile.NamedTemporaryFile(
             mode="wb", delete=False, suffix=".mailmap"

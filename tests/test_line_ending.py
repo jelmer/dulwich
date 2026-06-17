@@ -21,6 +21,9 @@
 
 """Tests for the line ending conversion."""
 
+from dulwich.attrs import GitAttributes, Pattern
+from dulwich.config import ConfigDict
+from dulwich.filters import FilterBlobNormalizer, FilterContext, FilterRegistry
 from dulwich.line_ending import (
     BlobNormalizer,
     LineEndingFilter,
@@ -32,7 +35,8 @@ from dulwich.line_ending import (
     get_smudge_filter_autocrlf,
     normalize_blob,
 )
-from dulwich.objects import Blob
+from dulwich.object_store import MemoryObjectStore
+from dulwich.objects import Blob, Tree
 
 from . import TestCase
 
@@ -252,8 +256,6 @@ class BlobNormalizerTests(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        from dulwich.config import ConfigDict
-
         self.config = ConfigDict()
         self.gitattributes = {}
 
@@ -372,9 +374,6 @@ class TreeBlobNormalizerTests(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        from dulwich.config import ConfigDict
-        from dulwich.object_store import MemoryObjectStore
-
         self.config = ConfigDict()
         self.gitattributes = {}
         self.object_store = MemoryObjectStore()
@@ -382,8 +381,6 @@ class TreeBlobNormalizerTests(TestCase):
     def test_autocrlf_input_existing_files(self) -> None:
         """Test that autocrlf=input normalizes existing files with CRLF."""
         # Create a tree with an existing file
-        from dulwich.objects import Tree
-
         tree = Tree()
         tree[b"existing.txt"] = (0o100644, b"a" * 40)  # dummy sha
         self.object_store.add_object(tree)
@@ -408,8 +405,6 @@ class TreeBlobNormalizerTests(TestCase):
     def test_autocrlf_false_existing_files(self) -> None:
         """Test that autocrlf=false does not normalize existing files."""
         # Create a tree with an existing file
-        from dulwich.objects import Tree
-
         tree = Tree()
         tree[b"existing.txt"] = (0o100644, b"a" * 40)  # dummy sha
         self.object_store.add_object(tree)
@@ -434,8 +429,6 @@ class TreeBlobNormalizerTests(TestCase):
     def test_autocrlf_input_new_files(self) -> None:
         """Test that autocrlf=input normalizes new files."""
         # Create empty tree (no existing files)
-        from dulwich.objects import Tree
-
         tree = Tree()
         self.object_store.add_object(tree)
 
@@ -462,9 +455,6 @@ class LineEndingIntegrationTests(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
-        from dulwich.config import ConfigDict
-        from dulwich.filters import FilterRegistry
-
         self.config = ConfigDict()
         self.registry = FilterRegistry(self.config)
 
@@ -480,14 +470,10 @@ class LineEndingIntegrationTests(TestCase):
 
         # Set up gitattributes
         # Create GitAttributes
-        from dulwich.attrs import GitAttributes, Pattern
-
         patterns = [(Pattern(b"*.txt"), {b"filter": b"text"})]
         gitattributes = GitAttributes(patterns)
 
         # Create normalizer
-        from dulwich.filters import FilterBlobNormalizer, FilterContext
-
         filter_context = FilterContext(self.registry)
         normalizer = FilterBlobNormalizer(
             self.config, gitattributes, filter_context=filter_context
@@ -532,15 +518,11 @@ class LineEndingIntegrationTests(TestCase):
         self.registry.register_driver("lfs", MockLFSFilter())
 
         # Different files use different filters
-        from dulwich.attrs import GitAttributes, Pattern
-
         patterns = [
             (Pattern(b"*.txt"), {b"filter": b"text"}),
             (Pattern(b"*.bin"), {b"filter": b"lfs"}),
         ]
         gitattributes = GitAttributes(patterns)
-
-        from dulwich.filters import FilterBlobNormalizer, FilterContext
 
         filter_context = FilterContext(self.registry)
         normalizer = FilterBlobNormalizer(
@@ -579,8 +561,6 @@ class LineEndingFilterFromConfigTests(TestCase):
 
     def test_from_config_autocrlf_true(self) -> None:
         """Test from_config with autocrlf=true."""
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         config.set(b"core", b"autocrlf", b"true")
 
@@ -591,8 +571,6 @@ class LineEndingFilterFromConfigTests(TestCase):
 
     def test_from_config_with_safecrlf(self) -> None:
         """Test from_config with safecrlf setting."""
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         config.set(b"core", b"autocrlf", b"input")
         config.set(b"core", b"safecrlf", b"warn")
@@ -604,8 +582,6 @@ class LineEndingFilterFromConfigTests(TestCase):
 
     def test_from_config_text_attr_overrides(self) -> None:
         """Test that for_text_attr=True always normalizes on checkin."""
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         config.set(b"core", b"autocrlf", b"false")
 

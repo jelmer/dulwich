@@ -27,6 +27,7 @@ import tempfile
 
 from dulwich.objects import (
     S_ISGITLINK,
+    ShaFile,
     Tree,
 )
 from dulwich.repo import Repo
@@ -100,8 +101,6 @@ class SubmoduleTests(TestCase):
         )
 
         # Create a tree from raw data
-        from dulwich.objects import ShaFile
-
         tree = ShaFile.from_raw_string(Tree.type_num, raw_tree_data)
 
         # Add the tree to the repository

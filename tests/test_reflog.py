@@ -21,6 +21,8 @@
 
 """Tests for dulwich.reflog."""
 
+import os
+import shutil
 import tempfile
 from io import BytesIO
 
@@ -201,8 +203,6 @@ class RepoReflogTests(TestCase):
 
     def tearDown(self) -> None:
         TestCase.tearDown(self)
-        import shutil
-
         self.repo.close()
         shutil.rmtree(self.test_dir)
 
@@ -302,8 +302,6 @@ class RepoReflogTests(TestCase):
         )
 
         # Use iter_reflogs to get all reflogs
-        import os
-
         logs_dir = os.path.join(self.repo.controldir(), "logs")
         reflogs = list(iter_reflogs(logs_dir))
 

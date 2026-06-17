@@ -28,6 +28,7 @@ import tempfile
 from dulwich.log_utils import (
     _DULWICH_LOGGER,
     _NULL_HANDLER,
+    _configure_logging_from_trace,
     _get_trace_target,
     _NullHandler,
     _should_trace,
@@ -249,8 +250,6 @@ class LogUtilsTests(TestCase):
 
     def test_configure_logging_from_trace_file_path(self) -> None:
         """Test _configure_logging_from_trace with file path."""
-        from dulwich.log_utils import _configure_logging_from_trace
-
         # Save current root logger state
         root_logger = logging.getLogger()
         original_level = root_logger.level
@@ -290,8 +289,6 @@ class LogUtilsTests(TestCase):
 
     def test_configure_logging_from_trace_directory(self) -> None:
         """Test _configure_logging_from_trace with directory path."""
-        from dulwich.log_utils import _configure_logging_from_trace
-
         # Save current root logger state
         root_logger = logging.getLogger()
         original_level = root_logger.level
@@ -332,8 +329,6 @@ class LogUtilsTests(TestCase):
 
     def test_configure_logging_from_trace_invalid_file(self) -> None:
         """Test _configure_logging_from_trace with invalid file path."""
-        from dulwich.log_utils import _configure_logging_from_trace
-
         # Save current root logger state
         root_logger = logging.getLogger()
         original_level = root_logger.level

@@ -25,12 +25,14 @@ Bundle URIs were introduced in Git 2.38.
 """
 
 import os
+import socket
 import tempfile
 import threading
+import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
 from dulwich.bundle import create_bundle_from_repo, write_bundle
-from dulwich.bundle_uri import parse_bundle_list
+from dulwich.bundle_uri import fetch_bundle_uri, parse_bundle_list
 from dulwich.client import BundleClient
 from dulwich.repo import MemoryRepo, Repo
 
@@ -349,8 +351,6 @@ class BundleURIHTTPCompatTestCase(CompatTestCase):
 
     def _start_http_server(self, serve_dir: str) -> str:
         """Start a simple HTTP server and return its URL."""
-        import socket
-        import time
 
         class QuietHandler(SimpleHTTPRequestHandler):
             def __init__(self, *args, **kwargs):
@@ -409,8 +409,6 @@ class BundleURIHTTPCompatTestCase(CompatTestCase):
         base_url = self._start_http_server(serve_dir)
 
         # Fetch bundle using dulwich
-        from dulwich.bundle_uri import fetch_bundle_uri
-
         bundle, bundle_list = fetch_bundle_uri(f"{base_url}/repo.bundle")
 
         # Should return a bundle, not a bundle list
@@ -462,8 +460,6 @@ class BundleURIHTTPCompatTestCase(CompatTestCase):
             f.write(bundle_list_content)
 
         # Fetch bundle list
-        from dulwich.bundle_uri import fetch_bundle_uri
-
         bundle, bundle_list = fetch_bundle_uri(f"{base_url}/bundle-list")
 
         # Should return a bundle list, not a bundle

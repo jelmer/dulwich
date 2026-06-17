@@ -23,9 +23,11 @@
 
 import io
 import os
+import socket
 import sys
 import tempfile
 import threading
+import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from unittest import skipUnless
 
@@ -76,9 +78,6 @@ class DumbHTTPGitServer:
         self.thread.start()
 
         # Give the server a moment to start and verify it's listening
-        import socket
-        import time
-
         for i in range(50):  # Try for up to 5 seconds
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

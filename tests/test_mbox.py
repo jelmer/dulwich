@@ -26,7 +26,7 @@ import os
 import tempfile
 from io import BytesIO
 
-from dulwich.mbox import split_maildir, split_mbox
+from dulwich.mbox import mailinfo, split_maildir, split_mbox
 
 from . import TestCase
 
@@ -323,8 +323,6 @@ class MailinfoTests(TestCase):
 
     def test_mailinfo_from_file_path(self) -> None:
         """Test mailinfo with file path."""
-        from dulwich.mbox import mailinfo
-
         email_content = b"""From: Test User <test@example.com>
 Subject: [PATCH] Test patch
 Date: Mon, 1 Jan 2024 12:00:00 +0000
@@ -349,8 +347,6 @@ diff --git a/test.txt b/test.txt
 
     def test_mailinfo_from_file_object(self) -> None:
         """Test mailinfo with file-like object."""
-        from dulwich.mbox import mailinfo
-
         email_content = b"""From: Test User <test@example.com>
 Subject: Test subject
 
@@ -363,8 +359,6 @@ Body text
 
     def test_mailinfo_with_options(self) -> None:
         """Test mailinfo with various options."""
-        from dulwich.mbox import mailinfo
-
         email_content = b"""From: Test <test@example.com>
 Subject: [PATCH] Feature
 Message-ID: <test123@example.com>

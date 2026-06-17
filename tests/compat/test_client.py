@@ -21,6 +21,8 @@
 
 """Compatibility tests between the Dulwich client and the cgit server."""
 
+import base64
+import binascii
 import copy
 import http.server
 import os
@@ -726,9 +728,6 @@ class GitHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         if authorization:
             authorization = authorization.split()
             if len(authorization) == 2:
-                import base64
-                import binascii
-
                 env["AUTH_TYPE"] = authorization[0]
                 if authorization[0].lower() == "basic":
                     try:

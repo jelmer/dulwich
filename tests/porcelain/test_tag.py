@@ -27,6 +27,7 @@ import tempfile
 
 from dulwich import porcelain
 from dulwich.objects import Blob, Commit, Tree
+from dulwich.porcelain import Error
 from dulwich.repo import Repo
 
 from .. import TestCase
@@ -77,8 +78,6 @@ class TagDeleteTests(TestCase):
 
     def test_tag_delete_invalid_type(self) -> None:
         """Test tag_delete with invalid input type raises Error."""
-        from dulwich.porcelain import Error
-
         # Create a tag
         porcelain.tag_create(self.repo, b"test-tag", annotated=False)
 

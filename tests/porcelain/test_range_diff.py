@@ -18,6 +18,7 @@
 
 import importlib.util
 import os
+import shutil
 import tempfile
 import unittest
 from io import BytesIO
@@ -42,8 +43,6 @@ class PorcelainRangeDiffTests(TestCase):
         self.addCleanup(self.repo.close)
 
     def _cleanup(self):
-        import shutil
-
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def commit(self, message, files):

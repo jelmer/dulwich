@@ -26,19 +26,26 @@ import os
 import sys
 import tempfile
 from io import BytesIO
+from pathlib import Path
 from typing import ClassVar
 
 from dulwich import errors
-from dulwich.file import GitFile
+from dulwich.file import FileLocked, GitFile
 from dulwich.objects import ZERO_SHA
 from dulwich.protocol import split_peeled_refs, strip_peeled_refs
 from dulwich.refs import (
     DictRefsContainer,
+    DiskRefsContainer,
     NamespacedRefsContainer,
     SymrefLoop,
     _split_ref_line,
     check_ref_format,
+    extract_branch_name,
+    extract_tag_name,
     is_per_worktree_ref,
+    local_branch_name,
+    local_replace_name,
+    local_tag_name,
     parse_remote_ref,
     parse_symref_value,
     read_packed_refs,
@@ -864,8 +871,6 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
     def test_write_unchanged_ref_with_lock(self):
         # Test that file locking is still detected when ref unchanged
 
-        from dulwich.file import FileLocked
-
         ref_name = b"refs/heads/locktest"
         ref_value = b"d" * 40
 
@@ -1091,10 +1096,6 @@ _TEST_REFS_SERIALIZED = (
 
 class DiskRefsContainerPathlibTests(TestCase):
     def test_pathlib_init(self) -> None:
-        from pathlib import Path
-
-        from dulwich.refs import DiskRefsContainer
-
         # Create a temporary directory
         temp_dir = tempfile.mkdtemp()
         self.addCleanup(os.rmdir, temp_dir)
@@ -1110,10 +1111,6 @@ class DiskRefsContainerPathlibTests(TestCase):
         self.assertEqual(ref_path, os.path.join(temp_dir.encode(), b"HEAD"))
 
     def test_pathlib_worktree_path(self) -> None:
-        from pathlib import Path
-
-        from dulwich.refs import DiskRefsContainer
-
         # Create temporary directories
         temp_dir = tempfile.mkdtemp()
         worktree_dir = tempfile.mkdtemp()
@@ -1247,8 +1244,6 @@ class RefUtilityFunctionsTests(TestCase):
 
     def test_local_branch_name(self) -> None:
         """Test local_branch_name function."""
-        from dulwich.refs import local_branch_name
-
         # Test adding prefix to branch name
         self.assertEqual(b"refs/heads/master", local_branch_name(b"master"))
         self.assertEqual(b"refs/heads/develop", local_branch_name(b"develop"))
@@ -1261,15 +1256,11 @@ class RefUtilityFunctionsTests(TestCase):
 
     def test_local_branch_name_leading_slash(self) -> None:
         """Test local_branch_name warns about and strips a leading slash."""
-        from dulwich.refs import local_branch_name
-
         with self.assertWarns(DeprecationWarning):
             self.assertEqual(b"refs/heads/master", local_branch_name(b"/master"))
 
     def test_local_tag_name(self) -> None:
         """Test local_tag_name function."""
-        from dulwich.refs import local_tag_name
-
         # Test adding prefix to tag name
         self.assertEqual(b"refs/tags/v1.0", local_tag_name(b"v1.0"))
         self.assertEqual(b"refs/tags/release-2.0", local_tag_name(b"release-2.0"))
@@ -1279,22 +1270,16 @@ class RefUtilityFunctionsTests(TestCase):
 
     def test_local_tag_name_leading_slash(self) -> None:
         """Test local_tag_name warns about and strips a leading slash."""
-        from dulwich.refs import local_tag_name
-
         with self.assertWarns(DeprecationWarning):
             self.assertEqual(b"refs/tags/v1.0", local_tag_name(b"/v1.0"))
 
     def test_local_replace_name_leading_slash(self) -> None:
         """Test local_replace_name warns about and strips a leading slash."""
-        from dulwich.refs import local_replace_name
-
         with self.assertWarns(DeprecationWarning):
             self.assertEqual(b"refs/replace/abc123", local_replace_name(b"/abc123"))
 
     def test_extract_branch_name(self) -> None:
         """Test extract_branch_name function."""
-        from dulwich.refs import extract_branch_name
-
         # Test extracting branch name from full ref
         self.assertEqual(b"master", extract_branch_name(b"refs/heads/master"))
         self.assertEqual(b"develop", extract_branch_name(b"refs/heads/develop"))
@@ -1312,8 +1297,6 @@ class RefUtilityFunctionsTests(TestCase):
 
     def test_extract_tag_name(self) -> None:
         """Test extract_tag_name function."""
-        from dulwich.refs import extract_tag_name
-
         # Test extracting tag name from full ref
         self.assertEqual(b"v1.0", extract_tag_name(b"refs/tags/v1.0"))
         self.assertEqual(b"release-2.0", extract_tag_name(b"refs/tags/release-2.0"))

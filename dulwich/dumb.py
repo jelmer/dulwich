@@ -28,6 +28,7 @@ __all__ = [
 
 import logging
 import os
+import shutil
 import tempfile
 import zlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -379,8 +380,6 @@ class DumbHTTPObjectStore(BaseObjectStore):
         """
         if self._temp_pack_dir is not None:
             if os.path.exists(self._temp_pack_dir):
-                import shutil
-
                 shutil.rmtree(self._temp_pack_dir, ignore_errors=True)
             self._temp_pack_dir = None
 

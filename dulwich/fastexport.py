@@ -139,8 +139,6 @@ class GitFastExporter:
             if new_mode is not None and not stat.S_ISDIR(new_mode):
                 if new_hexsha is not None:
                     blob = self.store[new_hexsha]
-                    from .objects import Blob
-
                     if isinstance(blob, Blob):
                         marker = self.emit_blob(blob)
             if old_path != new_path and old_path is not None:
@@ -321,8 +319,6 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
                 self._contents = {}
             else:
                 raise Exception(f"Command {filecmd.name!r} not supported")
-        from dulwich.objects import ObjectID
-
         commit.tree = commit_tree(
             self.repo.object_store,
             (
@@ -354,8 +350,6 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
         self._contents = {}
         self.last_commit = commit_id
         if commit_id != ZERO_SHA:
-            from .objects import Commit
-
             commit = self.repo[commit_id]
             tree_id = commit.tree if isinstance(commit, Commit) else None
             if tree_id is None:

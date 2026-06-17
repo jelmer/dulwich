@@ -48,7 +48,7 @@ from .index import (
 from .object_store import iter_tree_contents
 from .objects import S_IFGITLINK, Blob, Commit, ObjectID, TreeEntry
 from .reflog import drop_reflog_entry, read_reflog
-from .refs import Ref
+from .refs import HEADREF, Ref
 
 if TYPE_CHECKING:
     from .config import Config
@@ -144,8 +144,6 @@ class Stash:
 
         # Get current HEAD to determine if we can apply cleanly
         try:
-            from dulwich.refs import HEADREF
-
             current_head = self._repo.refs[HEADREF]
         except KeyError:
             raise ValueError("Cannot pop stash: no HEAD")

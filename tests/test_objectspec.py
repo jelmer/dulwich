@@ -23,6 +23,9 @@
 
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
+import tempfile
+
+from dulwich.index import ConflictedIndexEntry, IndexEntry
 from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.objectspec import (
     parse_commit,
@@ -34,7 +37,7 @@ from dulwich.objectspec import (
     parse_reftuples,
     parse_tree,
 )
-from dulwich.repo import MemoryRepo
+from dulwich.repo import MemoryRepo, Repo
 from dulwich.tests.utils import build_commit_graph
 
 from . import TestCase
@@ -215,10 +218,6 @@ class ParseObjectTests(TestCase):
 
     def test_reflog_lookup(self) -> None:
         # Use a real repo for reflog testing
-        import tempfile
-
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             r = Repo.init_bare(tmpdir)
             c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 2]])
@@ -262,10 +261,6 @@ class ParseObjectTests(TestCase):
 
     def test_reflog_time_lookup(self) -> None:
         # Use a real repo for reflog testing with time specifications
-        import tempfile
-
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             r = Repo.init_bare(tmpdir)
             c1, c2, c3 = build_commit_graph(r.object_store, [[1], [2, 1], [3, 2]])
@@ -311,10 +306,6 @@ class ParseObjectTests(TestCase):
 
     def test_index_path_lookup_stage0(self) -> None:
         # Test index path lookup for stage 0 (normal files)
-        import tempfile
-
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             r = Repo.init(tmpdir)
 
@@ -324,8 +315,6 @@ class ParseObjectTests(TestCase):
 
             # Add to index
             index = r.open_index()
-            from dulwich.index import IndexEntry
-
             index[b"test.txt"] = IndexEntry(
                 ctime=(0, 0),
                 mtime=(0, 0),
@@ -349,11 +338,6 @@ class ParseObjectTests(TestCase):
 
     def test_index_path_lookup_conflicts(self) -> None:
         # Test index path lookup with merge conflicts (stages 1-3)
-        import tempfile
-
-        from dulwich.index import ConflictedIndexEntry, IndexEntry
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             r = Repo.init(tmpdir)
 
@@ -421,10 +405,6 @@ class ParseObjectTests(TestCase):
 
     def test_index_path_not_found(self) -> None:
         # Test error when path not in index
-        import tempfile
-
-        from dulwich.repo import Repo
-
         with tempfile.TemporaryDirectory() as tmpdir:
             r = Repo.init(tmpdir)
 

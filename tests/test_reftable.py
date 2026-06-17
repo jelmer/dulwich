@@ -1,5 +1,6 @@
 """Tests for the reftable refs storage format."""
 
+import shutil
 import tempfile
 import unittest
 from io import BytesIO
@@ -150,8 +151,6 @@ class TestReftableRefsContainer(unittest.TestCase):
 
     def tearDown(self):
         """Clean up test environment."""
-        import shutil
-
         shutil.rmtree(self.test_dir)
 
     def test_empty_container(self):

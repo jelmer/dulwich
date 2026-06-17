@@ -21,10 +21,13 @@
 
 """Tests for porcelain maintenance functions."""
 
+import os
+import shutil
 import tempfile
 
 from dulwich import porcelain
-from dulwich.objects import Blob
+from dulwich.config import ConfigFile
+from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import Repo
 
 from .. import TestCase
@@ -41,16 +44,12 @@ class PorcelainMaintenanceTestCase(TestCase):
         self.addCleanup(self.repo.close)
 
     def _cleanup_test_dir(self):
-        import shutil
-
         shutil.rmtree(self.test_dir)
 
     def _create_commit(self):
         """Helper to create a test commit."""
         blob = Blob.from_string(b"test content\n")
         self.repo.object_store.add_object(blob)
-
-        from dulwich.objects import Commit, Tree
 
         tree = Tree()
         tree.add(b"testfile", 0o100644, blob.id)
@@ -97,8 +96,6 @@ class MaintenanceRegisterTest(PorcelainMaintenanceTestCase):
         self.overrideEnv("HOME", self.temp_home)
 
     def _cleanup_temp_home(self):
-        import shutil
-
         shutil.rmtree(self.temp_home)
 
     def test_register_repository(self):
@@ -106,10 +103,6 @@ class MaintenanceRegisterTest(PorcelainMaintenanceTestCase):
         porcelain.maintenance_register(self.test_dir)
 
         # Verify repository was added to global config
-        import os
-
-        from dulwich.config import ConfigFile
-
         global_config_path = os.path.expanduser("~/.gitconfig")
         global_config = ConfigFile.from_path(global_config_path)
 
@@ -140,10 +133,6 @@ class MaintenanceRegisterTest(PorcelainMaintenanceTestCase):
         porcelain.maintenance_unregister(self.test_dir)
 
         # Verify repository was removed from global config
-        import os
-
-        from dulwich.config import ConfigFile
-
         global_config_path = os.path.expanduser("~/.gitconfig")
         global_config = ConfigFile.from_path(global_config_path)
 

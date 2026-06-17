@@ -24,6 +24,7 @@
 import os
 import tempfile
 
+from dulwich.client import LocalGitClient
 from dulwich.object_format import SHA256
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import Repo
@@ -367,8 +368,6 @@ class GitSHA256CompatibilityTests(CompatTestCase):
 
     def test_dulwich_clone_sha256_repo(self):
         """Test that dulwich's clone() auto-detects SHA-256 format from git repo."""
-        from dulwich.client import LocalGitClient
-
         # Create source SHA-256 repo with git
         source_path = tempfile.mkdtemp()
         self.addCleanup(rmtree_ro, source_path)

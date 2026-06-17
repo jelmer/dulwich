@@ -24,11 +24,13 @@
 import shutil
 import tempfile
 import unittest
+from hashlib import sha1
 from io import BytesIO
 
 from dulwich.object_format import SHA256
 from dulwich.pack import (
     load_pack_index_file,
+    write_pack_index_v1,
     write_pack_index_v2,
 )
 
@@ -60,8 +62,6 @@ class SHA256PackTests(unittest.TestCase):
 
         # Write SHA256 pack index with SHA1 pack checksum (Git always uses SHA1 for pack checksums)
         index_buf = BytesIO()
-        from hashlib import sha1
-
         pack_checksum = sha1(b"fake pack data").digest()
         write_pack_index_v2(index_buf, entries, pack_checksum)
 
@@ -96,13 +96,8 @@ class SHA256PackTests(unittest.TestCase):
         # Sort entries by SHA (required for pack index)
         entries.sort(key=lambda e: e[0])
 
-        # Import write_pack_index_v1
-        from dulwich.pack import write_pack_index_v1
-
         # Write SHA256 pack index v1 with SHA1 pack checksum
         index_buf = BytesIO()
-        from hashlib import sha1
-
         pack_checksum = sha1(b"fake v1 pack data").digest()
 
         # Pack index v1 only supports SHA-1, so this should raise TypeError

@@ -26,12 +26,15 @@ import re
 import shutil
 import tempfile
 from io import BytesIO
+from pathlib import Path
 
 from dulwich.ignore import (
     IgnoreFilter,
     IgnoreFilterManager,
     IgnoreFilterStack,
     Pattern,
+    _check_parent_exclusion,
+    _pattern_excludes_parent,
     match_pattern,
     read_ignore_patterns,
     translate,
@@ -161,8 +164,6 @@ class ParentExclusionTests(TestCase):
 
     def test_check_parent_exclusion_direct_directory(self) -> None:
         """Test _check_parent_exclusion with direct directory exclusion."""
-        from dulwich.ignore import Pattern, _check_parent_exclusion
-
         # Pattern: dir/, !dir/file.txt
         patterns = [Pattern(b"dir/"), Pattern(b"!dir/file.txt")]
 
@@ -177,8 +178,6 @@ class ParentExclusionTests(TestCase):
 
     def test_check_parent_exclusion_no_negation(self) -> None:
         """Test _check_parent_exclusion when there's no negation pattern."""
-        from dulwich.ignore import Pattern, _check_parent_exclusion
-
         # Only exclusion patterns
         patterns = [Pattern(b"*.log"), Pattern(b"build/")]
 
@@ -187,8 +186,6 @@ class ParentExclusionTests(TestCase):
 
     def test_pattern_excludes_parent_directory_slash(self) -> None:
         """Test _pattern_excludes_parent for patterns ending with /."""
-        from dulwich.ignore import _pattern_excludes_parent
-
         # Pattern: parent/
         self.assertTrue(
             _pattern_excludes_parent("parent/", "parent/file.txt", "!parent/file.txt")
@@ -207,8 +204,6 @@ class ParentExclusionTests(TestCase):
 
     def test_pattern_excludes_parent_double_asterisk(self) -> None:
         """Test _pattern_excludes_parent for **/ patterns."""
-        from dulwich.ignore import _pattern_excludes_parent
-
         # Pattern: **/node_modules/**
         self.assertTrue(
             _pattern_excludes_parent(
@@ -230,8 +225,6 @@ class ParentExclusionTests(TestCase):
 
     def test_pattern_excludes_parent_glob(self) -> None:
         """Test _pattern_excludes_parent for dir/** patterns."""
-        from dulwich.ignore import _pattern_excludes_parent
-
         # Pattern: logs/** - allows exact file negations for immediate children
         self.assertFalse(
             _pattern_excludes_parent("logs/**", "logs/file.txt", "!logs/file.txt")
@@ -307,9 +300,6 @@ class IgnoreFilterTests(TestCase):
         self.assertTrue(filter.is_ignored("foo[bar]"))
 
     def test_from_path_pathlib(self) -> None:
-        import tempfile
-        from pathlib import Path
-
         # Create a temporary .gitignore file
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".gitignore", delete=False

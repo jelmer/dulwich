@@ -11,6 +11,7 @@
 
 import io
 import os
+import shutil
 import struct
 import tempfile
 import unittest
@@ -33,7 +34,11 @@ from dulwich.commit_graph import (
     get_reachable_commits,
     read_commit_graph,
 )
+from dulwich.graph import can_fast_forward, find_merge_base
 from dulwich.object_format import SHA1
+from dulwich.object_store import DiskObjectStore, MemoryObjectStore
+from dulwich.objects import Commit, Tree, hex_to_sha
+from dulwich.repo import ParentsProvider, Repo
 
 
 class CommitGraphEntryTests(unittest.TestCase):
@@ -417,8 +422,6 @@ class CommitGraphFileOperationsTests(unittest.TestCase):
         self.tempdir = tempfile.mkdtemp()
 
     def tearDown(self) -> None:
-        import shutil
-
         shutil.rmtree(self.tempdir, ignore_errors=True)
 
     def test_read_commit_graph_missing_file(self) -> None:
@@ -500,13 +503,10 @@ class CommitGraphGenerationTests(unittest.TestCase):
         self.tempdir = tempfile.mkdtemp()
 
     def tearDown(self) -> None:
-        import shutil
-
         shutil.rmtree(self.tempdir, ignore_errors=True)
 
     def test_generate_commit_graph_empty(self) -> None:
         """Test generating commit graph with no commits."""
-        from dulwich.object_store import MemoryObjectStore
 
         object_store = MemoryObjectStore()
         graph = generate_commit_graph(object_store, [])
@@ -515,8 +515,6 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
     def test_generate_commit_graph_single_commit(self) -> None:
         """Test generating commit graph with single commit."""
-        from dulwich.object_store import MemoryObjectStore
-        from dulwich.objects import Commit, Tree
 
         object_store = MemoryObjectStore()
 
@@ -546,8 +544,6 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
     def test_generate_commit_graph_oid_index_uses_binary_keys(self) -> None:
         """Test that generated commit graph _oid_to_index uses binary RawObjectID keys."""
-        from dulwich.object_store import MemoryObjectStore
-        from dulwich.objects import Commit, Tree, hex_to_sha
 
         object_store = MemoryObjectStore()
 
@@ -587,8 +583,6 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
     def test_get_reachable_commits(self) -> None:
         """Test getting reachable commits."""
-        from dulwich.object_store import MemoryObjectStore
-        from dulwich.objects import Commit, Tree
 
         object_store = MemoryObjectStore()
 
@@ -624,8 +618,6 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
     def test_write_commit_graph_to_file(self) -> None:
         """Test writing commit graph to file."""
-        from dulwich.object_store import DiskObjectStore
-        from dulwich.objects import Commit, Tree
 
         # Create a disk object store
         object_store_path = os.path.join(self.tempdir, "objects")
@@ -665,8 +657,6 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
     def test_object_store_commit_graph_methods(self) -> None:
         """Test ObjectStore commit graph methods."""
-        from dulwich.object_store import DiskObjectStore
-        from dulwich.objects import Commit, Tree
 
         # Create a disk object store
         object_store_path = os.path.join(self.tempdir, "objects")
@@ -701,9 +691,6 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
     def test_parents_provider_commit_graph_integration(self) -> None:
         """Test that ParentsProvider uses commit graph when available."""
-        from dulwich.object_store import DiskObjectStore
-        from dulwich.objects import Commit, Tree
-        from dulwich.repo import ParentsProvider
 
         # Create a disk object store
         object_store_path = os.path.join(self.tempdir, "objects")
@@ -770,10 +757,6 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
     def test_graph_operations_use_commit_graph(self) -> None:
         """Test that graph operations use commit graph when available."""
-        from dulwich.graph import can_fast_forward, find_merge_base
-        from dulwich.object_store import DiskObjectStore
-        from dulwich.objects import Commit, Tree
-        from dulwich.repo import Repo
 
         # Create a disk object store
         object_store_path = os.path.join(self.tempdir, "objects")
@@ -901,10 +884,6 @@ class CommitGraphGenerationTests(unittest.TestCase):
 
     def test_performance_with_commit_graph(self) -> None:
         """Test that using commit graph provides performance benefits."""
-        from dulwich.graph import find_merge_base
-        from dulwich.object_store import DiskObjectStore
-        from dulwich.objects import Commit, Tree
-        from dulwich.repo import Repo
 
         # Create a larger commit history to better measure performance
         object_store_path = os.path.join(self.tempdir, "objects")

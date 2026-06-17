@@ -24,6 +24,7 @@
 
 import os
 import shutil
+import sys
 import tempfile
 import time
 
@@ -520,8 +521,6 @@ class ApplyIncludedPathsTests(TestCase):
 
     def test_local_modifications_ioerror(self):
         """Test handling of PermissionError/OSError when checking for local modifications."""
-        import sys
-
         self._commit_blob("special_file.txt", b"content")
         file_path = os.path.join(self.temp_dir, "special_file.txt")
 

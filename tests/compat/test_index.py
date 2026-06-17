@@ -22,9 +22,19 @@
 """Compatibility tests for Git index format v4."""
 
 import os
+import shutil
+import sys
 import tempfile
 
-from dulwich.index import Index, read_index_dict_with_version, write_index_dict
+from dulwich.index import (
+    Index,
+    IndexEntry,
+    SparseDirExtension,
+    read_index_dict_with_version,
+    write_index_dict,
+)
+from dulwich.objects import Blob, Commit, Tree
+from dulwich.pack import SHA1Writer
 from dulwich.repo import Repo
 
 from .utils import CompatTestCase, require_git_version, run_git, run_git_or_fail
@@ -39,8 +49,6 @@ class IndexV4CompatTestCase(CompatTestCase):
         self.addCleanup(self._cleanup)
 
     def _cleanup(self) -> None:
-        import shutil
-
         shutil.rmtree(self.tempdir, ignore_errors=True)
 
     def _init_repo_with_manyfiles(self) -> Repo:
@@ -96,8 +104,6 @@ class IndexV4CompatTestCase(CompatTestCase):
 
         # Write the index back with dulwich
         with open(index_path + ".dulwich", "wb") as f:
-            from dulwich.pack import SHA1Writer
-
             sha1_writer = SHA1Writer(f)
             write_index_dict(sha1_writer, entries, version=4, extensions=extensions)
             sha1_writer.close()
@@ -235,8 +241,6 @@ class IndexV4CompatTestCase(CompatTestCase):
 
         # Test round-trip: dulwich write -> C Git read
         with open(index_path + ".dulwich", "wb") as f:
-            from dulwich.pack import SHA1Writer
-
             sha1_writer = SHA1Writer(f)
             write_index_dict(sha1_writer, entries, version=4, extensions=extensions)
             sha1_writer.close()
@@ -300,8 +304,6 @@ class IndexV4CompatTestCase(CompatTestCase):
 
         # Test that dulwich can write a compatible index
         with open(index_path + ".dulwich", "wb") as f:
-            from dulwich.pack import SHA1Writer
-
             sha1_writer = SHA1Writer(f)
             write_index_dict(sha1_writer, entries, version=4, extensions=extensions)
             sha1_writer.close()
@@ -376,8 +378,6 @@ class IndexV4CompatTestCase(CompatTestCase):
 
             # Test writing empty index
             with open(index_path + ".dulwich", "wb") as f:
-                from dulwich.pack import SHA1Writer
-
                 sha1_writer = SHA1Writer(f)
                 write_index_dict(
                     sha1_writer, entries, version=version, extensions=extensions
@@ -519,8 +519,6 @@ class IndexV4CompatTestCase(CompatTestCase):
         require_git_version((2, 20, 0))
 
         repo = self._init_repo_with_manyfiles()
-
-        import sys
 
         # Test various boundary conditions
         if sys.platform == "win32":
@@ -973,8 +971,6 @@ class SparseIndexCompatTestCase(CompatTestCase):
         self.addCleanup(self._cleanup)
 
     def _cleanup(self) -> None:
-        import shutil
-
         shutil.rmtree(self.tempdir, ignore_errors=True)
 
     def test_read_sparse_index_created_by_git(self) -> None:
@@ -1026,8 +1022,6 @@ class SparseIndexCompatTestCase(CompatTestCase):
         run_git_or_fail(["sparse-checkout", "reapply"], cwd=repo_path)
 
         # Read the index with Dulwich
-        from dulwich.index import Index
-
         index_path = os.path.join(repo_path, ".git", "index")
         idx = Index(index_path)
 
@@ -1049,10 +1043,6 @@ class SparseIndexCompatTestCase(CompatTestCase):
         """Test that Git can read a sparse index created by Dulwich."""
         # Sparse index requires Git 2.37+
         require_git_version((2, 37, 0))
-
-        from dulwich.index import Index, IndexEntry, SparseDirExtension
-        from dulwich.objects import Blob, Tree
-        from dulwich.repo import Repo
 
         repo_path = os.path.join(self.tempdir, "test_repo")
         os.mkdir(repo_path)
@@ -1086,8 +1076,6 @@ class SparseIndexCompatTestCase(CompatTestCase):
         repo.object_store.add_object(tree)
 
         # Create a commit
-        from dulwich.objects import Commit
-
         commit = Commit()
         commit.tree = tree.id
         commit.author = commit.committer = b"Test <test@example.com>"
@@ -1163,9 +1151,6 @@ class SparseIndexCompatTestCase(CompatTestCase):
         run_git_or_fail(["sparse-checkout", "reapply"], cwd=repo_path)
 
         # Read sparse index with Dulwich
-        from dulwich.index import Index
-        from dulwich.repo import Repo
-
         index_path = os.path.join(repo_path, ".git", "index")
         idx = Index(index_path)
 

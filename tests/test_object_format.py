@@ -21,6 +21,8 @@
 
 """Tests for object_format module."""
 
+import hashlib
+
 from dulwich.object_format import (
     DEFAULT_OBJECT_FORMAT,
     OBJECT_FORMAT_TYPE_NUMS,
@@ -79,8 +81,6 @@ class ObjectFormatTests(TestCase):
         self.assertEqual(20, len(sha1_digest))
 
         # Verify it matches expected hash
-        import hashlib
-
         expected_sha1 = hashlib.sha1(data).digest()
         self.assertEqual(expected_sha1, sha1_digest)
 
@@ -102,8 +102,6 @@ class ObjectFormatTests(TestCase):
         self.assertEqual(40, len(sha1_hex))
 
         # Verify it matches expected hash
-        import hashlib
-
         expected_sha1_hex = hashlib.sha1(data).hexdigest().encode("ascii")
         self.assertEqual(expected_sha1_hex, sha1_hex)
 

@@ -29,6 +29,7 @@ from dulwich.bundle import Bundle, create_bundle_from_repo, read_bundle, write_b
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.pack import PackData, write_pack_objects
+from dulwich.refs import Ref
 from dulwich.repo import MemoryRepo
 
 from . import TestCase
@@ -436,8 +437,6 @@ class BundleTests(TestCase):
         repo.refs[b"refs/heads/feature"] = commit.id
 
         # Create bundle with only master ref
-        from dulwich.refs import Ref
-
         bundle = create_bundle_from_repo(repo, refs=[Ref(b"refs/heads/master")])
         self.addCleanup(bundle.close)
 

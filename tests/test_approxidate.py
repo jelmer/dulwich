@@ -22,6 +22,7 @@
 """Tests for approxidate parsing."""
 
 import time
+from datetime import datetime
 
 from dulwich.approxidate import parse_approxidate, parse_relative_time
 
@@ -94,8 +95,6 @@ class ParseApproxidateTests(TestCase):
     def test_today(self) -> None:
         result = parse_approxidate("today")
         # Should be midnight of current day
-        from datetime import datetime
-
         now = datetime.fromtimestamp(time.time())
         expected_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
         expected = int(expected_dt.timestamp())
@@ -119,24 +118,18 @@ class ParseApproxidateTests(TestCase):
         # Test ISO format date
         result = parse_approxidate("2009-02-13")
         # 2009-02-13 00:00:00 UTC
-        from datetime import datetime
-
         expected = int(datetime(2009, 2, 13, 0, 0, 0).timestamp())
         self.assertEqual(result, expected)
 
     def test_absolute_datetime_iso(self) -> None:
         # Test ISO format datetime
         result = parse_approxidate("2009-02-13 23:31:30")
-        from datetime import datetime
-
         expected = int(datetime(2009, 2, 13, 23, 31, 30).timestamp())
         self.assertEqual(result, expected)
 
     def test_absolute_datetime_iso8601(self) -> None:
         # Test ISO 8601 format
         result = parse_approxidate("2009-02-13T23:31:30")
-        from datetime import datetime
-
         expected = int(datetime(2009, 2, 13, 23, 31, 30).timestamp())
         self.assertEqual(result, expected)
 

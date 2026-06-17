@@ -5,7 +5,9 @@
 
 """Tests for dulwich.diffstat."""
 
+import io
 import os
+import sys
 import tempfile
 import unittest
 
@@ -445,8 +447,6 @@ index 1234567..abcdefg 100644
 
         try:
             # Save the original sys.argv
-            import sys
-
             orig_argv = sys.argv
 
             # Test with a file path argument
@@ -468,9 +468,6 @@ index 1234567..abcdefg 100644
 
     def test_main_self_test_failure(self):
         """Test the main function when the self-test fails."""
-        import io
-        import sys
-
         from dulwich.diffstat import diffstat as real_diffstat
 
         # Save original sys.argv, diffstat function, and stdout

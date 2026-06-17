@@ -3,7 +3,13 @@
 import importlib.util
 import unittest
 
-from dulwich.merge import MergeConflict, Merger, recursive_merge, three_way_merge
+from dulwich.merge import (
+    MergeConflict,
+    Merger,
+    octopus_merge,
+    recursive_merge,
+    three_way_merge,
+)
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import MemoryRepo
 from dulwich.tests.utils import make_commit
@@ -747,8 +753,6 @@ class OctopusMergeTests(unittest.TestCase):
 
     def test_octopus_merge_three_branches(self):
         """Test octopus merge with three branches."""
-        from dulwich.merge import octopus_merge
-
         # Create base commit
         base_tree = Tree()
         blob1 = Blob.from_string(b"file1 content\n")
@@ -840,8 +844,6 @@ class OctopusMergeTests(unittest.TestCase):
 
     def test_octopus_merge_with_conflict(self):
         """Test that octopus merge refuses to proceed with conflicts."""
-        from dulwich.merge import octopus_merge
-
         # Create base commit
         base_tree = Tree()
         blob1 = Blob.from_string(b"original content\n")
@@ -903,8 +905,6 @@ class OctopusMergeTests(unittest.TestCase):
 
     def test_octopus_merge_no_commits(self):
         """Test that octopus merge raises error with no commits to merge."""
-        from dulwich.merge import octopus_merge
-
         # Create a simple commit
         tree = Tree()
         blob = Blob.from_string(b"content\n")

@@ -26,6 +26,7 @@ import shutil
 import sys
 import tempfile
 from io import BytesIO
+from unittest.mock import Mock
 
 from dulwich.errors import (
     GitProtocolError,
@@ -34,6 +35,7 @@ from dulwich.errors import (
     NotGitRepository,
     UnexpectedCommandError,
 )
+from dulwich.object_filters import BlobNoneFilter
 from dulwich.object_store import MemoryObjectStore, find_shallow
 from dulwich.objects import Tree
 from dulwich.protocol import ZERO_SHA, format_capability_line
@@ -188,8 +190,6 @@ class UploadPackHandlerTestCase(TestCase):
 
     def test_filter_spec_parsed(self) -> None:
         """Test that filter specification is parsed from client capabilities."""
-        from dulwich.object_filters import BlobNoneFilter
-
         caps = [b"filter=blob:none", *list(self._handler.required_capabilities())]
         self._handler.set_client_capabilities(caps)
         self.assertIsNotNone(self._handler.filter_spec)
@@ -203,8 +203,6 @@ class UploadPackHandlerTestCase(TestCase):
 
     def test_filter_spec_invalid(self) -> None:
         """Test that invalid filter spec raises GitProtocolError."""
-        from dulwich.errors import GitProtocolError
-
         caps = [b"filter=invalid:spec", *list(self._handler.required_capabilities())]
         with self.assertRaises(GitProtocolError):
             self._handler.set_client_capabilities(caps)
@@ -402,8 +400,6 @@ class ReceivePackHandlerTestCase(TestCase):
             return (b"", b"")
 
         # Create a mock hook
-        from unittest.mock import Mock
-
         mock_hook = Mock()
         mock_hook.execute = mock_hook_execute
         self._repo.hooks["pre-receive"] = mock_hook
@@ -419,8 +415,6 @@ class ReceivePackHandlerTestCase(TestCase):
             raise HookError("pre-receive hook declined")
 
         # Create a mock hook
-        from unittest.mock import Mock
-
         mock_hook = Mock()
         mock_hook.execute = mock_hook_execute
         self._repo.hooks["pre-receive"] = mock_hook
@@ -440,8 +434,6 @@ class ReceivePackHandlerTestCase(TestCase):
             return (b"", b"")
 
         # Create a mock hook
-        from unittest.mock import Mock
-
         mock_hook = Mock()
         mock_hook.execute = mock_hook_execute
         self._repo.hooks["update"] = mock_hook
@@ -457,8 +449,6 @@ class ReceivePackHandlerTestCase(TestCase):
             raise HookError("update hook declined")
 
         # Create a mock hook
-        from unittest.mock import Mock
-
         mock_hook = Mock()
         mock_hook.execute = mock_hook_execute
         self._repo.hooks["update"] = mock_hook
@@ -478,8 +468,6 @@ class ReceivePackHandlerTestCase(TestCase):
             raise HookError("update hook declined this ref")
 
         # Create a mock hook
-        from unittest.mock import Mock
-
         mock_hook = Mock()
         mock_hook.execute = mock_hook_execute
         self._repo.hooks["update"] = mock_hook

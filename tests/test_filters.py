@@ -29,7 +29,9 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from dulwich.config import ConfigDict
 from dulwich.filters import (
+    FilterBlobNormalizer,
     FilterContext,
     FilterError,
     FilterRegistry,
@@ -51,8 +53,6 @@ class GitAttributesFilterIntegrationTests(TestCase):
 
     def _cleanup_test_dir(self) -> None:
         """Clean up test directory."""
-        import shutil
-
         shutil.rmtree(self.test_dir)
 
     def test_gitattributes_text_filter(self) -> None:
@@ -108,8 +108,6 @@ class GitAttributesFilterIntegrationTests(TestCase):
     def test_gitattributes_custom_filter(self) -> None:
         """Test custom filter specified in gitattributes."""
         # Create a Python script that acts as our filter
-        import sys
-
         filter_script = os.path.join(self.test_dir, "redact_filter.py")
         with open(filter_script, "w") as f:
             f.write(
@@ -207,8 +205,6 @@ sys.stdout.buffer.write(result)
     def test_filter_precedence(self) -> None:
         """Test that filter attribute takes precedence over text attribute."""
         # Create a Python script that converts to uppercase
-        import sys
-
         filter_script = os.path.join(self.test_dir, "uppercase_filter.py")
         with open(filter_script, "w") as f:
             f.write(
@@ -262,8 +258,6 @@ sys.stdout.buffer.write(result)
         normalizer = self.repo.get_blob_normalizer()
 
         # Check it's the right type
-        from dulwich.filters import FilterBlobNormalizer
-
         self.assertIsInstance(normalizer, FilterBlobNormalizer)
 
         # Check it has access to gitattributes
@@ -411,8 +405,6 @@ class ProcessFilterDriverTests(TestCase):
 
     def _create_test_filter(self):
         """Create a simple test filter process that works on all platforms."""
-        import tempfile
-
         # Create filter script that uppercases on clean, lowercases on smudge
         filter_script = """import sys
 import os
@@ -530,8 +522,6 @@ while True:
 
     def test_process_filter_clean_operation(self):
         """Test clean operation using real process filter."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=False
         )
@@ -544,8 +534,6 @@ while True:
 
     def test_process_filter_smudge_operation(self):
         """Test smudge operation using real process filter."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=False
         )
@@ -558,8 +546,6 @@ while True:
 
     def test_process_filter_large_data(self):
         """Test process filter with data larger than single pkt-line."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=False
         )
@@ -588,8 +574,6 @@ while True:
 
     def test_process_reuse(self):
         """Test that process is reused across multiple operations."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=False
         )
@@ -653,8 +637,6 @@ class FilterContextTests(TestCase):
 
         # Create registry and context
         # Need to provide a config for caching to work
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         # Add some dummy config to make it truthy (use proper format)
         config.set((b"filter", b"uppercase"), b"clean", b"dummy")
@@ -757,8 +739,6 @@ class FilterContextTests(TestCase):
         )
 
         # Register in context
-        from dulwich.config import ConfigDict
-
         config = ConfigDict()
         # Add some dummy config to make it truthy (use proper format)
         config.set(
@@ -848,8 +828,6 @@ class ProcessFilterProtocolTests(TestCase):
 
     def _create_spec_compliant_filter(self):
         """Create a spec-compliant test filter that works on all platforms."""
-        import tempfile
-
         # This filter strictly follows Git spec - no newlines in packets
         filter_script = """import sys
 
@@ -969,8 +947,6 @@ while True:
 
     def test_protocol_handshake_exact_format(self):
         """Test that handshake uses exact format without newlines."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}",
             required=True,  # Require success to test protocol compliance
@@ -985,8 +961,6 @@ while True:
 
     def test_capability_negotiation_exact_format(self):
         """Test that capabilities are sent and received in exact format."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=True
         )
@@ -1000,8 +974,6 @@ while True:
 
     def test_binary_data_handling(self):
         """Test handling of binary data through the protocol."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=False
         )
@@ -1021,8 +993,6 @@ while True:
         Regression test for https://github.com/jelmer/dulwich/issues/2023
         where binary files (like .ogg, .jpg) caused UTF-8 decode errors.
         """
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=False
         )
@@ -1039,8 +1009,6 @@ while True:
 
     def test_large_file_chunking(self):
         """Test proper chunking of large files."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=True
         )
@@ -1055,8 +1023,6 @@ while True:
 
     def test_empty_file_handling(self):
         """Test handling of empty files."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=True
         )
@@ -1066,8 +1032,6 @@ while True:
 
     def test_special_characters_in_pathname(self):
         """Test paths with special characters are handled correctly."""
-        import sys
-
         # Test various special characters in paths
         special_paths = [
             b"file with spaces.txt",
@@ -1098,8 +1062,6 @@ while True:
 
     def test_process_crash_recovery(self):
         """Test that process is properly restarted after crash."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=False
         )
@@ -1143,8 +1105,6 @@ protocol.write_pkt_line(b"version=2")
 protocol.write_pkt_line(None)
 """
 
-        import tempfile
-
         fd, script_path = tempfile.mkstemp(suffix=".py")
         try:
             os.write(fd, malformed_filter.encode())
@@ -1167,8 +1127,6 @@ protocol.write_pkt_line(None)
 
     def test_concurrent_filter_operations(self):
         """Test that concurrent operations work correctly."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=True
         )
@@ -1205,8 +1163,6 @@ protocol.write_pkt_line(None)
 
     def test_process_resource_cleanup(self):
         """Test that process resources are properly cleaned up."""
-        import sys
-
         driver = ProcessFilterDriver(
             process_cmd=f"{sys.executable} {self.test_filter_path}", required=False
         )
@@ -1254,9 +1210,6 @@ protocol.write_pkt_line(None)
 
         This is the format used by git-lfs and documented in the Git filter protocol.
         """
-        import sys
-        import tempfile
-
         # Create a filter that follows the two-phase protocol
         filter_script = """import sys
 
@@ -1389,9 +1342,6 @@ while True:
         Some filters (like git-lfs) may send progress or status messages
         in the final headers. This test verifies that we can handle those.
         """
-        import sys
-        import tempfile
-
         # Create a filter that sends extra status info in final headers
         filter_script = """import sys
 
@@ -1515,9 +1465,6 @@ while True:
         then report an error in the final headers. This test ensures
         we handle that correctly.
         """
-        import sys
-        import tempfile
-
         # Create a filter that sends error in final headers
         filter_script = """import sys
 

@@ -23,10 +23,13 @@
 
 import hashlib
 import os
+import sys
 import tempfile
 from io import BytesIO
 
 from dulwich import porcelain
+from dulwich.filters import FilterRegistry, ProcessFilterDriver
+from dulwich.lfs import LFSPointer, LFSStore
 from dulwich.repo import Repo
 
 from .. import TestCase
@@ -219,8 +222,6 @@ class PorcelainFilterTests(TestCase):
     def test_process_filter_priority(self) -> None:
         """Test that process filters take priority over built-in ones."""
         # Create a cross-platform filter command
-        import sys
-
         if sys.platform == "win32":
             # On Windows, use echo command directly
             filter_cmd = "echo FILTERED"
@@ -243,14 +244,10 @@ class PorcelainFilterTests(TestCase):
             f.write(b"*.txt filter=test\n")
 
         # Test filter application
-        from dulwich.filters import FilterRegistry
-
         filter_registry = FilterRegistry(config, self.repo)
         test_driver = filter_registry.get_driver("test")
 
         # Should be ProcessFilterDriver, not built-in
-        from dulwich.filters import ProcessFilterDriver
-
         self.assertIsInstance(test_driver, ProcessFilterDriver)
 
         # Test smudge
@@ -262,8 +259,6 @@ class PorcelainFilterTests(TestCase):
         """Test committing with a clean filter."""
         # Set up a custom filter in git config
         config = self.repo.get_config()
-        import sys
-
         if sys.platform == "win32":
             # On Windows, use PowerShell for string replacement
             config.set(
@@ -311,8 +306,6 @@ class PorcelainFilterTests(TestCase):
             f.write(b"*.bin filter=lfs\n")
 
         # Create LFS pointer file manually
-        from dulwich.lfs import LFSPointer
-
         pointer = LFSPointer(
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0
         )
@@ -321,8 +314,6 @@ class PorcelainFilterTests(TestCase):
             f.write(pointer.to_bytes())
 
         # Create actual LFS object in the store
-        from dulwich.lfs import LFSStore
-
         lfs_store = LFSStore.from_repo(source_repo, create=True)
         lfs_store.write_object([b""])  # Empty file content
 
@@ -353,19 +344,13 @@ class PorcelainFilterTests(TestCase):
         test_oid = hashlib.sha256(test_content).hexdigest()
 
         # Create LFS pointer
-        from dulwich.lfs import LFSPointer
-
         pointer = LFSPointer(test_oid, len(test_content))
 
         # Create LFS store and write object
-        from dulwich.lfs import LFSStore
-
         lfs_store = LFSStore.from_repo(self.repo, create=True)
         lfs_store.write_object([test_content])
 
         # Test smudge filter
-        from dulwich.filters import FilterRegistry
-
         filter_registry = FilterRegistry(self.repo.get_config_stack(), self.repo)
         lfs_driver = filter_registry.get_driver("lfs")
 
@@ -460,8 +445,6 @@ class PorcelainLFSIntegrationTests(TestCase):
         porcelain.commit(self.repo, message=b"Add LFS attributes")
 
         # Create an LFS pointer file manually
-        from dulwich.lfs import LFSPointer
-
         pointer = LFSPointer(
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 1024
         )

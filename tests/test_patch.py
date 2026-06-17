@@ -39,6 +39,7 @@ from dulwich.patch import (
     get_summary,
     git_am_patch_split,
     git_base85_decode,
+    mailinfo,
     parse_unified_diff,
     patch_id,
     unified_diff_with_algorithm,
@@ -47,6 +48,7 @@ from dulwich.patch import (
     write_object_diff,
     write_tree_diff,
 )
+from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit
 
 from . import DependencyMissing, SkipTest, TestCase
@@ -963,10 +965,6 @@ class MailinfoTests(TestCase):
 
     def test_basic_parsing(self):
         """Test basic email parsing."""
-        from io import BytesIO
-
-        from dulwich.patch import mailinfo
-
         email_content = b"""From: John Doe <john@example.com>
 Date: Mon, 1 Jan 2024 12:00:00 +0000
 Subject: [PATCH] Add new feature
@@ -1000,10 +998,6 @@ diff --git a/file.txt b/file.txt
 
     def test_subject_munging(self):
         """Test subject line munging."""
-        from io import BytesIO
-
-        from dulwich.patch import mailinfo
-
         # Test with [PATCH] tag
         email = b"""From: Test <test@example.com>
 Subject: [PATCH 1/2] Fix bug
@@ -1033,10 +1027,6 @@ Body
 
     def test_keep_subject(self):
         """Test -k flag (keep subject intact)."""
-        from io import BytesIO
-
-        from dulwich.patch import mailinfo
-
         email = b"""From: Test <test@example.com>
 Subject: [PATCH 1/2] Fix bug
 
@@ -1047,10 +1037,6 @@ Body
 
     def test_keep_non_patch(self):
         """Test -b flag (only strip [PATCH])."""
-        from io import BytesIO
-
-        from dulwich.patch import mailinfo
-
         email = b"""From: Test <test@example.com>
 Subject: [RFC][PATCH] New feature
 
@@ -1061,10 +1047,6 @@ Body
 
     def test_scissors(self):
         """Test scissors line handling."""
-        from io import BytesIO
-
-        from dulwich.patch import mailinfo
-
         email = b"""From: Test <test@example.com>
 Subject: Test
 
@@ -1119,10 +1101,6 @@ diff --git a/file.txt b/file.txt
 
     def test_message_id(self):
         """Test -m flag (include Message-ID)."""
-        from io import BytesIO
-
-        from dulwich.patch import mailinfo
-
         email = b"""From: Test <test@example.com>
 Subject: Test
 Message-ID: <12345@example.com>
@@ -1135,10 +1113,6 @@ Body text
 
     def test_encoding(self):
         """Test encoding handling."""
-        from io import BytesIO
-
-        from dulwich.patch import mailinfo
-
         # Use explicit UTF-8 bytes with MIME encoded subject
         email = (
             b"From: Test <test@example.com>\n"
@@ -1156,10 +1130,6 @@ Body text
 
     def test_patch_separation(self):
         """Test separation of message from patch."""
-        from io import BytesIO
-
-        from dulwich.patch import mailinfo
-
         email = b"""From: Test <test@example.com>
 Subject: Test
 
@@ -1181,10 +1151,6 @@ diff --git a/file.txt b/file.txt
 
     def test_no_subject(self):
         """Test handling of missing subject."""
-        from io import BytesIO
-
-        from dulwich.patch import mailinfo
-
         email = b"""From: Test <test@example.com>
 
 Body text
@@ -1194,10 +1160,6 @@ Body text
 
     def test_missing_from_header(self):
         """Test error on missing From header."""
-        from io import BytesIO
-
-        from dulwich.patch import mailinfo
-
         email = b"""Subject: Test
 
 Body text
@@ -1579,8 +1541,6 @@ class ApplyPatchesPathTests(TestCase):
     """Tests that apply_patches refuses paths outside the working tree."""
 
     def _make_repo(self):
-        from dulwich.repo import Repo
-
         path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, path, ignore_errors=True)
         return Repo.init(path)

@@ -3,7 +3,9 @@
 import os
 import struct
 import tempfile
+from io import BytesIO
 
+from dulwich.config import ConfigFile
 from dulwich.reftable import (
     REF_VALUE_DELETE,
     REF_VALUE_REF,
@@ -75,10 +77,6 @@ class ReftableCompatTestCase(CompatTestCase):
 
     def _create_reftable_repo(self):
         """Create a Dulwich repository with reftable extension configured."""
-        from io import BytesIO
-
-        from dulwich.config import ConfigFile
-
         # Initialize bare repo
         repo = Repo.init_bare(self.test_dir)
         repo.close()

@@ -1,5 +1,6 @@
 """Tests for dulwich.gc."""
 
+import logging
 import os
 import shutil
 import tempfile
@@ -610,8 +611,6 @@ class AutoGCTestCase(TestCase):
                 r.object_store.add_object(blob)
 
                 # Capture log messages
-                import logging
-
                 with self.assertLogs(level=logging.INFO) as cm:
                     result = maybe_auto_gc(r, config, progress=no_op_progress)
 
@@ -727,8 +726,6 @@ class AutoGCTestCase(TestCase):
                 r.object_store.add_object(blob)
 
                 # Capture log messages
-                import logging
-
                 with self.assertLogs(level=logging.INFO) as cm:
                     result = maybe_auto_gc(r, config, progress=no_op_progress)
 

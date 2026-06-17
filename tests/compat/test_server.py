@@ -34,6 +34,7 @@ import threading
 
 from dulwich.object_format import SHA256
 from dulwich.objects import Blob, Commit, Tree
+from dulwich.protocol import Protocol
 from dulwich.repo import Repo
 from dulwich.server import DictBackend, TCPGitServer
 
@@ -55,8 +56,6 @@ class GitServerTestCase(ServerTests, CompatTestCase):
         return {b"git-receive-pack": NoSideBand64kReceivePackHandler}
 
     def _check_server(self, dul_server, repo) -> None:
-        from dulwich.protocol import Protocol
-
         receive_pack_handler_cls = dul_server.handlers[b"git-receive-pack"]
         # Create a handler instance to check capabilities
         proto = Protocol(lambda x: b"", lambda x: None)
@@ -113,8 +112,6 @@ class GitServerSideBand64kTestCase(GitServerTestCase):
         return None  # default handlers include side-band-64k
 
     def _check_server(self, server, repo) -> None:
-        from dulwich.protocol import Protocol
-
         receive_pack_handler_cls = server.handlers[b"git-receive-pack"]
         # Create a handler instance to check capabilities
         proto = Protocol(lambda x: b"", lambda x: None)

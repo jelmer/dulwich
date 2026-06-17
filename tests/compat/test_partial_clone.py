@@ -23,10 +23,14 @@
 
 import os
 import shutil
+import socket
+import subprocess
 import sys
 import tempfile
 import threading
+import time
 
+from dulwich.client import get_transport_and_path
 from dulwich.objects import Blob, Tree
 from dulwich.repo import Repo
 from dulwich.server import DictBackend, TCPGitServer
@@ -347,8 +351,6 @@ class PartialCloneClientTestCase(CompatTestCase):
 
     def test_fetch_with_blob_none_filter(self) -> None:
         """Test that dulwich client can fetch with blob:none filter."""
-        from dulwich.client import get_transport_and_path
-
         # Create a git repository using git itself
         repo_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_path)
@@ -405,8 +407,6 @@ class PartialCloneClientTestCase(CompatTestCase):
 
     def test_clone_with_filter(self) -> None:
         """Test that dulwich clone function works with filter."""
-        from dulwich.client import get_transport_and_path
-
         # Create a git repository
         repo_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_path)
@@ -447,10 +447,6 @@ class PartialCloneClientTestCase(CompatTestCase):
 
     def _start_git_daemon(self, repo_path):
         """Start git daemon for testing."""
-        import socket
-        import subprocess
-        import time
-
         # Find an available port
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(("localhost", 0))

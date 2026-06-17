@@ -22,6 +22,7 @@
 """Tests for object filtering (partial clone filter specifications)."""
 
 import os
+import shutil
 import tempfile
 
 from dulwich.object_filters import (
@@ -31,10 +32,11 @@ from dulwich.object_filters import (
     SparseOidFilter,
     TreeDepthFilter,
     filter_pack_objects,
+    filter_pack_objects_with_paths,
     parse_filter_spec,
 )
 from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import Blob, Tree
+from dulwich.objects import Blob, ObjectID, Tree
 from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit
 
@@ -329,9 +331,6 @@ class SparseOidFilterTests(TestCase):
 
     def test_load_patterns_from_blob(self):
         """Test loading sparse patterns from a blob object."""
-        from dulwich.object_store import MemoryObjectStore
-        from dulwich.objects import Blob
-
         # Create a sparse patterns blob
         patterns = b"*.txt\n!*.log\n/src/\n"
         blob = Blob.from_string(patterns)
@@ -348,8 +347,6 @@ class SparseOidFilterTests(TestCase):
 
     def test_load_patterns_missing_blob(self):
         """Test error when sparse blob is not found."""
-        from dulwich.object_store import MemoryObjectStore
-
         oid = b"1234567890abcdef1234567890abcdef12345678"
         object_store = MemoryObjectStore()
 
@@ -361,9 +358,6 @@ class SparseOidFilterTests(TestCase):
 
     def test_load_patterns_not_a_blob(self):
         """Test error when sparse OID points to non-blob object."""
-        from dulwich.object_store import MemoryObjectStore
-        from dulwich.objects import Tree
-
         tree = Tree()
         object_store = MemoryObjectStore()
         object_store.add_object(tree)
@@ -385,9 +379,6 @@ class SparseOidFilterTests(TestCase):
 
     def test_should_include_path_matching(self):
         """Test path matching with sparse patterns."""
-        from dulwich.object_store import MemoryObjectStore
-        from dulwich.objects import Blob
-
         # Create a sparse patterns blob: include *.txt files
         patterns = b"*.txt\n"
         blob = Blob.from_string(patterns)
@@ -407,9 +398,6 @@ class SparseOidFilterTests(TestCase):
 
     def test_should_include_path_negation(self):
         """Test path matching with negation patterns."""
-        from dulwich.object_store import MemoryObjectStore
-        from dulwich.objects import Blob
-
         # Include all .txt files except logs
         patterns = b"*.txt\n!*.log\n"
         blob = Blob.from_string(patterns)
@@ -542,8 +530,6 @@ class FilterPackObjectsTests(TestCase):
 
     def test_filter_missing_object(self):
         """Test that missing objects are skipped without error."""
-        from dulwich.objects import ObjectID
-
         fake_id = ObjectID(b"0" * 40)
         object_ids = [fake_id, self.small_blob.id]
 
@@ -588,8 +574,6 @@ class PartialCloneIntegrationTests(TestCase):
 
     def _cleanup(self):
         """Clean up test repository."""
-        import shutil
-
         if os.path.exists(self.repo_dir):
             shutil.rmtree(self.repo_dir)
 
@@ -718,13 +702,6 @@ class FilterPackObjectsWithPathsTests(TestCase):
 
     def test_tree_depth_filtering(self):
         """Test filtering by tree depth."""
-        from dulwich.object_filters import (
-            TreeDepthFilter,
-            filter_pack_objects_with_paths,
-        )
-        from dulwich.objects import Blob, Tree
-        from dulwich.tests.utils import make_commit
-
         # Create a nested tree structure:
         # root/
         #   file1.txt (blob1)
@@ -777,13 +754,6 @@ class FilterPackObjectsWithPathsTests(TestCase):
 
     def test_sparse_oid_path_filtering(self):
         """Test filtering by sparse checkout patterns."""
-        from dulwich.object_filters import (
-            SparseOidFilter,
-            filter_pack_objects_with_paths,
-        )
-        from dulwich.objects import Blob, Tree
-        from dulwich.tests.utils import make_commit
-
         # Create sparse patterns blob that includes only *.txt files
         patterns = b"*.txt\n"
         patterns_blob = Blob.from_string(patterns)
@@ -844,13 +814,6 @@ class FilterPackObjectsWithPathsTests(TestCase):
 
     def test_blob_size_filtering_with_paths(self):
         """Test that blob size filtering still works with path tracking."""
-        from dulwich.object_filters import (
-            BlobLimitFilter,
-            filter_pack_objects_with_paths,
-        )
-        from dulwich.objects import Blob, Tree
-        from dulwich.tests.utils import make_commit
-
         # Create blobs of different sizes
         blob_small = Blob.from_string(b"small")  # 5 bytes
         blob_large = Blob.from_string(b"x" * 1000)  # 1000 bytes
@@ -879,15 +842,6 @@ class FilterPackObjectsWithPathsTests(TestCase):
 
     def test_combined_sparse_and_size_filter(self):
         """Test combining sparse patterns with blob size limits."""
-        from dulwich.object_filters import (
-            BlobLimitFilter,
-            CombineFilter,
-            SparseOidFilter,
-            filter_pack_objects_with_paths,
-        )
-        from dulwich.objects import Blob, Tree
-        from dulwich.tests.utils import make_commit
-
         # Create sparse patterns: only *.txt files
         patterns = b"*.txt\n"
         patterns_blob = Blob.from_string(patterns)
@@ -938,13 +892,6 @@ class FilterPackObjectsWithPathsTests(TestCase):
 
     def test_blob_none_filter_with_paths(self):
         """Test that blob:none excludes all blobs with path tracking."""
-        from dulwich.object_filters import (
-            BlobNoneFilter,
-            filter_pack_objects_with_paths,
-        )
-        from dulwich.objects import Blob, Tree
-        from dulwich.tests.utils import make_commit
-
         blob1 = Blob.from_string(b"content1")
         blob2 = Blob.from_string(b"content2")
 
@@ -971,12 +918,6 @@ class FilterPackObjectsWithPathsTests(TestCase):
 
     def test_direct_tree_want(self):
         """Test filtering when a tree (not commit) is wanted."""
-        from dulwich.object_filters import (
-            BlobLimitFilter,
-            filter_pack_objects_with_paths,
-        )
-        from dulwich.objects import Blob, Tree
-
         blob_small = Blob.from_string(b"small")
         blob_large = Blob.from_string(b"x" * 1000)
 

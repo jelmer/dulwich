@@ -21,6 +21,9 @@
 
 """Tests for bundle URI support."""
 
+import os
+import tempfile
+
 from dulwich.bundle_uri import (
     BundleList,
     BundleListEntry,
@@ -187,6 +190,27 @@ class BundleURIParsingTests(TestCase):
 
         absolute_path = next(e for e in bundle_list.entries if e.id == "absolute-path")
         self.assertEqual(absolute_path.uri, "https://example.com/bundles/weekly.bundle")
+
+    def test_parse_bundle_list_ignores_includes(self) -> None:
+        """A bundle list from a remote host must not expand include directives."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            included = os.path.join(tmpdir, "included.cfg")
+            with open(included, "wb") as f:
+                f.write(b'[bundle "injected"]\n\turi = https://evil.example/x.bundle\n')
+
+            data = (
+                b"[bundle]\n"
+                b"\tversion = 1\n"
+                b"\tmode = all\n"
+                b"[include]\n"
+                b"\tpath = " + included.encode() + b"\n"
+                b'[bundle "real"]\n'
+                b"\turi = https://example.com/real.bundle\n"
+            )
+            bundle_list = parse_bundle_list(data)
+
+        ids = {e.id for e in bundle_list.entries}
+        self.assertEqual(ids, {"real"})
 
 
 class URIResolutionTests(TestCase):

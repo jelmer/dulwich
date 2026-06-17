@@ -109,7 +109,11 @@ def parse_bundle_list(data: bytes, base_uri: str | None = None) -> BundleList:
     from .config import ConfigFile
 
     try:
-        config = ConfigFile.from_file(BytesIO(data))
+        # The bundle list is served by a remote (untrusted) bundle-uri host;
+        # do not expand include/includeIf directives so a hostile list cannot
+        # make us open and parse arbitrary paths on disk, matching the handling
+        # of the equally untrusted .gitmodules in read_submodules.
+        config = ConfigFile.from_file(BytesIO(data), expand_includes=False)
     except Exception as e:
         raise BundleURIError(f"Failed to parse bundle list as config: {e}") from e
 

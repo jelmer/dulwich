@@ -36,11 +36,16 @@ __all__ = [
     "parse_bundle_list",
 ]
 
+import ipaddress
+import socket
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
+
+# Maximum number of redirects to follow when fetching a bundle URI.
+_MAX_BUNDLE_REDIRECTS = 5
 
 if TYPE_CHECKING:
     from .bundle import Bundle
@@ -244,6 +249,76 @@ def _is_bundle_file(data: bytes) -> bool:
     return data.startswith((b"# v2 git bundle\n", b"# v3 git bundle\n"))
 
 
+def _is_internal_address(ip: "ipaddress.IPv4Address | ipaddress.IPv6Address") -> bool:
+    """Return True if ``ip`` is a non-public address we must not fetch from."""
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None:
+        # Treat ::ffff:127.0.0.1 and friends as their embedded IPv4 address.
+        ip = mapped
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
+def _resolve_host_addresses(
+    host: str,
+) -> list["ipaddress.IPv4Address | ipaddress.IPv6Address"]:
+    """Resolve ``host`` to the list of IP addresses it points at."""
+    try:
+        return [ipaddress.ip_address(host)]
+    except ValueError:
+        pass
+
+    addresses: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return []
+    for info in infos:
+        address = info[4][0]
+        if not isinstance(address, str):
+            continue
+        raw = address.split("%", 1)[0]
+        try:
+            addresses.append(ipaddress.ip_address(raw))
+        except ValueError:
+            continue
+    return addresses
+
+
+def _check_bundle_uri_safe(uri: str) -> None:
+    """Validate a bundle URI before fetching it.
+
+    The bundle list is supplied by an untrusted remote, so its entry URIs are
+    rejected unless they use http/https and resolve to a public address. This
+    keeps a hostile list from pointing us at loopback, link-local (the cloud
+    metadata endpoint 169.254.169.254) or other internal hosts (SSRF).
+
+    Raises:
+        BundleURIError: if the URI scheme is unsupported, the host is missing
+            or unresolvable, or it resolves to a non-public address.
+    """
+    parsed = urlparse(uri)
+    if parsed.scheme not in ("http", "https"):
+        raise BundleURIError(f"Unsupported URI scheme: {parsed.scheme}")
+    host = parsed.hostname
+    if not host:
+        raise BundleURIError(f"Bundle URI has no host: {uri}")
+    addresses = _resolve_host_addresses(host)
+    if not addresses:
+        raise BundleURIError(f"Could not resolve bundle URI host: {host}")
+    for ip in addresses:
+        if _is_internal_address(ip):
+            raise BundleURIError(
+                f"Refusing to fetch bundle from non-public address {ip} ({host})"
+            )
+
+
 def fetch_bundle_uri(
     uri: str,
     progress: Callable[[bytes], None] | None = None,
@@ -269,18 +344,27 @@ def fetch_bundle_uri(
 
     from .bundle import read_bundle
 
-    parsed = urlparse(uri)
-    if parsed.scheme not in ("http", "https"):
-        raise BundleURIError(f"Unsupported URI scheme: {parsed.scheme}")
-
     http = urllib3.PoolManager(timeout=timeout)
+    current = uri
     try:
-        response = http.request("GET", uri)
-
-        if response.status != 200:
-            raise BundleURIError(f"HTTP error {response.status} fetching {uri}")
-
-        data = response.data
+        # Follow redirects manually so every hop is validated; urllib3's
+        # automatic redirect following would otherwise let a public host
+        # bounce us to an internal one.
+        for _ in range(_MAX_BUNDLE_REDIRECTS + 1):
+            _check_bundle_uri_safe(current)
+            response = http.request("GET", current, redirect=False)
+            if response.status in (301, 302, 303, 307, 308):
+                location = response.headers.get("Location")
+                if not location:
+                    raise BundleURIError(f"Redirect without Location from {current}")
+                current = urljoin(current, location)
+                continue
+            if response.status != 200:
+                raise BundleURIError(f"HTTP error {response.status} fetching {current}")
+            data = response.data
+            break
+        else:
+            raise BundleURIError(f"Too many redirects fetching {uri}")
     except urllib3.exceptions.HTTPError as e:
         raise BundleURIError(f"HTTP error fetching {uri}: {e}") from e
     finally:

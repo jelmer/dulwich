@@ -1,5 +1,10 @@
 1.2.7	2026-06-12
 
+ * SECURITY: Refuse to fetch a bundle URI that resolves to a loopback,
+   link-local, private or otherwise non-public address, and validate every
+   redirect hop, so a hostile bundle list can no longer point ``clone`` at
+   internal services (SSRF). (netliomax25-code)
+
  * Verify that an object retrieved by id actually hashes to the requested
    id, raising ``ChecksumMismatch`` otherwise. (Jelmer Vernooĳ, #2223)
 

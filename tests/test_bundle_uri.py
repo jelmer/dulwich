@@ -23,14 +23,17 @@
 
 import os
 import tempfile
+from unittest import mock
 
 from dulwich.bundle_uri import (
     BundleList,
     BundleListEntry,
     BundleURIError,
+    _check_bundle_uri_safe,
     _filter_bundle_entries,
     _is_absolute_uri,
     _resolve_relative_uri,
+    fetch_bundle_uri,
     parse_bundle_list,
 )
 
@@ -245,6 +248,42 @@ class URIResolutionTests(TestCase):
             _resolve_relative_uri(base, "../other/daily.bundle"),
             "https://example.com/git/other/daily.bundle",
         )
+
+
+class BundleURISafetyTests(TestCase):
+    def test_check_rejects_internal_addresses(self) -> None:
+        internal_uris = [
+            "http://127.0.0.1/x.bundle",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://10.0.0.5/x.bundle",
+            "http://192.168.1.1/x.bundle",
+            "http://[::1]/x.bundle",
+            "http://[::ffff:127.0.0.1]/x.bundle",
+            "http://0.0.0.0/x.bundle",
+        ]
+        for uri in internal_uris:
+            with self.assertRaises(BundleURIError):
+                _check_bundle_uri_safe(uri)
+
+    def test_check_rejects_unsupported_scheme(self) -> None:
+        for uri in ("file:///etc/passwd", "ftp://example.com/x", "gopher://1.1.1.1/"):
+            with self.assertRaises(BundleURIError):
+                _check_bundle_uri_safe(uri)
+
+    def test_check_allows_public_address(self) -> None:
+        # Public literal addresses pass the safety check (no DNS needed).
+        _check_bundle_uri_safe("http://93.184.216.34/x.bundle")
+        _check_bundle_uri_safe("https://1.1.1.1/x.bundle")
+
+    def test_fetch_blocks_internal_before_request(self) -> None:
+        # A hostile bundle list pointing at an internal address must be
+        # rejected before any HTTP request is issued.
+        with mock.patch("urllib3.PoolManager") as pool_manager:
+            pool_manager.return_value.request.side_effect = AssertionError(
+                "request must not be issued for an internal address"
+            )
+            with self.assertRaises(BundleURIError):
+                fetch_bundle_uri("http://169.254.169.254/latest/meta-data/")
 
 
 class BundleFilteringTests(TestCase):

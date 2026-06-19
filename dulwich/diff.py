@@ -94,6 +94,28 @@ def should_include_path(path: bytes, paths: Sequence[bytes] | None) -> bool:
     return any(path == p or path.startswith(p + b"/") for p in paths)
 
 
+def _worktree_fs_path(repo_path: str, tree_path: bytes) -> str:
+    """Resolve a tree/index path to a work-tree file path within the work tree.
+
+    Tree and index entries can come from an attacker-controlled object (a
+    fetched or cloned commit), so an entry named ``..`` would otherwise let the
+    working-tree diff read a file outside the work tree through ``os.path.join``
+    and disclose its contents in the diff output. The path is normalized
+    lexically with ``os.path.abspath`` rather than ``os.path.realpath`` so a
+    committed symlink whose target lies outside the tree is still diffed as a
+    symlink instead of being followed.
+
+    Raises:
+      ValueError: if the resolved path falls outside the work tree.
+    """
+    full_path = os.path.join(repo_path, tree_path.decode("utf-8"))
+    root = os.path.abspath(repo_path)
+    resolved = os.path.abspath(full_path)
+    if resolved != root and not resolved.startswith(root + os.sep):
+        raise ValueError(f"path escapes work tree: {tree_path!r}")
+    return full_path
+
+
 def diff_index_to_tree(
     repo: Repo,
     outstream: BinaryIO,
@@ -188,7 +210,7 @@ def diff_working_tree_to_tree(
             continue
 
         processed_paths.add(path)
-        full_path = os.path.join(repo.path, path.decode("utf-8"))
+        full_path = _worktree_fs_path(repo.path, path)
 
         # Get the old file from tree
         old_mode = entry.mode
@@ -339,7 +361,7 @@ def diff_working_tree_to_tree(
         if not should_include_path(path, paths):
             continue
 
-        full_path = os.path.join(repo.path, path.decode("utf-8"))
+        full_path = _worktree_fs_path(repo.path, path)
 
         try:
             # Use lstat to handle symlinks properly
@@ -442,7 +464,7 @@ def diff_working_tree_to_index(
         else:
             old_blob = None
 
-        full_path = os.path.join(repo.path, tree_path.decode("utf-8"))
+        full_path = _worktree_fs_path(repo.path, tree_path)
         try:
             # Use lstat to handle symlinks properly
             st = os.lstat(full_path)

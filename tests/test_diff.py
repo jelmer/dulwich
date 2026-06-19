@@ -22,9 +22,17 @@
 """Tests for diff functionality."""
 
 import io
+import os
+import shutil
+import tempfile
 import unittest
 
-from dulwich.diff import ColorizedDiffStream
+from dulwich.diff import (
+    ColorizedDiffStream,
+    diff_working_tree_to_tree,
+)
+from dulwich.objects import Blob, Commit, Tree
+from dulwich.repo import Repo
 
 from . import TestCase
 
@@ -182,3 +190,67 @@ class MockColorizedDiffStreamTests(TestCase):
         # Test that some output was produced
         result = self.output.getvalue()
         self.assertGreaterEqual(len(result), 0)
+
+
+class WorkingTreeDiffPathTraversalTests(TestCase):
+    """Tests that working-tree diffs stay inside the work tree."""
+
+    def setUp(self):
+        super().setUp()
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.repo_path = os.path.join(self.test_dir, "work")
+        os.mkdir(self.repo_path)
+        self.repo = Repo.init(self.repo_path)
+        self.addCleanup(self.repo.close)
+
+    def _commit_tree(self, tree):
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = commit.committer = b"Test <test@example.com>"
+        commit.author_time = commit.commit_time = 1
+        commit.author_timezone = commit.commit_timezone = 0
+        commit.message = b"x"
+        self.repo.object_store.add_object(commit)
+        return commit
+
+    def test_diff_does_not_escape_work_tree(self):
+        # A secret file living next to the work tree, not in it.
+        secret = os.path.join(self.test_dir, "secret.txt")
+        with open(secret, "wb") as f:
+            f.write(b"SECRET-OUTSIDE-WORKTREE")
+
+        # Craft a tree whose entry name is ".." so the path resolves outside
+        # the work tree (objects/<..>/secret.txt).
+        blob = Blob.from_string(b"placeholder\n")
+        self.repo.object_store.add_object(blob)
+        inner = Tree()
+        inner.add(b"secret.txt", 0o100644, blob.id)
+        self.repo.object_store.add_object(inner)
+        outer = Tree()
+        outer.add(b"..", 0o040000, inner.id)
+        self.repo.object_store.add_object(outer)
+        commit = self._commit_tree(outer)
+
+        out = io.BytesIO()
+        self.assertRaises(
+            ValueError, diff_working_tree_to_tree, self.repo, out, commit.id
+        )
+        self.assertNotIn(b"SECRET-OUTSIDE-WORKTREE", out.getvalue())
+
+    def test_diff_allows_normal_path(self):
+        blob = Blob.from_string(b"old\n")
+        self.repo.object_store.add_object(blob)
+        tree = Tree()
+        tree.add(b"a", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+        commit = self._commit_tree(tree)
+
+        with open(os.path.join(self.repo_path, "a"), "wb") as f:
+            f.write(b"new\n")
+
+        out = io.BytesIO()
+        diff_working_tree_to_tree(self.repo, out, commit.id)
+        data = out.getvalue()
+        self.assertIn(b"-old", data)
+        self.assertIn(b"+new", data)

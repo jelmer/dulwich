@@ -316,38 +316,56 @@ class GPGCliSignatureVendorTests(unittest.TestCase):
 class KeyIDMatchingTests(unittest.TestCase):
     """Tests for trusted key ID matching, independent of an installed gpg."""
 
-    def _run_with_stderr(self, vendor, stderr: str) -> None:
+    def _run_with_status(self, vendor, status: bytes, stderr: bytes = b"") -> None:
         completed = subprocess.CompletedProcess(
-            ["gpg"], 0, stdout=b"", stderr=stderr.encode()
+            ["gpg"], 0, stdout=status, stderr=stderr
         )
         with mock.patch("subprocess.run", return_value=completed):
             vendor.verify(b"data", b"signature")
 
+    @staticmethod
+    def _validsig(fpr: str, primary: str | None = None) -> bytes:
+        primary = primary or fpr
+        return (
+            f"[GNUPG:] VALIDSIG {fpr} 2020-01-01 0 0 4 0 1 8 00 {primary}\n"
+        ).encode()
+
     def test_gpg_rejects_keyid_embedded_in_fingerprint(self) -> None:
         """A trusted ID buried inside an untrusted fingerprint is not a match."""
         vendor = GPGCliSignatureVendor(keyids=["DEADBEEF"])
-        stderr = (
-            "gpg: Good signature\n"
-            "Primary key fingerprint: 1111 1111 1111 1111 1111  "
-            "1111 1111 DEAD BEEF 1111\n"
-        )
+        status = self._validsig("1111111111111111111111111111DEADBEEF1111")
         with self.assertRaises(UntrustedSignature):
-            self._run_with_stderr(vendor, stderr)
+            self._run_with_status(vendor, status)
 
     def test_gpg_accepts_short_keyid_suffix(self) -> None:
-        """A short key ID reported by gpg matches a trusted full fingerprint."""
-        trusted = "AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555"
-        vendor = GPGCliSignatureVendor(keyids=[trusted])
-        stderr = f"gpg: Good signature\ngpg: using RSA key {trusted[-16:]}\n"
+        """A short trusted key ID matches the suffix of the reported fingerprint."""
+        fpr = "AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555"
+        vendor = GPGCliSignatureVendor(keyids=[fpr[-16:]])
         # Should not raise.
-        self._run_with_stderr(vendor, stderr)
+        self._run_with_status(vendor, self._validsig(fpr))
+
+    def test_gpg_ignores_spoofed_user_id_on_stderr(self) -> None:
+        """A trusted id echoed in the signer-controlled user id is not trusted."""
+        vendor = GPGCliSignatureVendor(keyids=["DEADBEEF1234"])
+        status = self._validsig("9999AAAA8888BBBB7777CCCC6666DDDD5555EEEE")
+        stderr = b'gpg: Good signature from "evil <x using RSA key DEADBEEF1234 >"\n'
+        with self.assertRaises(UntrustedSignature):
+            self._run_with_status(vendor, status, stderr=stderr)
 
     def test_x509_rejects_keyid_embedded_in_fingerprint(self) -> None:
         """Same suffix rule applies to the gpgsm/X.509 path."""
         vendor = X509SignatureVendor(keyids=["DEADBEEF"])
-        stderr = "gpgsm: Good signature from 1111DEADBEEF1111\n"
+        status = self._validsig("1111DEADBEEF1111111111111111111111111111")
         with self.assertRaises(UntrustedSignature):
-            self._run_with_stderr(vendor, stderr)
+            self._run_with_status(vendor, status)
+
+    def test_x509_ignores_spoofed_subject_on_stderr(self) -> None:
+        """A trusted id placed in the signer-controlled cert subject is not trusted."""
+        vendor = X509SignatureVendor(keyids=["DEADBEEF1234"])
+        status = self._validsig("9999AAAA8888BBBB7777CCCC6666DDDD5555EEEE")
+        stderr = b"gpgsm: Good signature from CN = DEADBEEF1234\n"
+        with self.assertRaises(UntrustedSignature):
+            self._run_with_status(vendor, status, stderr=stderr)
 
 
 class X509SignatureVendorTests(unittest.TestCase):

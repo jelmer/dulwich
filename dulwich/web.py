@@ -159,6 +159,11 @@ HTTP_NOT_FOUND = "404 Not Found"
 HTTP_FORBIDDEN = "403 Forbidden"
 HTTP_ERROR = "500 Internal Server Error"
 
+# Upper bound on the decompressed size of a gzip-encoded request body. A small
+# compressed body can otherwise inflate to gigabytes before the request is even
+# dispatched, so the cap mirrors git's GIT_HTTP_MAX_REQUEST_BUFFER (10 MiB).
+DEFAULT_MAX_DECOMPRESSED_REQUEST_SIZE = 10 * 1024 * 1024
+
 
 NO_CACHE_HEADERS = [
     ("Expires", "Fri, 01 Jan 1980 00:00:00 GMT"),
@@ -742,12 +747,57 @@ class HTTPGitApplication:
         return handler(req, self.backend, mat)
 
 
+class _BoundedDecompressedFile:
+    """Wrap a decompressing stream so reads stop after ``max_bytes``.
+
+    ``LimitedInputFilter`` caps the *compressed* body at Content-Length, but a
+    gzip stream can expand by ~1000x, so without a separate cap on the
+    *decompressed* output a tiny request body can still exhaust memory
+    (CWE-405). Reads beyond ``max_bytes`` return EOF, the same truncation
+    behavior ``_LengthLimitedFile`` already applies to the compressed side.
+    """
+
+    def __init__(self, fileobj: BinaryIO, max_bytes: int) -> None:
+        self._fileobj = fileobj
+        self._bytes_avail = max_bytes
+
+    def read(self, size: int = -1) -> bytes:
+        """Read up to size decompressed bytes, never more than the cap."""
+        if self._bytes_avail <= 0:
+            return b""
+        if size is None or size < 0 or size > self._bytes_avail:
+            size = self._bytes_avail
+        data = self._fileobj.read(size)
+        self._bytes_avail -= len(data)
+        return data
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        """Proxy seek to the wrapped stream."""
+        return self._fileobj.seek(offset, whence)
+
+    def close(self) -> None:
+        """Close the wrapped stream."""
+        self._fileobj.close()
+
+
 class GunzipFilter:
     """WSGI middleware that unzips gzip-encoded requests before passing on to the underlying application."""
 
-    def __init__(self, application: WSGIApplication) -> None:
-        """Initialize GunzipFilter with WSGI application."""
+    def __init__(
+        self,
+        application: WSGIApplication,
+        max_decompressed_size: int = DEFAULT_MAX_DECOMPRESSED_REQUEST_SIZE,
+    ) -> None:
+        """Initialize GunzipFilter with WSGI application.
+
+        Args:
+          application: The wrapped WSGI application.
+          max_decompressed_size: Maximum number of decompressed bytes to read
+            from a gzip-encoded request body, guarding against decompression
+            bombs.
+        """
         self.app = application
+        self.max_decompressed_size = max_decompressed_size
 
     def __call__(
         self,
@@ -758,8 +808,14 @@ class GunzipFilter:
         import gzip
 
         if environ.get("HTTP_CONTENT_ENCODING", "") == "gzip":
-            environ["wsgi.input"] = gzip.GzipFile(
-                filename=None, fileobj=environ["wsgi.input"], mode="rb"
+            environ["wsgi.input"] = _BoundedDecompressedFile(
+                cast(
+                    BinaryIO,
+                    gzip.GzipFile(
+                        filename=None, fileobj=environ["wsgi.input"], mode="rb"
+                    ),
+                ),
+                self.max_decompressed_size,
             )
             del environ["HTTP_CONTENT_ENCODING"]
             environ.pop("CONTENT_LENGTH", None)

@@ -49,6 +49,32 @@ __all__ = [
 ]
 
 
+def _parse_status_fingerprints(status: bytes) -> list[str]:
+    """Extract signing key fingerprints from gpg/gpgsm --status-fd output.
+
+    Only the VALIDSIG status line is consulted. Its first argument is the
+    fingerprint of the signing key and its last argument is the primary key
+    fingerprint; both are produced by gpg and are not attacker-controlled,
+    unlike the human-readable "Good signature from <user id>" text on stderr.
+
+    Args:
+      status: Raw bytes written by gpg/gpgsm to the status file descriptor.
+
+    Returns:
+      List of fingerprints found (signing key and primary key).
+    """
+    fingerprints: list[str] = []
+    prefix = "[GNUPG:] "
+    for line in status.decode("utf-8", errors="replace").splitlines():
+        if not line.startswith(prefix):
+            continue
+        fields = line[len(prefix) :].split()
+        if len(fields) >= 2 and fields[0] == "VALIDSIG":
+            fingerprints.append(fields[1])
+            fingerprints.append(fields[-1])
+    return fingerprints
+
+
 # Signature verification exceptions
 class SignatureVerificationError(Exception):
     """Base exception for signature verification failures."""
@@ -423,7 +449,13 @@ class GPGCliSignatureVendor(SignatureSigner, SignatureVerifier):
             data_file.write(data)
             data_file.flush()
 
-            args = [self.gpg_command, "--verify", sig_file.name, data_file.name]
+            args = [
+                self.gpg_command,
+                "--status-fd=1",
+                "--verify",
+                sig_file.name,
+                data_file.name,
+            ]
 
             try:
                 result = subprocess.run(
@@ -438,33 +470,18 @@ class GPGCliSignatureVendor(SignatureSigner, SignatureVerifier):
 
             # If keyids are specified, check that the signature was made by one of them
             if self.keyids:
-                # Parse stderr to extract the key fingerprint/ID that made the signature
-                stderr_text = result.stderr.decode("utf-8", errors="replace")
-
-                # GPG outputs both subkey and primary key fingerprints
-                # Collect both to check against trusted keyids
-                signing_keys = []
-                for line in stderr_text.split("\n"):
-                    if (
-                        "using RSA key" in line
-                        or "using DSA key" in line
-                        or "using EDDSA key" in line
-                        or "using ECDSA key" in line
-                    ):
-                        # Extract the key ID from lines like "gpg: using RSA key ABCD1234..."
-                        parts = line.split()
-                        if "key" in parts:
-                            key_idx = parts.index("key")
-                            if key_idx + 1 < len(parts):
-                                signing_keys.append(parts[key_idx + 1])
-                    elif "Primary key fingerprint:" in line:
-                        # Extract fingerprint
-                        fpr = line.split(":", 1)[1].strip().replace(" ", "")
-                        signing_keys.append(fpr)
+                # Read the signing key from gpg's machine-readable status output
+                # (--status-fd) rather than the human-readable stderr. The
+                # VALIDSIG status line carries the signing key fingerprint and
+                # the primary key fingerprint, both computed by gpg. The stderr
+                # "Good signature from <user id>" / "aka" lines echo the key's
+                # user id, which the signer controls and can populate with text
+                # like "using RSA key <trusted-id>" to impersonate a trusted key.
+                signing_keys = _parse_status_fingerprints(result.stdout)
 
                 if not signing_keys:
                     raise UntrustedSignature(
-                        "Could not determine signing key from GPG output"
+                        "Could not determine signing key from GPG status output"
                     )
 
                 # Check if any of the signing keys (subkey or primary) match the trusted keyids
@@ -602,7 +619,13 @@ class X509SignatureVendor(SignatureSigner, SignatureVerifier):
             data_file.write(data)
             data_file.flush()
 
-            args = [self.gpgsm_command, "--verify", sig_file.name, data_file.name]
+            args = [
+                self.gpgsm_command,
+                "--status-fd=1",
+                "--verify",
+                sig_file.name,
+                data_file.name,
+            ]
 
             try:
                 result = subprocess.run(
@@ -617,26 +640,16 @@ class X509SignatureVendor(SignatureSigner, SignatureVerifier):
 
             # If keyids are specified, check that the signature was made by one of them
             if self.keyids:
-                # Parse stderr to extract the certificate fingerprint/ID that made the signature
-                stderr_text = result.stderr.decode("utf-8", errors="replace")
-
-                # Collect signing certificate IDs
-                signing_certs = []
-                for line in stderr_text.split("\n"):
-                    if "using certificate ID" in line or "Good signature from" in line:
-                        # Extract certificate ID from the output
-                        parts = line.split()
-                        for i, part in enumerate(parts):
-                            if part.upper().startswith("0x"):
-                                signing_certs.append(part[2:])
-                            elif len(part) >= 8 and all(
-                                c in "0123456789ABCDEF" for c in part.upper()
-                            ):
-                                signing_certs.append(part)
+                # Read the certificate fingerprint from gpgsm's machine-readable
+                # status output (--status-fd) instead of the human-readable
+                # "Good signature from <subject>" line on stderr. The subject DN
+                # is attacker-controlled, so a certificate whose subject contains
+                # a trusted key id as a token would otherwise be accepted.
+                signing_certs = _parse_status_fingerprints(result.stdout)
 
                 if not signing_certs:
                     raise UntrustedSignature(
-                        "Could not determine signing certificate from gpgsm output"
+                        "Could not determine signing certificate from gpgsm status output"
                     )
 
                 # Check if any of the signing certs match the trusted keyids

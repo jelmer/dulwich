@@ -1965,6 +1965,55 @@ class HttpGitClientTests(TestCase):
         client = HttpGitClient(clone_url, pool_manager=PoolManagerMock(), config=None)
         self.assertTrue(client._smart_request("git-upload-pack", clone_url, data=None))
 
+    def test_smart_request_sets_content_length_for_non_bytes_body(self) -> None:
+        # Regression test for #586: when the request body is not ``bytes``
+        # (e.g. the spooled file-like object that send_pack now builds), a
+        # Content-Length header must be sent so the body is not transmitted
+        # using chunked transfer-encoding. Some servers (e.g. GitHub's
+        # git-receive-pack) abort a chunked / mid-stream-stalled push body
+        # with a timeout or "broken pipe".
+        from io import BytesIO
+
+        from urllib3.response import HTTPResponse
+
+        captured: dict[str, object] = {}
+
+        class PoolManagerMock:
+            def __init__(self) -> None:
+                self.headers: dict[str, str] = {}
+
+            def request(
+                self,
+                method,
+                url,
+                headers=None,
+                body=None,
+                preload_content=True,
+                **kwargs,
+            ):
+                captured["method"] = method
+                captured["headers"] = headers
+                captured["body"] = body
+                return HTTPResponse(
+                    headers={"Content-Type": "application/x-git-receive-pack-result"},
+                    request_method=method,
+                    request_url=url,
+                    preload_content=preload_content,
+                    status=200,
+                )
+
+        clone_url = "https://example.com/repo.git/"
+        client = HttpGitClient(clone_url, pool_manager=PoolManagerMock(), config=None)
+        payload = b"0009done\n"
+        body = BytesIO(payload)
+        client._smart_request(
+            "git-receive-pack", clone_url, data=body, content_length=len(payload)
+        )
+        self.assertEqual(captured["method"], "POST")
+        assert isinstance(captured["headers"], dict)
+        self.assertEqual(captured["headers"].get("Content-Length"), str(len(payload)))
+        self.assertIs(captured["body"], body)
+
     def test_urllib3_protocol_error(self) -> None:
         from urllib3.exceptions import ProtocolError
         from urllib3.response import HTTPResponse

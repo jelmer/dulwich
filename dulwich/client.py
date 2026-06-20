@@ -4426,6 +4426,13 @@ def check_for_proxy_bypass(base_url: str | None) -> bool:
     return False
 
 
+# Push request bodies up to this many bytes are buffered in memory; larger
+# bodies spill to a temporary file on disk. See
+# AbstractHttpGitClient.send_pack for why the body is buffered rather than
+# streamed lazily.
+_SEND_PACK_SPOOL_MAX_SIZE = 100 * 1024 * 1024
+
+
 class AbstractHttpGitClient(GitClient):
     """Abstract base class for HTTP Git Clients.
 
@@ -4465,7 +4472,7 @@ class AbstractHttpGitClient(GitClient):
         self,
         url: str,
         headers: dict[str, str] | None = None,
-        data: bytes | Iterator[bytes] | None = None,
+        data: bytes | IO[bytes] | Iterator[bytes] | None = None,
         raise_for_status: bool = True,
     ) -> tuple["HTTPResponse", Callable[[int], bytes]]:
         """Perform HTTP request.
@@ -4659,12 +4666,21 @@ class AbstractHttpGitClient(GitClient):
             resp.close()
 
     def _smart_request(
-        self, service: str, url: str, data: bytes | Iterator[bytes]
+        self,
+        service: str,
+        url: str,
+        data: bytes | IO[bytes] | Iterator[bytes],
+        content_length: int | None = None,
     ) -> tuple["HTTPResponse", Callable[[int], bytes]]:
         """Send a 'smart' HTTP request.
 
         This is a simple wrapper around _http_request that sets
         a couple of extra headers.
+
+        If ``data`` is not ``bytes`` (e.g. a file-like object or an iterator
+        of chunks), ``content_length`` must be supplied so that a
+        ``Content-Length`` header can be sent; otherwise the request body
+        would be sent using chunked transfer-encoding.
         """
         assert url[-1] == "/"
         url = urljoin(url, service)
@@ -4677,6 +4693,8 @@ class AbstractHttpGitClient(GitClient):
             headers["Git-Protocol"] = "version=2"
         if isinstance(data, bytes):
             headers["Content-Length"] = str(len(data))
+        elif content_length is not None:
+            headers["Content-Length"] = str(content_length)
         resp, read = self._http_request(url, headers, data)
         if (
             not resp.content_type
@@ -4765,7 +4783,21 @@ class AbstractHttpGitClient(GitClient):
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)
 
-        def body_generator() -> Iterator[bytes]:
+        from tempfile import SpooledTemporaryFile
+
+        # Build the request body up front instead of streaming it lazily.
+        # generate_pack_data (called below) can take several seconds to
+        # enumerate objects on large repositories, and it only runs after the
+        # header pkt-lines have been produced. When the body is streamed
+        # lazily this leaves the HTTP request stalled mid-body while the pack
+        # is computed; some servers (notably GitHub's git-receive-pack) abort
+        # such a stalled upload with a timeout or "broken pipe" (see
+        # https://github.com/jelmer/dulwich/issues/586). Spooling the body
+        # keeps memory bounded for large pushes -- it spills to a temporary
+        # file once it exceeds the in-memory threshold -- while letting us send
+        # a contiguous body with an explicit Content-Length.
+        body: IO[bytes] = SpooledTemporaryFile(max_size=_SEND_PACK_SPOOL_MAX_SIZE)
+        try:
             header_handler = _v1ReceivePackHeader(
                 list(negotiated_capabilities),
                 old_refs_typed,
@@ -4773,7 +4805,7 @@ class AbstractHttpGitClient(GitClient):
                 push_options=push_options,
             )
             for pkt in header_handler:
-                yield pkt_line(pkt)
+                body.write(pkt_line(pkt))
             pack_data_count, pack_data = generate_pack_data(
                 header_handler.have,
                 header_handler.want,
@@ -4781,25 +4813,31 @@ class AbstractHttpGitClient(GitClient):
                 progress=progress,
             )
             if self._should_send_pack(new_refs):
-                yield from PackChunkGenerator(
+                for chunk in PackChunkGenerator(
                     # TODO: Don't hardcode object format
                     num_records=pack_data_count,
                     records=pack_data,
                     object_format=DEFAULT_OBJECT_FORMAT,
+                ):
+                    body.write(chunk)
+            content_length = body.tell()
+            body.seek(0)
+            resp, read = self._smart_request(
+                "git-receive-pack", url, data=body, content_length=content_length
+            )
+            try:
+                resp_proto = Protocol(read, lambda data: None)
+                ref_status = self._handle_receive_pack_tail(
+                    resp_proto, negotiated_capabilities, progress
                 )
-
-        resp, read = self._smart_request("git-receive-pack", url, data=body_generator())
-        try:
-            resp_proto = Protocol(read, lambda data: None)
-            ref_status = self._handle_receive_pack_tail(
-                resp_proto, negotiated_capabilities, progress
-            )
-            # Convert to Optional type for SendPackResult
-            return SendPackResult(
-                _to_optional_dict(new_refs), agent=agent, ref_status=ref_status
-            )
+                # Convert to Optional type for SendPackResult
+                return SendPackResult(
+                    _to_optional_dict(new_refs), agent=agent, ref_status=ref_status
+                )
+            finally:
+                resp.close()
         finally:
-            resp.close()
+            body.close()
 
     def fetch_pack(
         self,
@@ -5236,7 +5274,7 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
         self,
         url: str,
         headers: dict[str, str] | None = None,
-        data: bytes | Iterator[bytes] | None = None,
+        data: bytes | IO[bytes] | Iterator[bytes] | None = None,
         raise_for_status: bool = True,
     ) -> tuple["HTTPResponse", Callable[[int], bytes]]:
         import urllib3.exceptions

@@ -1,3 +1,14 @@
+1.2.8	UNRELEASED
+
+ * Buffer the HTTP ``git-receive-pack`` request body before sending it
+   instead of streaming it lazily. The body generator ran
+   ``generate_pack_data`` only after yielding the header pkt-lines, so on
+   large repositories the request stalled mid-body while the pack was
+   computed and servers such as GitHub aborted the push with a timeout /
+   "broken pipe". The body is now spooled (in memory, spilling to a
+   temporary file when large) and sent with a ``Content-Length``.
+   (synman, #2248)
+
 1.2.7	2026-06-12
 
  * Verify that an object retrieved by id actually hashes to the requested

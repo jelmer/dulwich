@@ -426,6 +426,18 @@ class RefsContainer:
             return
         raise RefFormatError(name)
 
+    def _check_ref_value(self, ref: ObjectID) -> None:
+        """Ensure a ref value is a valid object id or a symref.
+
+        Args:
+          ref: The value a ref is being set to.
+
+        Raises:
+          ValueError: if the value is neither a valid sha nor a symref.
+        """
+        if not (valid_hexsha(ref) or ref.startswith(SYMREF)):
+            raise ValueError(f"{ref!r} must be a valid sha (40 chars) or a symref")
+
     def read_ref(self, refname: Ref) -> bytes | None:
         """Read a reference without following any references.
 
@@ -549,8 +561,7 @@ class RefsContainer:
           name: The refname to set.
           ref: The new sha the refname will refer to.
         """
-        if not (valid_hexsha(ref) or ref.startswith(SYMREF)):
-            raise ValueError(f"{ref!r} must be a valid sha (40 chars) or a symref")
+        self._check_ref_value(ref)
         self.set_if_equals(name, None, ref)
 
     def remove_if_equals(
@@ -728,6 +739,7 @@ class DictRefsContainer(RefsContainer):
         Returns:
           True if the set was successful, False otherwise.
         """
+        self._check_ref_value(new_ref)
         if old_ref is not None and self._refs.get(name, ZERO_SHA) != old_ref:
             return False
         # Only update the specific ref requested, not the whole chain
@@ -768,6 +780,7 @@ class DictRefsContainer(RefsContainer):
         Returns:
           True if the add was successful, False otherwise.
         """
+        self._check_ref_value(ref)
         if name in self._refs:
             return False
         self._refs[name] = ref
@@ -1164,6 +1177,7 @@ class DiskRefsContainer(RefsContainer):
         Returns: True if the set was successful, False otherwise.
         """
         self._check_refname(name)
+        self._check_ref_value(new_ref)
         try:
             realnames, _ = self.follow(name)
             realname = realnames[-1]
@@ -1244,6 +1258,7 @@ class DiskRefsContainer(RefsContainer):
           message: Optional message for reflog
         Returns: True if the add was successful, False otherwise.
         """
+        self._check_ref_value(ref)
         try:
             realnames, contents = self.follow(name)
             if contents is not None:

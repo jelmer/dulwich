@@ -290,6 +290,25 @@ class RefsContainerTests:
         self.assertTrue(self._refs.add_if_new(b"refs/some/ref", nines))
         self.assertEqual(nines, self._refs[b"refs/some/ref"])
 
+    def test_set_if_equals_rejects_invalid_value(self) -> None:
+        # A non-hex value (e.g. one advertised by a malicious server) must be
+        # rejected before it is stored or used in a path.
+        self.assertRaises(
+            ValueError,
+            self._refs.set_if_equals,
+            b"refs/heads/master",
+            None,
+            b"../../../../etc/passwd",
+        )
+
+    def test_add_if_new_rejects_invalid_value(self) -> None:
+        self.assertRaises(
+            ValueError,
+            self._refs.add_if_new,
+            b"refs/heads/new",
+            b"../../config",
+        )
+
     def test_set_symbolic_ref(self) -> None:
         self._refs.set_symbolic_ref(b"refs/heads/symbolic", b"refs/heads/master")
         self.assertEqual(

@@ -76,6 +76,13 @@
    ``objects/info/packs`` but returned 404 for the pack itself.
    (Jelmer Vernooĳ)
 
+ * Enumerate the objects to push before the HTTP ``git-receive-pack``
+   request body starts streaming. ``generate_pack_data`` previously ran
+   lazily inside the body generator, after the header pkt-lines were
+   already on the wire, so on large repositories the request stalled
+   mid-body while objects were counted and servers such as GitHub aborted
+   the push with a timeout / "broken pipe". (synman, Jelmer Vernooĳ, #2248)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

@@ -1965,6 +1965,61 @@ class HttpGitClientTests(TestCase):
         client = HttpGitClient(clone_url, pool_manager=PoolManagerMock(), config=None)
         self.assertTrue(client._smart_request("git-upload-pack", clone_url, data=None))
 
+    def test_send_pack_enumerates_objects_before_request(self) -> None:
+        """generate_pack_data runs before the request body starts streaming.
+
+        On large repositories MissingObjectFinder is slow, and if it ran lazily
+        inside the body generator the request would stall mid-body and some
+        servers abort the push. See https://github.com/jelmer/dulwich/issues/2248.
+        """
+        events: list[str] = []
+
+        commit = Commit()
+        tree = Tree()
+        commit.tree = tree.id
+        commit.parents = []
+        commit.author = commit.committer = b"test user"
+        commit.commit_time = commit.author_time = 1174773719
+        commit.commit_timezone = commit.author_timezone = 0
+        commit.encoding = b"UTF-8"
+        commit.message = b"test message"
+
+        class _Client(HttpGitClient):
+            def _discover_references(
+                self, service, base_url, protocol_version=None, ref_prefix=None
+            ):
+                refs = {
+                    b"refs/heads/master": (b"310ca9477129b8586fa2afc779c1f57cf64bba6c")
+                }
+                caps = {b"report-status", b"ofs-delta"}
+                return refs, caps, base_url, {}, {}
+
+            def _smart_request(self, service, url, data):
+                events.append("smart_request")
+                # The body generator must still stream lazily; consuming it
+                # here mimics the real HTTP request reading the body.
+                for _chunk in data:
+                    pass
+                read = BytesIO(b"000eunpack ok\n0019ok refs/heads/master\n0000").read
+                resp = MagicMock()
+                resp.close = lambda: None
+                return resp, read
+
+        client = _Client("https://example.com/repo.git/")
+
+        def update_refs(refs):
+            return {b"refs/heads/master": commit.id}
+
+        def generate_pack_data(have, want, *, ofs_delta=False, progress=None):
+            events.append("generate_pack_data")
+            return pack_objects_to_data([(commit, None), (tree, b"")])
+
+        client.send_pack("/", update_refs, generate_pack_data)
+
+        # generate_pack_data must have been called before _smart_request, i.e.
+        # the objects are enumerated before the request body starts streaming.
+        self.assertEqual(["generate_pack_data", "smart_request"], events)
+
     def test_urllib3_protocol_error(self) -> None:
         from urllib3.exceptions import ProtocolError
         from urllib3.response import HTTPResponse

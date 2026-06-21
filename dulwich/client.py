@@ -4164,6 +4164,37 @@ class AuthCallbackPoolManager:
         return response
 
 
+# Default for http.postBuffer: request bodies up to this size are buffered and
+# sent with a Content-Length header; larger bodies are streamed with
+# Transfer-Encoding: chunked. Matches C git's GIT_HTTP_POST_BUFFER_DEFAULT.
+DEFAULT_POST_BUFFER_SIZE = 1024 * 1024
+
+
+def _buffer_or_stream(data: Iterator[bytes], limit: int) -> bytes | Iterator[bytes]:
+    """Buffer up to ``limit`` bytes from ``data``.
+
+    If the iterator is exhausted within the limit, the full body is returned as
+    a single ``bytes`` object so it can be sent with a Content-Length header.
+    Otherwise an iterator is returned that re-yields the buffered prefix
+    followed by the remaining chunks, for chunked streaming.
+    """
+    buffered: list[bytes] = []
+    size = 0
+    for chunk in data:
+        buffered.append(chunk)
+        size += len(chunk)
+        if size > limit:
+            break
+    else:
+        return b"".join(buffered)
+
+    def stream() -> Iterator[bytes]:
+        yield from buffered
+        yield from data
+
+    return stream()
+
+
 def default_urllib3_manager(
     config: Config | None,
     pool_manager_cls: type | None = None,
@@ -4658,8 +4689,29 @@ class AbstractHttpGitClient(GitClient):
         finally:
             resp.close()
 
+    def _post_buffer_size(self, url: str) -> int:
+        """Return the http.postBuffer size in bytes for the given URL.
+
+        Mirrors C git: request bodies up to this size are buffered and sent
+        with a Content-Length header, larger bodies are streamed chunked.
+        """
+        from .object_filters import _parse_size
+
+        config = getattr(self, "config", None)
+        if config is None:
+            return DEFAULT_POST_BUFFER_SIZE
+        size = DEFAULT_POST_BUFFER_SIZE
+        for section in _urlmatch_http_sections(config, url):
+            try:
+                value = config.get(section, b"postBuffer")
+            except KeyError:
+                continue
+            if value is not None:
+                size = _parse_size(value.decode("utf-8"))
+        return size
+
     def _smart_request(
-        self, service: str, url: str, data: bytes | Iterator[bytes]
+        self, service: str, url: str, data: bytes | Iterator[bytes] | None
     ) -> tuple["HTTPResponse", Callable[[int], bytes]]:
         """Send a 'smart' HTTP request.
 
@@ -4675,6 +4727,13 @@ class AbstractHttpGitClient(GitClient):
         }
         if self.protocol_version == 2:
             headers["Git-Protocol"] = "version=2"
+        if data is not None and not isinstance(data, bytes):
+            # Buffer the body up to http.postBuffer bytes. If it fits, send it
+            # with a Content-Length header (some servers, notably GitHub's
+            # git-receive-pack, reject chunked uploads on large repositories).
+            # Larger bodies fall back to chunked streaming so memory stays
+            # bounded. See https://github.com/jelmer/dulwich/issues/2248.
+            data = _buffer_or_stream(data, self._post_buffer_size(url))
         if isinstance(data, bytes):
             headers["Content-Length"] = str(len(data))
         resp, read = self._http_request(url, headers, data)

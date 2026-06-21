@@ -59,6 +59,7 @@ from dulwich.client import (
     TCPGitClient,
     TraditionalGitClient,
     Urllib3HttpGitClient,
+    _buffer_or_stream,
     _download_packfile_from_uri,
     _extract_symrefs_and_agent,
     _handle_upload_pack_head,
@@ -2019,6 +2020,80 @@ class HttpGitClientTests(TestCase):
         # generate_pack_data must have been called before _smart_request, i.e.
         # the objects are enumerated before the request body starts streaming.
         self.assertEqual(["generate_pack_data", "smart_request"], events)
+
+    def _capture_smart_request(self, client, data):
+        """Run _smart_request with a stubbed _http_request and return (headers, body)."""
+        from urllib3.response import HTTPResponse
+
+        captured = {}
+
+        def fake_http_request(url, headers=None, data=None, raise_for_status=True):
+            captured["headers"] = headers
+            captured["data"] = data
+            resp = HTTPResponse(
+                headers={"Content-Type": "application/x-git-receive-pack-result"},
+                request_method="POST",
+                request_url=url,
+                preload_content=False,
+                status=200,
+            )
+            resp.content_type = "application/x-git-receive-pack-result"
+            return resp, resp.read
+
+        client._http_request = fake_http_request
+        client._smart_request("git-receive-pack", client._base_url, data=data)
+        return captured["headers"], captured["data"]
+
+    def test_smart_request_buffers_small_body(self) -> None:
+        client = HttpGitClient("https://example.com/repo.git/", config=None)
+
+        def body():
+            yield b"hello "
+            yield b"world"
+
+        headers, data = self._capture_smart_request(client, body())
+        # Body fits within the default postBuffer, so it is buffered and sent
+        # with a Content-Length header rather than chunked.
+        self.assertEqual(b"hello world", data)
+        self.assertEqual("11", headers["Content-Length"])
+
+    def test_smart_request_streams_large_body(self) -> None:
+        config = ConfigDict()
+        config.set((b"http",), b"postBuffer", b"8")
+        client = HttpGitClient("https://example.com/repo.git/", config=config)
+
+        def body():
+            yield b"hello "
+            yield b"world"
+
+        headers, data = self._capture_smart_request(client, body())
+        # Body exceeds postBuffer, so it stays an iterator (chunked) and no
+        # Content-Length is set.
+        self.assertNotIn("Content-Length", headers)
+        self.assertEqual(b"hello world", b"".join(data))
+
+    def test_post_buffer_size_from_config(self) -> None:
+        config = ConfigDict()
+        config.set((b"http",), b"postBuffer", b"2m")
+        client = HttpGitClient("https://example.com/repo.git/", config=config)
+        self.assertEqual(
+            2 * 1024 * 1024,
+            client._post_buffer_size("https://example.com/repo.git/git-receive-pack"),
+        )
+
+    def test_buffer_or_stream_within_limit(self) -> None:
+        result = _buffer_or_stream(iter([b"ab", b"cd"]), 8)
+        self.assertEqual(b"abcd", result)
+
+    def test_buffer_or_stream_at_limit(self) -> None:
+        # A body exactly the size of the limit is still buffered.
+        result = _buffer_or_stream(iter([b"abcd"]), 4)
+        self.assertEqual(b"abcd", result)
+
+    def test_buffer_or_stream_over_limit(self) -> None:
+        result = _buffer_or_stream(iter([b"abc", b"de"]), 4)
+        self.assertNotIsInstance(result, bytes)
+        self.assertEqual(b"abcde", b"".join(result))
 
     def test_urllib3_protocol_error(self) -> None:
         from urllib3.exceptions import ProtocolError

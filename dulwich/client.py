@@ -4765,21 +4765,33 @@ class AbstractHttpGitClient(GitClient):
         if self.dumb:
             raise NotImplementedError(self.fetch_pack)
 
+        header_handler = _v1ReceivePackHeader(
+            list(negotiated_capabilities),
+            old_refs_typed,
+            new_refs,
+            push_options=push_options,
+        )
+        header_pkts = [pkt_line(pkt) for pkt in header_handler]
+
+        # Enumerate the objects to send before the request body starts
+        # streaming. generate_pack_data runs MissingObjectFinder, which can
+        # take several seconds on large repositories. If it ran lazily inside
+        # the body generator (after the header pkt-lines were already on the
+        # wire) the request would stall mid-body, and some servers (notably
+        # GitHub's git-receive-pack) abort such a stalled upload with a timeout
+        # or "broken pipe". Running it here keeps the body streaming -- so
+        # memory stays bounded -- while ensuring the slow phase happens before
+        # any bytes are sent. See https://github.com/jelmer/dulwich/issues/586
+        # and https://github.com/jelmer/dulwich/issues/2248.
+        pack_data_count, pack_data = generate_pack_data(
+            header_handler.have,
+            header_handler.want,
+            ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities),
+            progress=progress,
+        )
+
         def body_generator() -> Iterator[bytes]:
-            header_handler = _v1ReceivePackHeader(
-                list(negotiated_capabilities),
-                old_refs_typed,
-                new_refs,
-                push_options=push_options,
-            )
-            for pkt in header_handler:
-                yield pkt_line(pkt)
-            pack_data_count, pack_data = generate_pack_data(
-                header_handler.have,
-                header_handler.want,
-                ofs_delta=(CAPABILITY_OFS_DELTA in negotiated_capabilities),
-                progress=progress,
-            )
+            yield from header_pkts
             if self._should_send_pack(new_refs):
                 yield from PackChunkGenerator(
                     # TODO: Don't hardcode object format

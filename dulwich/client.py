@@ -3834,6 +3834,18 @@ class PLinkSSHVendor(SSHVendor):
 get_ssh_vendor: Callable[[], SSHVendor] = SubprocessSSHVendor
 
 
+def _quote_remote_path(path: bytes) -> bytes:
+    r"""Single-quote a repository path for the remote shell over SSH.
+
+    The git command we hand to the SSH vendor is run by the remote login
+    shell, so the path has to be quoted the way git does it (sq_quote): wrap
+    it in single quotes and rewrite every embedded single quote as ``'\\''``.
+    Wrapping in single quotes without escaping lets a path containing a quote
+    close the quoting and have the remainder run as shell.
+    """
+    return b"'" + path.replace(b"'", b"'\\''") + b"'"
+
+
 class SSHGitClient(TraditionalGitClient):
     """Git client that connects over SSH."""
 
@@ -3990,9 +4002,8 @@ class SSHGitClient(TraditionalGitClient):
             path = path[1:]
         argv = (
             self._get_cmd_path(cmd)
-            + b" '"
-            + path.encode(self._remote_path_encoding)
-            + b"'"
+            + b" "
+            + _quote_remote_path(path.encode(self._remote_path_encoding))
         )
         kwargs = {}
         if self.password is not None:

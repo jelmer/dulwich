@@ -1153,6 +1153,20 @@ class SSHGitClientTests(TestCase):
         finally:
             proto.close()
 
+    def test_connect_escapes_quote_in_path(self) -> None:
+        # A path containing a single quote must not be able to close the
+        # quoting and have the remainder interpreted by the remote shell.
+        server = self.server
+        client = self.client
+
+        proto, _, _ = client._connect(b"command", b"/repo'; touch pwned; '")
+        try:
+            self.assertEqual(
+                b"git-command '/repo'\\''; touch pwned; '\\'''", server.command
+            )
+        finally:
+            proto.close()
+
     def test_ssh_command_precedence(self) -> None:
         # GIT_SSH / GIT_SSH_COMMAND are read at the CLI layer
         # (dulwich.cli._ssh_command_from_env); SSHGitClient itself should

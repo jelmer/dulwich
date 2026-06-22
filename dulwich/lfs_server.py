@@ -29,7 +29,6 @@ __all__ = [
 
 import hashlib
 import json
-import re
 import tempfile
 import typing
 from collections.abc import Mapping
@@ -40,12 +39,13 @@ from .lfs import LFSStore
 # LFS object ids are SHA-256 digests, i.e. 64 lowercase hex characters. The
 # store maps an oid onto a path (objects/<oid[:2]>/<oid[2:4]>/<oid>), so an oid
 # taken from the request path must be checked before it reaches the filesystem.
-_VALID_OID = re.compile(r"[0-9a-f]{64}\Z")
+_OID_LENGTH = 64
+_HEX_DIGITS = frozenset("0123456789abcdef")
 
 
 def _is_valid_oid(oid: str) -> bool:
     """Return whether ``oid`` is a well-formed LFS object id."""
-    return _VALID_OID.match(oid) is not None
+    return len(oid) == _OID_LENGTH and set(oid) <= _HEX_DIGITS
 
 
 class LFSRequestHandler(BaseHTTPRequestHandler):

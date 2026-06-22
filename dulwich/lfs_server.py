@@ -36,6 +36,17 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from .lfs import LFSStore
 
+# LFS object ids are SHA-256 digests, i.e. 64 lowercase hex characters. The
+# store maps an oid onto a path (objects/<oid[:2]>/<oid[2:4]>/<oid>), so an oid
+# taken from the request path must be checked before it reaches the filesystem.
+_OID_LENGTH = 64
+_HEX_DIGITS = frozenset("0123456789abcdef")
+
+
+def _is_valid_oid(oid: str) -> bool:
+    """Return whether ``oid`` is a well-formed LFS object id."""
+    return len(oid) == _OID_LENGTH and set(oid) <= _HEX_DIGITS
+
 
 class LFSRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler for LFS operations."""
@@ -154,6 +165,9 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
             return
 
         oid = path_parts[1]
+        if not _is_valid_oid(oid):
+            self.send_error(404, "Not Found")
+            return
 
         try:
             with self.lfs_server.lfs_store.open_object(oid) as f:
@@ -176,6 +190,10 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
             return
 
         oid = path_parts[1]
+        if not _is_valid_oid(oid):
+            self.send_error(404, "Not Found")
+            return
+
         content_length = int(self.headers["Content-Length"])
 
         # Read content in chunks
@@ -215,6 +233,10 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
             return
 
         oid = path_parts[1]
+        if not _is_valid_oid(oid):
+            self.send_error(404, "Not Found")
+            return
+
         content_length = int(self.headers.get("Content-Length", 0))
 
         if content_length > 0:

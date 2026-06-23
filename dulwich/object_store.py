@@ -1932,6 +1932,12 @@ class DiskObjectStore(PackBasedObjectStore):
         return new_packs
 
     def _get_shafile_path(self, sha: ObjectID | RawObjectID) -> str:
+        # Reject anything that is neither a valid hex object id nor a raw
+        # binary oid before building a path. Otherwise a malformed id (e.g.
+        # one containing path separators) would be joined into a filename
+        # that escapes the objects directory.
+        if not valid_hexsha(sha) and len(sha) != self.object_format.oid_length:
+            raise ValueError(f"Invalid object id {sha!r}")
         # Check from object dir
         return hex_to_filename(os.fspath(self.path), sha)
 

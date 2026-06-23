@@ -205,6 +205,17 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         TestCase.tearDown(self)
         PackBasedObjectStoreTests.tearDown(self)
 
+    def test_contains_rejects_invalid_sha(self) -> None:
+        # A malformed object id (e.g. one advertised by a malicious server)
+        # must not be turned into a path that escapes the objects directory.
+        for bad in (b"../../config", b"../../../../etc/passwd"):
+            self.assertRaises(ValueError, self.store.__contains__, bad)
+
+    def test_get_shafile_path_rejects_invalid_sha(self) -> None:
+        self.assertRaises(
+            ValueError, self.store._get_shafile_path, b"../../../../etc/passwd"
+        )
+
     def test_loose_compression_level(self) -> None:
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)

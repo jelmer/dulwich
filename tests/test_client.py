@@ -1143,13 +1143,27 @@ class SSHGitClientTests(TestCase):
         try:
             self.assertEqual(b"username", server.username)
             self.assertEqual(1337, server.port)
-            self.assertEqual(b"git-command '/path/to/repo'", server.command)
+            self.assertEqual(b"git-command /path/to/repo", server.command)
         finally:
             proto.close()
 
         proto, _, _ = client._connect(b"relative-command", b"/~/path/to/repo")
         try:
             self.assertEqual(b"git-relative-command '~/path/to/repo'", server.command)
+        finally:
+            proto.close()
+
+    def test_connect_escapes_quote_in_path(self) -> None:
+        # A path containing a single quote must not be able to close the
+        # quoting and have the remainder interpreted by the remote shell.
+        server = self.server
+        client = self.client
+
+        proto, _, _ = client._connect(b"command", b"/repo'; touch pwned; '")
+        try:
+            self.assertEqual(
+                b"git-command '/repo'\"'\"'; touch pwned; '\"'\"''", server.command
+            )
         finally:
             proto.close()
 

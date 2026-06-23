@@ -3988,11 +3988,15 @@ class SSHGitClient(TraditionalGitClient):
             path = path.decode(self._remote_path_encoding)
         if path.startswith("/~"):
             path = path[1:]
+        import shlex
+
+        # The git command is run by the remote login shell, so the path has
+        # to be quoted to stop an embedded single quote from closing the
+        # quoting and having the remainder interpreted as shell.
         argv = (
             self._get_cmd_path(cmd)
-            + b" '"
-            + path.encode(self._remote_path_encoding)
-            + b"'"
+            + b" "
+            + shlex.quote(path).encode(self._remote_path_encoding)
         )
         kwargs = {}
         if self.password is not None:

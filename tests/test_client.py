@@ -1143,7 +1143,7 @@ class SSHGitClientTests(TestCase):
         try:
             self.assertEqual(b"username", server.username)
             self.assertEqual(1337, server.port)
-            self.assertEqual(b"git-command '/path/to/repo'", server.command)
+            self.assertEqual(b"git-command /path/to/repo", server.command)
         finally:
             proto.close()
 
@@ -1162,7 +1162,7 @@ class SSHGitClientTests(TestCase):
         proto, _, _ = client._connect(b"command", b"/repo'; touch pwned; '")
         try:
             self.assertEqual(
-                b"git-command '/repo'\\''; touch pwned; '\\'''", server.command
+                b"git-command '/repo'\"'\"'; touch pwned; '\"'\"''", server.command
             )
         finally:
             proto.close()

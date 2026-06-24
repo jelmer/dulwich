@@ -252,7 +252,7 @@ class DumbHandlersTestCase(WebTestCase):
 
         objects = [blob1, blob2, blob3, tag1]
         refs = {
-            b"HEAD": b"000",
+            b"HEAD": b"ref: refs/heads/master",
             b"refs/heads/master": blob1.id,
             b"refs/tags/tag-tag": tag1.id,
             b"refs/tags/blob-tag": blob3.id,

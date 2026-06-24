@@ -1290,17 +1290,10 @@ class BaseRepo:
         Args:
           name: Git object SHA1/SHA256 or ref name
         """
-        if len(name) == 20:
-            return RawObjectID(name) in self.object_store or Ref(name) in self.refs
-        elif len(name) == 40 and valid_hexsha(name):
-            return ObjectID(name) in self.object_store or Ref(name) in self.refs
         # Check if it's a binary or hex SHA
-        if len(name) == self.object_format.oid_length:
-            return RawObjectID(name) in self.object_store or Ref(name) in self.refs
-        elif len(name) == self.object_format.hex_length and valid_hexsha(name):
+        if len(name) == self.object_format.hex_length and valid_hexsha(name):
             return ObjectID(name) in self.object_store or Ref(name) in self.refs
-        else:
-            return Ref(name) in self.refs
+        return Ref(name) in self.refs
 
     def __setitem__(self, name: bytes, value: ShaFile | bytes) -> None:
         """Set a ref.

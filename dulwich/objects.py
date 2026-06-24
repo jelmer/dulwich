@@ -224,7 +224,7 @@ def valid_hexsha(hex: bytes | str) -> bool:
 PathT = TypeVar("PathT", str, bytes)
 
 
-def hex_to_filename(path: PathT, hex: str | bytes) -> PathT:
+def hex_to_filename(path: PathT, hex: ObjectID | str) -> PathT:
     """Takes a hex sha and returns its filename relative to the given path."""
     # os.path.join accepts bytes or unicode, but all args must be of the same
     # type. Make sure that hex which is expected to be bytes, is the same type
@@ -254,6 +254,12 @@ def hex_to_filename(path: PathT, hex: str | bytes) -> PathT:
 
 def filename_to_hex(filename: str | bytes) -> str:
     """Takes an object filename and returns its corresponding hex sha."""
+    import warnings
+
+    warnings.warn(
+        "filename_to_hex is unused and will be removed in a future version of Dulwich",
+        DeprecationWarning,
+    )
     # grab the last (up to) two path components
     errmsg = f"Invalid object filename: {filename!r}"
     if isinstance(filename, str):

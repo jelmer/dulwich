@@ -48,9 +48,6 @@ __all__ = [
     "REF_VALUE_PEELED",
     "REF_VALUE_REF",
     "REF_VALUE_SYMREF",
-    "SHA1_BINARY_SIZE",
-    "SHA1_HEX_SIZE",
-    "SHA1_PEELED_HEX_SIZE",
     "LogBlock",
     "RefBlock",
     "RefRecord",
@@ -76,6 +73,7 @@ from io import BytesIO
 from types import TracebackType
 from typing import BinaryIO
 
+from dulwich.object_format import SHA1
 from dulwich.objects import ObjectID
 from dulwich.refs import (
     SYMREF,
@@ -181,11 +179,6 @@ MAX_SYMREF_DEPTH = 5
 CRC_DATA_SIZE = 64
 FINAL_PADDING_SIZE = 36
 
-# SHA1 and size constants
-SHA1_BINARY_SIZE = 20  # SHA1 is 20 bytes
-SHA1_HEX_SIZE = 40  # SHA1 as hex string is 40 characters
-SHA1_PEELED_HEX_SIZE = 80  # Peeled ref is 80 hex characters (2 SHA1s)
-
 # Validation limits
 MAX_REASONABLE_SUFFIX_LEN = 100
 MAX_REASONABLE_BLOCK_SIZE = 1000000
@@ -210,13 +203,13 @@ def _encode_ref_value(value_type: int, value: bytes) -> bytes:
         return b""
     elif value_type == REF_VALUE_REF:
         # Convert hex string to binary if needed
-        if len(value) == SHA1_HEX_SIZE:
+        if len(value) == SHA1.hex_length:
             return bytes.fromhex(value.decode())
         else:
             return value
     elif value_type == REF_VALUE_PEELED:
         # Convert hex strings to binary if needed
-        if len(value) == SHA1_PEELED_HEX_SIZE:
+        if len(value) == 2 * SHA1.hex_length:
             return bytes.fromhex(value.decode())
         else:
             return value
@@ -232,14 +225,14 @@ def _decode_ref_value(stream: BinaryIO, value_type: int) -> bytes:
     if value_type == REF_VALUE_DELETE:
         return b""
     elif value_type == REF_VALUE_REF:
-        value = stream.read(SHA1_BINARY_SIZE)
-        if len(value) != SHA1_BINARY_SIZE:
+        value = stream.read(SHA1.oid_length)
+        if len(value) != SHA1.oid_length:
             raise ValueError("Unexpected end of stream while reading ref value")
         # Convert to hex string for interface compatibility
         return value.hex().encode()
     elif value_type == REF_VALUE_PEELED:
-        value = stream.read(SHA1_BINARY_SIZE * 2)
-        if len(value) != SHA1_BINARY_SIZE * 2:
+        value = stream.read(SHA1.oid_length * 2)
+        if len(value) != SHA1.oid_length * 2:
             raise ValueError("Unexpected end of stream while reading peeled value")
         # Convert to hex string for interface compatibility
         return value.hex().encode()
@@ -282,7 +275,7 @@ class RefValue:
         if self.value_type == REF_VALUE_REF:
             return self.value
         elif self.value_type == REF_VALUE_PEELED:
-            return self.value[:SHA1_HEX_SIZE]
+            return self.value[: SHA1.hex_length]
         return None
 
 
@@ -1034,7 +1027,9 @@ class ReftableRefsContainer(RefsContainer):
             if value_type == REF_VALUE_REF:
                 return refnames, ObjectID(value)
             if value_type == REF_VALUE_PEELED:
-                return refnames, ObjectID(value[:SHA1_HEX_SIZE])  # First SHA1 hex chars
+                return refnames, ObjectID(
+                    value[: SHA1.hex_length]
+                )  # First SHA1 hex chars
             if value_type == REF_VALUE_SYMREF:
                 current = Ref(value)
                 continue
@@ -1079,7 +1074,7 @@ class ReftableRefsContainer(RefsContainer):
             return SYMREF + value
         elif value_type == REF_VALUE_PEELED:
             # Return the first SHA (not the peeled one)
-            return value[:SHA1_HEX_SIZE]  # First SHA1 hex chars
+            return value[: SHA1.hex_length]  # First SHA1 hex chars
 
         raise ValueError(f"Unknown ref value type: {value_type}")
 
@@ -1091,7 +1086,9 @@ class ReftableRefsContainer(RefsContainer):
             if value_type == REF_VALUE_REF:
                 result[name] = ObjectID(value)
             elif value_type == REF_VALUE_PEELED:
-                result[name] = ObjectID(value[:SHA1_HEX_SIZE])  # First SHA1 hex chars
+                result[name] = ObjectID(
+                    value[: SHA1.hex_length]
+                )  # First SHA1 hex chars
         return result
 
     def get_peeled(self, name: Ref) -> ObjectID | None:

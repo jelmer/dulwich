@@ -257,8 +257,7 @@ def filename_to_hex(filename: str | bytes) -> str:
     import warnings
 
     warnings.warn(
-        "filename_to_hex is unused and will be removed in a future version "
-        "of Dulwich",
+        "filename_to_hex is unused and will be removed in a future version of Dulwich",
         DeprecationWarning,
     )
     # grab the last (up to) two path components

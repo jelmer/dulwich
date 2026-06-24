@@ -28,6 +28,7 @@ import http.server
 import os
 import select
 import signal
+import socket
 import stat
 import subprocess
 import sys
@@ -358,25 +359,29 @@ class DulwichClientTestBase:
     def test_fetch_pack_deepen_since(self) -> None:
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
-            # Fetch commits since a specific date
-            # Using Unix timestamp - the test repo has commits around 1265755064 (Feb 2010)
-            # So we use a timestamp between first and last commit
+            # Commits in server_new.export have these committer times:
+            #   master: 1265755295 -> 1265755287 -> 1265755140 -> 1265755064
+            #   branch: 1265755319 -> 1265755111 -> 1265755064
+            # 1265755200 sits comfortably between 1265755140 and 1265755287,
+            # so the shallow points are deterministic across git versions.
             result = c.fetch(
                 self._build_path("/server_new.export"),
                 dest,
-                shallow_since="1265755100",
+                shallow_since="1265755200",
             )
             for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
-            # Verify that shallow commits were created
-            shallow = dest.get_shallow()
-            self.assertIsNotNone(shallow)
-            self.assertGreater(len(shallow), 0)
+            self.assertEqual(
+                dest.get_shallow(),
+                {
+                    b"35e0b59e187dd72a0af294aedffc213eaa4d03ff",
+                    b"da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d",
+                },
+            )
 
     def test_fetch_pack_deepen_not(self) -> None:
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
-            # Fetch excluding commits reachable from a specific ref
             result = c.fetch(
                 self._build_path("/server_new.export"),
                 dest,
@@ -384,27 +389,26 @@ class DulwichClientTestBase:
             )
             for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
-            # Verify that shallow commits were created
-            shallow = dest.get_shallow()
-            self.assertIsNotNone(shallow)
-            self.assertGreater(len(shallow), 0)
+            self.assertEqual(
+                dest.get_shallow(),
+                {b"cbcb465d85de3761d1127430e52c87549f7cd1b9"},
+            )
 
     def test_fetch_pack_deepen_since_and_not(self) -> None:
         c = self._client()
         with repo.Repo(os.path.join(self.gitroot, "dest")) as dest:
-            # Fetch combining deepen-since and deepen-not
             result = c.fetch(
                 self._build_path("/server_new.export"),
                 dest,
-                shallow_since="1265755100",
+                shallow_since="1265755200",
                 shallow_exclude=["refs/heads/branch"],
             )
             for r in result.refs.items():
                 dest.refs.set_if_equals(r[0], None, r[1])
-            # Verify that shallow commits were created
-            shallow = dest.get_shallow()
-            self.assertIsNotNone(shallow)
-            self.assertGreater(len(shallow), 0)
+            self.assertEqual(
+                dest.get_shallow(),
+                {b"da5cd81e1883c62a25bb37c4d1f8ad965b29bf8d"},
+            )
 
     def test_repeat(self) -> None:
         c = self._client()
@@ -521,10 +525,14 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
     def setUp(self) -> None:
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)
-        if check_for_daemon(limit=1):
-            raise SkipTest(
-                f"git-daemon was already running on port {protocol.TCP_GIT_PORT}"
-            )
+        # Bind to a per-test ephemeral port instead of the global 9418 so
+        # parallel test runs and leftover daemons from previous failures
+        # cannot collide. We grab a free port by binding to 0, then close
+        # the probe socket and immediately reuse the number for git-daemon.
+        probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        probe.bind(("localhost", 0))
+        self.port = probe.getsockname()[1]
+        probe.close()
         fd, self.pidfile = tempfile.mkstemp(
             prefix="dulwich-test-git-client", suffix=".pid"
         )
@@ -539,21 +547,36 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             "--enable=receive-pack",
             "--enable=upload-archive",
             "--listen=localhost",
+            f"--port={self.port}",
             "--reuseaddr",
             self.gitroot,
         ]
+        # Redirect daemon output to DEVNULL: we never read it, and leaving
+        # it on PIPE risks the daemon blocking on a full pipe buffer if a
+        # noisy test session ever fills the ~64KB kernel buffer.
         self.process = subprocess.Popen(
             args,
             cwd=self.gitroot,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
-        if not check_for_daemon():
+        if not check_for_daemon(port=self.port):
             raise SkipTest("git-daemon failed to start")
 
     def tearDown(self) -> None:
-        with open(self.pidfile) as f:
-            pid = int(f.read().strip())
+        # If the daemon failed to start it may not have written the pidfile;
+        # fall back to the Popen handle so we still clean up the subprocess
+        # without raising and masking the real test failure.
+        pid = None
+        try:
+            with open(self.pidfile) as f:
+                contents = f.read().strip()
+            if contents:
+                pid = int(contents)
+        except (OSError, ValueError):
+            pass
+        if pid is None:
+            pid = self.process.pid
         if sys.platform == "win32":
             PROCESS_TERMINATE = 1
             handle = ctypes.windll.kernel32.OpenProcess(PROCESS_TERMINATE, False, pid)
@@ -562,14 +585,13 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         else:
             with suppress(OSError):
                 os.kill(pid, signal.SIGKILL)
+            with suppress(OSError):
                 os.unlink(self.pidfile)
         self.process.wait()
-        self.process.stdout.close()
-        self.process.stderr.close()
         CompatTestCase.tearDown(self)
 
     def _client(self):
-        return client.TCPGitClient("localhost")
+        return client.TCPGitClient("localhost", port=self.port)
 
     def _build_path(self, path):
         return path
@@ -586,7 +608,7 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         self.skipTest("skip flaky test; see #1015")
 
 
-@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+@patch("dulwich.client.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
 class DulwichTCPClientTestGitProtov0(DulwichTCPClientTest):
     pass
 
@@ -647,7 +669,7 @@ class DulwichMockSSHClientTest(CompatTestCase, DulwichClientTestBase):
         return self.gitroot + path
 
 
-@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+@patch("dulwich.client.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
 class DulwichMockSSHClientTestGitProtov0(DulwichMockSSHClientTest):
     pass
 
@@ -667,7 +689,7 @@ class DulwichSubprocessClientTest(CompatTestCase, DulwichClientTestBase):
         return self.gitroot + path
 
 
-@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+@patch("dulwich.client.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
 class DulwichSubprocessClientTestGitProtov0(DulwichSubprocessClientTest):
     pass
 
@@ -856,6 +878,6 @@ class DulwichHttpClientTest(CompatTestCase, DulwichClientTestBase):
         raise SkipTest("exporting archives not supported over http")
 
 
-@patch("dulwich.protocol.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
+@patch("dulwich.client.DEFAULT_GIT_PROTOCOL_VERSION_FETCH", new=0)
 class DulwichHttpClientTestGitProtov0(DulwichHttpClientTest):
     pass

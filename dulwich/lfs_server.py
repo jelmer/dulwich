@@ -32,7 +32,7 @@ import json
 import tempfile
 import typing
 from collections.abc import Mapping
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .lfs import LFSStore
 
@@ -50,6 +50,11 @@ def _is_valid_oid(oid: str) -> bool:
 
 class LFSRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler for LFS operations."""
+
+    # Speak HTTP/1.1 so urllib3's keep-alive pool works reliably; without
+    # this the default HTTP/1.0 response would let the client reuse a
+    # connection the server has already closed, causing RemoteDisconnected.
+    protocol_version = "HTTP/1.1"
 
     @property
     def lfs_server(self) -> "LFSServer":
@@ -222,6 +227,7 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
             self.lfs_server.lfs_store.write_object(chunks)
 
         self.send_response(200)
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     def handle_verify(self) -> None:
@@ -253,6 +259,7 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
         # Check if object exists
         if self._object_exists(oid):
             self.send_response(200)
+            self.send_header("Content-Length", "0")
             self.end_headers()
         else:
             self.send_error(404, "Object not found")
@@ -272,7 +279,7 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
             super().log_message(format, *args)
 
 
-class LFSServer(HTTPServer):
+class LFSServer(ThreadingHTTPServer):
     """Simple LFS server for testing."""
 
     def __init__(

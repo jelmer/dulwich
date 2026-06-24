@@ -1260,6 +1260,8 @@ def _handle_upload_pack_tail(
                 pack_data(data)
             elif chan == SIDE_BAND_CHANNEL_PROGRESS:
                 _progress(data)
+            elif chan == SIDE_BAND_CHANNEL_FATAL:
+                raise GitProtocolError(data.decode("utf-8", "replace"))
             else:
                 raise AssertionError(f"Invalid sideband channel {chan}")
     else:
@@ -1891,6 +1893,8 @@ class GitClient:
                         pktline_parser.parse(data)
                 elif chan == SIDE_BAND_CHANNEL_PROGRESS:
                     _progress(data)
+                elif chan == SIDE_BAND_CHANNEL_FATAL:
+                    raise GitProtocolError(data.decode("utf-8", "replace"))
                 else:
                     raise AssertionError(f"Invalid sideband channel {chan}")
         else:

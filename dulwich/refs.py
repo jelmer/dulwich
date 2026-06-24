@@ -436,7 +436,7 @@ class RefsContainer:
           ValueError: if the value is neither a valid sha nor a symref.
         """
         if not (valid_hexsha(ref) or ref.startswith(SYMREF)):
-            raise ValueError(f"{ref!r} must be a valid sha (40 chars) or a symref")
+            raise ValueError(f"{ref!r} must be a valid sha or a symref")
 
     def read_ref(self, refname: Ref) -> bytes | None:
         """Read a reference without following any references.
@@ -1857,7 +1857,7 @@ class locked_ref:
             raise RuntimeError("locked_ref not in context")
 
         if not (valid_hexsha(new_ref) or new_ref.startswith(SYMREF)):
-            raise ValueError(f"{new_ref!r} must be a valid sha (40 chars) or a symref")
+            raise ValueError(f"{new_ref!r} must be a valid sha or a symref")
 
         self._file.seek(0)
         self._file.truncate()

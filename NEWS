@@ -85,6 +85,11 @@
 
  * Support ``http.postBuffer``. (Jelmer Vernooĳ, #2248)
 
+ * SECURITY: Canonicalize file modes to ``0o644``/``0o755`` before ``chmod``
+   on checkout and patch apply, matching git. An untrusted tree entry or
+   patch ``new file mode`` could otherwise set setuid/setgid/sticky or
+   world-writable bits on a materialized file. (netliomax25-code)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

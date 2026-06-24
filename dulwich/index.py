@@ -1876,7 +1876,11 @@ def build_file_from_blob(
             f.write(contents)
 
         if honor_filemode:
-            os.chmod(target_path, mode)
+            # Canonicalize to the permission bits git honors (0o644/0o755).
+            # The mode comes from a tree/index entry, which for an untrusted
+            # repository can carry setuid/setgid/sticky or world-writable bits;
+            # git reduces every regular-file mode to 0o644 or 0o755 on checkout.
+            os.chmod(target_path, cleanup_mode(mode))
 
     return os.lstat(target_path)
 

@@ -1411,7 +1411,12 @@ def _apply_rename_or_copy(
         - ``original_lines``: Content lines if hunks need to be applied, None otherwise
         - ``should_continue``: True to skip to next patch, False to continue processing
     """
-    from .index import ConflictedIndexEntry, IndexEntry, index_entry_from_stat
+    from .index import (
+        ConflictedIndexEntry,
+        IndexEntry,
+        cleanup_mode,
+        index_entry_from_stat,
+    )
 
     # Strip path components
     src_stripped = src_path
@@ -1471,7 +1476,7 @@ def _apply_rename_or_copy(
         with open(dst_fs_path, "wb") as f:
             f.write(content)
         if patch.new_mode is not None:
-            os.chmod(dst_fs_path, patch.new_mode)
+            os.chmod(dst_fs_path, cleanup_mode(patch.new_mode))
 
     # Update index
     index = r.open_index(config=config)
@@ -1535,7 +1540,12 @@ def apply_patches(
     Raises:
         ValueError: If patch cannot be applied
     """
-    from .index import ConflictedIndexEntry, IndexEntry, index_entry_from_stat
+    from .index import (
+        ConflictedIndexEntry,
+        IndexEntry,
+        cleanup_mode,
+        index_entry_from_stat,
+    )
 
     if config is None:
         config = r.get_config_stack()
@@ -1635,7 +1645,7 @@ def apply_patches(
                     with open(fs_path, "wb") as f:
                         f.write(binary_content)
                     if patch.new_mode is not None:
-                        os.chmod(fs_path, patch.new_mode)
+                        os.chmod(fs_path, cleanup_mode(patch.new_mode))
 
                 # Update index
                 index = r.open_index(config=config)
@@ -1803,7 +1813,7 @@ def apply_patches(
 
                 # Update file mode if specified
                 if patch.new_mode is not None:
-                    os.chmod(fs_path, patch.new_mode)
+                    os.chmod(fs_path, cleanup_mode(patch.new_mode))
 
             # Update index
             index = r.open_index(config=config)

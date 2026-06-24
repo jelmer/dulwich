@@ -23,6 +23,8 @@
 
 import os
 import shutil
+import stat
+import sys
 import tempfile
 from io import BytesIO, StringIO
 from typing import NoReturn
@@ -51,7 +53,7 @@ from dulwich.patch import (
 from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit
 
-from . import DependencyMissing, SkipTest, TestCase
+from . import DependencyMissing, SkipTest, TestCase, skipIf
 
 
 class WriteCommitPatchTests(TestCase):
@@ -1576,3 +1578,24 @@ class ApplyPatchesPathTests(TestCase):
         )
         apply_patches(r, parse_unified_diff(diff), strip=1)
         self.assertTrue(os.path.exists(os.path.join(r.path, "sub", "x")))
+
+    @skipIf(sys.platform == "win32", "Requires POSIX file modes")
+    def test_canonicalizes_new_file_mode(self) -> None:
+        # The mode in a patch's "new file mode" header is attacker-controlled
+        # (e.g. an emailed patch applied via git am). Like git, apply_patches
+        # must only honor the 0o644/0o755 distinction, never setuid/setgid or
+        # world-writable bits.
+        r = self._make_repo()
+        diff = (
+            b"diff --git a/x b/x\n"
+            b"new file mode 104777\n"
+            b"--- /dev/null\n"
+            b"+++ b/x\n"
+            b"@@ -0,0 +1 @@\n"
+            b"+owned\n"
+        )
+        apply_patches(r, parse_unified_diff(diff), strip=1)
+        mode = os.lstat(os.path.join(r.path, "x")).st_mode
+        self.assertEqual(stat.S_IMODE(mode), 0o755)
+        self.assertFalse(mode & stat.S_ISUID)
+        self.assertFalse(mode & stat.S_IWOTH)

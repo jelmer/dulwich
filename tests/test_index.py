@@ -627,6 +627,36 @@ class BuildIndexTests(TestCase):
             self.assertFalse(os.path.exists(os.path.join(repo.path, ".git", "a")))
             self.assertFalse(os.path.exists(os.path.join(repo.path, "c", "e")))
 
+    @skipIf(sys.platform == "win32", "Requires POSIX file modes")
+    def test_canonicalize_file_mode(self) -> None:
+        # A tree entry's mode is attacker-controlled for an untrusted repo.
+        # git reduces every regular-file mode to 0o644/0o755 on checkout, so
+        # setuid/setgid/sticky and world-writable bits from a hostile tree
+        # must never reach the working tree.
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            blob = Blob.from_string(b"#!/bin/sh\n")
+            tree = Tree()
+            # setuid + world-writable executable
+            tree[b"evil"] = (0o104777, blob.id)
+            # world-writable, non-executable
+            tree[b"plain"] = (0o100666, blob.id)
+            repo.object_store.add_objects([(o, None) for o in [blob, tree]])
+
+            build_index_from_tree(
+                repo.path, repo.index_path(), repo.object_store, tree.id
+            )
+
+            evil_mode = os.lstat(os.path.join(repo.path, "evil")).st_mode
+            self.assertEqual(stat.S_IMODE(evil_mode), 0o755)
+            self.assertFalse(evil_mode & stat.S_ISUID)
+            self.assertFalse(evil_mode & stat.S_IWOTH)
+
+            plain_mode = os.lstat(os.path.join(repo.path, "plain")).st_mode
+            self.assertEqual(stat.S_IMODE(plain_mode), 0o644)
+
     def test_ntfs_malicious_entry_aborts_checkout(self) -> None:
         # A tree authored on POSIX containing an entry that would resolve to
         # ``.git`` on NTFS (a ``.git\`` prefix, the ``git~1`` 8.3 short

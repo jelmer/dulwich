@@ -431,7 +431,7 @@ class BaseObjectStore:
             and not ref.endswith(PEELED_TAG_SUFFIX)
         ]
 
-    def contains_loose(self, sha: ObjectID | RawObjectID) -> bool:
+    def contains_loose(self, sha: ObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is loose."""
         raise NotImplementedError(self.contains_loose)
 
@@ -439,7 +439,7 @@ class BaseObjectStore:
         """Check if a particular object is present by SHA1 and is packed."""
         return False  # Default implementation for stores that don't support packing
 
-    def __contains__(self, sha1: ObjectID | RawObjectID) -> bool:
+    def __contains__(self, sha1: ObjectID) -> bool:
         """Check if a particular object is present by SHA1.
 
         This method makes no distinction between loose and packed objects.
@@ -1046,7 +1046,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         except KeyError:
             return False
 
-    def __contains__(self, sha: ObjectID | RawObjectID) -> bool:
+    def __contains__(self, sha: ObjectID) -> bool:
         """Check if a particular object is present by SHA1.
 
         This method makes no distinction between loose and packed objects.
@@ -1247,7 +1247,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         """Iterate over the SHAs of all loose objects."""
         raise NotImplementedError(self._iter_loose_objects)
 
-    def _get_loose_object(self, sha: ObjectID | RawObjectID) -> ShaFile | None:
+    def _get_loose_object(self, sha: ObjectID) -> ShaFile | None:
         raise NotImplementedError(self._get_loose_object)
 
     def delete_loose_object(self, sha: ObjectID) -> None:
@@ -1377,7 +1377,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         yield from self._iter_loose_objects()
         yield from self._iter_alternate_objects()
 
-    def contains_loose(self, sha: ObjectID | RawObjectID) -> bool:
+    def contains_loose(self, sha: ObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is loose.
 
         This does not check alternates.
@@ -1392,9 +1392,10 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         Returns: tuple with numeric type and object contents.
         """
         sha: RawObjectID
+        hexsha: ObjectID | None
         if len(name) == self.object_format.hex_length:
             sha = hex_to_sha(ObjectID(name))
-            hexsha = name
+            hexsha = cast(ObjectID, name)
         elif len(name) == self.object_format.oid_length:
             sha = RawObjectID(name)
             hexsha = None
@@ -1931,12 +1932,12 @@ class DiskObjectStore(PackBasedObjectStore):
         self._enforce_packed_git_limit()
         return new_packs
 
-    def _get_shafile_path(self, sha: ObjectID | RawObjectID) -> str:
+    def _get_shafile_path(self, sha: ObjectID) -> str:
         # Reject anything that is neither a valid hex object id nor a raw
         # binary oid before building a path. Otherwise a malformed id (e.g.
         # one containing path separators) would be joined into a filename
         # that escapes the objects directory.
-        if not valid_hexsha(sha) and len(sha) != self.object_format.oid_length:
+        if not valid_hexsha(sha):
             raise ValueError(f"Invalid object id {sha!r}")
         # Check from object dir
         return hex_to_filename(os.fspath(self.path), sha)
@@ -1976,8 +1977,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         return count
 
-    def _get_loose_object(self, sha: ObjectID | RawObjectID) -> ShaFile | None:
-        path = self._get_shafile_path(sha)
+    def _get_loose_object(self, sha: ObjectID) -> ShaFile | None:
         try:
             # Load the object from path with SHA and hash algorithm from object store
             # Convert to hex ObjectID if needed
@@ -1985,6 +1985,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 hex_sha: ObjectID = sha_to_hex(RawObjectID(sha))
             else:
                 hex_sha = ObjectID(sha)
+            path = self._get_shafile_path(hex_sha)
             return ShaFile.from_path(path, hex_sha, object_format=self.object_format)
         except FileNotFoundError:
             return None
@@ -2643,8 +2644,6 @@ class DiskObjectStore(PackBasedObjectStore):
                     isinstance(ref, bytes) and len(ref) == self.object_format.oid_length
                 ):
                     # Binary SHA, convert to hex ObjectID
-                    from .objects import sha_to_hex
-
                     commit_ids.append(sha_to_hex(RawObjectID(ref)))
                 else:
                     # Assume it's already correct format
@@ -2770,7 +2769,7 @@ class MemoryObjectStore(PackCapableObjectStore):
         else:
             raise ValueError(f"Invalid sha {sha!r}")
 
-    def contains_loose(self, sha: ObjectID | RawObjectID) -> bool:
+    def contains_loose(self, sha: ObjectID) -> bool:
         """Check if a particular object is present by SHA1 and is loose."""
         return self._to_hexsha(sha) in self._data
 
@@ -3558,7 +3557,7 @@ class OverlayObjectStore(BaseObjectStore):
                 return True
         return False
 
-    def contains_loose(self, sha: ObjectID | RawObjectID) -> bool:
+    def contains_loose(self, sha: ObjectID) -> bool:
         """Check if an object is loose in any base store.
 
         Args:
@@ -3591,7 +3590,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
         """Iterate over the SHAs of all loose objects."""
         return iter([])
 
-    def _get_loose_object(self, sha: ObjectID | RawObjectID) -> None:
+    def _get_loose_object(self, sha: ObjectID) -> None:
         return None
 
     def delete_loose_object(self, sha: ObjectID) -> None:

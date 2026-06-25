@@ -695,6 +695,54 @@ class BuildIndexTests(TestCase):
             self.assertTrue(os.path.exists(colon_path))
             self.assertFileContents(colon_path, b"foo\n")
 
+    @skipIf(not can_symlink(), "Requires symlink support")
+    def test_regular_file_replaces_symlink(self) -> None:
+        # A symlink left in the work tree by an earlier checkout must be
+        # replaced when the same path becomes a regular file, not written
+        # through. Otherwise a tree that first materializes ``foo`` as a
+        # symlink pointing outside the work tree and then as a regular file
+        # would overwrite the link target, an arbitrary file. C git never
+        # writes a tracked file through a symlink.
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        outside_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside_dir)
+        outside_file = os.path.join(outside_dir, "secret")
+        with open(outside_file, "wb") as f:
+            f.write(b"original")
+
+        with Repo.init(repo_dir) as repo:
+            link = Blob.from_string(os.fsencode(outside_file))
+            regular = Blob.from_string(b"payload")
+
+            tree_link = Tree()
+            tree_link[b"foo"] = (stat.S_IFLNK, link.id)
+            tree_file = Tree()
+            tree_file[b"foo"] = (stat.S_IFREG | 0o644, regular.id)
+            repo.object_store.add_objects(
+                [(o, None) for o in [link, regular, tree_link, tree_file]]
+            )
+
+            # First checkout leaves ``foo`` as a symlink pointing outside.
+            build_index_from_tree(
+                repo.path, repo.index_path(), repo.object_store, tree_link.id
+            )
+            foo_path = os.path.join(repo.path, "foo")
+            self.assertTrue(os.path.islink(foo_path))
+
+            # Second checkout makes ``foo`` a regular file.
+            build_index_from_tree(
+                repo.path, repo.index_path(), repo.object_store, tree_file.id
+            )
+
+            # The link target outside the work tree is untouched and the
+            # path is now a real file holding the blob content.
+            self.assertFalse(os.path.islink(foo_path))
+            self.assertFileContents(foo_path, b"payload")
+            with open(outside_file, "rb") as f:
+                self.assertEqual(f.read(), b"original")
+
     def test_nonempty(self) -> None:
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)

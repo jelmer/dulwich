@@ -1866,6 +1866,13 @@ def build_file_from_blob(
         else:
             (symlink_fn or symlink)(contents, target_path)
     else:
+        if oldstat is not None and stat.S_ISLNK(oldstat.st_mode):
+            # A symlink left at the target path must not be written through.
+            # open(..., "wb") would follow it and clobber whatever it points
+            # at, possibly outside the work tree. Replace it with a fresh
+            # regular file, like git does on checkout.
+            _remove_file_with_readonly_handling(target_path)
+            oldstat = None
         if oldstat is not None and oldstat.st_size == len(contents):
             with open(target_path, "rb") as f:
                 if f.read() == contents:

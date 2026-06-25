@@ -1758,12 +1758,16 @@ def format_timezone(offset: int, unnecessary_negative_timezone: bool = False) ->
     """
     if offset % 60 != 0:
         raise ValueError("Unable to handle non-minute offset.")
-    if offset < 0 or unnecessary_negative_timezone:
+    negative = offset < 0
+    sign = "+"
+    if negative:
         sign = "-"
         offset = -offset
-    else:
-        sign = "+"
-    return ("%c%02d%02d" % (sign, offset / 3600, (offset / 60) % 60)).encode("ascii")  # noqa: UP031
+    timezone = (offset // 3600) * 100 + (offset // 60) % 60
+    if unnecessary_negative_timezone and not negative:
+        sign = "-"
+        timezone = -timezone
+    return ("%c%04d" % (sign, timezone)).encode("ascii")  # noqa: UP031
 
 
 def parse_time_entry(

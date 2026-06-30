@@ -22,9 +22,17 @@
 """Tests for diff functionality."""
 
 import io
+import os
+import shutil
+import tempfile
 import unittest
 
-from dulwich.diff import ColorizedDiffStream
+from dulwich.diff import (
+    ColorizedDiffStream,
+    diff_working_tree_to_tree,
+)
+from dulwich.objects import Blob, Commit, Tree
+from dulwich.repo import Repo
 
 from . import TestCase
 
@@ -182,3 +190,106 @@ class MockColorizedDiffStreamTests(TestCase):
         # Test that some output was produced
         result = self.output.getvalue()
         self.assertGreaterEqual(len(result), 0)
+
+
+class WorkingTreeDiffPathTraversalTests(TestCase):
+    """Working-tree diffs must not read files outside the work tree.
+
+    A tree from an untrusted commit may carry an entry named ``..`` (or
+    ``.git``), so joining it onto the work-tree root would otherwise let the
+    diff read an arbitrary file. Like C git, the invalid path is not touched on
+    the filesystem; its work-tree side is treated as absent and the rest of the
+    diff is still produced.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.repo_path = os.path.join(self.test_dir, "work")
+        os.mkdir(self.repo_path)
+        self.repo = Repo.init(self.repo_path)
+        self.addCleanup(self.repo.close)
+
+    def _commit_tree(self, tree):
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = commit.committer = b"Test <test@example.com>"
+        commit.author_time = commit.commit_time = 1
+        commit.author_timezone = commit.commit_timezone = 0
+        commit.message = b"x"
+        self.repo.object_store.add_object(commit)
+        return commit
+
+    def test_diff_does_not_escape_work_tree(self):
+        # A secret file living next to the work tree, not in it.
+        secret = os.path.join(self.test_dir, "secret.txt")
+        with open(secret, "wb") as f:
+            f.write(b"SECRET-OUTSIDE-WORKTREE")
+
+        # Craft a tree whose entry name is ".." so the path would resolve to
+        # ../secret.txt outside the work tree.
+        old_blob = Blob.from_string(b"OLD-COMMITTED-CONTENT\n")
+        self.repo.object_store.add_object(old_blob)
+        inner = Tree()
+        inner.add(b"secret.txt", 0o100644, old_blob.id)
+        self.repo.object_store.add_object(inner)
+        outer = Tree()
+        outer.add(b"..", 0o040000, inner.id)
+        # Also include a legitimate path so we can confirm the diff continues.
+        good_blob = Blob.from_string(b"old\n")
+        self.repo.object_store.add_object(good_blob)
+        outer.add(b"a", 0o100644, good_blob.id)
+        self.repo.object_store.add_object(outer)
+        commit = self._commit_tree(outer)
+
+        with open(os.path.join(self.repo_path, "a"), "wb") as f:
+            f.write(b"new\n")
+
+        out = io.BytesIO()
+        diff_working_tree_to_tree(self.repo, out, commit.id)
+
+        # Like C git: the ".." entry is shown as removed against its committed
+        # blob (the on-disk secret is never read), and the legitimate file
+        # still diffs.
+        self.assertEqual(
+            b"diff --git a/../secret.txt b/../secret.txt\n"
+            b"deleted file mode 100644\n"
+            b"index 9cd170c..0000000\n"
+            b"--- a/../secret.txt\n"
+            b"+++ /dev/null\n"
+            b"@@ -1 +0,0 @@\n"
+            b"-OLD-COMMITTED-CONTENT\n"
+            b"diff --git a/a b/a\n"
+            b"index 3367afd..3e75765 100644\n"
+            b"--- a/a\n"
+            b"+++ b/a\n"
+            b"@@ -1 +1 @@\n"
+            b"-old\n"
+            b"+new\n",
+            out.getvalue(),
+        )
+
+    def test_diff_allows_normal_path(self):
+        blob = Blob.from_string(b"old\n")
+        self.repo.object_store.add_object(blob)
+        tree = Tree()
+        tree.add(b"a", 0o100644, blob.id)
+        self.repo.object_store.add_object(tree)
+        commit = self._commit_tree(tree)
+
+        with open(os.path.join(self.repo_path, "a"), "wb") as f:
+            f.write(b"new\n")
+
+        out = io.BytesIO()
+        diff_working_tree_to_tree(self.repo, out, commit.id)
+        self.assertEqual(
+            b"diff --git a/a b/a\n"
+            b"index 3367afd..3e75765 100644\n"
+            b"--- a/a\n"
+            b"+++ b/a\n"
+            b"@@ -1 +1 @@\n"
+            b"-old\n"
+            b"+new\n",
+            out.getvalue(),
+        )

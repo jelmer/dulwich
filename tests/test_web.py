@@ -38,6 +38,7 @@ from dulwich.web import (
     HTTP_FORBIDDEN,
     HTTP_NOT_FOUND,
     HTTP_OK,
+    ChunkReader,
     GunzipFilter,
     HTTPGitApplication,
     HTTPGitRequest,
@@ -435,6 +436,42 @@ class LengthLimitedFileTestCase(TestCase):
         self.assertEqual(b"fo", f.read(2))
         self.assertEqual(b"o", f.read(2))
         self.assertEqual(b"", f.read())
+
+
+class ChunkReaderTestCase(TestCase):
+    @staticmethod
+    def _encode(chunks: list[bytes]) -> bytes:
+        parts = []
+        for chunk in chunks:
+            parts.append(b"%x\r\n" % len(chunk) + chunk + b"\r\n")
+        parts.append(b"0\r\n\r\n")
+        return b"".join(parts)
+
+    def test_single_chunk(self) -> None:
+        r = ChunkReader(BytesIO(self._encode([b"foobar"])))
+        self.assertEqual(b"foobar", r.read(6))
+
+    def test_reassembles_across_chunks(self) -> None:
+        data = b"abcdefghijklmnopqrstuvwxyz0123456789"
+        chunks = [data[i : i + 3] for i in range(0, len(data), 3)]
+        r = ChunkReader(BytesIO(self._encode(chunks)))
+        out = b""
+        for n in (1, 5, 4, 10, 100):
+            out += r.read(n)
+        self.assertEqual(data, out)
+
+    def test_read_past_end(self) -> None:
+        r = ChunkReader(BytesIO(self._encode([b"foo"])))
+        self.assertEqual(b"foo", r.read(100))
+        self.assertEqual(b"", r.read(100))
+
+    def test_many_small_chunks(self) -> None:
+        # A body split into a large number of single-byte chunks must still
+        # reassemble correctly. Reading it used to be quadratic in the number
+        # of chunks because the buffered length was recomputed on every step.
+        count = 20000
+        r = ChunkReader(BytesIO(self._encode([b"x"] * count)))
+        self.assertEqual(b"x" * count, r.read(count))
 
 
 class HTTPGitRequestTestCase(WebTestCase):

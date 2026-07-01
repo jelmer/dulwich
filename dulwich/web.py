@@ -470,6 +470,7 @@ class ChunkReader:
         """
         self._iter = _chunk_iter(f)
         self._buffer: list[bytes] = []
+        self._buffered = 0
 
     def read(self, n: int) -> bytes:
         """Read n bytes from the chunked stream.
@@ -480,14 +481,17 @@ class ChunkReader:
         Returns:
           Up to n bytes of data
         """
-        while sum(map(len, self._buffer)) < n:
+        while self._buffered < n:
             try:
-                self._buffer.append(next(self._iter))
+                chunk = next(self._iter)
             except StopIteration:
                 break
+            self._buffer.append(chunk)
+            self._buffered += len(chunk)
         f = b"".join(self._buffer)
         ret = f[:n]
         self._buffer = [f[n:]]
+        self._buffered = len(f) - len(ret)
         return ret
 
 

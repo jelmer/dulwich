@@ -5661,18 +5661,17 @@ def checkout(
                     # Create directories if needed
                     os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-                    # Write the file content
+                    # Write the file content. Route through build_file_from_blob
+                    # rather than a raw os.open: it replaces a symlink left at the
+                    # target instead of following it, so a malicious repository
+                    # cannot use a symlink to write outside the work tree.
                     if stat.S_ISREG(mode):
                         # Apply checkout filters (smudge)
                         if blob_normalizer:
                             obj = blob_normalizer.checkout_normalize(obj, path)
-
-                        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-                        if sys.platform == "win32":
-                            flags |= os.O_BINARY
-
-                        with os.fdopen(os.open(file_path, flags, mode), "wb") as f:
-                            f.write(obj.data)
+                        build_file_from_blob(obj, mode, file_path)
+                    elif stat.S_ISLNK(mode):
+                        build_file_from_blob(obj, mode, file_path)
 
                     # Update the index
                     worktree.stage(path, config=r.get_config_stack())

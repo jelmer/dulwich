@@ -119,6 +119,29 @@ class BaseProtocolTests:
         self.rin.seek(0)
         self.assertRaises(GitProtocolError, self.proto.read_pkt_line)
 
+    def test_read_pkt_line_non_hex_length(self) -> None:
+        # git's packet_length rejects any non-hex length byte; int(_, 16)
+        # would silently accept these (and the "0x" form) as a length.
+        for prefix in (b"+abc", b"0x0e", b" abc"):
+            self.rin.seek(0)
+            self.rin.truncate()
+            self.rin.write(prefix + b"payload")
+            self.rin.seek(0)
+            self.assertRaises(GitProtocolError, self.proto.read_pkt_line)
+
+    def test_read_pkt_line_negative_length(self) -> None:
+        # A "-"-prefixed length parses to a negative int; read(size - 4) would
+        # then be read() with a negative argument and consume the whole stream.
+        self.rin.write(b"-004" + b"A" * 4096)
+        self.rin.seek(0)
+        self.assertRaises(GitProtocolError, self.proto.read_pkt_line)
+
+    def test_read_pkt_line_short_length(self) -> None:
+        # 0002/0003 are not valid data-line lengths (read(size - 4) < 0).
+        self.rin.write(b"0003a")
+        self.rin.seek(0)
+        self.assertRaises(GitProtocolError, self.proto.read_pkt_line)
+
     def test_write_sideband(self) -> None:
         self.proto.write_sideband(3, b"bloe")
         self.assertEqual(self.rout.getvalue(), b"0009\x03bloe")
@@ -351,6 +374,17 @@ class PktLineParserTests(TestCase):
         parser.parse(b"0005z0006aba")
         self.assertEqual(pktlines, [b"z", b"ab"])
         self.assertEqual(b"a", parser.get_tail())
+
+    def test_negative_length(self) -> None:
+        # A negative length whose magnitude exceeds the buffer made
+        # buf = buf[size:] a no-op, so parse() looped forever. It now rejects
+        # the non-hex prefix instead of hanging.
+        parser = PktLineParser(lambda pkt: None)
+        self.assertRaises(GitProtocolError, parser.parse, b"-fff" + b"C" * 8)
+
+    def test_non_hex_length(self) -> None:
+        parser = PktLineParser(lambda pkt: None)
+        self.assertRaises(GitProtocolError, parser.parse, b"+abcpayload")
 
 
 class CapabilitiesTests(TestCase):

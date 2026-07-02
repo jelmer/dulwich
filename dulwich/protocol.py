@@ -377,6 +377,33 @@ def pkt_seq(*seq: bytes | None) -> bytes:
     return b"".join([pkt_line(s) for s in seq]) + pkt_line(None)
 
 
+_HEX_DIGITS = frozenset(b"0123456789abcdefABCDEF")
+
+
+def _parse_pkt_line_length(sizestr: bytes) -> int:
+    """Parse the four-byte length prefix of a pkt-line.
+
+    Mirrors git's ``packet_length()``: the prefix must be exactly four
+    hexadecimal digits. ``int(sizestr, 16)`` on its own also accepts a leading
+    ``+``/``-``, surrounding whitespace, an ``0x`` prefix and digit-group
+    underscores, none of which git allows. Accepting a ``-``-prefixed prefix is
+    the dangerous case: the resulting negative length turns the following
+    ``read(size - 4)`` into a ``read()`` with a negative argument (which reads
+    the rest of the stream into memory) and makes the incremental
+    :class:`PktLineParser` loop without ever consuming its buffer.
+
+    Args:
+      sizestr: The four raw length bytes read from the wire.
+    Returns: The length encoded by the prefix.
+
+    Raises:
+      GitProtocolError: if the prefix is not four hexadecimal digits.
+    """
+    if len(sizestr) != 4 or not _HEX_DIGITS.issuperset(sizestr):
+        raise GitProtocolError(f"Invalid pkt-line length prefix: {sizestr!r}")
+    return int(sizestr, 16)
+
+
 class Protocol:
     """Class for interacting with a remote git process over the wire.
 
@@ -464,12 +491,14 @@ class Protocol:
             sizestr = read(4)
             if not sizestr:
                 raise HangupException
-            size = int(sizestr, 16)
+            size = _parse_pkt_line_length(sizestr)
             if size == 0 or size == 1:  # flush-pkt or delim-pkt
                 if self.report_activity:
                     self.report_activity(4, "read")
                 logger.debug("git< %s", sizestr.decode("ascii"))
                 return None
+            if size < 4:
+                raise GitProtocolError(f"Invalid pkt-line length: {size:04x}")
             if self.report_activity:
                 self.report_activity(size, "read")
             pkt_contents = read(size - 4)
@@ -871,10 +900,12 @@ class PktLineParser:
         if len(buf) < 4:
             return
         while len(buf) >= 4:
-            size = int(buf[:4], 16)
+            size = _parse_pkt_line_length(buf[:4])
             if size == 0:
                 self.handle_pkt(None)
                 buf = buf[4:]
+            elif size < 4:
+                raise GitProtocolError(f"Invalid pkt-line length: {size:04x}")
             elif size <= len(buf):
                 self.handle_pkt(buf[4:size])
                 buf = buf[size:]

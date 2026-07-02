@@ -583,7 +583,7 @@ class GitClientTests(TestCase):
             b"0070310ca9477129b8586fa2afc779c1f57cf64bba6c "
             b"refs/heads/master\x00report-status delete-refs ofs-delta push-options\n"
             b"0000000eunpack ok\n"
-            b"001aok refs/heads/blah12\n"
+            b"0019ok refs/heads/blah12\n"
             b"0000"
         )
         self.rin.seek(0)

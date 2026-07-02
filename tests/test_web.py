@@ -649,3 +649,29 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
             MinimalistWSGIInputStream2(zstream.read()),
             zlength,
         )
+
+    def test_decompression_bomb_capped(self) -> None:
+        """A small gzip body must not decompress past the configured cap."""
+        cap = 4096
+        captured = {}
+
+        def app(environ, start_response):
+            data = b""
+            while True:
+                chunk = environ["wsgi.input"].read(1024)
+                if not chunk:
+                    break
+                data += chunk
+            captured["read"] = data
+            return []
+
+        raw = b"\x00" * (1024 * 1024)
+        zstream, zlength = self._get_zstream(raw)
+        self.assertLess(zlength, cap)
+        environ = {
+            "wsgi.input": zstream,
+            "HTTP_CONTENT_ENCODING": "gzip",
+            "CONTENT_LENGTH": str(zlength),
+        }
+        GunzipFilter(app, max_decompressed_size=cap)(environ, None)
+        self.assertEqual(cap, len(captured["read"]))

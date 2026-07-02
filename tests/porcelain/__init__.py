@@ -4976,6 +4976,44 @@ class CheckoutTests(PorcelainTestCase):
         hook = os.path.join(self.repo.path, ".git", "hooks", "post-checkout")
         self.assertFalse(os.path.exists(hook))
 
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_checkout_paths_replaces_symlink_target(self) -> None:
+        # A path-specific checkout must not follow a symlink already present at
+        # the target path. Otherwise a malicious tree that first lands a symlink
+        # pointing outside the work tree, then a regular file at the same path,
+        # could write attacker content anywhere the user can write.
+        outside = os.path.join(self.test_dir, "outside")
+        with open(outside, "w") as f:
+            f.write("original\n")
+
+        file_blob = Blob.from_string(b"payload\n")
+        file_tree = Tree()
+        file_tree.add(b"trigger", 0o100644, file_blob.id)
+        self.repo.object_store.add_object(file_blob)
+        self.repo.object_store.add_object(file_tree)
+        file_sha = self.repo.get_worktree().commit(
+            message=b"regular file",
+            tree=file_tree.id,
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        # Simulate an attacker-controlled work tree that already carries a
+        # symlink at the path about to be restored, pointing outside the repo.
+        trigger = os.path.join(self.repo.path, "trigger")
+        os.symlink(os.path.join("..", "outside"), trigger)
+        self.assertTrue(os.path.islink(trigger))
+
+        porcelain.checkout(self.repo, file_sha, paths=[b"trigger"])
+
+        # The file outside the work tree must be untouched, and the work tree
+        # path must now be a regular file holding the payload.
+        with open(outside) as f:
+            self.assertEqual("original\n", f.read())
+        self.assertFalse(os.path.islink(trigger))
+        with open(trigger) as f:
+            self.assertEqual("payload\n", f.read())
+
     def test_checkout_to_head(self) -> None:
         new_sha = self._commit_something_wrong()
 

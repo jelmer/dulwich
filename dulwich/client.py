@@ -4719,7 +4719,10 @@ class AbstractHttpGitClient(GitClient):
         return size
 
     def _smart_request(
-        self, service: str, url: str, data: bytes | Iterator[bytes] | None
+        self,
+        service: str,
+        url: str,
+        data: bytes | Iterator[bytes] | None,
     ) -> tuple["HTTPResponse", Callable[[int], bytes]]:
         """Send a 'smart' HTTP request.
 
@@ -5203,6 +5206,37 @@ def _wrap_urllib3_exceptions(
     return wrapper
 
 
+class _IteratorReader:
+    """Read-only file-like adapter over an iterator of bytes.
+
+    urllib3 treats a file-like body specially: it calls ``read(blocksize)``
+    and emits one HTTP chunked-transfer frame per read, so wire framing
+    tracks the connection's blocksize rather than the caller's yield
+    boundaries. That matters because ``PackChunkGenerator`` yields many very
+    small pieces (object headers, zlib intermediates); handing that iterator
+    to urllib3 directly produces thousands of tiny HTTP chunks, which is
+    inefficient and has been observed to trigger server-side rejections on
+    large pushes. See https://github.com/jelmer/dulwich/issues/2248.
+    """
+
+    def __init__(self, chunks: Iterator[bytes]) -> None:
+        self._chunks = chunks
+        self._buf = b""
+
+    def read(self, size: int = -1) -> bytes:
+        if size < 0:
+            parts = [self._buf, *self._chunks]
+            self._buf = b""
+            return b"".join(parts)
+        while len(self._buf) < size:
+            try:
+                self._buf += next(self._chunks)
+            except StopIteration:
+                break
+        out, self._buf = self._buf[:size], self._buf[size:]
+        return out
+
+
 class Urllib3HttpGitClient(AbstractHttpGitClient):
     """HTTP Git client using urllib3.
 
@@ -5345,7 +5379,13 @@ class Urllib3HttpGitClient(AbstractHttpGitClient):
             if data is None:
                 resp = self.pool_manager.request("GET", url, **request_kwargs)  # type: ignore[arg-type]
             else:
-                request_kwargs["body"] = data
+                # Wrap iterators so urllib3 drives the body with fixed-size
+                # reads (one HTTP chunk per read) rather than one HTTP chunk
+                # per source yield -- see _IteratorReader.
+                body: bytes | _IteratorReader = (
+                    data if isinstance(data, bytes) else _IteratorReader(data)
+                )
+                request_kwargs["body"] = body
                 resp = self.pool_manager.request("POST", url, **request_kwargs)  # type: ignore[arg-type]
         except urllib3.exceptions.HTTPError as e:
             raise GitProtocolError(str(e)) from e

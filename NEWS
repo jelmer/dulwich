@@ -94,8 +94,8 @@
    in path-restricted ``porcelain.checkout(paths=...)`` instead of a raw
    ``os.open``. The old path followed a symlink left at the target, so a
    crafted repository could write attacker content outside the work tree
-   (e.g. into ``.git/hooks``) on ``checkout``. (reported by zx (Jace),
-   Jelmer Vernooĳ)
+   (e.g. into ``.git/hooks``) on ``checkout``. (reported by zx (Jace) and
+   Houlton McGuinn, Jelmer Vernooĳ)
 
 1.2.6	2026-05-31
 

@@ -97,6 +97,12 @@
    (e.g. into ``.git/hooks``) on ``checkout``. (reported by zx (Jace) and
    Houlton McGuinn, Jelmer Vernooĳ)
 
+ * SECURITY(GHSA-5fqc-mrg8-w798): Build the temporary index for
+   ``filter-branch --index-filter`` in memory instead of materializing tree
+   entries into CWD. Persisted entries between commits let a symlink from
+   an ancestor commit redirect a descendant's writes outside the work tree.
+   (reported by zx (Jace), Jelmer Vernooĳ)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

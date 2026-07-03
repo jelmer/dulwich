@@ -21,11 +21,14 @@
 
 """Tests for dulwich.filter_branch."""
 
+import os
+import stat
+import tempfile
 import unittest
 
 from dulwich.filter_branch import CommitFilter, filter_refs
 from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import ZERO_SHA, Commit, Tree
+from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
 from dulwich.refs import DictRefsContainer
 
 
@@ -125,6 +128,71 @@ class CommitFilterTests(unittest.TestCase):
 
         new_parent = self.store[new_parent_sha]
         self.assertEqual(new_parent.author, b"New Author <new@example.com>")
+
+    def test_index_filter_does_not_touch_working_dir(self):
+        """Index filter must not materialize files to the working directory.
+
+        Regression test for a symlink traversal vulnerability: previously
+        ``_apply_index_filter`` called ``build_index_from_tree(".", ...)``,
+        which wrote tree entries into the caller's CWD and left them there
+        across commits. When an ancestor commit contained a symlink named
+        ``evil`` and a descendant commit contained a regular file at
+        ``evil/payload``, processing the descendant would write through
+        the persisted symlink to arbitrary filesystem locations.
+        """
+        payload = Blob.from_string(b"attacker content")
+        self.store.add_object(payload)
+
+        with tempfile.TemporaryDirectory() as target_dir:
+            symlink_blob = Blob.from_string(target_dir.encode())
+            self.store.add_object(symlink_blob)
+
+            ancestor_tree = Tree()
+            ancestor_tree.add(b"evil", stat.S_IFLNK | 0o777, symlink_blob.id)
+            self.store.add_object(ancestor_tree)
+
+            evil_subtree = Tree()
+            evil_subtree.add(b"payload", stat.S_IFREG | 0o644, payload.id)
+            self.store.add_object(evil_subtree)
+            descendant_tree = Tree()
+            descendant_tree.add(b"evil", stat.S_IFDIR, evil_subtree.id)
+            self.store.add_object(descendant_tree)
+
+            ancestor = Commit()
+            ancestor.tree = ancestor_tree.id
+            ancestor.author = ancestor.committer = b"Test <test@example.com>"
+            ancestor.author_time = ancestor.commit_time = 1000
+            ancestor.author_timezone = ancestor.commit_timezone = 0
+            ancestor.message = b"ancestor"
+            self.store.add_object(ancestor)
+
+            descendant = Commit()
+            descendant.tree = descendant_tree.id
+            descendant.parents = [ancestor.id]
+            descendant.author = descendant.committer = b"Test <test@example.com>"
+            descendant.author_time = descendant.commit_time = 2000
+            descendant.author_timezone = descendant.commit_timezone = 0
+            descendant.message = b"descendant"
+            self.store.add_object(descendant)
+
+            def identity_index_filter(tree_sha, index_path):
+                return None
+
+            with tempfile.TemporaryDirectory() as cwd:
+                old_cwd = os.getcwd()
+                os.chdir(cwd)
+                try:
+                    filter = CommitFilter(
+                        self.store, index_filter=identity_index_filter
+                    )
+                    filter.process_commit(descendant.id)
+                    written_target = os.listdir(target_dir)
+                    written_cwd = os.listdir(cwd)
+                finally:
+                    os.chdir(old_cwd)
+
+            self.assertEqual([], written_target)
+            self.assertEqual([], written_cwd)
 
 
 class FilterRefsTests(unittest.TestCase):

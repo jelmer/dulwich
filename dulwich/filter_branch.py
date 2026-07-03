@@ -33,9 +33,9 @@ import warnings
 from collections.abc import Callable, Sequence
 from typing import TypedDict
 
-from .index import Index, build_index_from_tree, validate_path_element_ntfs
-from .object_store import BaseObjectStore
-from .objects import Commit, ObjectID, Tag, Tree
+from .index import Index, index_entry_from_tree_entry
+from .object_store import BaseObjectStore, iter_tree_contents
+from .objects import S_ISGITLINK, Commit, ObjectID, Tag, Tree
 from .refs import Ref, RefsContainer, local_tag_name
 
 
@@ -203,24 +203,28 @@ class CommitFilter:
             self._tree_cache[tree_sha] = tree_sha
             return tree_sha
 
-        # Create temporary index file
         with tempfile.NamedTemporaryFile(delete=False) as tmp_index:
             tmp_index_path = tmp_index.name
 
         try:
-            # Build index from tree
-            build_index_from_tree(
-                ".",
-                tmp_index_path,
-                self.object_store,
-                tree_sha,
-                validate_path_element=validate_path_element_ntfs,
-            )
+            index = Index(tmp_index_path, read=False)
+            for entry in iter_tree_contents(self.object_store, tree_sha):
+                assert (
+                    entry.path is not None
+                    and entry.mode is not None
+                    and entry.sha is not None
+                )
+                if S_ISGITLINK(entry.mode):
+                    size = 0
+                else:
+                    size = self.object_store[entry.sha].raw_length()
+                index[entry.path] = index_entry_from_tree_entry(
+                    entry.mode, entry.sha, size
+                )
+            index.write()
 
-            # Run index filter
             new_tree_sha = self.index_filter(tree_sha, tmp_index_path)
             if new_tree_sha is None:
-                # Read back the modified index and create new tree
                 index = Index(tmp_index_path)
                 new_tree_sha = index.commit(self.object_store)
 

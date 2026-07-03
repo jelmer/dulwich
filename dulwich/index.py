@@ -64,6 +64,7 @@ __all__ = [
     "get_path_element_validator",
     "get_unstaged_changes",
     "index_entry_from_stat",
+    "index_entry_from_tree_entry",
     "make_path_normalizer",
     "pathjoin",
     "pathsplit",
@@ -1768,6 +1769,40 @@ def index_entry_from_stat(
         uid=stat_val.st_uid,
         gid=stat_val.st_gid,
         size=stat_val.st_size,
+        sha=ObjectID(hex_sha),
+        flags=0,
+        extended_flags=0,
+    )
+
+
+def index_entry_from_tree_entry(
+    mode: int,
+    hex_sha: bytes,
+    size: int = 0,
+) -> IndexEntry:
+    """Create an index entry from a tree entry, with zeroed stat fields.
+
+    Use this when populating an index directly from a tree without touching
+    the filesystem, matching ``git read-tree``. The stat-derived fields
+    (ctime/mtime/dev/ino/uid/gid) are zeroed; git treats such entries as
+    stat-unmerged and refreshes them on the next stat.
+
+    Args:
+      mode: File mode from the tree entry
+      hex_sha: Hex sha of the object
+      size: Size of the object (0 for gitlinks or when unknown)
+    """
+    from dulwich.objects import ObjectID
+
+    return IndexEntry(
+        ctime=0,
+        mtime=0,
+        dev=0,
+        ino=0,
+        mode=mode,
+        uid=0,
+        gid=0,
+        size=size,
         sha=ObjectID(hex_sha),
         flags=0,
         extended_flags=0,

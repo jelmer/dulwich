@@ -607,6 +607,12 @@ def _checked_worktree_path(repo: "Repo", tree_path: bytes) -> bytes:
     outside the work tree or into the control directory, matching the bar git
     applies to its own path operands.
 
+    In addition to the name-based validation, refuse any path whose leading
+    directory components already exist in the work tree as a symlink. A
+    malicious repository could otherwise leave e.g. ``sub`` as a symlink to
+    ``.git/hooks`` and then have ``checkout(paths=["sub/post-checkout"])``
+    write attacker content through it.
+
     Args:
       repo: Repository the path is relative to.
       tree_path: Path in tree form (``/``-separated), as produced by
@@ -616,10 +622,16 @@ def _checked_worktree_path(repo: "Repo", tree_path: bytes) -> bytes:
       The filesystem path under the repository root, as bytes.
 
     Raises:
-      Error: If the path is absolute or carries a component the configured
-        ``core.protectNTFS``/``core.protectHFS`` validator rejects.
+      Error: If the path is absolute, carries a component the configured
+        ``core.protectNTFS``/``core.protectHFS`` validator rejects, or resolves
+        through a symlink already present in the work tree.
     """
-    from ..index import get_path_element_validator, validate_path
+    from ..index import (
+        InvalidPathError,
+        get_path_element_validator,
+        validate_path,
+        verify_leading_dirs,
+    )
 
     # Tree paths always use "/" as the separator; a leading "/" or "\\" would
     # make os.path.join discard the repository root, so treat it as absolute.
@@ -628,7 +640,12 @@ def _checked_worktree_path(repo: "Repo", tree_path: bytes) -> bytes:
     validator = get_path_element_validator(repo.get_config_stack())
     if not validate_path(tree_path, validator):
         raise Error(f"refusing to write unsafe path: {tree_path!r}")
-    return os.path.join(os.fsencode(repo.path), tree_path)
+    repo_path = os.fsencode(repo.path)
+    try:
+        verify_leading_dirs(tree_path, [], repo_path)
+    except InvalidPathError:
+        raise Error(f"refusing to write through symlink: {tree_path!r}")
+    return os.path.join(repo_path, tree_path)
 
 
 def parse_timezone_format(tz_str: str) -> int:

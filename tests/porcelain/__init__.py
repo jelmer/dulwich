@@ -5014,6 +5014,47 @@ class CheckoutTests(PorcelainTestCase):
         with open(trigger) as f:
             self.assertEqual("payload\n", f.read())
 
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_checkout_paths_rejects_intermediate_symlink(self) -> None:
+        # A path-specific checkout of ``sub/victim`` must refuse to write when
+        # ``sub`` already exists in the work tree as a symlink pointing
+        # elsewhere. Otherwise ``os.makedirs`` and the subsequent write would
+        # both traverse the symlink and land content outside the work tree.
+        outside_dir = os.path.join(self.test_dir, "outside")
+        os.makedirs(outside_dir)
+        outside_file = os.path.join(outside_dir, "victim")
+        with open(outside_file, "w") as f:
+            f.write("original\n")
+
+        payload = Blob.from_string(b"PWNED\n")
+        subdir_tree = Tree()
+        subdir_tree.add(b"victim", 0o100644, payload.id)
+        root_tree = Tree()
+        root_tree.add(b"sub", stat.S_IFDIR, subdir_tree.id)
+        for obj in (payload, subdir_tree, root_tree):
+            self.repo.object_store.add_object(obj)
+        sha = self.repo.get_worktree().commit(
+            message=b"malicious",
+            tree=root_tree.id,
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+
+        os.symlink(
+            os.path.join("..", "outside"),
+            os.path.join(self.repo.path, "sub"),
+        )
+
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.checkout,
+            self.repo,
+            sha,
+            paths=[b"sub/victim"],
+        )
+        with open(outside_file) as f:
+            self.assertEqual("original\n", f.read())
+
     def test_checkout_to_head(self) -> None:
         new_sha = self._commit_something_wrong()
 
@@ -5311,6 +5352,20 @@ class CheckWorktreePathTests(PorcelainTestCase):
         self.assertEqual(
             os.path.join(root, b".github/workflows/ci.yml"),
             _checked_worktree_path(self.repo, b".github/workflows/ci.yml"),
+        )
+
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_rejects_intermediate_symlink(self) -> None:
+        # A leading directory component that already exists in the work tree
+        # as a symlink must be refused: a crafted repository could otherwise
+        # leave ``sub`` as a symlink to ``.git/hooks`` and then have a
+        # subsequent write to ``sub/anything`` land through the link.
+        os.symlink(".git/hooks", os.path.join(self.repo.path, "sub"))
+        self.assertRaises(
+            porcelain.Error,
+            _checked_worktree_path,
+            self.repo,
+            b"sub/post-checkout",
         )
 
 

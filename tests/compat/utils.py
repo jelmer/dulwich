@@ -146,6 +146,9 @@ def run_git(
     env["GIT_CONFIG_NOSYSTEM"] = "1"
     env["GIT_CONFIG_GLOBAL"] = "/dev/null"
 
+    # Prevent background gc/maintenance from racing with test cleanup.
+    env["GIT_AUTO_GC"] = "0"
+
     # Preserve Git identity environment variables if they exist, otherwise set dummy values
     git_env_defaults = {
         "GIT_AUTHOR_NAME": "Test User",

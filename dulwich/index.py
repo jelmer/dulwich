@@ -2181,6 +2181,59 @@ def validate_path(
         return True
 
 
+def verify_leading_dirs(
+    tree_path: bytes,
+    safe_prefix: list[bytes],
+    repo_path: bytes,
+) -> None:
+    """Reject writes whose leading path resolves through a symlink.
+
+    Callers that materialize many paths in sorted order can pass a shared
+    ``safe_prefix`` list to cache the deepest chain of directory components
+    already verified to be real directories (or absent); each call only
+    ``lstat``s the components that differ from that chain. Callers that only
+    verify a single path can pass an empty list. Mirrors git's
+    ``lstat_cache_matchlen`` (see CVE-2021-21300).
+
+    Args:
+      tree_path: Tree-form path (``/``-separated) about to be written.
+      safe_prefix: Mutable cache of directory components already verified
+        under ``repo_path``. Updated in place.
+      repo_path: Filesystem path to the work-tree root.
+
+    Raises:
+      InvalidPathError: If any leading component is a symlink.
+    """
+    slash = tree_path.rfind(b"/")
+    if slash <= 0:
+        return
+    components = tree_path[:slash].split(b"/")
+
+    common = 0
+    while (
+        common < len(safe_prefix)
+        and common < len(components)
+        and safe_prefix[common] == components[common]
+    ):
+        common += 1
+    del safe_prefix[common:]
+
+    current = repo_path
+    for part in components[:common]:
+        current = os.path.join(current, part)
+    for part in components[common:]:
+        current = os.path.join(current, part)
+        try:
+            st = os.lstat(current)
+        except FileNotFoundError:
+            # Anything below here doesn't exist yet; makedirs will create
+            # it under a verified-real-directory prefix.
+            break
+        if stat.S_ISLNK(st.st_mode):
+            raise InvalidPathError(tree_path)
+        safe_prefix.append(part)
+
+
 def build_index_from_tree(
     root_path: str | bytes,
     index_path: str | bytes,

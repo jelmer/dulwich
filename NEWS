@@ -33,6 +33,91 @@
    worktree (e.g. ``link`` -> ``.git/hooks``) let the subsequent write land
    outside the work tree. (reported by zx (Jace), Jelmer Vernooĳ)
 
+ * SECURITY: Reject non-hex pkt-line length prefixes in the protocol parser.
+   ``int(sizestr, 16)`` accepted a leading ``-``, whose negative length made
+   the following ``read(size - 4)`` slurp the rest of the stream and caused
+   ``PktLineParser`` to loop without consuming its buffer.
+   (Kartik Kenchi, #2267)
+
+ * SECURITY: Escape the repository path passed to the remote in the SSH
+   client, so a path containing a single quote can no longer close the
+   quoting and have the remainder interpreted by the remote shell.
+   (netliomax25-code, Kartik Kenchi, #2254)
+
+ * SECURITY: Reject an option-like host in ``TCPGitClient`` before invoking
+   the ``core.gitProxy`` command, matching the ``SubprocessSSHVendor`` guard,
+   so a URL like ``git://-oProxyCommand=...`` can no longer be interpreted
+   as a flag by the proxy program. (netliomax25-code, #2240)
+
+ * SECURITY: Validate object ids in the object store and refs container. An
+   id containing path separators would previously be joined into a filename
+   by ``DiskObjectStore._get_shafile_path`` (escaping the objects
+   directory) or stored as a ref value. (netliomax25-code, #2256)
+
+ * SECURITY: Validate the object id in LFS server request handlers before
+   it reaches the store. The store maps ``oid`` onto
+   ``objects/<oid[:2]>/<oid[2:4]>/<oid>``, so a request path containing
+   ``..`` could otherwise escape the LFS directory.
+   (netliomax25-code, Jelmer Vernooĳ, #2255)
+
+ * SECURITY: Don't expand config ``include``/``includeIf`` directives when
+   parsing bundle lists served by an untrusted bundle-uri host, matching
+   the handling of ``.gitmodules``. (netliomax25-code, #2243)
+
+ * SECURITY: Read the signing key from gpg's ``--status-fd`` (``VALIDSIG``)
+   in ``GPGCliSignatureVendor.verify`` instead of the human-readable
+   ``using RSA key ...`` text on stderr, which could be spoofed by embedding
+   a matching line in the signed payload. (netliomax25-code, #2245)
+
+ * SECURITY: Raise ``UntrustedSignature`` from ``verify_commit`` and
+   ``verify_tag`` when ``keyids`` is set and the object carries no
+   signature, instead of silently accepting it. (netliomax25-code, #2238)
+
+ * SECURITY: Fix quadratic backtracking in ``_find_scissors_line``. The
+   perforation regex had two unbounded ``-+`` groups separated only by
+   optional subpatterns, so a long dash-only line ran in O(n^2); every line
+   of a mailbox is fed through ``mailinfo``/``git am --scissors``, so a
+   crafted patch could stall the parser. (netliomax25-code, #2239)
+
+ * SECURITY: Collapse consecutive ``*`` wildcards to at most ``**`` in
+   ``.gitattributes``, ``.gitignore`` and config glob translation, so a
+   pattern with a long run of stars can no longer produce adjacent
+   unbounded regex quantifiers that backtrack catastrophically (ReDoS).
+   (netliomax25-code, #2237)
+
+ * SECURITY: Fix quadratic buffering in ``web.ChunkReader.read``. The
+   buffered-byte total was recomputed from scratch on each iteration, so a
+   large chunked request body ran in O(n^2). (Kartik Kenchi, #2262)
+
+ * SECURITY: Skip invalid tree paths (containing ``..``, ``.git``, etc.) in
+   ``diff_working_tree_to_tree`` instead of joining them onto the work
+   tree, matching git. A working-tree diff against an untrusted commit
+   could otherwise read a file outside the work tree and disclose its
+   contents in the diff output.
+   (reported by netliomax25-code, Jelmer Vernooĳ, #2261)
+
+ * SECURITY: Fix quadratic header accumulation in ``ShaFile._parse_message``
+   so parsing an object with many header lines no longer runs in O(n^2).
+   (Kartik Kenchi, #2273)
+
+ * Replace a symlink left at the target path with a fresh regular file in
+   ``build_file_from_blob`` instead of writing through it, matching git on
+   checkout. (Kartik Kenchi, #2259)
+
+ * Raise ``GitProtocolError`` carrying the server's message when the
+   fetch/send-pack tail loop sees a fatal side-band channel (``\x03``),
+   instead of crashing with ``AssertionError: Invalid sideband channel 3``
+   and swallowing the server's error text. (Jelmer Vernooĳ)
+
+ * Use ``ThreadingHTTPServer`` and advertise HTTP/1.1 in ``lfs_server`` so
+   urllib3's keep-alive pool doesn't race a torn-down connection into
+   ``RemoteDisconnected``. (Jelmer Vernooĳ)
+
+ * Deprecate ``dulwich.objects.filename_to_hex``, which is unused.
+   (Jelmer Vernooĳ)
+
+ * Support pyo3 0.29. (Jelmer Vernooĳ)
+
 1.2.7	2026-06-12
 
  * Verify that an object retrieved by id actually hashes to the requested

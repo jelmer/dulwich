@@ -23,8 +23,11 @@
 
 import os
 import shutil
+import sys
 import tempfile
+import unittest
 
+from dulwich.index import InvalidPathError
 from dulwich.objects import Blob, Tree
 from dulwich.repo import Repo
 from dulwich.stash import DEFAULT_STASH_REF, Stash
@@ -223,6 +226,66 @@ class StashTests(TestCase):
         # Verify index has the staged changes
         index = self.repo.open_index()
         self.assertIn(b"new.txt", index)
+
+    @unittest.skipIf(
+        sys.platform == "win32", "symlink creation requires privileges on Windows"
+    )
+    def test_pop_rejects_symlink_traversal(self) -> None:
+        """A stash whose parent path is a symlink must not write through it.
+
+        Regression test for CVE-style path traversal via ``stash.pop``: an
+        intermediate directory component that is a symlink (e.g.
+        ``link -> .git/hooks``) previously passed ``os.path.exists`` and the
+        subsequent ``open`` followed the symlink, writing attacker content
+        outside the worktree.
+        """
+        stash = Stash.from_repo(self.repo)
+
+        os.makedirs(os.path.join(self.repo.commondir(), "logs"), exist_ok=True)
+        hooks_dir = os.path.join(self.repo.commondir(), "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+
+        # Point the symlink at the hooks directory relative to the worktree.
+        link_target = os.path.relpath(hooks_dir, self.repo_dir)
+        os.symlink(link_target, os.path.join(self.repo_dir, "link"))
+
+        payload = Blob()
+        payload.data = b"#!/bin/sh\necho pwned\n"
+        self.repo.object_store.add_object(payload)
+
+        subtree = Tree()
+        subtree.add(b"post-checkout", 0o100755, payload.id)
+        self.repo.object_store.add_object(subtree)
+
+        stash_tree = Tree()
+        stash_tree.add(b"link", 0o040000, subtree.id)
+        self.repo.object_store.add_object(stash_tree)
+
+        index_commit_id = self.repo.get_worktree().commit(
+            tree=stash_tree.id,
+            message=b"Index stash",
+            merge_heads=[self.repo.head()],
+            no_verify=True,
+            sign=False,
+            ref=None,
+        )
+        self.repo.refs[DEFAULT_STASH_REF] = self.repo.head()
+        stash_commit_id = self.repo.get_worktree().commit(
+            ref=DEFAULT_STASH_REF,
+            tree=stash_tree.id,
+            message=b"malicious stash",
+            merge_heads=[index_commit_id],
+            no_verify=True,
+            sign=False,
+        )
+        self.assertIsNotNone(stash_commit_id)
+        self.assertEqual(1, len(stash))
+
+        with self.assertRaises(InvalidPathError):
+            stash.pop(0)
+
+        # The payload must not have been written through the symlink.
+        self.assertFalse(os.path.exists(os.path.join(hooks_dir, "post-checkout")))
 
 
 class StashInWorktreeTest(StashTests):

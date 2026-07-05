@@ -103,6 +103,12 @@
    an ancestor commit redirect a descendant's writes outside the work tree.
    (reported by zx (Jace), Jelmer Vernooĳ)
 
+ * SECURITY: Refuse to write a stash entry through an intermediate symlink
+   on ``stash.pop``. The old ``os.path.exists`` check followed symlinks, so
+   a crafted stash whose parent path was a symlink already present in the
+   worktree (e.g. ``link`` -> ``.git/hooks``) let the subsequent write land
+   outside the work tree. (reported by zx (Jace), Jelmer Vernooĳ)
+
 1.2.6	2026-05-31
 
  * SECURITY: Honor ``core.protectNTFS``/``core.protectHFS`` on all

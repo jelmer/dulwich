@@ -42,6 +42,7 @@ from dulwich.objects import (
     Tag,
     Tree,
     TreeEntry,
+    _parse_message,
     _parse_tree_py,
     _sorted_tree_items_py,
     check_hexsha,
@@ -841,6 +842,18 @@ nHxksHfeNln9RKseIDcy4b2ATjhDNIJZARHNfr6oy4u3XPW4svRqtBsLoMiIeuI=
         self.assertEqual(pre_sig + post_sig, c.raw_without_sig())
         self.assertEqual(gpgsig, c.gpgsig)
         self.assertEqual(b"3.3.0 version bump and docs\n", c.message)
+
+    def test_parse_header_many_continuation_lines(self) -> None:
+        # A header value may be split across indented continuation lines. A
+        # value spread over a large number of them must still be reassembled
+        # exactly, and in linear time (the accumulation used to be quadratic).
+        n = 50000
+        body = b"".join(b" line%d\n" % i for i in range(n))
+        text = b"tree " + b"0" * 40 + b"\ngpgsig first\n" + body + b"\nthe message\n"
+        fields = dict((k, v) for (k, v) in _parse_message([text]) if k is not None)
+        expected = b"first\n" + b"".join(b"line%d\n" % i for i in range(n))
+        expected = expected[:-1]  # trailing newline is stripped from the value
+        self.assertEqual(expected, fields[b"gpgsig"])
 
     def test_commit_extract_signature_pgp(self) -> None:
         gpgsig = b"""-----BEGIN PGP SIGNATURE-----

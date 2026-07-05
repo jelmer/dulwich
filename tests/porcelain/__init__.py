@@ -113,6 +113,54 @@ class PorcelainTestCase(TestCase):
         self.assertLess(time.time() - ts, 50)
 
 
+class TransportKwargsTests(TestCase):
+    def test_git_ssh_command_wins(self) -> None:
+        self.overrideEnv("GIT_SSH_COMMAND", "ssh -i /path/to/key")
+        self.overrideEnv("GIT_SSH", "/path/to/ssh")
+        self.assertEqual(
+            porcelain._transport_kwargs_with_env()["ssh_command"],
+            "ssh -i /path/to/key",
+        )
+
+    def test_git_ssh_fallback(self) -> None:
+        self.overrideEnv("GIT_SSH_COMMAND", "")
+        self.overrideEnv("GIT_SSH", "/path/to/ssh")
+        self.assertEqual(
+            porcelain._transport_kwargs_with_env()["ssh_command"], "/path/to/ssh"
+        )
+
+    def test_explicit_ssh_command_wins(self) -> None:
+        self.overrideEnv("GIT_SSH_COMMAND", "ssh -i /path/to/key")
+        self.assertEqual(
+            porcelain._transport_kwargs_with_env("custom-ssh")["ssh_command"],
+            "custom-ssh",
+        )
+
+    def test_ls_remote_forwards_env_ssh_command(self) -> None:
+        captured_kwargs: dict[str, object] = {}
+
+        class TestClient:
+            def get_refs(self, path: bytes) -> dict[bytes, bytes]:
+                captured_kwargs["path"] = path
+                return {}
+
+        original = porcelain.get_transport_and_path
+
+        def get_transport_and_path(
+            location: str, **kwargs: object
+        ) -> tuple[TestClient, str]:
+            captured_kwargs.update(kwargs)
+            return TestClient(), "repo.git"
+
+        porcelain.get_transport_and_path = get_transport_and_path
+        self.addCleanup(setattr, porcelain, "get_transport_and_path", original)
+
+        self.overrideEnv("GIT_SSH_COMMAND", "ssh -i /path/to/key")
+        self.assertEqual(porcelain.ls_remote("git@example.com:repo.git"), {})
+        self.assertEqual(captured_kwargs["ssh_command"], "ssh -i /path/to/key")
+        self.assertEqual(captured_kwargs["path"], b"repo.git")
+
+
 @skipIf(gpg is None, "gpg is not available")
 class PorcelainGpgTestCase(PorcelainTestCase):
     DEFAULT_KEY = """

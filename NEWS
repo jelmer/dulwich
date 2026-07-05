@@ -1,4 +1,4 @@
-1.2.8	UNRELEASED
+1.2.8	2026-07-05
 
  * Enumerate the objects to push before the HTTP ``git-receive-pack``
    request body starts streaming. ``generate_pack_data`` previously ran

@@ -28,7 +28,6 @@ __all__ = [
 ]
 
 import os
-import stat
 from typing import TYPE_CHECKING, TypedDict
 
 from .diff_tree import tree_changes
@@ -45,6 +44,7 @@ from .index import (
     symlink,
     update_working_tree,
     validate_path,
+    verify_leading_dirs,
 )
 from .object_store import iter_tree_contents
 from .objects import S_IFGITLINK, Blob, Commit, ObjectID, TreeEntry
@@ -65,52 +65,6 @@ class CommitKwargs(TypedDict, total=False):
 
 
 DEFAULT_STASH_REF = Ref(b"refs/stash")
-
-
-def _verify_leading_dirs(
-    tree_path: bytes,
-    safe_prefix: list[bytes],
-    repo_path: bytes,
-) -> None:
-    """Reject writes whose leading path resolves through a symlink.
-
-    ``iter_tree_contents`` yields paths in sorted order, so consecutive
-    siblings share a long prefix. ``safe_prefix`` tracks the deepest chain
-    of directory components already verified to be real directories (or
-    absent), starting at the worktree root; each call only ``lstat``s the
-    components that differ from that chain. Mirrors git's
-    ``lstat_cache_matchlen`` (see CVE-2021-21300).
-
-    Raises ``InvalidPathError`` if any leading component is a symlink.
-    """
-    slash = tree_path.rfind(b"/")
-    if slash <= 0:
-        return
-    components = tree_path[:slash].split(b"/")
-
-    common = 0
-    while (
-        common < len(safe_prefix)
-        and common < len(components)
-        and safe_prefix[common] == components[common]
-    ):
-        common += 1
-    del safe_prefix[common:]
-
-    current = repo_path
-    for part in components[:common]:
-        current = os.path.join(current, part)
-    for part in components[common:]:
-        current = os.path.join(current, part)
-        try:
-            st = os.lstat(current)
-        except FileNotFoundError:
-            # Anything below here doesn't exist yet; makedirs will create
-            # it under a verified-real-directory prefix.
-            break
-        if stat.S_ISLNK(st.st_mode):
-            raise InvalidPathError(tree_path)
-        safe_prefix.append(part)
 
 
 class Stash:
@@ -278,7 +232,7 @@ class Stash:
             # Refuse writes whose leading path goes through a symlink left
             # in the worktree (e.g. ``link`` -> ``.git/hooks``); the cache
             # keeps the total cost to one ``lstat`` per unique directory.
-            _verify_leading_dirs(tree_entry2.path, safe_prefix, repo_path)
+            verify_leading_dirs(tree_entry2.path, safe_prefix, repo_path)
 
             full_path = _tree_to_fs_path(repo_path, tree_entry2.path)
 

@@ -33,6 +33,12 @@
    worktree (e.g. ``link`` -> ``.git/hooks``) let the subsequent write land
    outside the work tree. (reported by zx (Jace), Jelmer Vernooĳ)
 
+ * SECURITY: Refuse path-restricted ``porcelain.checkout``, ``restore`` and
+   ``reset_file`` writes whose leading directory is an existing symlink, so
+   a crafted repository can no longer land ``sub`` as a link to
+   ``.git/hooks`` and have a write to ``sub/anything`` traverse it.
+   (reported by zx (Jace), Jelmer Vernooĳ)
+
  * SECURITY: Reject non-hex pkt-line length prefixes in the protocol parser.
    ``int(sizestr, 16)`` accepted a leading ``-``, whose negative length made
    the following ``read(size - 4)`` slurp the rest of the stream and caused

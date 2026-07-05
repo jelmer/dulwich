@@ -1,3 +1,38 @@
+1.2.8	UNRELEASED
+
+ * Enumerate the objects to push before the HTTP ``git-receive-pack``
+   request body starts streaming. ``generate_pack_data`` previously ran
+   lazily inside the body generator, after the header pkt-lines were
+   already on the wire, so on large repositories the request stalled
+   mid-body while objects were counted and servers such as GitHub aborted
+   the push with a timeout / "broken pipe". (synman, Jelmer Vernooĳ, #2248)
+
+ * Support ``http.postBuffer``. (Jelmer Vernooĳ, #2248)
+
+ * SECURITY: Canonicalize file modes to ``0o644``/``0o755`` before ``chmod``
+   on checkout and patch apply, matching git. An untrusted tree entry or
+   patch ``new file mode`` could otherwise set setuid/setgid/sticky or
+   world-writable bits on a materialized file. (netliomax25-code)
+
+ * SECURITY(GHSA-8w8g-wq8h-fq33): Write files through ``build_file_from_blob``
+   in path-restricted ``porcelain.checkout(paths=...)`` instead of a raw
+   ``os.open``. The old path followed a symlink left at the target, so a
+   crafted repository could write attacker content outside the work tree
+   (e.g. into ``.git/hooks``) on ``checkout``. (reported by zx (Jace) and
+   Houlton McGuinn, Jelmer Vernooĳ)
+
+ * SECURITY(GHSA-5fqc-mrg8-w798): Build the temporary index for
+   ``filter-branch --index-filter`` in memory instead of materializing tree
+   entries into CWD. Persisted entries between commits let a symlink from
+   an ancestor commit redirect a descendant's writes outside the work tree.
+   (reported by zx (Jace), Jelmer Vernooĳ)
+
+ * SECURITY: Refuse to write a stash entry through an intermediate symlink
+   on ``stash.pop``. The old ``os.path.exists`` check followed symlinks, so
+   a crafted stash whose parent path was a symlink already present in the
+   worktree (e.g. ``link`` -> ``.git/hooks``) let the subsequent write land
+   outside the work tree. (reported by zx (Jace), Jelmer Vernooĳ)
+
 1.2.7	2026-06-12
 
  * Verify that an object retrieved by id actually hashes to the requested
@@ -75,39 +110,6 @@
    packs over the dumb HTTP transport, which previously advertised them in
    ``objects/info/packs`` but returned 404 for the pack itself.
    (Jelmer Vernooĳ)
-
- * Enumerate the objects to push before the HTTP ``git-receive-pack``
-   request body starts streaming. ``generate_pack_data`` previously ran
-   lazily inside the body generator, after the header pkt-lines were
-   already on the wire, so on large repositories the request stalled
-   mid-body while objects were counted and servers such as GitHub aborted
-   the push with a timeout / "broken pipe". (synman, Jelmer Vernooĳ, #2248)
-
- * Support ``http.postBuffer``. (Jelmer Vernooĳ, #2248)
-
- * SECURITY: Canonicalize file modes to ``0o644``/``0o755`` before ``chmod``
-   on checkout and patch apply, matching git. An untrusted tree entry or
-   patch ``new file mode`` could otherwise set setuid/setgid/sticky or
-   world-writable bits on a materialized file. (netliomax25-code)
-
- * SECURITY(GHSA-8w8g-wq8h-fq33): Write files through ``build_file_from_blob``
-   in path-restricted ``porcelain.checkout(paths=...)`` instead of a raw
-   ``os.open``. The old path followed a symlink left at the target, so a
-   crafted repository could write attacker content outside the work tree
-   (e.g. into ``.git/hooks``) on ``checkout``. (reported by zx (Jace) and
-   Houlton McGuinn, Jelmer Vernooĳ)
-
- * SECURITY(GHSA-5fqc-mrg8-w798): Build the temporary index for
-   ``filter-branch --index-filter`` in memory instead of materializing tree
-   entries into CWD. Persisted entries between commits let a symlink from
-   an ancestor commit redirect a descendant's writes outside the work tree.
-   (reported by zx (Jace), Jelmer Vernooĳ)
-
- * SECURITY: Refuse to write a stash entry through an intermediate symlink
-   on ``stash.pop``. The old ``os.path.exists`` check followed symlinks, so
-   a crafted stash whose parent path was a symlink already present in the
-   worktree (e.g. ``link`` -> ``.git/hooks``) let the subsequent write land
-   outside the work tree. (reported by zx (Jace), Jelmer Vernooĳ)
 
 1.2.6	2026-05-31
 

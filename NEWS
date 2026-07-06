@@ -1,3 +1,12 @@
+1.2.9	UNRELEASED
+
+ * SECURITY: Reject ``OFS_DELTA`` pack entries whose ``delta_base_offset``
+   is zero. Such an entry references itself, so ``Pack.resolve_object``
+   would loop forever growing its delta stack until the process ran out
+   of memory. ``unpack_object`` now raises ``ApplyDeltaError`` at parse
+   time, matching git's ``delta offset == 0 is invalid`` guard.
+   (reported by Luke Banto, Jelmer Vernooĳ)
+
 1.2.8	2026-07-05
 
  * Enumerate the objects to push before the HTTP ``git-receive-pack``

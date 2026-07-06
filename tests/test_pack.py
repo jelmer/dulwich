@@ -1035,6 +1035,20 @@ class WritePackTests(TestCase):
         finally:
             f.close()
 
+    def test_unpack_object_rejects_zero_ofs_delta(self) -> None:
+        # An OFS_DELTA with delta_base_offset == 0 would reference itself
+        # and cause resolve_object to loop forever. Reject at parse time.
+        header = bytes([(OFS_DELTA << 4) | 0])
+        ofs_bytes = bytes([0x00])
+        body = zlib.compress(b"")
+        f = BytesIO(header + ofs_bytes + body)
+        self.assertRaises(
+            ApplyDeltaError,
+            unpack_object,
+            f.read,
+            DEFAULT_OBJECT_FORMAT.hash_func,
+        )
+
     def test_write_pack_object_sha(self) -> None:
         f = BytesIO()
         f.write(b"header")

@@ -29,6 +29,10 @@
    time, matching git's ``delta offset == 0 is invalid`` guard.
    (reported by Luke Banto, Jelmer Vernooĳ)
 
+ * dulwich.web: Warn at startup that running ``python3 -m dulwich.web``
+   is not meant to provide a production web server. It does not
+   support authentication, for example.   (Jelmer Vernooĳ)
+
  * SECURITY: Bound ``Transfer-Encoding: chunked`` request bodies in
    ``dulwich.web``. ``_chunk_iter`` now strips chunk extensions, rejects
    negative sizes, and enforces per-chunk and per-request size limits;

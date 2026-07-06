@@ -141,10 +141,11 @@ class CompatPatchTestCase(CompatTestCase):
 
         # Generate binary patch with git
         patch_path = os.path.join(self.test_dir, "binary.patch")
-        run_git_or_fail(
-            ["-C", self.repo_path, "diff", "--binary", "HEAD", "binary.bin"],
-            stdout=open(patch_path, "wb"),
-        )
+        with open(patch_path, "wb") as patch_file:
+            run_git_or_fail(
+                ["-C", self.repo_path, "diff", "--binary", "HEAD", "binary.bin"],
+                stdout=patch_file,
+            )
 
         # Apply with dulwich
         with open(patch_path, "rb") as f:
@@ -179,9 +180,10 @@ class CompatPatchTestCase(CompatTestCase):
 
         # Generate patch
         patch_path = os.path.join(self.test_dir, "rename.patch")
-        run_git_or_fail(
-            ["-C", self.repo_path, "diff", "--cached"], stdout=open(patch_path, "wb")
-        )
+        with open(patch_path, "wb") as patch_file:
+            run_git_or_fail(
+                ["-C", self.repo_path, "diff", "--cached"], stdout=patch_file
+            )
 
         # Apply with dulwich
         with open(patch_path, "rb") as f:
@@ -217,10 +219,11 @@ class CompatPatchTestCase(CompatTestCase):
 
         # Generate patch with copy detection
         patch_path = os.path.join(self.test_dir, "copy.patch")
-        run_git_or_fail(
-            ["-C", self.repo_path, "diff", "--cached", "-C"],
-            stdout=open(patch_path, "wb"),
-        )
+        with open(patch_path, "wb") as patch_file:
+            run_git_or_fail(
+                ["-C", self.repo_path, "diff", "--cached", "-C"],
+                stdout=patch_file,
+            )
 
         # Apply with dulwich
         with open(patch_path, "rb") as f:

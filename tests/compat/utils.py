@@ -42,6 +42,7 @@ _VERSION_LEN = 4
 _REPOS_DATA_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "testdata", "repos")
 )
+_TEST_GITCONFIG = os.path.join(os.path.dirname(__file__), "gitconfig")
 
 
 def git_version(git_path=_DEFAULT_GIT):
@@ -140,13 +141,13 @@ def run_git(
     env["LC_ALL"] = env["LANG"] = "C"
     env["PATH"] = os.getenv("PATH")
 
-    # Isolate from system and user git config to prevent config leakage
-    # This prevents issues like Apple Git's system-wide init.defaultBranch=main
-    # from affecting test behavior (see issue #1188)
+    # Isolate from system and user git config. GIT_CONFIG_GLOBAL points at
+    # a synthetic config that disables background gc/maintenance so a
+    # detached "git maintenance run" spawned by git-receive-pack cannot
+    # race with test cleanup on maintenance.lock. This env var (unlike -c
+    # flags) survives receive-pack's transport-boundary spawn.
     env["GIT_CONFIG_NOSYSTEM"] = "1"
-    env["GIT_CONFIG_GLOBAL"] = "/dev/null"
-
-    # Prevent background gc/maintenance from racing with test cleanup.
+    env["GIT_CONFIG_GLOBAL"] = _TEST_GITCONFIG
     env["GIT_AUTO_GC"] = "0"
 
     # Preserve Git identity environment variables if they exist, otherwise set dummy values
@@ -162,21 +163,7 @@ def run_git(
             # If the environment variable is not set, use the default value
             env[git_env_var] = default_value
 
-    # Disable background auto-gc and maintenance so pack directory contents
-    # stay quiescent between git invocations. Without this, a commit or repack
-    # can fork a detached gc that keeps modifying (and deleting) pack/idx files
-    # after the foreground git process exits, causing spurious failures in
-    # tests that inspect the pack directory immediately afterwards.
-    args = [
-        git_path,
-        "-c",
-        "gc.auto=0",
-        "-c",
-        "gc.autoDetach=false",
-        "-c",
-        "maintenance.auto=false",
-        *args,
-    ]
+    args = [git_path, *args]
     popen_kwargs["stdin"] = subprocess.PIPE
     if capture_stdout:
         popen_kwargs["stdout"] = subprocess.PIPE
@@ -275,6 +262,10 @@ class CompatTestCase(TestCase):
     def setUp(self) -> None:
         super().setUp()
         require_git_version(self.min_git_version)
+        # Propagate the gc/maintenance-disabling config to git subprocesses
+        # spawned via dulwich clients (SubprocessGitClient, SSH-mock vendor,
+        # git daemon), which invoke git with the parent's environment.
+        self.overrideEnv("GIT_CONFIG_GLOBAL", _TEST_GITCONFIG)
 
     def assertObjectStoreEqual(self, store1, store2) -> None:
         self.assertEqual(sorted(set(store1)), sorted(set(store2)))

@@ -38,10 +38,12 @@ from dulwich.web import (
     HTTP_FORBIDDEN,
     HTTP_NOT_FOUND,
     HTTP_OK,
+    ChunkedEncodingError,
     ChunkReader,
     GunzipFilter,
     HTTPGitApplication,
     HTTPGitRequest,
+    LimitedInputFilter,
     _LengthLimitedFile,
     get_idx_file,
     get_info_packs,
@@ -346,14 +348,41 @@ class SmartHandlersTestCase(WebTestCase):
         return {b"git-upload-pack": self._make_handler}
 
     def test_handle_service_request_unknown(self) -> None:
+        self._environ["CONTENT_TYPE"] = "application/x-git-evil-handler-request"
         mat = re.search(".*", "/git-evil-handler")
         content = list(handle_service_request(self._req, "backend", mat))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertNotIn(b"git-evil-handler", b"".join(content))
         self.assertFalse(self._req.cached)
 
+    def test_handle_service_request_wrong_content_type(self) -> None:
+        self._environ["wsgi.input"] = BytesIO(b"foo")
+        self._environ["CONTENT_TYPE"] = "text/plain"
+        mat = re.search(".*", "/git-upload-pack")
+
+        class Backend:
+            def open_repository(self, path) -> None:
+                return None
+
+        content = b"".join(handle_service_request(self._req, Backend(), mat))
+        self.assertEqual(HTTP_FORBIDDEN, self._status)
+        self.assertEqual(b"Invalid Content-Type", content)
+
+    def test_handle_service_request_missing_content_type(self) -> None:
+        self._environ["wsgi.input"] = BytesIO(b"foo")
+        mat = re.search(".*", "/git-upload-pack")
+
+        class Backend:
+            def open_repository(self, path) -> None:
+                return None
+
+        content = b"".join(handle_service_request(self._req, Backend(), mat))
+        self.assertEqual(HTTP_FORBIDDEN, self._status)
+        self.assertEqual(b"Invalid Content-Type", content)
+
     def _run_handle_service_request(self, content_length=None) -> None:
         self._environ["wsgi.input"] = BytesIO(b"foo")
+        self._environ["CONTENT_TYPE"] = "application/x-git-upload-pack-request"
         if content_length is not None:
             self._environ["CONTENT_LENGTH"] = content_length
         mat = re.search(".*", "/git-upload-pack")
@@ -472,6 +501,107 @@ class ChunkReaderTestCase(TestCase):
         count = 20000
         r = ChunkReader(BytesIO(self._encode([b"x"] * count)))
         self.assertEqual(b"x" * count, r.read(count))
+
+    def test_rejects_oversized_chunk(self) -> None:
+        # A single chunk larger than MAX_CHUNK_SIZE must not be honoured.
+        # ``FFFFFFFF`` (~4 GB) is the classic PoC value; parse it as a size
+        # line without ever allocating the body.
+        body = b"FFFFFFFF\r\n"
+        r = ChunkReader(BytesIO(body))
+        self.assertRaises(ChunkedEncodingError, r.read, 1)
+
+    def test_rejects_negative_chunk_size(self) -> None:
+        # ``int("-10", 16)`` is negative and used to become ``f.read(-14)``
+        # which reads until EOF. It must be rejected outright.
+        r = ChunkReader(BytesIO(b"-10\r\n"))
+        self.assertRaises(ChunkedEncodingError, r.read, 1)
+
+    def test_rejects_non_hex_chunk_size(self) -> None:
+        r = ChunkReader(BytesIO(b"zz\r\n"))
+        self.assertRaises(ChunkedEncodingError, r.read, 1)
+
+    def test_accepts_chunk_extensions(self) -> None:
+        # ``10;name=value`` is a valid HTTP/1.1 chunk size line and must be
+        # parsed without raising.
+        payload = b"a"
+        body = b"1;ext=val\r\n" + payload + b"\r\n0\r\n\r\n"
+        r = ChunkReader(BytesIO(body))
+        self.assertEqual(payload, r.read(1))
+
+    def test_rejects_when_total_size_exceeds_cap(self) -> None:
+        # Many small chunks that together exceed the total budget must be
+        # rejected rather than allowed to grow the buffer unbounded.
+        chunk = b"x" * 8
+        payload = self._encode([chunk, chunk])
+        f = BytesIO(payload)
+        from dulwich.web import _chunk_iter
+
+        it = _chunk_iter(f, max_chunk_size=8, max_total_size=8)
+        # First chunk is at the limit and comes through.
+        self.assertEqual(chunk, next(it))
+        # Second chunk pushes over the total cap.
+        self.assertRaises(ChunkedEncodingError, next, it)
+
+    def test_rejects_truncated_stream(self) -> None:
+        # A stream that ends without a terminating ``0\r\n`` used to loop
+        # forever calling ``readline()`` that returned ``b""``. It must
+        # now surface a clear error.
+        r = ChunkReader(BytesIO(b""))
+        self.assertRaises(ChunkedEncodingError, r.read, 1)
+
+
+class LimitedInputFilterTestCase(TestCase):
+    @staticmethod
+    def _make_env(**overrides: object) -> dict:
+        env = {"wsgi.input": BytesIO(b"x" * 10)}
+        env.update(overrides)
+        return env
+
+    def _capture_app(self) -> tuple:
+        seen: dict = {}
+
+        def app(environ: dict, start_response: object) -> list[bytes]:
+            seen["input"] = environ["wsgi.input"]
+            return [b""]
+
+        return app, seen
+
+    def test_wraps_when_content_length_set(self) -> None:
+        app, seen = self._capture_app()
+        f = LimitedInputFilter(app)
+        env = self._make_env(CONTENT_LENGTH="3")
+        f(env, lambda *a, **kw: None)
+        self.assertEqual(b"xxx", seen["input"].read())
+
+    def test_wraps_without_content_length(self) -> None:
+        # Chunked and other bodies with no Content-Length must still be
+        # capped at MAX_REQUEST_SIZE, not passed through unwrapped.
+        app, seen = self._capture_app()
+        f = LimitedInputFilter(app)
+        env = self._make_env()
+        f(env, lambda *a, **kw: None)
+        self.assertIsInstance(seen["input"], _LengthLimitedFile)
+
+    def test_ignores_content_length_over_cap(self) -> None:
+        app, seen = self._capture_app()
+        f = LimitedInputFilter(app, max_request_size=5)
+        env = self._make_env(CONTENT_LENGTH=str(1 << 40))
+        f(env, lambda *a, **kw: None)
+        self.assertEqual(b"xxxxx", seen["input"].read())
+
+    def test_ignores_negative_content_length(self) -> None:
+        app, seen = self._capture_app()
+        f = LimitedInputFilter(app, max_request_size=5)
+        env = self._make_env(CONTENT_LENGTH="-1")
+        f(env, lambda *a, **kw: None)
+        self.assertEqual(b"xxxxx", seen["input"].read())
+
+    def test_ignores_non_numeric_content_length(self) -> None:
+        app, seen = self._capture_app()
+        f = LimitedInputFilter(app, max_request_size=5)
+        env = self._make_env(CONTENT_LENGTH="bogus")
+        f(env, lambda *a, **kw: None)
+        self.assertEqual(b"xxxxx", seen["input"].read())
 
 
 class HTTPGitRequestTestCase(WebTestCase):

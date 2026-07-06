@@ -26,6 +26,7 @@ import os
 import shutil
 import sys
 import tempfile
+import tracemalloc
 import types
 import zlib
 from hashlib import sha1
@@ -1443,6 +1444,26 @@ class ReadZlibTests(TestCase):
     def test_decompress_include_comp(self) -> None:
         self._do_decompress_test(4096, include_comp=True)
         self.assertEqual(self.comp, b"".join(self.unpacked.comp_chunks))
+
+    def test_decompress_bomb_rejected_before_full_inflation(self) -> None:
+        # Regression: a malicious pack entry that declares a small decomp_len
+        # but ships a highly compressible stream must not be fully inflated
+        # before the size check fires (decompression-bomb DoS).
+        payload = b"\x00" * (4 * 1024 * 1024)
+        comp = zlib.compress(payload)
+        # Sanity check that this stream is actually a bomb candidate.
+        self.assertLess(len(comp), len(payload) // 100)
+        unpacked = UnpackedObject(Blob.type_num, decomp_len=1, crc32=0)
+        read = BytesIO(comp + b"\x00" * 20).read
+        tracemalloc.start()
+        try:
+            self.assertRaises(zlib.error, read_zlib_chunks, read, unpacked)
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        # We should never have allocated anywhere near the full payload.
+        # Give plenty of headroom for compression bookkeeping.
+        self.assertLess(peak, len(payload) // 4)
 
 
 class DeltifyTests(TestCase):

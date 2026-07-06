@@ -628,14 +628,19 @@ def _checked_worktree_path(repo: "Repo", tree_path: bytes) -> bytes:
     """
     from ..index import (
         InvalidPathError,
+        _has_dos_drive_prefix,
         get_path_element_validator,
         validate_path,
         verify_leading_dirs,
     )
 
-    # Tree paths always use "/" as the separator; a leading "/" or "\\" would
-    # make os.path.join discard the repository root, so treat it as absolute.
-    if tree_path.startswith((b"/", b"\\")):
+    # Tree paths use "/" as the separator, so a leading "/", "\\" or (on
+    # Windows) drive-letter prefix would make os.path.join discard the
+    # repository root.
+    absolute = tree_path.startswith((b"/", b"\\")) or (
+        os.name == "nt" and _has_dos_drive_prefix(tree_path)
+    )
+    if absolute:
         raise Error(f"refusing to write path outside repository: {tree_path!r}")
     validator = get_path_element_validator(repo.get_config_stack())
     if not validate_path(tree_path, validator):

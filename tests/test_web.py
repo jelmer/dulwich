@@ -348,14 +348,41 @@ class SmartHandlersTestCase(WebTestCase):
         return {b"git-upload-pack": self._make_handler}
 
     def test_handle_service_request_unknown(self) -> None:
+        self._environ["CONTENT_TYPE"] = "application/x-git-evil-handler-request"
         mat = re.search(".*", "/git-evil-handler")
         content = list(handle_service_request(self._req, "backend", mat))
         self.assertEqual(HTTP_FORBIDDEN, self._status)
         self.assertNotIn(b"git-evil-handler", b"".join(content))
         self.assertFalse(self._req.cached)
 
+    def test_handle_service_request_wrong_content_type(self) -> None:
+        self._environ["wsgi.input"] = BytesIO(b"foo")
+        self._environ["CONTENT_TYPE"] = "text/plain"
+        mat = re.search(".*", "/git-upload-pack")
+
+        class Backend:
+            def open_repository(self, path) -> None:
+                return None
+
+        content = b"".join(handle_service_request(self._req, Backend(), mat))
+        self.assertEqual(HTTP_FORBIDDEN, self._status)
+        self.assertEqual(b"Invalid Content-Type", content)
+
+    def test_handle_service_request_missing_content_type(self) -> None:
+        self._environ["wsgi.input"] = BytesIO(b"foo")
+        mat = re.search(".*", "/git-upload-pack")
+
+        class Backend:
+            def open_repository(self, path) -> None:
+                return None
+
+        content = b"".join(handle_service_request(self._req, Backend(), mat))
+        self.assertEqual(HTTP_FORBIDDEN, self._status)
+        self.assertEqual(b"Invalid Content-Type", content)
+
     def _run_handle_service_request(self, content_length=None) -> None:
         self._environ["wsgi.input"] = BytesIO(b"foo")
+        self._environ["CONTENT_TYPE"] = "application/x-git-upload-pack-request"
         if content_length is not None:
             self._environ["CONTENT_LENGTH"] = content_length
         mat = re.search(".*", "/git-upload-pack")

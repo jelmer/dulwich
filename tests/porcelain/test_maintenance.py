@@ -93,7 +93,7 @@ class MaintenanceRegisterTest(PorcelainMaintenanceTestCase):
         # Set up a temporary HOME for testing global config
         self.temp_home = tempfile.mkdtemp()
         self.addCleanup(self._cleanup_temp_home)
-        self.overrideEnv("HOME", self.temp_home)
+        self.overrideHome(self.temp_home)
 
     def _cleanup_temp_home(self):
         shutil.rmtree(self.temp_home)

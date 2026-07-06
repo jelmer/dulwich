@@ -76,6 +76,13 @@ _GIT_ENV_SCRUB: tuple[str, ...] = (
 
 def _scrub_git_env(override: "Callable[[str, str | None], None]") -> None:
     override("HOME", "/nonexistent")
+    # On Windows, os.path.expanduser("~") consults USERPROFILE (or
+    # HOMEDRIVE+HOMEPATH) and never HOME, so we have to redirect those too or
+    # the developer's real ~/.gitconfig still leaks in.
+    if sys.platform == "win32":
+        override("USERPROFILE", "C:\\nonexistent")
+        override("HOMEDRIVE", "C:")
+        override("HOMEPATH", "\\nonexistent")
     override("GIT_CONFIG_NOSYSTEM", "1")
     for name in _GIT_ENV_SCRUB:
         override(name, None)
@@ -117,6 +124,21 @@ class TestCase(_TestCase):
         elif name in os.environ:
             del os.environ[name]
         self.addCleanup(restore)
+
+    def overrideHome(self, path: str) -> None:
+        """Point ``~`` expansion at ``path`` on the current platform.
+
+        Setting only HOME is not enough on Windows, where
+        os.path.expanduser("~") consults USERPROFILE (or HOMEDRIVE+HOMEPATH)
+        instead. Use this whenever a test wants global git config to land in
+        a controlled directory.
+        """
+        self.overrideEnv("HOME", path)
+        if sys.platform == "win32":
+            self.overrideEnv("USERPROFILE", path)
+            drive, tail = os.path.splitdrive(path)
+            self.overrideEnv("HOMEDRIVE", drive)
+            self.overrideEnv("HOMEPATH", tail or "\\")
 
 
 class BlackboxTestCase(TestCase):

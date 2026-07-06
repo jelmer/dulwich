@@ -593,6 +593,13 @@ def handle_service_request(
     """
     service = mat.group().lstrip("/")
     logger.info("Handling service request for %s", service)
+    # Require the exact Git smart HTTP request Content-Type, matching
+    # ``git http-backend``. The value is not a CORS-safe MIME type, so browsers
+    # must preflight cross-origin POSTs.
+    expected_content_type = f"application/x-{service}-request"
+    if req.environ.get("CONTENT_TYPE") != expected_content_type:
+        yield req.forbidden("Invalid Content-Type")
+        return
     if req.handlers is None:
         yield req.forbidden("No handlers configured")
         return

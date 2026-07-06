@@ -13,6 +13,13 @@
    ``LimitedInputFilter`` also caps requests that omit ``Content-Length``.
    (Jelmer Vernooĳ)
 
+ * SECURITY: Cap the decompressed size of gzip-encoded request bodies in
+   ``dulwich.web``. ``GunzipFilter`` inflated ``Content-Encoding: gzip``
+   bodies with no bound on the output size, so a small compressed POST
+   could expand to gigabytes in server memory. Bodies inflating past
+   10 MiB are now rejected with ``413 Request Entity Too Large``.
+   (netliomax25-code)
+
 1.2.8	2026-07-05
 
  * Enumerate the objects to push before the HTTP ``git-receive-pack``

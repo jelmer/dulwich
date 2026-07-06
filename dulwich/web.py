@@ -26,7 +26,9 @@ __all__ = [
     "HTTP_FORBIDDEN",
     "HTTP_NOT_FOUND",
     "HTTP_OK",
+    "HTTP_REQUEST_ENTITY_TOO_LARGE",
     "MAX_CHUNK_SIZE",
+    "MAX_DECOMPRESSED_REQUEST_SIZE",
     "MAX_REQUEST_SIZE",
     "ChunkedEncodingError",
     "GunzipFilter",
@@ -160,6 +162,7 @@ logger = log_utils.getLogger(__name__)
 HTTP_OK = "200 OK"
 HTTP_NOT_FOUND = "404 Not Found"
 HTTP_FORBIDDEN = "403 Forbidden"
+HTTP_REQUEST_ENTITY_TOO_LARGE = "413 Request Entity Too Large"
 HTTP_ERROR = "500 Internal Server Error"
 
 
@@ -798,12 +801,37 @@ class HTTPGitApplication:
         return handler(req, self.backend, mat)
 
 
-class GunzipFilter:
-    """WSGI middleware that unzips gzip-encoded requests before passing on to the underlying application."""
+# Upper bound on the decompressed size of a gzip-encoded request body.
+# ``LimitedInputFilter`` only bounds the compressed body, and DEFLATE expands
+# up to ~1000x, so a tiny request could otherwise inflate to gigabytes in
+# memory. C git has no direct equivalent: http-backend buffers the compressed
+# body (bounded by GIT_HTTP_MAX_REQUEST_BUFFER) and streams the inflated bytes
+# into a separate service process, while dulwich inflates in-process. Requests
+# inflating past the cap are rejected with 413.
+MAX_DECOMPRESSED_REQUEST_SIZE = 10 * 1024 * 1024
 
-    def __init__(self, application: WSGIApplication) -> None:
-        """Initialize GunzipFilter with WSGI application."""
+
+class GunzipFilter:
+    """WSGI middleware that unzips gzip-encoded requests before passing on to the underlying application.
+
+    Bodies whose decompressed size exceeds ``max_decompressed_size`` are
+    rejected with ``413 Request Entity Too Large``.
+    """
+
+    def __init__(
+        self,
+        application: WSGIApplication,
+        max_decompressed_size: int = MAX_DECOMPRESSED_REQUEST_SIZE,
+    ) -> None:
+        """Initialize GunzipFilter with WSGI application.
+
+        Args:
+          application: The wrapped WSGI application.
+          max_decompressed_size: Maximum decompressed size of a gzip-encoded
+            request body; larger bodies are rejected with 413.
+        """
         self.app = application
+        self.max_decompressed_size = max_decompressed_size
 
     def __call__(
         self,
@@ -814,9 +842,28 @@ class GunzipFilter:
         import gzip
 
         if environ.get("HTTP_CONTENT_ENCODING", "") == "gzip":
-            environ["wsgi.input"] = gzip.GzipFile(
+            # Inflate the body up front so its size can be checked before the
+            # request is dispatched; handlers start their response before
+            # reading the body, at which point a 413 is no longer possible.
+            zfile = gzip.GzipFile(
                 filename=None, fileobj=environ["wsgi.input"], mode="rb"
             )
+            buf = BytesIO()
+            while True:
+                chunk = zfile.read(65536)
+                if not chunk:
+                    break
+                if buf.tell() + len(chunk) > self.max_decompressed_size:
+                    zfile.close()
+                    start_response(
+                        HTTP_REQUEST_ENTITY_TOO_LARGE,
+                        [("Content-Type", "text/plain")],
+                    )
+                    return [b"decompressed request body exceeds maximum size\n"]
+                buf.write(chunk)
+            zfile.close()
+            buf.seek(0)
+            environ["wsgi.input"] = buf
             del environ["HTTP_CONTENT_ENCODING"]
             environ.pop("CONTENT_LENGTH", None)
 

@@ -68,6 +68,7 @@ class SHA256PackTests(unittest.TestCase):
         # Load and verify the index
         index_buf.seek(0)
         pack_idx = load_pack_index_file("<memory>", index_buf, SHA256)
+        self.addCleanup(pack_idx.close)
 
         # Check that the index loaded correctly
         self.assertEqual(len(pack_idx), 5)

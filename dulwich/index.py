@@ -2075,6 +2075,17 @@ def _is_reserved_windows_device_name(normalized: bytes) -> bool:
     return stem in RESERVED_WINDOWS_DEVICE_NAMES
 
 
+def _has_dos_drive_prefix(name: bytes) -> bool:
+    """Return True if name begins with a DOS drive-letter prefix like 'C:'.
+
+    Any ASCII byte followed by a colon counts, matching the ASCII branch of
+    C git's win32_has_dos_drive_prefix: subst allows non-alphabetic drives.
+    """
+    if len(name) < 2 or name[1:2] != b":":
+        return False
+    return name[0] < 0x80
+
+
 def validate_path_element_ntfs(element: bytes) -> bool:
     """Validate a path element using NTFS filesystem rules.
 
@@ -2173,6 +2184,11 @@ def validate_path(
     element_validator: Callable[[bytes], bool] = validate_path_element_default,
 ) -> bool:
     """Default path validator that just checks for .git/."""
+    # A leading drive-letter prefix lets os.path.join discard the work-tree
+    # root on Windows. Matches C git's verify_path, whose has_dos_drive_prefix
+    # is a no-op stub on non-Windows.
+    if os.name == "nt" and _has_dos_drive_prefix(path):
+        return False
     parts = path.split(b"/")
     for p in parts:
         if not element_validator(p):

@@ -80,6 +80,7 @@ from .errors import NotTreeError
 from .file import GitFile, _GitFile
 from .midx import MultiPackIndex, load_midx
 from .objects import (
+    DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     S_ISGITLINK,
     Blob,
     Commit,
@@ -1606,6 +1607,7 @@ class DiskObjectStore(PackBasedObjectStore):
         file_mode: int | None = None,
         dir_mode: int | None = None,
         object_format: "ObjectFormat | None" = None,
+        loose_object_size_limit: int | None = None,
     ) -> None:
         """Open an object store.
 
@@ -1629,6 +1631,10 @@ class DiskObjectStore(PackBasedObjectStore):
           file_mode: File permission mask for shared repository
           dir_mode: Directory permission mask for shared repository
           object_format: Hash algorithm to use (SHA1 or SHA256)
+          loose_object_size_limit: Maximum inflated size of a single loose
+            object. Defaults to core.bigFileThreshold's Git default (512 MiB)
+            via :data:`DEFAULT_LOOSE_OBJECT_SIZE_LIMIT` when None. Guards against
+            decompression-bomb attacks.
         """
         # Import here to avoid circular dependency
         from .object_format import DEFAULT_OBJECT_FORMAT
@@ -1658,6 +1664,11 @@ class DiskObjectStore(PackBasedObjectStore):
         self.pack_write_bitmap_lookup_table = pack_write_bitmap_lookup_table
         self.file_mode = file_mode
         self.dir_mode = dir_mode
+        self.loose_object_size_limit = (
+            loose_object_size_limit
+            if loose_object_size_limit is not None
+            else DEFAULT_LOOSE_OBJECT_SIZE_LIMIT
+        )
 
         # Commit graph support - lazy loaded
         self._commit_graph = None
@@ -1764,6 +1775,15 @@ class DiskObjectStore(PackBasedObjectStore):
         except KeyError:
             delta_base_cache_limit = None
 
+        # Read core.bigFileThreshold setting; used as the upper bound for
+        # inflating a single loose object, guarding against decompression bombs.
+        try:
+            loose_object_size_limit: int | None = int(
+                config.get((b"core",), b"bigFileThreshold").decode()
+            )
+        except KeyError:
+            loose_object_size_limit = None
+
         # Read core.commitGraph setting
         use_commit_graph = config.get_boolean((b"core",), b"commitGraph", True)
 
@@ -1825,6 +1845,7 @@ class DiskObjectStore(PackBasedObjectStore):
             file_mode=file_mode,
             dir_mode=dir_mode,
             object_format=object_format,
+            loose_object_size_limit=loose_object_size_limit,
         )
         instance._use_commit_graph = use_commit_graph
         instance._use_midx = use_midx
@@ -1986,7 +2007,12 @@ class DiskObjectStore(PackBasedObjectStore):
             else:
                 hex_sha = ObjectID(sha)
             path = self._get_shafile_path(hex_sha)
-            return ShaFile.from_path(path, hex_sha, object_format=self.object_format)
+            return ShaFile.from_path(
+                path,
+                hex_sha,
+                object_format=self.object_format,
+                max_size=self.loose_object_size_limit,
+            )
         except FileNotFoundError:
             return None
 

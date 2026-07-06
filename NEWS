@@ -6,6 +6,14 @@
    client) already send this header, so there is no interop cost; the check
    is defense in depth against cross-origin POSTs for deployments that wrap
    ``dulwich.web`` in a cookie-based auth layer.
+
+ * SECURITY: Bound zlib decompression of pack entries and loose objects
+   against decompression-bomb DoS. ``read_zlib_chunks`` now caps the
+   inflated size at the declared ``decomp_len``, and loose-object parsing
+   (``ShaFile.from_file``/``from_path``) accepts a ``max_size`` argument
+   defaulting to Git's ``core.bigFileThreshold`` (512 MiB). The disk
+   object store reads ``core.bigFileThreshold`` from config and enforces
+   it on ``_get_loose_object``.
    (reported by Luke Bento, Jelmer Vernooĳ)
 
  * SECURITY: Reject ``OFS_DELTA`` pack entries whose ``delta_base_offset``
@@ -14,6 +22,12 @@
    of memory. ``unpack_object`` now raises ``ApplyDeltaError`` at parse
    time, matching git's ``delta offset == 0 is invalid`` guard.
    (reported by Luke Banto, Jelmer Vernooĳ)
+
+ * SECURITY: Bound ``Transfer-Encoding: chunked`` request bodies in
+   ``dulwich.web``. ``_chunk_iter`` now strips chunk extensions, rejects
+   negative sizes, and enforces per-chunk and per-request size limits;
+   ``LimitedInputFilter`` also caps requests that omit ``Content-Length``.
+   (Jelmer Vernooĳ)
 
 1.2.8	2026-07-05
 

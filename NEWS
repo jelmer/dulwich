@@ -7,6 +7,12 @@
    time, matching git's ``delta offset == 0 is invalid`` guard.
    (reported by Luke Banto, Jelmer Vernooĳ)
 
+ * SECURITY: Bound ``Transfer-Encoding: chunked`` request bodies in
+   ``dulwich.web``. ``_chunk_iter`` now strips chunk extensions, rejects
+   negative sizes, and enforces per-chunk and per-request size limits;
+   ``LimitedInputFilter`` also caps requests that omit ``Content-Length``.
+   (Jelmer Vernooĳ)
+
 1.2.8	2026-07-05
 
  * Enumerate the objects to push before the HTTP ``git-receive-pack``

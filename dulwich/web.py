@@ -927,6 +927,13 @@ def main(argv: list[str] = sys.argv) -> None:
         handler_class=WSGIRequestHandlerLogger,
         server_class=WSGIServerLogger,
     )
+    logger.warning(
+        "This server is intended for debugging only. "
+        "For production use, run the WSGI app returned by make_wsgi_chain() "
+        "inside a proper WSGI server (e.g. gunicorn, uWSGI, mod_wsgi). "
+        "The GunzipFilter middleware it wraps is required, as WSGI servers "
+        "do not decode gzip-encoded request bodies that git clients send."
+    )
     logger.info(
         "Listening for HTTP connections on %s:%d",
         options.listen_address,

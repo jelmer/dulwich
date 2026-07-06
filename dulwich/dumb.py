@@ -37,6 +37,8 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     from .object_format import ObjectFormat
 
 from .errors import NotGitRepository, ObjectFormatException
@@ -418,6 +420,23 @@ class DumbRemoteHTTPRepo:
         self._refs: dict[Ref, ObjectID] | None = None
         self._peeled: dict[Ref, ObjectID] | None = None
         self.object_store = DumbHTTPObjectStore(base_url, http_request_func)
+
+    def close(self) -> None:
+        """Close the repository and release resources."""
+        self.object_store.close()
+
+    def __enter__(self) -> "DumbRemoteHTTPRepo":
+        """Enter context manager."""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: "type[BaseException] | None",
+        exc_val: "BaseException | None",
+        exc_tb: "TracebackType | None",
+    ) -> None:
+        """Exit context manager and close the repository."""
+        self.close()
 
     def _fetch_url(self, path: str) -> bytes:
         """Fetch content from a URL path relative to base_url."""

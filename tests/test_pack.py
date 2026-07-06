@@ -607,6 +607,7 @@ class TestPackData(PackTests):
             filename = os.path.join(self.tempdir, "v1test.idx")
             p.create_index_v1(filename)
             idx1 = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
+            self.addCleanup(idx1.close)
             idx2 = self.get_pack_index(pack1_sha)
             self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
@@ -616,6 +617,7 @@ class TestPackData(PackTests):
             filename = os.path.join(self.tempdir, "v2test.idx")
             p.create_index_v2(filename)
             idx1 = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
+            self.addCleanup(idx1.close)
             idx2 = self.get_pack_index(pack1_sha)
             self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
@@ -625,6 +627,7 @@ class TestPackData(PackTests):
             filename = os.path.join(self.tempdir, "v3test.idx")
             p.create_index_v3(filename)
             idx1 = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
+            self.addCleanup(idx1.close)
             idx2 = self.get_pack_index(pack1_sha)
             self.assertEqual(oct(os.stat(filename).st_mode), indexmode)
             self.assertEqual(idx1, idx2)
@@ -636,6 +639,7 @@ class TestPackData(PackTests):
             filename = os.path.join(self.tempdir, "version3test.idx")
             p.create_index(filename, version=3)
             idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
+            self.addCleanup(idx.close)
             self.assertIsInstance(idx, PackIndex3)
             self.assertEqual(idx.version, 3)
 
@@ -1153,14 +1157,13 @@ class BaseTestPackIndexWriting:
 class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
     def setUp(self) -> None:
         self.tempdir = tempfile.mkdtemp()
-
-    def tearDown(self) -> None:
-        shutil.rmtree(self.tempdir)
+        self.addCleanup(shutil.rmtree, self.tempdir)
 
     def index(self, filename, entries, pack_checksum):
         path = os.path.join(self.tempdir, filename)
         self.writeIndex(path, entries, pack_checksum)
         idx = load_pack_index(path, DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(idx.close)
         self.assertSucceeds(idx.check)
         self.assertEqual(idx.version, self._expected_version)
         return idx
@@ -1193,10 +1196,6 @@ class TestPackIndexWritingv1(TestCase, BaseTestFilePackIndexWriting):
         self._supports_large = False
         self._write_fn = write_pack_index_v1
 
-    def tearDown(self) -> None:
-        TestCase.tearDown(self)
-        BaseTestFilePackIndexWriting.tearDown(self)
-
 
 class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
     def setUp(self) -> None:
@@ -1206,10 +1205,6 @@ class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
         self._supports_large = True
         self._expected_version = 2
         self._write_fn = write_pack_index_v2
-
-    def tearDown(self) -> None:
-        TestCase.tearDown(self)
-        BaseTestFilePackIndexWriting.tearDown(self)
 
 
 class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
@@ -1221,16 +1216,13 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         self._expected_version = 3
         self._write_fn = write_pack_index_v3
 
-    def tearDown(self) -> None:
-        TestCase.tearDown(self)
-        BaseTestFilePackIndexWriting.tearDown(self)
-
     def test_load_v3_index_returns_packindex3(self) -> None:
         """Test that loading a v3 index file returns a PackIndex3 instance."""
         entries = [(b"abcd" * 5, 0, zlib.crc32(b""))]
         filename = os.path.join(self.tempdir, "test.idx")
         self.writeIndex(filename, entries, b"1234567890" * 2)
         idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(idx.close)
         self.assertIsInstance(idx, PackIndex3)
         self.assertEqual(idx.version, 3)
         self.assertEqual(idx.hash_format, 1)  # SHA-1
@@ -1245,6 +1237,7 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         with GitFile(filename, "wb") as f:
             write_pack_index_v3(f, entries, b"1" * 20, hash_format=1)
         idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(idx.close)
         self.assertEqual(idx.hash_format, 1)
         self.assertEqual(idx.hash_size, 20)
 
@@ -1298,6 +1291,7 @@ class WritePackIndexTests(TestCase):
             write_pack_index(f, entries, b"P" * 20)
 
         idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(idx.close)
         self.assertEqual(DEFAULT_PACK_INDEX_VERSION, idx.version)
 
     def test_write_pack_index_version_1(self) -> None:
@@ -1311,6 +1305,7 @@ class WritePackIndexTests(TestCase):
             write_pack_index(f, entries, b"P" * 20, version=1)
 
         idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(idx.close)
         self.assertEqual(1, idx.version)
 
     def test_write_pack_index_version_3(self) -> None:
@@ -1324,6 +1319,7 @@ class WritePackIndexTests(TestCase):
             write_pack_index(f, entries, b"P" * 20, version=3)
 
         idx = load_pack_index(filename, DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(idx.close)
         self.assertEqual(3, idx.version)
 
     def test_write_pack_index_invalid_version(self) -> None:

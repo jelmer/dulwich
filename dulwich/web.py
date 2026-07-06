@@ -26,6 +26,9 @@ __all__ = [
     "HTTP_FORBIDDEN",
     "HTTP_NOT_FOUND",
     "HTTP_OK",
+    "MAX_CHUNK_SIZE",
+    "MAX_REQUEST_SIZE",
+    "ChunkedEncodingError",
     "GunzipFilter",
     "HTTPGitApplication",
     "HTTPGitRequest",
@@ -449,13 +452,52 @@ def get_info_packs(
     return generate_objects_info_packs(get_repo(backend, mat))
 
 
-def _chunk_iter(f: BinaryIO) -> Iterator[bytes]:
+# Upper bound on a single dechunked chunk. Matches the largest pkt-line the
+# smart-http protocol will emit (~64 KiB) with room to spare, and keeps a
+# hostile ``Transfer-Encoding: chunked`` peer from asking the server to
+# allocate an arbitrarily large buffer in one call.
+MAX_CHUNK_SIZE = 1 * 1024 * 1024
+
+# Upper bound on the total dechunked body of a single request. Large enough
+# to cover realistic pushes but finite so a stream of small chunks can no
+# longer grow the buffer without limit. Also used by ``LimitedInputFilter``
+# as a fallback cap when the request omits ``Content-Length`` (as chunked
+# requests do).
+MAX_REQUEST_SIZE = 1 * 1024 * 1024 * 1024
+
+
+class ChunkedEncodingError(ValueError):
+    """Raised when a chunked-encoded request body is malformed or too large."""
+
+
+def _chunk_iter(
+    f: BinaryIO,
+    max_chunk_size: int = MAX_CHUNK_SIZE,
+    max_total_size: int = MAX_REQUEST_SIZE,
+) -> Iterator[bytes]:
+    total = 0
     while True:
         line = f.readline()
-        length = int(line.rstrip(), 16)
-        chunk = f.read(length + 2)
+        if not line:
+            raise ChunkedEncodingError("Truncated chunked stream")
+        # Strip HTTP/1.1 chunk extensions (RFC 7230 section 4.1.1) before
+        # parsing the length. ``int(..., 16)`` accepts a leading ``-``, so
+        # reject negatives explicitly.
+        size_str = line.rstrip(b"\r\n").split(b";", 1)[0].strip()
+        try:
+            length = int(size_str, 16)
+        except ValueError:
+            raise ChunkedEncodingError("Invalid chunk size") from None
+        if length < 0:
+            raise ChunkedEncodingError("Invalid chunk size")
+        if length > max_chunk_size:
+            raise ChunkedEncodingError("Chunk size exceeds maximum allowed")
         if length == 0:
             break
+        total += length
+        if total > max_total_size:
+            raise ChunkedEncodingError("Request body exceeds maximum allowed size")
+        chunk = f.read(length + 2)
         yield chunk[:-2]
 
 
@@ -522,6 +564,16 @@ class _LengthLimitedFile:
             size = self._bytes_avail
         self._bytes_avail -= size
         return self._input.read(size)
+
+    def readline(self, size: int = -1) -> bytes:
+        """Read a single line, honouring the remaining byte budget."""
+        if self._bytes_avail <= 0:
+            return b""
+        if size == -1 or size > self._bytes_avail:
+            size = self._bytes_avail
+        line = self._input.readline(size)
+        self._bytes_avail -= len(line)
+        return line
 
     # TODO: support more methods as necessary
 
@@ -772,11 +824,23 @@ class GunzipFilter:
 
 
 class LimitedInputFilter:
-    """WSGI middleware that limits the input length of a request to that specified in Content-Length."""
+    """WSGI middleware that limits the input length of a request.
 
-    def __init__(self, application: WSGIApplication) -> None:
+    When ``Content-Length`` is present the input is capped at that value.
+    Requests that omit ``Content-Length`` (notably HTTP/1.1 chunked
+    transfer-encoded requests) are still capped at ``MAX_REQUEST_SIZE``
+    bytes so a hostile peer cannot force the server to buffer an
+    unbounded body.
+    """
+
+    def __init__(
+        self,
+        application: WSGIApplication,
+        max_request_size: int = MAX_REQUEST_SIZE,
+    ) -> None:
         """Initialize LimitedInputFilter with WSGI application."""
         self.app = application
+        self.max_request_size = max_request_size
 
     def __call__(
         self,
@@ -786,13 +850,18 @@ class LimitedInputFilter:
         """Handle WSGI request with input length limiting."""
         # This is not necessary if this app is run from a conforming WSGI
         # server. Unfortunately, there's no way to tell that at this point.
-        # TODO: git may used HTTP/1.1 chunked encoding instead of specifying
-        # content-length
         content_length = environ.get("CONTENT_LENGTH", "")
         if content_length:
-            environ["wsgi.input"] = _LengthLimitedFile(
-                environ["wsgi.input"], int(content_length)
-            )
+            try:
+                limit = int(content_length)
+            except ValueError:
+                limit = self.max_request_size
+            else:
+                if limit < 0 or limit > self.max_request_size:
+                    limit = self.max_request_size
+        else:
+            limit = self.max_request_size
+        environ["wsgi.input"] = _LengthLimitedFile(environ["wsgi.input"], limit)
         return self.app(environ, start_response)
 
 

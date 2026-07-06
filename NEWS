@@ -1,4 +1,4 @@
-1.2.9	UNRELEASED
+1.2.9	2026-07-06
 
  * Bound the running length when decoding EWAH bitmaps, so a corrupt or
    malformed ``.bitmap`` index raises ``ValueError`` instead of hanging in

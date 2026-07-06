@@ -7,6 +7,11 @@
    time, matching git's ``delta offset == 0 is invalid`` guard.
    (reported by Luke Banto, Jelmer Vernooĳ)
 
+ * dulwich.web: Warn at startup that running ``python3 -m dulwich.web``
+   is not meant to provide a production web server. It does not
+   support authentication, for example.
+   (Jelmer Vernooĳ)
+
 1.2.8	2026-07-05
 
  * Enumerate the objects to push before the HTTP ``git-receive-pack``

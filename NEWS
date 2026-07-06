@@ -1,5 +1,27 @@
 1.2.9	UNRELEASED
 
+ * web: Reject smart HTTP ``git-upload-pack`` / ``git-receive-pack`` POSTs
+   whose ``Content-Type`` is not the exact ``application/x-<service>-request``
+   value, matching ``git http-backend``. Real git clients (and dulwich's own
+   client) already send this header, so there is no interop cost; the check
+   is defense in depth against cross-origin POSTs for deployments that wrap
+   ``dulwich.web`` in a cookie-based auth layer.
+
+ * SECURITY: On Windows, reject checkout paths whose leading component
+   is a DOS drive-letter prefix like `C:`. `os.path.join(root, "C:...")`
+   discards `root` and writes to the absolute drive path, so a tree entry
+   named `C:` could otherwise write arbitrary files outside the work tree.
+   (reported by Luke Baton, Jelmer Vernooĳ)
+
+ * SECURITY: Bound zlib decompression of pack entries and loose objects
+   against decompression-bomb DoS. ``read_zlib_chunks`` now caps the
+   inflated size at the declared ``decomp_len``, and loose-object parsing
+   (``ShaFile.from_file``/``from_path``) accepts a ``max_size`` argument
+   defaulting to Git's ``core.bigFileThreshold`` (512 MiB). The disk
+   object store reads ``core.bigFileThreshold`` from config and enforces
+   it on ``_get_loose_object``.
+   (reported by Luke Bento, Jelmer Vernooĳ)
+
  * SECURITY: Reject ``OFS_DELTA`` pack entries whose ``delta_base_offset``
    is zero. Such an entry references itself, so ``Pack.resolve_object``
    would loop forever growing its delta stack until the process ran out
@@ -9,7 +31,12 @@
 
  * dulwich.web: Warn at startup that running ``python3 -m dulwich.web``
    is not meant to provide a production web server. It does not
-   support authentication, for example.
+   support authentication, for example.   (Jelmer Vernooĳ)
+
+ * SECURITY: Bound ``Transfer-Encoding: chunked`` request bodies in
+   ``dulwich.web``. ``_chunk_iter`` now strips chunk extensions, rejects
+   negative sizes, and enforces per-chunk and per-request size limits;
+   ``LimitedInputFilter`` also caps requests that omit ``Content-Length``.
    (Jelmer Vernooĳ)
 
 1.2.8	2026-07-05

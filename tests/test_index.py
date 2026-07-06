@@ -61,6 +61,7 @@ from dulwich.index import (
     _ensure_parent_dir_exists,
     _fs_to_tree_path,
     _has_directory_changed,
+    _has_dos_drive_prefix,
     _tree_to_fs_path,
     build_index_from_tree,
     cleanup_mode,
@@ -77,6 +78,7 @@ from dulwich.index import (
     read_index_dict,
     read_submodule_head,
     update_working_tree,
+    validate_path,
     validate_path_element_default,
     validate_path_element_hfs,
     validate_path_element_ntfs,
@@ -694,6 +696,33 @@ class BuildIndexTests(TestCase):
 
                 # Nothing was written, including the benign entry.
                 self.assertEqual(os.listdir(repo.path), [".git"])
+
+    @skipIf(os.name != "nt", "drive prefix is only rejected on Windows")
+    def test_dos_drive_prefix_aborts_checkout(self) -> None:
+        # A "C:" entry at the top of the tree makes Windows' os.path.join
+        # discard the work-tree root. Nested trees because a single tree
+        # entry cannot contain a slash.
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            blob = Blob.from_string(b"payload\n")
+            inner = Tree()
+            inner[b"evil.txt"] = (stat.S_IFREG | 0o644, blob.id)
+            outer = Tree()
+            outer[b"C:"] = (stat.S_IFDIR, inner.id)
+            repo.object_store.add_objects([(o, None) for o in [blob, inner, outer]])
+
+            self.assertRaises(
+                InvalidPathError,
+                build_index_from_tree,
+                repo.path,
+                repo.index_path(),
+                repo.object_store,
+                outer.id,
+                validate_path_element=validate_path_element_ntfs,
+            )
+
+            self.assertEqual(os.listdir(repo.path), [".git"])
 
     def test_ntfs_colon_filename_checked_out(self) -> None:
         # A file whose name merely contains a colon (an NTFS-hostile
@@ -1724,6 +1753,79 @@ class TestValidatePathElement(TestCase):
         self.assertTrue(validate_path_element_ntfs(b"com0"))
         self.assertTrue(validate_path_element_ntfs(b"com10"))
         self.assertTrue(validate_path_element_ntfs(b"lpt0"))
+
+    def test_ntfs_element_accepts_bare_drive_letter(self) -> None:
+        # The drive-letter check lives in validate_path against the whole
+        # path, matching where C git's verify_path applies it. Individual
+        # elements may still contain a colon (see issue #2205).
+        self.assertTrue(validate_path_element_ntfs(b"C:"))
+        self.assertTrue(validate_path_element_ntfs(b"C:foo"))
+
+
+class TestHasDosDrivePrefix(TestCase):
+    def test_bare_drive_letter(self) -> None:
+        for name in (b"C:", b"c:", b"D:", b"Z:", b"a:"):
+            self.assertTrue(_has_dos_drive_prefix(name), repr(name))
+
+    def test_drive_letter_with_tail(self) -> None:
+        self.assertTrue(_has_dos_drive_prefix(b"C:foo"))
+        self.assertTrue(_has_dos_drive_prefix(b"C:/foo"))
+        self.assertTrue(_has_dos_drive_prefix(b"C:\\foo"))
+
+    def test_non_alphabetic_drive(self) -> None:
+        # subst allows any ASCII byte as a drive letter.
+        self.assertTrue(_has_dos_drive_prefix(b"1:"))
+        self.assertTrue(_has_dos_drive_prefix(b"!:"))
+
+    def test_high_bit_first_byte_not_treated_as_ascii(self) -> None:
+        # C git also handles subst-created Unicode drives; not emulated.
+        self.assertFalse(_has_dos_drive_prefix(b"\xc3\xa9:"))
+
+    def test_no_colon(self) -> None:
+        self.assertFalse(_has_dos_drive_prefix(b"C"))
+        self.assertFalse(_has_dos_drive_prefix(b"CD"))
+        self.assertFalse(_has_dos_drive_prefix(b""))
+
+    def test_colon_not_at_position_one(self) -> None:
+        self.assertFalse(_has_dos_drive_prefix(b":foo"))
+        self.assertFalse(_has_dos_drive_prefix(b"ab:cd"))
+
+
+class TestValidatePath(TestCase):
+    @skipIf(os.name != "nt", "drive prefix is only rejected on Windows")
+    def test_rejects_drive_letter_prefix_on_windows(self) -> None:
+        self.assertFalse(validate_path(b"C:/Users/victim/evil.txt"))
+        self.assertFalse(validate_path(b"C:"))
+        self.assertFalse(validate_path(b"c:evil"))
+
+    @skipIf(os.name != "nt", "drive prefix is only rejected on Windows")
+    def test_rejects_drive_letter_prefix_regardless_of_validator(self) -> None:
+        # Not gated on core.protectNTFS, matching C git.
+        for v in (
+            validate_path_element_default,
+            validate_path_element_hfs,
+            validate_path_element_ntfs,
+        ):
+            self.assertFalse(
+                validate_path(b"C:/x", v),
+                f"validator {v.__name__} should reject drive-prefix path",
+            )
+
+    @skipIf(os.name == "nt", "on POSIX C:x is just an unusual filename")
+    def test_accepts_drive_letter_prefix_on_posix(self) -> None:
+        # POSIX' os.path.join does not absolutize on a drive-letter prefix.
+        self.assertTrue(validate_path(b"C:/Users/victim/evil.txt"))
+        self.assertTrue(validate_path(b"C:"))
+        self.assertTrue(validate_path(b"c:evil"))
+
+    def test_accepts_colon_mid_path(self) -> None:
+        # See issue #2205.
+        self.assertTrue(
+            validate_path(b"foo/C:bar", validate_path_element_ntfs),
+        )
+        self.assertTrue(
+            validate_path(b"with:colon.txt", validate_path_element_ntfs),
+        )
 
 
 class TestDecodeUTF8WithFallback(TestCase):

@@ -5339,6 +5339,11 @@ class CheckWorktreePathTests(PorcelainTestCase):
         ):
             self.assertRaises(porcelain.Error, _checked_worktree_path, self.repo, bad)
 
+    @skipIf(os.name != "nt", "drive prefix is only rejected on Windows")
+    def test_rejects_dos_drive_prefix_on_windows(self) -> None:
+        for bad in (b"C:/Users/victim/evil.txt", b"C:", b"c:evil"):
+            self.assertRaises(porcelain.Error, _checked_worktree_path, self.repo, bad)
+
     def test_allows_ordinary_paths(self) -> None:
         root = os.fsencode(self.repo.path)
         self.assertEqual(

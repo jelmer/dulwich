@@ -1,5 +1,9 @@
 1.2.9	UNRELEASED
 
+ * Bound the running length when decoding EWAH bitmaps, so a corrupt or
+   malformed ``.bitmap`` index raises ``ValueError`` instead of hanging in
+   an unbounded loop that exhausts memory. (Jelmer Vernooĳ)
+
  * web: Reject smart HTTP ``git-upload-pack`` / ``git-receive-pack`` POSTs
    whose ``Content-Type`` is not the exact ``application/x-<service>-request``
    value, matching ``git http-backend``. Real git clients (and dulwich's own

@@ -4955,23 +4955,22 @@ class AbstractHttpGitClient(GitClient):
             from .dumb import DumbRemoteHTTPRepo
 
             # Pass http_request function
-            dumb_repo = DumbRemoteHTTPRepo(
+            with DumbRemoteHTTPRepo(
                 url, functools.partial(self._http_request, raise_for_status=False)
-            )
-
-            # Fetch pack data from dumb remote
-            pack_data_list = list(
-                dumb_repo.fetch_pack_data(
-                    lambda refs, depth: wants,
-                    graph_walker,
-                    progress=progress,
-                    depth=depth,
+            ) as dumb_repo:
+                # Fetch pack data from dumb remote
+                pack_data_list = list(
+                    dumb_repo.fetch_pack_data(
+                        lambda refs, depth: wants,
+                        graph_walker,
+                        progress=progress,
+                        depth=depth,
+                    )
                 )
-            )
 
-            head = dumb_repo.get_head()
-            if head is not None:
-                symrefs[HEADREF] = head
+                head = dumb_repo.get_head()
+                if head is not None:
+                    symrefs[HEADREF] = head
 
             # Write pack data
             if pack_data_list:

@@ -495,8 +495,14 @@ class IndexV4CompatTestCase(CompatTestCase):
         run_git_or_fail(["add", "conflict.txt"], cwd=repo.path)
         run_git_or_fail(["commit", "-m", "master change"], cwd=repo.path)
 
-        # Try to merge (should create conflicts)
-        run_git(["merge", "feature"], cwd=repo.path)
+        # Try to merge (should create conflicts). Capture output so the
+        # expected conflict messages don't leak to the test console.
+        run_git(
+            ["merge", "feature"],
+            cwd=repo.path,
+            capture_stdout=True,
+            capture_stderr=True,
+        )
 
         # Read the index with conflicts
         index_path = os.path.join(repo.path, ".git", "index")

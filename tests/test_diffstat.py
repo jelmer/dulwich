@@ -5,6 +5,7 @@
 
 """Tests for dulwich.diffstat."""
 
+import contextlib
 import io
 import os
 import sys
@@ -451,12 +452,14 @@ index 1234567..abcdefg 100644
 
             # Test with a file path argument
             sys.argv = ["diffstat.py", tmp_path]
-            return_code = main()
+            with contextlib.redirect_stdout(io.StringIO()):
+                return_code = main()
             self.assertEqual(return_code, 0)
 
             # Test with no args to trigger the self-test
             sys.argv = ["diffstat.py"]
-            return_code = main()
+            with contextlib.redirect_stdout(io.StringIO()):
+                return_code = main()
             self.assertEqual(return_code, 0)
         finally:
             # Restore original sys.argv

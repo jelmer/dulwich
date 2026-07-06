@@ -232,6 +232,7 @@ class TestPackIndexCompat(PackTests):
 
         # Load with dulwich
         idx = load_pack_index(pack_path + ".idx", DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(idx.close)
 
         # Verify it works
         self.assertIn(blob.id, idx)
@@ -251,6 +252,7 @@ class TestPackIndexCompat(PackTests):
 
         # Load and verify structure
         idx = load_pack_index(v3_path, DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(idx.close)
         self.assertIsInstance(idx, PackIndex3)
         self.assertEqual(idx.version, 3)
         self.assertEqual(idx.hash_format, 1)  # SHA-1

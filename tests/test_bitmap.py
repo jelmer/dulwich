@@ -23,6 +23,7 @@
 
 import os
 import shutil
+import struct
 import tempfile
 import time
 import unittest
@@ -730,6 +731,70 @@ class BitmapErrorHandlingTests(unittest.TestCase):
 
         # Should raise ValueError about missing data
         self.assertIsInstance(ctx.exception, ValueError)
+
+    def test_decode_oversized_running_length(self):
+        """Reject an RLW whose running length exceeds the declared bit count.
+
+        A malicious bitmap can declare a tiny bit_count but a huge
+        running_len, which would otherwise trigger an unbounded loop and
+        memory allocation (a decompression bomb).
+        """
+        # bit_count=1024 (16 words), word_count=1, then a single RLW with
+        # running_bit=1 and running_len=0x10000000.
+        rlw = (1 << 1) | 1 | (0x10000000 << 1)
+        data = struct.pack(">II", 1024, 1)
+        data += struct.pack(">Q", rlw)
+        data += struct.pack(">I", 0)  # RLW position
+
+        with self.assertRaises(ValueError) as ctx:
+            EWAHBitmap(data)
+        self.assertIn("running length", str(ctx.exception).lower())
+
+    def test_decode_oversized_literal_words(self):
+        """Reject more literal words than the declared bit count allows."""
+        # bit_count=64 (one word) but the RLW claims two literal words.
+        rlw = 2 << 33
+        data = struct.pack(">II", 64, 3)
+        data += struct.pack(">Q", rlw)
+        data += struct.pack(">Q", 0xFFFFFFFFFFFFFFFF)
+        data += struct.pack(">Q", 0xFFFFFFFFFFFFFFFF)
+        data += struct.pack(">I", 0)  # RLW position
+
+        with self.assertRaises(ValueError) as ctx:
+            EWAHBitmap(data)
+        self.assertIn("literal words", str(ctx.exception).lower())
+
+    def test_decode_running_length_at_limit(self):
+        """A run that fills exactly the declared bit count is accepted."""
+        # bit_count=128 (two words), one RLW with running_bit=1 and
+        # running_len=2 fills the whole bitmap.
+        rlw = (2 << 1) | 1
+        data = struct.pack(">II", 128, 1)
+        data += struct.pack(">Q", rlw)
+        data += struct.pack(">I", 0)  # RLW position
+
+        decoded = EWAHBitmap(data)
+        self.assertEqual(128, len(decoded))
+        self.assertIn(0, decoded)
+        self.assertIn(127, decoded)
+
+    def test_read_bitmap_file_oversized_running_length(self):
+        """A corrupt type bitmap with an oversized run is rejected on read."""
+        data = BITMAP_SIGNATURE
+        data += BITMAP_VERSION.to_bytes(2, "big")
+        data += b"\x00\x00"  # Flags
+        data += b"\x00\x00\x00\x00"  # Entry count
+        data += b"\x00" * 20  # Pack checksum
+
+        # First type bitmap: bit_count=1024, one RLW with a huge running_len.
+        rlw = (1 << 1) | 1 | (0x10000000 << 1)
+        data += struct.pack(">II", 1024, 1)
+        data += struct.pack(">Q", rlw)
+        data += struct.pack(">I", 0)
+
+        with self.assertRaises(ValueError) as ctx:
+            read_bitmap_file(BytesIO(data))
+        self.assertIn("running length", str(ctx.exception).lower())
 
     def test_empty_bitmap_file(self):
         """Test reading completely empty file."""

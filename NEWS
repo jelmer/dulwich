@@ -1,5 +1,9 @@
 1.2.9	UNRELEASED
 
+ * Bound the running length when decoding EWAH bitmaps, so a corrupt or
+   malformed ``.bitmap`` index raises ``ValueError`` instead of hanging in
+   an unbounded loop that exhausts memory. (Jelmer Vernooĳ)
+
  * SECURITY: On Windows, reject checkout paths whose leading component
    is a DOS drive-letter prefix like `C:`. `os.path.join(root, "C:...")`
    discards `root` and writes to the absolute drive path, so a tree entry

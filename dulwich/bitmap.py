@@ -201,6 +201,13 @@ class EWAHBitmap:
         self.bit_count = bit_count
         current_bit = 0
 
+        # The bitmap describes bit_count bits, stored as ceil(bit_count / 64)
+        # 64-bit words. Decoding must never emit more bits than that. A corrupt
+        # or malicious RLW can declare a huge running_len, which would otherwise
+        # trigger an unbounded loop and memory allocation, so bound every
+        # section against this limit.
+        max_bits = ((bit_count + 63) // 64) * 64
+
         # Read all words first
         words = []
         for _ in range(word_count):
@@ -223,16 +230,27 @@ class EWAHBitmap:
 
             # Process running bits
             if running_len > 0:
+                run_bits = running_len * 64
+                if current_bit + run_bits > max_bits:
+                    raise ValueError(
+                        f"EWAH running length {running_len} exceeds declared "
+                        f"bit count {bit_count}"
+                    )
                 if running_bit == 1:
                     # Add all bits in the repeated section
-                    for i in range(running_len * 64):
+                    for i in range(run_bits):
                         self.bits.add(current_bit + i)
-                current_bit += running_len * 64
+                current_bit += run_bits
 
             # Process literal words
             for _ in range(literal_words):
                 if idx >= len(words):
                     break
+
+                if current_bit + 64 > max_bits:
+                    raise ValueError(
+                        f"EWAH literal words exceed declared bit count {bit_count}"
+                    )
 
                 literal = words[idx]
                 idx += 1

@@ -1844,9 +1844,16 @@ class GitClient:
         raise NotImplementedError(self.get_refs)
 
     @staticmethod
-    def _should_send_pack(new_refs: Mapping[Ref, ObjectID]) -> bool:
+    def _should_send_pack(
+        old_refs: Mapping[Ref, ObjectID], new_refs: Mapping[Ref, ObjectID]
+    ) -> bool:
         # The packfile MUST NOT be sent if the only command used is delete.
-        return any(sha != ZERO_SHA for sha in new_refs.values())
+        # Only refs whose value actually changes result in a command, so
+        # unchanged refs must not be considered here.
+        return any(
+            new_sha != ZERO_SHA and old_refs.get(refname, ZERO_SHA) != new_sha
+            for refname, new_sha in new_refs.items()
+        )
 
     def _negotiate_receive_pack_capabilities(
         self, server_capabilities: set[bytes]
@@ -2153,7 +2160,7 @@ class TraditionalGitClient(GitClient):
                 progress=progress,
             )
 
-            if self._should_send_pack(new_refs):
+            if self._should_send_pack(old_refs, new_refs):
                 for chunk in PackChunkGenerator(
                     num_records=pack_data_count,
                     records=pack_data,
@@ -4859,7 +4866,7 @@ class AbstractHttpGitClient(GitClient):
 
         def body_generator() -> Iterator[bytes]:
             yield from header_pkts
-            if self._should_send_pack(new_refs):
+            if self._should_send_pack(old_refs_typed, new_refs):
                 yield from PackChunkGenerator(
                     # TODO: Don't hardcode object format
                     num_records=pack_data_count,

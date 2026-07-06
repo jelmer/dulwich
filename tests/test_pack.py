@@ -1157,9 +1157,7 @@ class BaseTestPackIndexWriting:
 class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):
     def setUp(self) -> None:
         self.tempdir = tempfile.mkdtemp()
-
-    def tearDown(self) -> None:
-        shutil.rmtree(self.tempdir)
+        self.addCleanup(shutil.rmtree, self.tempdir)
 
     def index(self, filename, entries, pack_checksum):
         path = os.path.join(self.tempdir, filename)
@@ -1198,10 +1196,6 @@ class TestPackIndexWritingv1(TestCase, BaseTestFilePackIndexWriting):
         self._supports_large = False
         self._write_fn = write_pack_index_v1
 
-    def tearDown(self) -> None:
-        TestCase.tearDown(self)
-        BaseTestFilePackIndexWriting.tearDown(self)
-
 
 class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
     def setUp(self) -> None:
@@ -1212,10 +1206,6 @@ class TestPackIndexWritingv2(TestCase, BaseTestFilePackIndexWriting):
         self._expected_version = 2
         self._write_fn = write_pack_index_v2
 
-    def tearDown(self) -> None:
-        TestCase.tearDown(self)
-        BaseTestFilePackIndexWriting.tearDown(self)
-
 
 class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
     def setUp(self) -> None:
@@ -1225,10 +1215,6 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         self._supports_large = True
         self._expected_version = 3
         self._write_fn = write_pack_index_v3
-
-    def tearDown(self) -> None:
-        TestCase.tearDown(self)
-        BaseTestFilePackIndexWriting.tearDown(self)
 
     def test_load_v3_index_returns_packindex3(self) -> None:
         """Test that loading a v3 index file returns a PackIndex3 instance."""

@@ -1,5 +1,14 @@
 1.2.9	UNRELEASED
 
+ * SECURITY: Bound zlib decompression of pack entries and loose objects
+   against decompression-bomb DoS. ``read_zlib_chunks`` now caps the
+   inflated size at the declared ``decomp_len``, and loose-object parsing
+   (``ShaFile.from_file``/``from_path``) accepts a ``max_size`` argument
+   defaulting to Git's ``core.bigFileThreshold`` (512 MiB). The disk
+   object store reads ``core.bigFileThreshold`` from config and enforces
+   it on ``_get_loose_object``.
+   (reported by Luke Bento, Jelmer Vernooĳ)
+
  * SECURITY: Reject ``OFS_DELTA`` pack entries whose ``delta_base_offset``
    is zero. Such an entry references itself, so ``Pack.resolve_object``
    would loop forever growing its delta stack until the process ran out

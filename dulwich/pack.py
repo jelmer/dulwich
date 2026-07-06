@@ -576,13 +576,18 @@ def read_zlib_chunks(
     decomp_chunks = unpacked.decomp_chunks
     decomp_len = 0
     crc32 = unpacked.crc32
+    max_decomp = unpacked.decomp_len
 
     while True:
         add = read_some(buffer_size)
         if not add:
             raise zlib.error("EOF before end of zlib stream")
         comp_chunks.append(add)
-        decomp = decomp_obj.decompress(add)
+        # +1 so overrun surfaces as unconsumed_tail rather than being truncated.
+        remaining = max_decomp - decomp_len + 1
+        decomp = decomp_obj.decompress(add, remaining)
+        if decomp_obj.unconsumed_tail:
+            raise zlib.error("decompressed data exceeds expected size")
         decomp_len += len(decomp)
         decomp_chunks.append(decomp)
         unused = decomp_obj.unused_data

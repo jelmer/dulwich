@@ -469,6 +469,44 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         with self.assertRaises(PackInputTooLarge):
             o.add_thin_pack(f.read, None, max_input_size=8)
 
+    def test_big_file_threshold_config(self) -> None:
+        # core.bigFileThreshold caps single-object decompression to guard
+        # against zip-bomb attacks on loose objects.
+        config = ConfigDict()
+        config[(b"core",)] = {b"bigFileThreshold": b"4096"}
+
+        store_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, store_dir)
+        os.makedirs(os.path.join(store_dir, "pack"))
+        store = DiskObjectStore.from_config(store_dir, config)
+        self.addCleanup(store.close)
+        self.assertEqual(4096, store.loose_object_size_limit)
+
+    def test_big_file_threshold_default(self) -> None:
+        from dulwich.objects import DEFAULT_LOOSE_OBJECT_SIZE_LIMIT
+
+        store_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, store_dir)
+        os.makedirs(os.path.join(store_dir, "pack"))
+        store = DiskObjectStore.from_config(store_dir, ConfigDict())
+        self.addCleanup(store.close)
+        self.assertEqual(DEFAULT_LOOSE_OBJECT_SIZE_LIMIT, store.loose_object_size_limit)
+
+    def test_loose_object_size_limit_enforced(self) -> None:
+        # A loose object that inflates past loose_object_size_limit is rejected.
+        store = self.store
+        store.loose_object_size_limit = 1024
+        b = make_object(Blob, data=b"x" * 2048)
+        store.add_object(b)
+        # Bypass the size cap to confirm the object exists on disk normally.
+        store.loose_object_size_limit = 512 * 1024 * 1024
+        self.assertEqual(b.data, store[b.id].data)
+        # Now re-enforce a small cap and expect a decompression error.
+        store.loose_object_size_limit = 1024
+        import zlib
+
+        self.assertRaises(zlib.error, store._get_loose_object, b.id)
+
     def test_pack_index_version_config(self) -> None:
         # Test that pack.indexVersion configuration is respected
         # Create config with pack.indexVersion = 1

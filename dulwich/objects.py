@@ -173,10 +173,27 @@ def S_ISGITLINK(m: int) -> bool:
     return stat.S_IFMT(m) == S_IFGITLINK
 
 
-def _decompress(string: bytes) -> bytes:
+# Git's core.bigFileThreshold default.
+DEFAULT_LOOSE_OBJECT_SIZE_LIMIT = 512 * 1024 * 1024
+
+
+def _decompress(
+    string: bytes, max_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT
+) -> bytes:
+    """Decompress a zlib-compressed loose object, bounded by max_size.
+
+    Raises:
+      zlib.error: if the decompressed data would exceed max_size bytes,
+        or on any other decompression error.
+    """
     dcomp = zlib.decompressobj()
-    dcomped = dcomp.decompress(string)
+    # +1 so overrun surfaces as unconsumed_tail rather than being truncated.
+    dcomped = dcomp.decompress(string, max_size + 1)
+    if dcomp.unconsumed_tail:
+        raise zlib.error("decompressed data exceeds maximum size")
     dcomped += dcomp.flush()
+    if len(dcomped) > max_size:
+        raise zlib.error("decompressed data exceeds maximum size")
     return dcomped
 
 
@@ -483,13 +500,23 @@ class ShaFile:
     ) -> "ShaFile":
         """Parse a legacy object, creating it but not reading the file."""
         bufsize = 1024
+        # Legitimate loose object headers are at most a few dozen bytes; a
+        # larger inflated prefix indicates corruption or a decompression bomb.
+        header_max = 8192
         decomp = zlib.decompressobj()
-        header = decomp.decompress(magic)
+        header = decomp.decompress(magic, header_max)
+        if decomp.unconsumed_tail:
+            raise zlib.error("object header exceeds maximum size")
         start = 0
-        end = -1
+        end = header.find(b"\0", start)
+        start = len(header)
         while end < 0:
             extra = f.read(bufsize)
-            header += decomp.decompress(extra)
+            if not extra:
+                raise ObjectFormatException("Invalid object header, no \\0")
+            header += decomp.decompress(extra, header_max - len(header))
+            if decomp.unconsumed_tail:
+                raise zlib.error("object header exceeds maximum size")
             magic += extra
             end = header.find(b"\0", start)
             start = len(header)
@@ -506,9 +533,13 @@ class ShaFile:
             )
         return obj_class()
 
-    def _parse_legacy_object(self, map: bytes) -> None:
+    def _parse_legacy_object(
+        self,
+        map: bytes,
+        max_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
+    ) -> None:
         """Parse a legacy object, setting the raw string."""
-        text = _decompress(map)
+        text = _decompress(map, max_size=max_size)
         header_end = text.find(b"\0")
         if header_end < 0:
             raise ObjectFormatException("Invalid object header, no \\0")
@@ -623,7 +654,11 @@ class ShaFile:
             raise ObjectFormatException(f"Not a known type {num_type}")
         return obj_class()
 
-    def _parse_object(self, map: bytes) -> None:
+    def _parse_object(
+        self,
+        map: bytes,
+        max_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
+    ) -> None:
         """Parse a new style object, setting self._text."""
         # skip type and size; type must have already been determined, and
         # we trust zlib to fail if it's otherwise corrupted
@@ -633,7 +668,7 @@ class ShaFile:
             byte = ord(map[used : used + 1])
             used += 1
         raw = map[used:]
-        self.set_raw_string(_decompress(raw))
+        self.set_raw_string(_decompress(raw, max_size=max_size))
 
     @classmethod
     def _is_legacy_object(cls, magic: bytes) -> bool:
@@ -648,6 +683,7 @@ class ShaFile:
         f: BufferedIOBase | IO[bytes] | "_GitFile",
         *,
         object_format: ObjectFormat | None = None,
+        max_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     ) -> "ShaFile":
         map = f.read()
         if not map:
@@ -657,12 +693,12 @@ class ShaFile:
             obj = cls._parse_legacy_object_header(map, f)
             if object_format is not None:
                 obj.object_format = object_format
-            obj._parse_legacy_object(map)
+            obj._parse_legacy_object(map, max_size=max_size)
         else:
             obj = cls._parse_object_header(map, f)
             if object_format is not None:
                 obj.object_format = object_format
-            obj._parse_object(map)
+            obj._parse_object(map, max_size=max_size)
         return obj
 
     def _deserialize(self, chunks: list[bytes]) -> None:
@@ -678,10 +714,11 @@ class ShaFile:
         sha: ObjectID | None = None,
         *,
         object_format: ObjectFormat | None = None,
+        max_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     ) -> "ShaFile":
         """Open a SHA file from disk."""
         with GitFile(path, "rb") as f:
-            return cls.from_file(f, sha, object_format=object_format)
+            return cls.from_file(f, sha, object_format=object_format, max_size=max_size)
 
     @classmethod
     def from_file(
@@ -690,6 +727,7 @@ class ShaFile:
         sha: ObjectID | None = None,
         *,
         object_format: ObjectFormat | None = None,
+        max_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     ) -> "ShaFile":
         """Get the contents of a SHA file on disk."""
         try:
@@ -702,7 +740,7 @@ class ShaFile:
                         f"{object_format.name} (expected {expected_len})"
                     )
 
-            obj = cls._parse_file(f, object_format=object_format)
+            obj = cls._parse_file(f, object_format=object_format, max_size=max_size)
             if sha is not None:
                 obj._sha = FixedSha(sha)
             else:
@@ -944,6 +982,7 @@ class Blob(ShaFile):
         sha: ObjectID | None = None,
         *,
         object_format: ObjectFormat | None = None,
+        max_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     ) -> "Blob":
         """Read a blob from a file on disk.
 
@@ -951,6 +990,7 @@ class Blob(ShaFile):
           path: Path to the blob file
           sha: Optional known SHA for the object
           object_format: Optional object format to use
+          max_size: Maximum inflated size in bytes
 
         Returns:
           A Blob object
@@ -958,7 +998,9 @@ class Blob(ShaFile):
         Raises:
           NotBlobError: If the file is not a blob
         """
-        blob = ShaFile.from_path(path, sha, object_format=object_format)
+        blob = ShaFile.from_path(
+            path, sha, object_format=object_format, max_size=max_size
+        )
         if not isinstance(blob, cls):
             raise NotBlobError(_path_to_bytes(path))
         return blob
@@ -1117,6 +1159,7 @@ class Tag(ShaFile):
         sha: ObjectID | None = None,
         *,
         object_format: ObjectFormat | None = None,
+        max_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     ) -> "Tag":
         """Read a tag from a file on disk.
 
@@ -1124,6 +1167,7 @@ class Tag(ShaFile):
           path: Path to the tag file
           sha: Optional known SHA for the object
           object_format: Optional object format to use
+          max_size: Maximum inflated size in bytes
 
         Returns:
           A Tag object
@@ -1131,7 +1175,9 @@ class Tag(ShaFile):
         Raises:
           NotTagError: If the file is not a tag
         """
-        tag = ShaFile.from_path(path, sha, object_format=object_format)
+        tag = ShaFile.from_path(
+            path, sha, object_format=object_format, max_size=max_size
+        )
         if not isinstance(tag, cls):
             raise NotTagError(_path_to_bytes(path))
         return tag
@@ -1502,6 +1548,7 @@ class Tree(ShaFile):
         sha: ObjectID | None = None,
         *,
         object_format: ObjectFormat | None = None,
+        max_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     ) -> "Tree":
         """Read a tree from a file on disk.
 
@@ -1509,6 +1556,7 @@ class Tree(ShaFile):
           path: Path to the tree file
           sha: Optional known SHA for the object
           object_format: Optional object format to use
+          max_size: Maximum inflated size in bytes
 
         Returns:
           A Tree object
@@ -1516,7 +1564,9 @@ class Tree(ShaFile):
         Raises:
           NotTreeError: If the file is not a tree
         """
-        tree = ShaFile.from_path(path, sha, object_format=object_format)
+        tree = ShaFile.from_path(
+            path, sha, object_format=object_format, max_size=max_size
+        )
         if not isinstance(tree, cls):
             raise NotTreeError(_path_to_bytes(path))
         return tree
@@ -2049,6 +2099,7 @@ class Commit(ShaFile):
         sha: ObjectID | None = None,
         *,
         object_format: ObjectFormat | None = None,
+        max_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     ) -> "Commit":
         """Read a commit from a file on disk.
 
@@ -2056,6 +2107,7 @@ class Commit(ShaFile):
           path: Path to the commit file
           sha: Optional known SHA for the object
           object_format: Optional object format to use
+          max_size: Maximum inflated size in bytes
 
         Returns:
           A Commit object
@@ -2063,7 +2115,9 @@ class Commit(ShaFile):
         Raises:
           NotCommitError: If the file is not a commit
         """
-        commit = ShaFile.from_path(path, sha, object_format=object_format)
+        commit = ShaFile.from_path(
+            path, sha, object_format=object_format, max_size=max_size
+        )
         if not isinstance(commit, cls):
             raise NotCommitError(_path_to_bytes(path))
         return commit

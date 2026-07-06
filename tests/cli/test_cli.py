@@ -203,9 +203,11 @@ class HelperFunctionsTest(TestCase):
         self.assertEqual("1.0 GB", format_bytes(1024 * 1024 * 1024))
         self.assertEqual("1.0 TB", format_bytes(1024 * 1024 * 1024 * 1024))
 
-    def test_launch_editor_with_cat(self):
-        """Test launch_editor by using cat as the editor."""
-        self.overrideEnv("GIT_EDITOR", "cat")
+    def test_launch_editor_leaves_content_unchanged(self):
+        """Test launch_editor with an editor that leaves the file untouched."""
+        # ``true`` exits successfully without modifying the file, so the
+        # template content is returned unchanged.
+        self.overrideEnv("GIT_EDITOR", "true")
         result = launch_editor(b"Test template content")
         self.assertEqual(b"Test template content", result)
 

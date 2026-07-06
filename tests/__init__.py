@@ -76,6 +76,13 @@ _GIT_ENV_SCRUB: tuple[str, ...] = (
 
 def _scrub_git_env(override: "Callable[[str, str | None], None]") -> None:
     override("HOME", "/nonexistent")
+    # On Windows, os.path.expanduser("~") consults USERPROFILE (or
+    # HOMEDRIVE+HOMEPATH) and never HOME, so we have to redirect those too or
+    # the developer's real ~/.gitconfig still leaks in.
+    if sys.platform == "win32":
+        override("USERPROFILE", "C:\\nonexistent")
+        override("HOMEDRIVE", "C:")
+        override("HOMEPATH", "\\nonexistent")
     override("GIT_CONFIG_NOSYSTEM", "1")
     for name in _GIT_ENV_SCRUB:
         override(name, None)

@@ -125,6 +125,21 @@ class TestCase(_TestCase):
             del os.environ[name]
         self.addCleanup(restore)
 
+    def overrideHome(self, path: str) -> None:
+        """Point ``~`` expansion at ``path`` on the current platform.
+
+        Setting only HOME is not enough on Windows, where
+        os.path.expanduser("~") consults USERPROFILE (or HOMEDRIVE+HOMEPATH)
+        instead. Use this whenever a test wants global git config to land in
+        a controlled directory.
+        """
+        self.overrideEnv("HOME", path)
+        if sys.platform == "win32":
+            self.overrideEnv("USERPROFILE", path)
+            drive, tail = os.path.splitdrive(path)
+            self.overrideEnv("HOMEDRIVE", drive)
+            self.overrideEnv("HOMEPATH", tail or "\\")
+
 
 class BlackboxTestCase(TestCase):
     """Blackbox testing."""

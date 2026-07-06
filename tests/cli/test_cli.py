@@ -4396,7 +4396,7 @@ class MaintenanceCommandTest(DulwichCliTestCase):
         # Set up a temporary HOME for testing global config
         self.temp_home = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.temp_home)
-        self.overrideEnv("HOME", self.temp_home)
+        self.overrideHome(self.temp_home)
 
     def test_maintenance_run_default(self):
         """Test maintenance run with default tasks."""

@@ -539,6 +539,12 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         os.fdopen(fd).close()
         args = [
             _DEFAULT_GIT,
+            "-c",
+            "gc.auto=0",
+            "-c",
+            "gc.autoDetach=false",
+            "-c",
+            "maintenance.auto=false",
             "daemon",
             "--verbose",
             "--export-all",
@@ -551,12 +557,18 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             "--reuseaddr",
             self.gitroot,
         ]
+        # Prevent receive-pack/upload-pack children spawned by git-daemon
+        # from running background gc/maintenance that would race with the
+        # rmtree in tearDown.
+        daemon_env = os.environ.copy()
+        daemon_env["GIT_AUTO_GC"] = "0"
         # Redirect daemon output to DEVNULL: we never read it, and leaving
         # it on PIPE risks the daemon blocking on a full pipe buffer if a
         # noisy test session ever fills the ~64KB kernel buffer.
         self.process = subprocess.Popen(
             args,
             cwd=self.gitroot,
+            env=daemon_env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

@@ -1,5 +1,11 @@
 1.2.9	UNRELEASED
 
+ * SECURITY: On Windows, reject checkout paths whose leading component
+   is a DOS drive-letter prefix like `C:`. `os.path.join(root, "C:...")`
+   discards `root` and writes to the absolute drive path, so a tree entry
+   named `C:` could otherwise write arbitrary files outside the work tree.
+   (reported by Luke Baton, Jelmer Vernooĳ)
+
  * SECURITY: Reject ``OFS_DELTA`` pack entries whose ``delta_base_offset``
    is zero. Such an entry references itself, so ``Pack.resolve_object``
    would loop forever growing its delta stack until the process ran out

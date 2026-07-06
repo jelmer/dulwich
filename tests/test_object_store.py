@@ -547,6 +547,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         # Load and verify it's version 1
         idx_path = os.path.join(pack_dir, idx_files[0])
         idx = load_pack_index(idx_path, DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(idx.close)
         self.assertEqual(1, idx.version)
 
         # Test version 3
@@ -576,6 +577,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
         idx_path2 = os.path.join(pack_dir2, idx_files2[0])
         idx2 = load_pack_index(idx_path2, DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(idx2.close)
         self.assertEqual(3, idx2.version)
 
     def test_prune_orphaned_tempfiles(self) -> None:
@@ -1392,10 +1394,10 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
         # Build a MIDX that references the pack by its "loose-<hash>.idx" name.
         pack_dir = os.path.join(self.store_dir, "pack")
-        idx = load_pack_index(
+        with load_pack_index(
             os.path.join(pack_dir, new_base + ".idx"), DEFAULT_OBJECT_FORMAT
-        )
-        entries = list(idx.iterentries())
+        ) as idx:
+            entries = list(idx.iterentries())
         write_midx_file(
             os.path.join(pack_dir, "multi-pack-index"),
             [(new_base + ".idx", entries)],

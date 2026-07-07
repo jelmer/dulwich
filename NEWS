@@ -1,3 +1,12 @@
+1.2.11	UNRELEASED
+
+ * SECURITY: Canonicalize the file mode of regular files written into a
+   ``git archive`` tarball. ``tar_stream`` copied the tree-supplied mode
+   verbatim, so a crafted tree entry (e.g. mode ``0o104755``) carried
+   setuid/setgid/sticky bits into the archive and an extracted file could
+   land setuid. Modes are now run through ``cleanup_mode`` like checkout,
+   matching git's archive writer.
+
 1.2.10	2026-07-07
 
  * Fix regression in 1.2.9 where loose objects whose content inflates to

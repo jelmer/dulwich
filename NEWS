@@ -1,4 +1,4 @@
-1.2.10	UNRELEASED
+1.2.10	2026-07-07
 
  * Fix regression in 1.2.9 where loose objects whose content inflates to
    more than 8192 bytes failed to parse with ``zlib.error: object header

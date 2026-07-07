@@ -188,6 +188,33 @@ class ArchiveTests(TestCase):
         with self.assertRaises(UnsafeArchivePathError):
             b"".join(tar_stream(store, outer, mtime=0))
 
+    def test_mode_canonicalized(self) -> None:
+        """setuid/setgid/sticky and other non-canonical mode bits are dropped.
+
+        A crafted tree can hold a regular-file mode such as 0o104755. git's
+        archive writer canonicalizes these before emitting the tar permission
+        field, so an extracted file never ends up setuid.
+        """
+        store = MemoryObjectStore()
+        b1 = Blob.from_string(b"payload")
+        store.add_object(b1)
+        t = Tree()
+        t.add(b"suid_exec", 0o104755, b1.id)
+        t.add(b"sgid_sticky", 0o106644, b1.id)
+        t.add(b"plain", 0o100644, b1.id)
+        t.add(b"exec", 0o100755, b1.id)
+        store.add_object(t)
+        stream = b"".join(tar_stream(store, t, mtime=0))
+        tf = tarfile.TarFile(fileobj=BytesIO(stream))
+        self.addCleanup(tf.close)
+        modes = {m.name: m.mode for m in tf.getmembers()}
+        self.assertEqual(0o755, modes["suid_exec"])
+        self.assertEqual(0o644, modes["sgid_sticky"])
+        self.assertEqual(0o644, modes["plain"])
+        self.assertEqual(0o755, modes["exec"])
+        for mode in modes.values():
+            self.assertEqual(0, mode & 0o7000)
+
     def test_tar_stream_with_submodule(self) -> None:
         """Test tar_stream handles missing objects (submodules) gracefully."""
         store = MemoryObjectStore()

@@ -1483,7 +1483,23 @@ class Repo(BaseRepo):
                 self._controldir = hidden_path
         else:
             self._controldir = root
-        commondir = self.get_named_file(COMMONDIR)
+        # GIT_COMMON_DIR env var takes precedence over the commondir file
+        # (matches git's setup.c: read_repo_path() honours GIT_COMMON_DIR
+        # before falling back to the `commondir` file in the gitdir).
+        # Closes https://github.com/jelmer/dulwich/issues/1860
+        git_common_dir = os.environ.get("GIT_COMMON_DIR")
+        if git_common_dir:
+            self._commondir = git_common_dir
+        else:
+            commondir = self.get_named_file(COMMONDIR)
+            if commondir is not None:
+                with commondir:
+                    self._commondir = os.path.join(
+                        self.controldir(),
+                        os.fsdecode(commondir.read().rstrip(b"\r\n")),
+                    )
+            else:
+                self._commondir = self._controldir
         if commondir is not None:
             with commondir:
                 self._commondir = os.path.join(

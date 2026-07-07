@@ -1,3 +1,9 @@
+1.2.10	UNRELEASED
+
+ * Fix regression in 1.2.9 where loose objects whose content inflates to
+   more than 8192 bytes failed to parse with ``zlib.error: object header
+   exceeds maximum size``. (Jelmer Vernooĳ, #2292)
+
 1.2.9	2026-07-06
 
  * Bound the running length when decoding EWAH bitmaps, so a corrupt or

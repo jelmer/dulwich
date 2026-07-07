@@ -339,6 +339,23 @@ class ShaFileTests(TestCase):
             tracemalloc.stop()
         self.assertLess(peak, len(payload) // 4)
 
+    def test_legacy_from_file_large(self) -> None:
+        # Regression (#2292): a loose object whose content inflates past the
+        # 8192-byte header scan window must still parse; only the header, not
+        # the whole payload, is bounded by that window.
+        b1 = Blob.from_string(b"x" * 200000)
+        b2 = ShaFile.from_file(BytesIO(b1.as_legacy_object()))
+        self.assertEqual(b1, b2)
+
+    def test_legacy_from_file_rejects_oversized_header(self) -> None:
+        import zlib
+
+        # A legacy object whose header has no NUL within the scan window is
+        # rejected without inflating the whole stream.
+        payload = b"blob " + b"9" * 20000 + b"\x00rest"
+        stream = zlib.compress(payload)
+        self.assertRaises(zlib.error, ShaFile.from_file, BytesIO(stream))
+
     def test_from_file_has_default_size_limit(self) -> None:
         # DEFAULT_LOOSE_OBJECT_SIZE_LIMIT must match Git's core.bigFileThreshold
         # default (512 MiB). Callers that do not pass max_size inherit this cap.

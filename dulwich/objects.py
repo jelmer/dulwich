@@ -495,29 +495,27 @@ class ShaFile:
         self.object_format = DEFAULT_OBJECT_FORMAT
 
     @staticmethod
-    def _parse_legacy_object_header(
-        magic: bytes, f: BufferedIOBase | IO[bytes] | "_GitFile"
-    ) -> "ShaFile":
-        """Parse a legacy object, creating it but not reading the file."""
-        bufsize = 1024
+    def _parse_legacy_object_header(magic: bytes) -> "ShaFile":
+        """Parse a legacy object header, creating it but not reading the file."""
         # Legitimate loose object headers are at most a few dozen bytes; a
         # larger inflated prefix indicates corruption or a decompression bomb.
         header_max = 8192
         decomp = zlib.decompressobj()
+        # Inflate only the header prefix. The object content may be far larger
+        # than header_max, so we cap the output and keep pulling from
+        # unconsumed_tail until we find the NUL that terminates the header.
         header = decomp.decompress(magic, header_max)
-        if decomp.unconsumed_tail:
-            raise zlib.error("object header exceeds maximum size")
         start = 0
         end = header.find(b"\0", start)
         start = len(header)
         while end < 0:
-            extra = f.read(bufsize)
-            if not extra:
-                raise ObjectFormatException("Invalid object header, no \\0")
-            header += decomp.decompress(extra, header_max - len(header))
-            if decomp.unconsumed_tail:
+            if len(header) >= header_max:
                 raise zlib.error("object header exceeds maximum size")
-            magic += extra
+            if not decomp.unconsumed_tail:
+                raise ObjectFormatException("Invalid object header, no \\0")
+            header += decomp.decompress(
+                decomp.unconsumed_tail, header_max - len(header)
+            )
             end = header.find(b"\0", start)
             start = len(header)
         header = header[:end]
@@ -690,7 +688,7 @@ class ShaFile:
             raise EmptyFileException("Corrupted empty file detected")
 
         if cls._is_legacy_object(map):
-            obj = cls._parse_legacy_object_header(map, f)
+            obj = cls._parse_legacy_object_header(map)
             if object_format is not None:
                 obj.object_format = object_format
             obj._parse_legacy_object(map, max_size=max_size)

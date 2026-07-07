@@ -1477,32 +1477,6 @@ def _filter_transport_kwargs(**kwargs: object) -> TransportKwargs:
     return cast(TransportKwargs, {k: v for k, v in kwargs.items() if k in valid_params})
 
 
-def _ssh_command_from_env() -> str | None:
-    """Return the SSH command requested via Git-compatible environment vars."""
-    env_ssh_command = os.environ.get("GIT_SSH_COMMAND")
-    if env_ssh_command:
-        return env_ssh_command
-    env_ssh = os.environ.get("GIT_SSH")
-    if env_ssh:
-        return env_ssh
-    return None
-
-
-def _transport_kwargs_with_env(
-    ssh_command: str | None = None,
-    **kwargs: object,
-) -> TransportKwargs:
-    """Build transport kwargs, applying Git SSH env vars as porcelain defaults."""
-    transport_kwargs = _filter_transport_kwargs(**kwargs)
-    if ssh_command is not None:
-        transport_kwargs["ssh_command"] = ssh_command
-    elif transport_kwargs.get("ssh_command") is None:
-        env_ssh_command = _ssh_command_from_env()
-        if env_ssh_command is not None:
-            transport_kwargs["ssh_command"] = env_ssh_command
-    return transport_kwargs
-
-
 def clone(
     source: str | bytes | Repo,
     target: str | os.PathLike[str] | None = None,
@@ -1588,7 +1562,9 @@ def clone(
         path = source.path
     else:
         source_str = source.decode() if isinstance(source, bytes) else source
-        transport_kwargs = _transport_kwargs_with_env(ssh_command, **kwargs)
+        transport_kwargs = _filter_transport_kwargs(**kwargs)
+        if ssh_command is not None:
+            transport_kwargs["ssh_command"] = ssh_command
         (client, path) = get_transport_and_path(
             source_str, config=config, **transport_kwargs
         )
@@ -3181,7 +3157,7 @@ def push(
             force = True
 
         # Get the client and path
-        transport_kwargs = _transport_kwargs_with_env(**kwargs)
+        transport_kwargs = _filter_transport_kwargs(**kwargs)
         client, path = get_transport_and_path(
             remote_location,
             config=r.get_config_stack(),
@@ -3427,7 +3403,7 @@ def pull(
                 and remote_refs[lh] not in r.object_store
             ]
 
-        transport_kwargs = _transport_kwargs_with_env(**kwargs)
+        transport_kwargs = _filter_transport_kwargs(**kwargs)
         client, path = get_transport_and_path(
             remote_location,
             config=r.get_config_stack(),
@@ -4635,7 +4611,6 @@ def fetch(
             # Use a very large depth to fetch complete history (same as Git)
             depth = INFINITE_DEPTH
 
-        transport_kwargs = _transport_kwargs_with_env(ssh_command=ssh_command)
         client, path = get_transport_and_path(
             remote_location,
             config=r.get_config_stack(),
@@ -4647,7 +4622,7 @@ def fetch(
             username=username,
             password=password,
             key_filename=key_filename,
-            **transport_kwargs,
+            ssh_command=ssh_command,
         )
 
         def progress(data: bytes) -> None:
@@ -5151,7 +5126,6 @@ def ls_remote(
         if env_override is not None:
             config.backends.insert(0, env_override)
     remote_str = remote.decode() if isinstance(remote, bytes) else remote
-    transport_kwargs = _transport_kwargs_with_env(ssh_command=ssh_command)
     client, host_path = get_transport_and_path(
         remote_str,
         config=config,
@@ -5163,7 +5137,7 @@ def ls_remote(
         username=username,
         password=password,
         key_filename=key_filename,
-        **transport_kwargs,
+        ssh_command=ssh_command,
     )
     return client.get_refs(
         host_path.encode() if isinstance(host_path, str) else host_path

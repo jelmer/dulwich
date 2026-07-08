@@ -1,5 +1,13 @@
 1.2.11	UNRELEASED
 
+ * SECURITY: Apply ``core.protectHFS`` and ``core.protectNTFS`` together when
+   selecting the checkout path-element validator. ``get_path_element_validator``
+   returned only the NTFS validator whenever ``protectNTFS`` was on (the default
+   everywhere), so on macOS the HFS check never ran and an HFS+ spelling of
+   ``.git`` using ignorable code points (e.g. ``.gi<U+200C>t``) passed
+   validation and could poison ``.git`` on checkout. Both protections now apply
+   when both are enabled, matching git's ``verify_path``.
+
  * SECURITY: Canonicalize the file mode of regular files written into a
    ``git archive`` tarball. ``tar_stream`` copied the tree-supplied mode
    verbatim, so a crafted tree entry (e.g. mode ``0o104755``) carried

@@ -2161,7 +2161,9 @@ def get_path_element_validator(config: "Config") -> Callable[[bytes], bool]:
     ``core.protectNTFS`` defaults to true on every platform (matching Git's
     ``PROTECT_NTFS_DEFAULT=1``) because a repository authored on POSIX can
     still be cloned on Windows later; ``core.protectHFS`` defaults to true on
-    macOS. With both disabled this falls back to the default validator, which
+    macOS. Both protections are independent and apply together, so on macOS
+    (where both default on) a path element must satisfy the NTFS and HFS+
+    checks. With both disabled this falls back to the default validator, which
     only refuses ``.git``, ``.`` and ``..``.
 
     Args:
@@ -2171,12 +2173,20 @@ def get_path_element_validator(config: "Config") -> Callable[[bytes], bool]:
         Function that validates a single path element for the configured
         filesystem protections.
     """
+    validators: list[Callable[[bytes], bool]] = []
     if config.get_boolean(b"core", b"protectNTFS", True):
-        return validate_path_element_ntfs
-    elif config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
-        return validate_path_element_hfs
-    else:
+        validators.append(validate_path_element_ntfs)
+    if config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
+        validators.append(validate_path_element_hfs)
+    if not validators:
         return validate_path_element_default
+    if len(validators) == 1:
+        return validators[0]
+
+    def validate_all(element: bytes) -> bool:
+        return all(validator(element) for validator in validators)
+
+    return validate_all
 
 
 def validate_path(

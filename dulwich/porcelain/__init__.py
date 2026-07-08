@@ -367,12 +367,10 @@ from ..index import (
     _fs_to_tree_path,
     blob_from_path_and_stat,
     build_file_from_blob,
+    get_path_element_validator,
     get_unstaged_changes,
     symlink,
     update_working_tree,
-    validate_path_element_default,
-    validate_path_element_hfs,
-    validate_path_element_ntfs,
 )
 from ..object_store import BaseObjectStore, tree_lookup_path
 from ..objects import (
@@ -5498,15 +5496,10 @@ def _get_worktree_update_config(
     config = repo.get_config()
     honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
 
-    # core.protectNTFS defaults to True on all platforms (matching
-    # Git's PROTECT_NTFS_DEFAULT=1) because a repo authored on
-    # POSIX can still be cloned on Windows later.
-    if config.get_boolean(b"core", b"protectNTFS", True):
-        validate_path_element = validate_path_element_ntfs
-    elif config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
-        validate_path_element = validate_path_element_hfs
-    else:
-        validate_path_element = validate_path_element_default
+    # core.protectNTFS defaults to True on all platforms (matching Git's
+    # PROTECT_NTFS_DEFAULT=1) and protectHFS defaults to True on macOS; both
+    # apply together, so defer to the shared selector rather than picking one.
+    validate_path_element = get_path_element_validator(config)
 
     if config.get_boolean(b"core", b"symlinks", True):
 

@@ -242,6 +242,206 @@ class MergeTests(unittest.TestCase):
         self.assertEqual(len(conflicts), 1)
         self.assertEqual(conflicts[0], b"conflict.txt")
 
+    def _add_tree(self, entries):
+        tree = Tree()
+        for name, mode, sha in entries:
+            tree.add(name, mode, sha)
+        self.repo.object_store.add_object(tree)
+        return tree
+
+    def test_merge_trees_subtree_disjoint_edits(self):
+        """Different files edited on each side inside a shared directory
+        should merge cleanly, matching git's behavior."""
+        base_a = Blob.from_string(b"a base\n")
+        base_b = Blob.from_string(b"b base\n")
+        ours_a = base_a
+        ours_b = Blob.from_string(b"b changed on ours\n")
+        theirs_a = Blob.from_string(b"a changed on theirs\n")
+        theirs_b = base_b
+        for blob in (base_a, base_b, ours_b, theirs_a):
+            self.repo.object_store.add_object(blob)
+
+        base_sub = self._add_tree(
+            [(b"a.txt", 0o100644, base_a.id), (b"b.txt", 0o100644, base_b.id)]
+        )
+        ours_sub = self._add_tree(
+            [(b"a.txt", 0o100644, ours_a.id), (b"b.txt", 0o100644, ours_b.id)]
+        )
+        theirs_sub = self._add_tree(
+            [(b"a.txt", 0o100644, theirs_a.id), (b"b.txt", 0o100644, theirs_b.id)]
+        )
+        base_tree = self._add_tree([(b"shared", 0o040000, base_sub.id)])
+        ours_tree = self._add_tree([(b"shared", 0o040000, ours_sub.id)])
+        theirs_tree = self._add_tree([(b"shared", 0o040000, theirs_sub.id)])
+
+        merged_tree, conflicts = self.merger.merge_trees(
+            base_tree, ours_tree, theirs_tree
+        )
+        self.assertEqual(conflicts, [])
+        # Verify the merged subtree contains the expected leaf content.
+        merged_shared_mode, merged_shared_sha = merged_tree[b"shared"]
+        self.assertEqual(merged_shared_mode, 0o040000)
+        merged_sub = self.repo.object_store[merged_shared_sha]
+        assert isinstance(merged_sub, Tree)
+        self.assertEqual(merged_sub[b"a.txt"], (0o100644, theirs_a.id))
+        self.assertEqual(merged_sub[b"b.txt"], (0o100644, ours_b.id))
+
+    def test_merge_trees_subtree_conflicting_edits(self):
+        """Both sides editing the same file inside a shared directory should
+        report the leaf path (not the directory) as the conflict."""
+        base_blob = Blob.from_string(b"base\n")
+        ours_blob = Blob.from_string(b"ours\n")
+        theirs_blob = Blob.from_string(b"theirs\n")
+        for blob in (base_blob, ours_blob, theirs_blob):
+            self.repo.object_store.add_object(blob)
+
+        base_sub = self._add_tree([(b"file.txt", 0o100644, base_blob.id)])
+        ours_sub = self._add_tree([(b"file.txt", 0o100644, ours_blob.id)])
+        theirs_sub = self._add_tree([(b"file.txt", 0o100644, theirs_blob.id)])
+        base_tree = self._add_tree([(b"shared", 0o040000, base_sub.id)])
+        ours_tree = self._add_tree([(b"shared", 0o040000, ours_sub.id)])
+        theirs_tree = self._add_tree([(b"shared", 0o040000, theirs_sub.id)])
+
+        _merged_tree, conflicts = self.merger.merge_trees(
+            base_tree, ours_tree, theirs_tree
+        )
+        self.assertEqual(conflicts, [b"shared/file.txt"])
+
+    def test_merge_trees_nested_subtree_disjoint_edits(self):
+        """Recursion should reach files nested more than one level deep."""
+        base_a = Blob.from_string(b"a base\n")
+        base_b = Blob.from_string(b"b base\n")
+        ours_b = Blob.from_string(b"b changed on ours\n")
+        theirs_a = Blob.from_string(b"a changed on theirs\n")
+        for blob in (base_a, base_b, ours_b, theirs_a):
+            self.repo.object_store.add_object(blob)
+
+        def make(a_sha, b_sha):
+            inner = self._add_tree(
+                [(b"a.txt", 0o100644, a_sha), (b"b.txt", 0o100644, b_sha)]
+            )
+            outer = self._add_tree([(b"inner", 0o040000, inner.id)])
+            return self._add_tree([(b"outer", 0o040000, outer.id)])
+
+        base_tree = make(base_a.id, base_b.id)
+        ours_tree = make(base_a.id, ours_b.id)
+        theirs_tree = make(theirs_a.id, base_b.id)
+
+        _merged_tree, conflicts = self.merger.merge_trees(
+            base_tree, ours_tree, theirs_tree
+        )
+        self.assertEqual(conflicts, [])
+
+    def test_merge_trees_both_sides_add_subtree_disjoint(self):
+        """Adding a new directory on both sides with disjoint files should
+        merge into a single directory."""
+        ours_blob = Blob.from_string(b"ours only\n")
+        theirs_blob = Blob.from_string(b"theirs only\n")
+        for blob in (ours_blob, theirs_blob):
+            self.repo.object_store.add_object(blob)
+
+        ours_sub = self._add_tree([(b"o.txt", 0o100644, ours_blob.id)])
+        theirs_sub = self._add_tree([(b"t.txt", 0o100644, theirs_blob.id)])
+        base_tree = self._add_tree([])
+        ours_tree = self._add_tree([(b"newdir", 0o040000, ours_sub.id)])
+        theirs_tree = self._add_tree([(b"newdir", 0o040000, theirs_sub.id)])
+
+        merged_tree, conflicts = self.merger.merge_trees(
+            base_tree, ours_tree, theirs_tree
+        )
+        self.assertEqual(conflicts, [])
+        merged_mode, merged_sha = merged_tree[b"newdir"]
+        self.assertEqual(merged_mode, 0o040000)
+        merged_sub = self.repo.object_store[merged_sha]
+        assert isinstance(merged_sub, Tree)
+        self.assertEqual(
+            sorted(item.path for item in merged_sub.items()),
+            [b"o.txt", b"t.txt"],
+        )
+
+    def test_merge_trees_both_sides_add_subtree_with_conflict(self):
+        """Both sides adding the same directory with conflicting content for
+        the same file should report the leaf as the conflict, with no common
+        ancestor for the recursion."""
+        ours_blob = Blob.from_string(b"ours\n")
+        theirs_blob = Blob.from_string(b"theirs\n")
+        for blob in (ours_blob, theirs_blob):
+            self.repo.object_store.add_object(blob)
+
+        ours_sub = self._add_tree([(b"file.txt", 0o100644, ours_blob.id)])
+        theirs_sub = self._add_tree([(b"file.txt", 0o100644, theirs_blob.id)])
+        base_tree = self._add_tree([])
+        ours_tree = self._add_tree([(b"newdir", 0o040000, ours_sub.id)])
+        theirs_tree = self._add_tree([(b"newdir", 0o040000, theirs_sub.id)])
+
+        _merged_tree, conflicts = self.merger.merge_trees(
+            base_tree, ours_tree, theirs_tree
+        )
+        self.assertEqual(conflicts, [b"newdir/file.txt"])
+
+    def test_merge_trees_subtree_deletion_inside(self):
+        """A file deleted on one side inside a shared subtree, while the other
+        side leaves it alone, should be dropped from the merged subtree."""
+        keep_blob = Blob.from_string(b"keep me\n")
+        drop_blob = Blob.from_string(b"drop me\n")
+        for blob in (keep_blob, drop_blob):
+            self.repo.object_store.add_object(blob)
+
+        base_sub = self._add_tree(
+            [
+                (b"keep.txt", 0o100644, keep_blob.id),
+                (b"drop.txt", 0o100644, drop_blob.id),
+            ]
+        )
+        ours_sub = self._add_tree([(b"keep.txt", 0o100644, keep_blob.id)])
+        theirs_sub = base_sub
+        base_tree = self._add_tree([(b"shared", 0o040000, base_sub.id)])
+        ours_tree = self._add_tree([(b"shared", 0o040000, ours_sub.id)])
+        theirs_tree = self._add_tree([(b"shared", 0o040000, theirs_sub.id)])
+
+        merged_tree, conflicts = self.merger.merge_trees(
+            base_tree, ours_tree, theirs_tree
+        )
+        self.assertEqual(conflicts, [])
+        _, merged_shared_sha = merged_tree[b"shared"]
+        merged_sub = self.repo.object_store[merged_shared_sha]
+        assert isinstance(merged_sub, Tree)
+        self.assertEqual(
+            [item.path for item in merged_sub.items()],
+            [b"keep.txt"],
+        )
+
+    def test_merge_trees_base_file_both_replace_with_subtree(self):
+        """When base is a file at a given name but both sides replace it with
+        a directory, the recursion should treat the base as absent for the
+        subtree merge."""
+        base_blob = Blob.from_string(b"was a file\n")
+        ours_leaf = Blob.from_string(b"ours leaf\n")
+        theirs_leaf = Blob.from_string(b"theirs leaf\n")
+        for blob in (base_blob, ours_leaf, theirs_leaf):
+            self.repo.object_store.add_object(blob)
+
+        ours_sub = self._add_tree([(b"o.txt", 0o100644, ours_leaf.id)])
+        theirs_sub = self._add_tree([(b"t.txt", 0o100644, theirs_leaf.id)])
+        base_tree = self._add_tree([(b"path", 0o100644, base_blob.id)])
+        ours_tree = self._add_tree([(b"path", 0o040000, ours_sub.id)])
+        theirs_tree = self._add_tree([(b"path", 0o040000, theirs_sub.id)])
+
+        merged_tree, conflicts = self.merger.merge_trees(
+            base_tree, ours_tree, theirs_tree
+        )
+        # Modes match (both directories), so mode conflict is skipped and we
+        # recurse. Disjoint leaves should merge without conflict.
+        self.assertEqual(conflicts, [])
+        merged_mode, merged_sha = merged_tree[b"path"]
+        self.assertEqual(merged_mode, 0o040000)
+        merged_sub = self.repo.object_store[merged_sha]
+        assert isinstance(merged_sub, Tree)
+        self.assertEqual(
+            sorted(item.path for item in merged_sub.items()),
+            [b"o.txt", b"t.txt"],
+        )
+
     def test_three_way_merge(self):
         """Test three-way merge between commits."""
         # Create base commit

@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from .object_store import BaseObjectStore
     from .objects import TreeEntry
 
+from .index import cleanup_mode
 from .objects import Blob, Tree
 
 
@@ -204,7 +205,14 @@ def tar_stream(
             info.name = entry_abspath.decode("utf-8", "surrogateescape")
             info.size = blob.raw_length()
             assert entry.mode is not None
-            info.mode = entry.mode
+            # Canonicalize the tree-supplied mode the same way git's archive
+            # writer does before emitting a permission field. A crafted tree
+            # entry can carry setuid/setgid/sticky or other non-canonical bits
+            # (e.g. 0o104755), which tarfile would otherwise copy verbatim into
+            # the archive so an extracted file lands setuid. cleanup_mode maps a
+            # regular file to 0o644/0o755 (matching checkout), and masking to the
+            # permission bits drops the special bits.
+            info.mode = cleanup_mode(entry.mode) & 0o777
             info.mtime = mtime
 
             tar.addfile(info, data)

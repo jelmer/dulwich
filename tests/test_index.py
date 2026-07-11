@@ -67,6 +67,7 @@ from dulwich.index import (
     cleanup_mode,
     commit_tree,
     detect_case_only_renames,
+    get_path_element_validator,
     get_unstaged_changes,
     index_entry_from_directory,
     index_entry_from_path,
@@ -1826,6 +1827,47 @@ class TestValidatePath(TestCase):
         self.assertTrue(
             validate_path(b"with:colon.txt", validate_path_element_ntfs),
         )
+
+
+class TestGetPathElementValidator(TestCase):
+    # ``.gi`` + U+200C ZERO WIDTH NON-JOINER + ``t``. HFS+ drops the
+    # ignorable code point, so this file lands as ``.git`` on macOS.
+    HFS_DOTGIT = b".gi\xe2\x80\x8ct"
+
+    def test_ntfs_only_leaves_hfs_spelling(self) -> None:
+        config = ConfigDict()
+        config.set((b"core",), b"protectNTFS", b"true")
+        config.set((b"core",), b"protectHFS", b"false")
+        validator = get_path_element_validator(config)
+        # The NTFS check does not strip HFS+ ignorable characters, matching
+        # git without core.protectHFS.
+        self.assertTrue(validator(self.HFS_DOTGIT))
+
+    def test_both_enabled_rejects_hfs_spelling(self) -> None:
+        config = ConfigDict()
+        config.set((b"core",), b"protectNTFS", b"true")
+        config.set((b"core",), b"protectHFS", b"true")
+        validator = get_path_element_validator(config)
+        # protectNTFS and protectHFS apply together; the HFS spelling of
+        # ``.git`` must still be rejected when NTFS protection is also on.
+        self.assertFalse(validator(self.HFS_DOTGIT))
+        self.assertFalse(validator(b".git"))
+        self.assertTrue(validator(b"README.md"))
+
+    def test_hfs_only_rejects_hfs_spelling(self) -> None:
+        config = ConfigDict()
+        config.set((b"core",), b"protectNTFS", b"false")
+        config.set((b"core",), b"protectHFS", b"true")
+        validator = get_path_element_validator(config)
+        self.assertFalse(validator(self.HFS_DOTGIT))
+
+    def test_both_disabled_uses_default(self) -> None:
+        config = ConfigDict()
+        config.set((b"core",), b"protectNTFS", b"false")
+        config.set((b"core",), b"protectHFS", b"false")
+        validator = get_path_element_validator(config)
+        self.assertIs(validator, validate_path_element_default)
+        self.assertTrue(validator(self.HFS_DOTGIT))
 
 
 class TestDecodeUTF8WithFallback(TestCase):

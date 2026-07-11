@@ -105,6 +105,11 @@ def format_reflog_line(
     """
     if old_sha is None:
         old_sha = ZERO_SHA
+    # A reflog entry is a single line and the message is the last, tab-separated
+    # field. Collapse embedded whitespace (in particular newlines) to single
+    # spaces so a multi-line or crafted message cannot split into extra physical
+    # lines and forge additional reflog entries. Matches Git's copy_reflog_msg.
+    message = b" ".join(message.split())
     return (
         old_sha
         + b" "
@@ -169,7 +174,7 @@ def drop_reflog_entry(f: BinaryIO, index: int, rewrite: bool = False) -> None:
     log = []
     offset = f.tell()
     for line in f:
-        log.append((offset, parse_reflog_line(line)))
+        log.append((offset, parse_reflog_line(line.rstrip(b"\n"))))
         offset = f.tell()
 
     inverse_index = len(log) - index - 1
@@ -209,6 +214,7 @@ def drop_reflog_entry(f: BinaryIO, index: int, rewrite: bool = False) -> None:
                 entry.timezone,
                 entry.message,
             )
+            + b"\n"
         )
     f.truncate()
 
@@ -240,7 +246,7 @@ def expire_reflog(
     entries = []
     offset = f.tell()
     for line in f:
-        entries.append((offset, parse_reflog_line(line)))
+        entries.append((offset, parse_reflog_line(line.rstrip(b"\n"))))
         offset = f.tell()
 
     # Filter entries that should be kept
@@ -285,6 +291,7 @@ def expire_reflog(
                     entry.timezone,
                     entry.message,
                 )
+                + b"\n"
             )
         f.truncate()
 

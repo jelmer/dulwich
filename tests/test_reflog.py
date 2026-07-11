@@ -136,6 +136,29 @@ class ReflogLineTests(TestCase):
             parse_reflog_line(reflog_line),
         )
 
+    def test_format_message_newline(self) -> None:
+        # A message with an embedded newline (e.g. a commit body, or a crafted
+        # message from a rebased/cherry-picked untrusted commit) must not split
+        # into extra physical lines and forge additional reflog entries.
+        line = format_reflog_line(
+            None,
+            b"49030649db3dfec5a9bc03e5dde4255a14499f16",
+            b"Jelmer Vernooij <jelmer@jelmer.uk>",
+            1446552482,
+            0,
+            b"commit: subject\n\n"
+            b"0000000000000000000000000000000000000000 "
+            b"1111111111111111111111111111111111111111 "
+            b"Attacker <evil@example.com> 1700000000 +0000\tforged",
+        )
+        self.assertNotIn(b"\n", line)
+        entries = list(read_reflog(BytesIO(line + b"\n")))
+        self.assertEqual(1, len(entries))
+        self.assertEqual(b"Jelmer Vernooij <jelmer@jelmer.uk>", entries[0].committer)
+        self.assertEqual(
+            b"49030649db3dfec5a9bc03e5dde4255a14499f16", entries[0].new_sha
+        )
+
 
 _TEST_REFLOG = (
     b"0000000000000000000000000000000000000000 "

@@ -7,22 +7,23 @@
    ``.git`` using ignorable code points (e.g. ``.gi<U+200C>t``) passed
    validation and could poison ``.git`` on checkout. Both protections now apply
    when both are enabled, matching git's ``verify_path``.
+   (netliomax25-code)
 
- * SECURITY: Canonicalize the file mode of regular files written into a
+ * HARDEN: Canonicalize the file mode of regular files written into a
    ``git archive`` tarball. ``tar_stream`` copied the tree-supplied mode
    verbatim, so a crafted tree entry (e.g. mode ``0o104755``) carried
    setuid/setgid/sticky bits into the archive and an extracted file could
    land setuid. Modes are now run through ``cleanup_mode`` like checkout,
-   matching git's archive writer.
+   matching git's archive writer. (netliomax25-code)
 
- * SECURITY: Collapse embedded whitespace in reflog messages when writing a
+ * HARDEN: Collapse embedded whitespace in reflog messages when writing a
    reflog line. ``format_reflog_line`` wrote the message verbatim, and
    ``do_commit`` logs ``commit: <full message>``, so any commit whose message
    spans multiple lines produced a multi-line reflog that ``read_reflog``
    could not parse; a crafted message (e.g. from a rebased or cherry-picked
    untrusted commit) could inject additional, forged reflog entries with
    attacker-chosen SHAs. Newlines are now collapsed to spaces, matching git's
-   ``copy_reflog_msg``.
+   ``copy_reflog_msg``. (netliomax25-code, #2300)
 
 1.2.10	2026-07-07
 

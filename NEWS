@@ -15,6 +15,15 @@
    land setuid. Modes are now run through ``cleanup_mode`` like checkout,
    matching git's archive writer.
 
+ * SECURITY: Collapse embedded whitespace in reflog messages when writing a
+   reflog line. ``format_reflog_line`` wrote the message verbatim, and
+   ``do_commit`` logs ``commit: <full message>``, so any commit whose message
+   spans multiple lines produced a multi-line reflog that ``read_reflog``
+   could not parse; a crafted message (e.g. from a rebased or cherry-picked
+   untrusted commit) could inject additional, forged reflog entries with
+   attacker-chosen SHAs. Newlines are now collapsed to spaces, matching git's
+   ``copy_reflog_msg``.
+
 1.2.10	2026-07-07
 
  * Fix regression in 1.2.9 where loose objects whose content inflates to

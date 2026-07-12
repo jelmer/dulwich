@@ -1,5 +1,9 @@
 1.2.11	UNRELEASED
 
+ * Recurse into subtrees when merging trees, so non-overlapping changes on
+   different sides of a shared directory merge cleanly instead of being
+   reported as a directory-level conflict. (Jelmer Vernooĳ, #2295)
+
  * SECURITY: Apply ``core.protectHFS`` and ``core.protectNTFS`` together when
    selecting the checkout path-element validator. ``get_path_element_validator``
    returned only the NTFS validator whenever ``protectNTFS`` was on (the default

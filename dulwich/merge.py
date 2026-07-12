@@ -31,6 +31,7 @@ __all__ = [
     "three_way_merge",
 ]
 
+import stat
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
@@ -324,6 +325,10 @@ class Merger:
     ) -> tuple[Tree, list[bytes]]:
         """Perform three-way merge on trees.
 
+        Recurses into subtrees so that non-overlapping changes on different
+        sides of a directory are merged rather than reported as a directory
+        conflict.
+
         Args:
             base_tree: Common ancestor tree (can be None for no common ancestor)
             ours_tree: Our version of the tree
@@ -332,76 +337,85 @@ class Merger:
         Returns:
             tuple of (merged_tree, list_of_conflicted_paths)
         """
+        return self._merge_trees(base_tree, ours_tree, theirs_tree, b"")
+
+    def _load_tree(self, sha: ObjectID) -> Tree:
+        obj = self.object_store[sha]
+        if not is_tree(obj):
+            raise TypeError(f"Expected tree for {sha!r}, got {obj.type_name.decode()}")
+        assert isinstance(obj, Tree)
+        return obj
+
+    def _merge_trees(
+        self,
+        base_tree: Tree | None,
+        ours_tree: Tree,
+        theirs_tree: Tree,
+        prefix: bytes,
+    ) -> tuple[Tree, list[bytes]]:
         conflicts: list[bytes] = []
         merged_entries: dict[bytes, tuple[int | None, ObjectID | None]] = {}
 
-        # Get all paths from all trees
-        all_paths = set()
-
-        if base_tree:
+        # Collect top-level entries from each tree
+        base_entries: dict[bytes, tuple[int, ObjectID]] = {}
+        if base_tree is not None:
             for entry in base_tree.items():
                 assert entry.path is not None
-                all_paths.add(entry.path)
+                base_entries[entry.path] = (entry.mode, entry.sha)
 
+        ours_entries: dict[bytes, tuple[int, ObjectID]] = {}
         for entry in ours_tree.items():
             assert entry.path is not None
-            all_paths.add(entry.path)
+            ours_entries[entry.path] = (entry.mode, entry.sha)
 
+        theirs_entries: dict[bytes, tuple[int, ObjectID]] = {}
         for entry in theirs_tree.items():
             assert entry.path is not None
-            all_paths.add(entry.path)
+            theirs_entries[entry.path] = (entry.mode, entry.sha)
 
-        # Process each path
-        for path in sorted(all_paths):
-            base_entry = None
-            if base_tree:
-                try:
-                    base_entry = base_tree.lookup_path(
-                        self.object_store.__getitem__, path
-                    )
-                except KeyError:
-                    pass
+        all_names = set(base_entries) | set(ours_entries) | set(theirs_entries)
 
-            try:
-                ours_entry = ours_tree.lookup_path(self.object_store.__getitem__, path)
-            except KeyError:
-                ours_entry = None
+        for name in sorted(all_names):
+            path = prefix + name if not prefix else prefix + b"/" + name
 
-            try:
-                theirs_entry = theirs_tree.lookup_path(
-                    self.object_store.__getitem__, path
-                )
-            except KeyError:
-                theirs_entry = None
-
-            # Extract mode and sha
-            _base_mode, base_sha = base_entry if base_entry else (None, None)
-            ours_mode, ours_sha = ours_entry if ours_entry else (None, None)
-            theirs_mode, theirs_sha = theirs_entry if theirs_entry else (None, None)
+            base_mode, base_sha = base_entries.get(name, (None, None))
+            ours_mode, ours_sha = ours_entries.get(name, (None, None))
+            theirs_mode, theirs_sha = theirs_entries.get(name, (None, None))
 
             # Handle deletions
             if ours_sha is None and theirs_sha is None:
-                continue  # Deleted in both
+                continue  # Deleted in both (or never existed)
 
-            # Handle additions
+            # Handle additions (not present in base)
             if base_sha is None:
                 if ours_sha == theirs_sha and ours_mode == theirs_mode:
                     # Same addition in both
-                    merged_entries[path] = (ours_mode, ours_sha)
+                    merged_entries[name] = (ours_mode, ours_sha)
                 elif ours_sha is None:
                     # Added only in theirs
-                    merged_entries[path] = (theirs_mode, theirs_sha)
+                    merged_entries[name] = (theirs_mode, theirs_sha)
                 elif theirs_sha is None:
                     # Added only in ours
-                    merged_entries[path] = (ours_mode, ours_sha)
+                    merged_entries[name] = (ours_mode, ours_sha)
+                elif stat.S_ISDIR(ours_mode or 0) and stat.S_ISDIR(theirs_mode or 0):
+                    # Both added a subtree at the same name; recurse to
+                    # merge the two subtrees (no common ancestor).
+                    ours_sub = self._load_tree(ours_sha)
+                    theirs_sub = self._load_tree(theirs_sha)
+                    sub_merged, sub_conflicts = self._merge_trees(
+                        None, ours_sub, theirs_sub, path
+                    )
+                    conflicts.extend(sub_conflicts)
+                    self.object_store.add_object(sub_merged)
+                    merged_entries[name] = (ours_mode, sub_merged.id)
                 else:
                     # Different additions - conflict
                     conflicts.append(path)
                     # For now, keep ours
-                    merged_entries[path] = (ours_mode, ours_sha)
+                    merged_entries[name] = (ours_mode, ours_sha)
                 continue
 
-            # Check for mode conflicts
+            # Check for mode conflicts (both sides present with different modes)
             if (
                 ours_mode != theirs_mode
                 and ours_mode is not None
@@ -409,20 +423,20 @@ class Merger:
             ):
                 conflicts.append(path)
                 # For now, keep ours
-                merged_entries[path] = (ours_mode, ours_sha)
+                merged_entries[name] = (ours_mode, ours_sha)
                 continue
 
             # Handle modifications
             if ours_sha == theirs_sha:
                 # Same modification or no change
                 if ours_sha is not None:
-                    merged_entries[path] = (ours_mode, ours_sha)
+                    merged_entries[name] = (ours_mode, ours_sha)
             elif base_sha == ours_sha and theirs_sha is not None:
                 # Only theirs modified
-                merged_entries[path] = (theirs_mode, theirs_sha)
+                merged_entries[name] = (theirs_mode, theirs_sha)
             elif base_sha == theirs_sha and ours_sha is not None:
                 # Only ours modified
-                merged_entries[path] = (ours_mode, ours_sha)
+                merged_entries[name] = (ours_mode, ours_sha)
             elif ours_sha is None:
                 # We deleted
                 if base_sha == theirs_sha:
@@ -439,19 +453,34 @@ class Merger:
                 else:
                     # We modified, they deleted - conflict
                     conflicts.append(path)
-                    merged_entries[path] = (ours_mode, ours_sha)
+                    merged_entries[name] = (ours_mode, ours_sha)
             else:
                 # Both modified differently
-                # For trees and submodules, this is a conflict
                 if S_ISGITLINK(ours_mode or 0) or S_ISGITLINK(theirs_mode or 0):
+                    # Submodule conflict - can't merge submodule contents
                     conflicts.append(path)
-                    merged_entries[path] = (ours_mode, ours_sha)
-                elif (ours_mode or 0) & 0o170000 == 0o040000 or (
-                    theirs_mode or 0
-                ) & 0o170000 == 0o040000:
-                    # Tree conflict
+                    merged_entries[name] = (ours_mode, ours_sha)
+                elif stat.S_ISDIR(ours_mode or 0) and stat.S_ISDIR(theirs_mode or 0):
+                    # Both sides are subtrees modified differently: recurse
+                    # so non-overlapping changes inside the directory can
+                    # merge cleanly.
+                    base_sub = (
+                        self._load_tree(base_sha)
+                        if base_sha is not None and stat.S_ISDIR(base_mode or 0)
+                        else None
+                    )
+                    ours_sub = self._load_tree(ours_sha)
+                    theirs_sub = self._load_tree(theirs_sha)
+                    sub_merged, sub_conflicts = self._merge_trees(
+                        base_sub, ours_sub, theirs_sub, path
+                    )
+                    conflicts.extend(sub_conflicts)
+                    self.object_store.add_object(sub_merged)
+                    merged_entries[name] = (ours_mode, sub_merged.id)
+                elif stat.S_ISDIR(ours_mode or 0) or stat.S_ISDIR(theirs_mode or 0):
+                    # File/directory type transition on one side - conflict.
                     conflicts.append(path)
-                    merged_entries[path] = (ours_mode, ours_sha)
+                    merged_entries[name] = (ours_mode, ours_sha)
                 else:
                     # Try to merge blobs
                     base_blob = None
@@ -464,27 +493,23 @@ class Merger:
                                 f"Expected blob for {path!r}, got {base_obj.type_name.decode()}"
                             )
 
-                    ours_blob = None
-                    if ours_sha:
-                        ours_obj = self.object_store[ours_sha]
-                        if is_blob(ours_obj):
-                            ours_blob = ours_obj
-                        else:
-                            raise TypeError(
-                                f"Expected blob for {path!r}, got {ours_obj.type_name.decode()}"
-                            )
+                    ours_obj = self.object_store[ours_sha]
+                    if is_blob(ours_obj):
+                        ours_blob = ours_obj
+                    else:
+                        raise TypeError(
+                            f"Expected blob for {path!r}, got {ours_obj.type_name.decode()}"
+                        )
 
-                    theirs_blob = None
-                    if theirs_sha:
-                        theirs_obj = self.object_store[theirs_sha]
-                        if is_blob(theirs_obj):
-                            theirs_blob = theirs_obj
-                        else:
-                            raise TypeError(
-                                f"Expected blob for {path!r}, got {theirs_obj.type_name.decode()}"
-                            )
+                    theirs_obj = self.object_store[theirs_sha]
+                    if is_blob(theirs_obj):
+                        theirs_blob = theirs_obj
+                    else:
+                        raise TypeError(
+                            f"Expected blob for {path!r}, got {theirs_obj.type_name.decode()}"
+                        )
 
-                    assert isinstance(base_blob, Blob)
+                    assert isinstance(base_blob, Blob) or base_blob is None
                     assert isinstance(ours_blob, Blob)
                     assert isinstance(theirs_blob, Blob)
                     merged_content, had_conflict = self.merge_blobs(
@@ -497,13 +522,13 @@ class Merger:
                     # Store merged blob
                     merged_blob = Blob.from_string(merged_content)
                     self.object_store.add_object(merged_blob)
-                    merged_entries[path] = (ours_mode or theirs_mode, merged_blob.id)
+                    merged_entries[name] = (ours_mode or theirs_mode, merged_blob.id)
 
         # Build merged tree
         merged_tree = Tree()
-        for path, (mode, sha) in sorted(merged_entries.items()):
+        for name, (mode, sha) in sorted(merged_entries.items()):
             if mode is not None and sha is not None:
-                merged_tree.add(path, mode, sha)
+                merged_tree.add(name, mode, sha)
 
         return merged_tree, conflicts
 

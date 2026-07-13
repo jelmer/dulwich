@@ -4,6 +4,14 @@
    different sides of a shared directory merge cleanly instead of being
    reported as a directory-level conflict. (Jelmer Vernooĳ, #2295)
 
+ * HARDEN: Parse commit-message trailers in linear time. ``parse_trailers``
+   located the trailer block by re-slicing and re-stripping the tail of the
+   message for every blank line, which is cubic on a message made mostly of
+   blank lines. Trailers are scanned during subtree operations, which walk
+   every reachable commit, so a crafted commit message could tie up CPU for
+   minutes to hours (a 3 KB all-blank message took roughly 36s before the fix
+   and is now immediate). (netliomax25-code)
+
  * SECURITY: Apply ``core.protectHFS`` and ``core.protectNTFS`` together when
    selecting the checkout path-element validator. ``get_path_element_validator``
    returned only the NTFS validator whenever ``protectNTFS`` was on (the default

@@ -123,6 +123,35 @@ class TestParseTrailers(unittest.TestCase):
         self.assertEqual(body, b"")
         self.assertEqual(trailers, [])
 
+    def test_many_blank_lines(self) -> None:
+        """A message of only blank lines has no trailers and parses in linear time.
+
+        A commit message comes from an untrusted remote and is scanned for
+        trailers during subtree operations (a walk over every reachable commit).
+        The previous backward search re-sliced and re-stripped the tail for each
+        blank line, which is cubic; this many-blank-line input would take minutes
+        to hours before the fix and completes immediately after it.
+        """
+        message = b"\n" * 200000
+        body, trailers = parse_trailers(message)
+        self.assertEqual(body, message)
+        self.assertEqual(trailers, [])
+
+    def test_many_blank_lines_then_non_trailer(self) -> None:
+        """Blank lines followed by a non-trailer line still parse in linear time."""
+        message = b"\n" * 200000 + b"not a trailer line\n"
+        body, trailers = parse_trailers(message)
+        self.assertEqual(body, message)
+        self.assertEqual(trailers, [])
+
+    def test_trailer_after_many_blank_lines(self) -> None:
+        """A real trailer is still found after a long run of blank lines."""
+        message = b"Subject\n" + b"\n" * 100000 + b"Signed-off-by: Alice\n"
+        _body, trailers = parse_trailers(message)
+        self.assertEqual(len(trailers), 1)
+        self.assertEqual(trailers[0].key, "Signed-off-by")
+        self.assertEqual(trailers[0].value, "Alice")
+
 
 class TestFormatTrailers(unittest.TestCase):
     """Tests for format_trailers function."""

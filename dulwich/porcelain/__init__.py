@@ -989,21 +989,58 @@ def check_diverged(repo: BaseRepo, current_sha: ObjectID, new_sha: ObjectID) -> 
 
 
 def archive(
-    repo: str | BaseRepo,
+    repo: str | BaseRepo = ".",
     committish: str | bytes | Commit | Tag | None = None,
     outstream: BinaryIO | RawIOBase = default_bytes_out_stream,
     errstream: BinaryIO | RawIOBase = default_bytes_err_stream,
+    remote: str | bytes | None = None,
+    ssh_command: str | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> None:
     """Create an archive.
 
     Args:
-      repo: Path of repository for which to generate an archive.
+      repo: Path of repository for which to generate an archive. Ignored when
+        ``remote`` is set.
       committish: Commit SHA1 or ref to use
       outstream: Output stream (defaults to stdout)
       errstream: Error stream (defaults to stderr)
+      remote: Location of a remote repository to retrieve the archive from,
+        rather than generating it from ``repo``.
+      ssh_command: SSH command to use. Defaults to the command configured in
+        ``env``.
+      env: Environment to read Git variables from (defaults to os.environ)
     """
     if committish is None:
         committish = "HEAD"
+
+    if remote is not None:
+        if ssh_command is None:
+            ssh_command = _ssh_command_from_env(env)
+        remote_str = remote.decode() if isinstance(remote, bytes) else remote
+        client, path = get_transport_and_path(remote_str, ssh_command=ssh_command)
+        committish_bytes: bytes
+        if isinstance(committish, (Commit, Tag)):
+            committish_bytes = committish.id
+        elif isinstance(committish, str):
+            committish_bytes = committish.encode(DEFAULT_ENCODING)
+        else:
+            committish_bytes = committish
+
+        def write_data(data: bytes) -> None:
+            outstream.write(data)
+
+        def write_error(data: bytes) -> None:
+            errstream.write(data)
+
+        client.archive(
+            path.encode(DEFAULT_ENCODING) if isinstance(path, str) else path,
+            committish_bytes,
+            write_data,
+            write_error=write_error,
+        )
+        return
+
     with open_repo_closing(repo) as repo_obj:
         c = parse_commit(repo_obj, committish)
         tree = repo_obj.object_store[c.tree]

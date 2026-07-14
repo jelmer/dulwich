@@ -335,6 +335,33 @@ class ArchiveTests(PorcelainTestCase):
         self.addCleanup(tf.close)
         self.assertEqual([], tf.getnames())
 
+    def test_remote(self) -> None:
+        calls = []
+
+        class FakeClient:
+            def archive(self, path, committish, write_data, **kwargs) -> None:
+                calls.append((path, committish))
+                write_data(b"tar data")
+
+        real = porcelain.get_transport_and_path
+        porcelain.get_transport_and_path = lambda location, **kwargs: (
+            FakeClient(),
+            location,
+        )
+        self.addCleanup(setattr, porcelain, "get_transport_and_path", real)
+
+        out = BytesIO()
+        err = BytesIO()
+        porcelain.archive(
+            remote="git://example.com/repo",
+            committish=b"HEAD",
+            outstream=out,
+            errstream=err,
+        )
+        self.assertEqual([(b"git://example.com/repo", b"HEAD")], calls)
+        self.assertEqual(b"tar data", out.getvalue())
+        self.assertEqual(b"", err.getvalue())
+
 
 class UpdateServerInfoTests(PorcelainTestCase):
     def test_simple(self) -> None:

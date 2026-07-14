@@ -1,5 +1,11 @@
 1.2.11	UNRELEASED
 
+ * Let porcelain functions that consult the environment take an ``env``
+   argument overriding ``os.environ``. As a side effect ``tag_create`` now
+   honours ``GIT_COMMITTER_NAME``/``GIT_COMMITTER_EMAIL`` for the tagger line
+   and ``merge``/``revert`` honour ``GIT_AUTHOR_NAME``/``GIT_AUTHOR_EMAIL``,
+   matching git. (Jelmer Vernooĳ)
+
  * Recurse into subtrees when merging trees, so non-overlapping changes on
    different sides of a shared directory merge cleanly instead of being
    reported as a directory-level conflict. (Jelmer Vernooĳ, #2295)

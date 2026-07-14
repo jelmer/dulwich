@@ -239,6 +239,25 @@ def _get_default_identity(env: Mapping[str, str] | None = None) -> tuple[str, st
     return (fullname, email)
 
 
+def _warn_if_identity_from_env(kind: str) -> None:
+    """Warn if GIT_${KIND}_NAME/EMAIL would supply the identity.
+
+    Taking the identity from the environment couples the commit machinery to
+    the process it runs in. Callers should resolve it themselves and pass it
+    in; porcelain does this and accepts an ``env`` argument to override
+    ``os.environ``.
+    """
+    for var in (f"GIT_{kind}_NAME", f"GIT_{kind}_EMAIL"):
+        if var in os.environ:
+            warnings.warn(
+                f"taking the {kind.lower()} from {var} is deprecated; "
+                f"pass an explicit {kind.lower()} instead",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+            return
+
+
 def get_user_identity(config: "Config", kind: str | None = None) -> bytes:
     """Determine the identity to use for new commits.
 
@@ -2781,6 +2800,7 @@ class MemoryRepo(BaseRepo):
         if merge_heads is None:
             merge_heads = []
         if committer is None:
+            _warn_if_identity_from_env("COMMITTER")
             committer = get_user_identity(config, kind="COMMITTER")
         check_user_identity(committer)
         c.committer = committer
@@ -2791,6 +2811,7 @@ class MemoryRepo(BaseRepo):
             commit_timezone = 0
         c.commit_timezone = commit_timezone
         if author is None:
+            _warn_if_identity_from_env("AUTHOR")
             author = get_user_identity(config, kind="AUTHOR")
         c.author = author
         check_user_identity(author)

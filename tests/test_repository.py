@@ -187,6 +187,45 @@ class MemoryRepoTests(TestCase):
         r.set_description(description)
         self.assertEqual(description, r.get_description())
 
+    def _do_commit_with_empty_tree(self, **kwargs) -> None:
+        r = MemoryRepo.init_bare([], {})
+        config = r.get_config()
+        config.set((b"user",), b"name", b"Config Name")
+        config.set((b"user",), b"email", b"config@example.com")
+        tree = objects.Tree()
+        r.object_store.add_object(tree)
+        r.do_commit(message=b"message", tree=tree.id, **kwargs)
+
+    def test_do_commit_identity_from_env_deprecated(self) -> None:
+        self.overrideEnv("GIT_AUTHOR_NAME", "Env Author")
+        with self.assertWarns(DeprecationWarning):
+            self._do_commit_with_empty_tree()
+
+    def test_do_commit_no_warning_without_env(self) -> None:
+        for var in (
+            "GIT_AUTHOR_NAME",
+            "GIT_AUTHOR_EMAIL",
+            "GIT_COMMITTER_NAME",
+            "GIT_COMMITTER_EMAIL",
+        ):
+            self.overrideEnv(var, None)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self._do_commit_with_empty_tree()
+        self.assertEqual(
+            [], [w for w in caught if issubclass(w.category, DeprecationWarning)]
+        )
+
+    def test_do_commit_no_warning_with_explicit_identity(self) -> None:
+        self.overrideEnv("GIT_AUTHOR_NAME", "Env Author")
+        identity = b"Explicit <explicit@example.com>"
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self._do_commit_with_empty_tree(author=identity, committer=identity)
+        self.assertEqual(
+            [], [w for w in caught if issubclass(w.category, DeprecationWarning)]
+        )
+
     def test_pull_into(self) -> None:
         r = MemoryRepo.init_bare([], {})
         repo = open_repo("a.git")

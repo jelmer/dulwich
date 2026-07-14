@@ -25,6 +25,7 @@ import os
 import shutil
 import stat
 import tempfile
+import warnings
 from unittest import skipIf
 
 from dulwich.errors import CommitError
@@ -261,6 +262,30 @@ class WorkTreeUnstagingTests(WorkTreeTestCase):
 
 class WorkTreeCommitTests(WorkTreeTestCase):
     """Tests for WorkTree commit operations."""
+
+    def test_commit_identity_from_env_deprecated(self):
+        """Taking the identity from GIT_AUTHOR_* is deprecated."""
+        with open(os.path.join(self.repo.path, "a"), "wb") as f:
+            f.write(b"new contents")
+        self.worktree.stage(["a"])
+        self.overrideEnv("GIT_AUTHOR_NAME", "Env Author")
+        self.overrideEnv("GIT_AUTHOR_EMAIL", "env@nodomain.com")
+        with self.assertWarns(DeprecationWarning):
+            self.worktree.commit(b"message")
+
+    def test_commit_no_warning_with_explicit_identity(self):
+        """No deprecation warning when the identity is passed in."""
+        with open(os.path.join(self.repo.path, "a"), "wb") as f:
+            f.write(b"new contents")
+        self.worktree.stage(["a"])
+        self.overrideEnv("GIT_AUTHOR_NAME", "Env Author")
+        identity = b"Test <test@nodomain.com>"
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self.worktree.commit(b"message", author=identity, committer=identity)
+        self.assertEqual(
+            [], [w for w in caught if issubclass(w.category, DeprecationWarning)]
+        )
 
     def test_commit_modified(self):
         """Test committing a modified file."""

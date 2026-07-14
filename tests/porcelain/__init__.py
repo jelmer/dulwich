@@ -59,6 +59,8 @@ from dulwich.porcelain import (
     CheckoutError,  # Hypothetical or real error class
     CountObjectsResult,
     _checked_worktree_path,
+    _protocol_version_from_env,
+    _ssh_command_from_env,
     add,
     commit,
 )
@@ -333,6 +335,33 @@ class ArchiveTests(PorcelainTestCase):
         tf = tarfile.TarFile(fileobj=out)
         self.addCleanup(tf.close)
         self.assertEqual([], tf.getnames())
+
+    def test_remote(self) -> None:
+        calls = []
+
+        class FakeClient:
+            def archive(self, path, committish, write_data, **kwargs) -> None:
+                calls.append((path, committish))
+                write_data(b"tar data")
+
+        real = porcelain.get_transport_and_path
+        porcelain.get_transport_and_path = lambda location, **kwargs: (
+            FakeClient(),
+            location,
+        )
+        self.addCleanup(setattr, porcelain, "get_transport_and_path", real)
+
+        out = BytesIO()
+        err = BytesIO()
+        porcelain.archive(
+            remote="git://example.com/repo",
+            committish=b"HEAD",
+            outstream=out,
+            errstream=err,
+        )
+        self.assertEqual([(b"git://example.com/repo", b"HEAD")], calls)
+        self.assertEqual(b"tar data", out.getvalue())
+        self.assertEqual(b"", err.getvalue())
 
 
 class UpdateServerInfoTests(PorcelainTestCase):
@@ -13597,3 +13626,147 @@ class EnvOverrideTests(PorcelainTestCase):
         )
         tag = self.repo[self.repo.refs[b"refs/tags/v1"]]
         self.assertEqual(b"Env Tagger <tagger@example.com>", tag.tagger)
+
+    def _captured_ssh_command(self, run) -> str | None:
+        """Return the ssh_command ``run`` ends up handing to the transport."""
+        captured = {}
+        real = porcelain.get_transport_and_path
+
+        def get_transport_and_path(location, **transport_kwargs):
+            captured.update(transport_kwargs)
+            return real(location, **transport_kwargs)
+
+        porcelain.get_transport_and_path = get_transport_and_path
+        self.addCleanup(setattr, porcelain, "get_transport_and_path", real)
+        run()
+        return captured["ssh_command"]
+
+    def test_ls_remote_ssh_command_from_env(self) -> None:
+        self.assertEqual(
+            "/usr/bin/ssh -v",
+            self._captured_ssh_command(
+                lambda: porcelain.ls_remote(
+                    self.repo.path, env={"GIT_SSH_COMMAND": "/usr/bin/ssh -v"}
+                )
+            ),
+        )
+
+    def test_ls_remote_ssh_command_argument_wins(self) -> None:
+        self.assertEqual(
+            "explicit-ssh",
+            self._captured_ssh_command(
+                lambda: porcelain.ls_remote(
+                    self.repo.path,
+                    ssh_command="explicit-ssh",
+                    env={"GIT_SSH_COMMAND": "/usr/bin/ssh -v"},
+                )
+            ),
+        )
+
+    def test_ls_remote_ssh_command_defaults_to_os_environ(self) -> None:
+        self.overrideEnv("GIT_SSH_COMMAND", "/usr/bin/ssh -v")
+        self.assertEqual(
+            "/usr/bin/ssh -v",
+            self._captured_ssh_command(lambda: porcelain.ls_remote(self.repo.path)),
+        )
+
+    def test_clone_protocol_version_from_env(self) -> None:
+        captured = {}
+        real = porcelain.get_transport_and_path
+
+        def get_transport_and_path(location, **kwargs):
+            client, path = real(location, **kwargs)
+            real_clone = client.clone
+
+            def clone(*args, **clone_kwargs):
+                captured["protocol_version"] = clone_kwargs.get("protocol_version")
+                return real_clone(*args, **clone_kwargs)
+
+            client.clone = clone
+            return client, path
+
+        porcelain.get_transport_and_path = get_transport_and_path
+        self.addCleanup(setattr, porcelain, "get_transport_and_path", real)
+
+        target = os.path.join(self.test_dir, "proto-target")
+        porcelain.clone(
+            self.repo.path, target, env={"GIT_PROTOCOL": "version=2"}
+        ).close()
+        self.assertEqual(2, captured["protocol_version"])
+
+    def test_clone_ssh_command_from_os_environ(self) -> None:
+        # porcelain.clone() ignored GIT_SSH_COMMAND when the env var was only
+        # consulted by the CLI (#2209).
+        self.overrideEnv("GIT_SSH_COMMAND", "ssh -i /path/to/id_ed25519")
+        target = os.path.join(self.test_dir, "target")
+        self.assertEqual(
+            "ssh -i /path/to/id_ed25519",
+            self._captured_ssh_command(lambda: porcelain.clone(self.repo.path, target)),
+        )
+
+
+class SshCommandFromEnvTests(TestCase):
+    """Tests for :func:`dulwich.porcelain._ssh_command_from_env`.
+
+    GIT_SSH_COMMAND wins over GIT_SSH, matching git's own precedence.
+    """
+
+    def test_both_unset_returns_none(self) -> None:
+        self.assertIsNone(_ssh_command_from_env({}))
+
+    def test_git_ssh_command_wins(self) -> None:
+        self.assertEqual(
+            "/usr/bin/ssh -v",
+            _ssh_command_from_env(
+                {"GIT_SSH_COMMAND": "/usr/bin/ssh -v", "GIT_SSH": "/path/to/ssh"}
+            ),
+        )
+
+    def test_git_ssh_alone(self) -> None:
+        self.assertEqual(
+            "/path/to/ssh", _ssh_command_from_env({"GIT_SSH": "/path/to/ssh"})
+        )
+
+    def test_empty_git_ssh_command_falls_back(self) -> None:
+        # An empty string is effectively unset; fall back to GIT_SSH.
+        self.assertEqual(
+            "/path/to/ssh",
+            _ssh_command_from_env({"GIT_SSH_COMMAND": "", "GIT_SSH": "/path/to/ssh"}),
+        )
+
+    def test_defaults_to_os_environ(self) -> None:
+        self.overrideEnv("GIT_SSH_COMMAND", "/usr/bin/ssh -v")
+        self.overrideEnv("GIT_SSH", None)
+        self.assertEqual("/usr/bin/ssh -v", _ssh_command_from_env())
+
+
+class ProtocolVersionFromEnvTests(TestCase):
+    """Tests for :func:`dulwich.porcelain._protocol_version_from_env`."""
+
+    def test_unset_returns_none(self) -> None:
+        self.assertIsNone(_protocol_version_from_env({}))
+
+    def test_empty_returns_none(self) -> None:
+        self.assertIsNone(_protocol_version_from_env({"GIT_PROTOCOL": ""}))
+
+    def test_version_2(self) -> None:
+        self.assertEqual(2, _protocol_version_from_env({"GIT_PROTOCOL": "version=2"}))
+
+    def test_version_1(self) -> None:
+        self.assertEqual(1, _protocol_version_from_env({"GIT_PROTOCOL": "version=1"}))
+
+    def test_version_in_compound_value(self) -> None:
+        # GIT_PROTOCOL can carry multiple colon-separated key=value entries.
+        self.assertEqual(
+            2, _protocol_version_from_env({"GIT_PROTOCOL": "feature=extra:version=2"})
+        )
+
+    def test_non_version_key_returns_none(self) -> None:
+        self.assertIsNone(_protocol_version_from_env({"GIT_PROTOCOL": "feature=extra"}))
+
+    def test_unparsable_version_returns_none(self) -> None:
+        self.assertIsNone(_protocol_version_from_env({"GIT_PROTOCOL": "version=nope"}))
+
+    def test_defaults_to_os_environ(self) -> None:
+        self.overrideEnv("GIT_PROTOCOL", "version=2")
+        self.assertEqual(2, _protocol_version_from_env())

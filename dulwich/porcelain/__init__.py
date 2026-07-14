@@ -706,6 +706,60 @@ def parse_timezone_format(tz_str: str) -> int:
     raise TimezoneFormatError(tz_str)
 
 
+def _ssh_command_from_env(env: Mapping[str, str] | None = None) -> str | None:
+    """Return the ssh command requested via ``GIT_SSH_COMMAND`` / ``GIT_SSH``.
+
+    ``GIT_SSH_COMMAND`` wins over ``GIT_SSH``, matching git's own precedence.
+    Returns ``None`` when neither is set, so callers can fall through to the
+    ``core.sshCommand`` config or the transport default.
+
+    Env lookup lives here in porcelain rather than in the transport library so
+    that :mod:`dulwich.client` stays process-environment-free.
+    """
+    if env is None:
+        env = os.environ
+    env_ssh_command = env.get("GIT_SSH_COMMAND")
+    if env_ssh_command:
+        return env_ssh_command
+    env_ssh = env.get("GIT_SSH")
+    if env_ssh:
+        return env_ssh
+    return None
+
+
+def _protocol_version_from_env(env: Mapping[str, str] | None = None) -> int | None:
+    """Parse the version from the ``GIT_PROTOCOL`` environment variable.
+
+    Git uses a colon-separated ``key=value`` format for ``GIT_PROTOCOL``
+    (for example ``version=2`` or ``feature=extra:version=2``). Return the
+    requested version as an ``int`` when present and parseable, otherwise
+    ``None``.
+
+    Env lookup lives here in porcelain rather than in the transport library so
+    that :mod:`dulwich.client` stays process-environment-free.
+    """
+    if env is None:
+        env = os.environ
+    value = env.get("GIT_PROTOCOL")
+    if not value:
+        return None
+    for pair in value.split(":"):
+        key, sep, raw_val = pair.partition("=")
+        if not sep or key.strip() != "version":
+            # TODO: extract and surface features (e.g. ``feature=extra``).
+            # For now dulwich only consumes ``version``; other keys are
+            # ignored rather than being forwarded to the transport.
+            logger.warning("Ignoring unsupported GIT_PROTOCOL pair %r", pair)
+            continue
+        try:
+            return int(raw_val.strip())
+        except ValueError:
+            logger.warning("Ignoring unparsable GIT_PROTOCOL version %r", raw_val)
+            return None
+    logger.warning("GIT_PROTOCOL %r has no version= pair; ignoring", value)
+    return None
+
+
 def _config_stack(
     repo: BaseRepo, env: Mapping[str, str] | None = None
 ) -> "StackedConfig":
@@ -968,21 +1022,58 @@ def check_diverged(repo: BaseRepo, current_sha: ObjectID, new_sha: ObjectID) -> 
 
 
 def archive(
-    repo: str | BaseRepo,
+    repo: str | BaseRepo = ".",
     committish: str | bytes | Commit | Tag | None = None,
     outstream: BinaryIO | RawIOBase = default_bytes_out_stream,
     errstream: BinaryIO | RawIOBase = default_bytes_err_stream,
+    remote: str | bytes | None = None,
+    ssh_command: str | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> None:
     """Create an archive.
 
     Args:
-      repo: Path of repository for which to generate an archive.
+      repo: Path of repository for which to generate an archive. Ignored when
+        ``remote`` is set.
       committish: Commit SHA1 or ref to use
       outstream: Output stream (defaults to stdout)
       errstream: Error stream (defaults to stderr)
+      remote: Location of a remote repository to retrieve the archive from,
+        rather than generating it from ``repo``.
+      ssh_command: SSH command to use. Defaults to the command configured in
+        ``env``.
+      env: Environment to read Git variables from (defaults to os.environ)
     """
     if committish is None:
         committish = "HEAD"
+
+    if remote is not None:
+        if ssh_command is None:
+            ssh_command = _ssh_command_from_env(env)
+        remote_str = remote.decode() if isinstance(remote, bytes) else remote
+        client, path = get_transport_and_path(remote_str, ssh_command=ssh_command)
+        committish_bytes: bytes
+        if isinstance(committish, (Commit, Tag)):
+            committish_bytes = committish.id
+        elif isinstance(committish, str):
+            committish_bytes = committish.encode(DEFAULT_ENCODING)
+        else:
+            committish_bytes = committish
+
+        def write_data(data: bytes) -> None:
+            outstream.write(data)
+
+        def write_error(data: bytes) -> None:
+            errstream.write(data)
+
+        client.archive(
+            path.encode(DEFAULT_ENCODING) if isinstance(path, str) else path,
+            committish_bytes,
+            write_data,
+            write_error=write_error,
+        )
+        return
+
     with open_repo_closing(repo) as repo_obj:
         c = parse_commit(repo_obj, committish)
         tree = repo_obj.object_store[c.tree]
@@ -1638,12 +1729,13 @@ def clone(
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
-      protocol_version: desired Git protocol version. By default the highest
-        mutually supported protocol version will be used.
+      protocol_version: desired Git protocol version. Defaults to the version
+        requested in ``env``, and otherwise to the highest mutually supported
+        protocol version.
       recurse_submodules: Whether to initialize and clone submodules
-      ssh_command: Optional custom SSH command
-      env: Environment to read Git configuration overrides from
-        (defaults to os.environ)
+      ssh_command: Optional custom SSH command. Defaults to the command
+        configured in ``env``.
+      env: Environment to read Git variables from (defaults to os.environ)
       **kwargs: Additional keyword arguments including refspecs to fetch.
         Can be a bytestring, a string, or a list of bytestring/string.
 
@@ -1664,6 +1756,9 @@ def clone(
         env_override = env_config(os.environ if env is None else env)
         if env_override is not None:
             config.backends.insert(0, env_override)
+
+    if protocol_version is None:
+        protocol_version = _protocol_version_from_env(env)
 
     if checkout is None:
         checkout = not bare
@@ -1692,6 +1787,8 @@ def clone(
     else:
         source_str = source.decode() if isinstance(source, bytes) else source
         transport_kwargs = _filter_transport_kwargs(**kwargs)
+        if ssh_command is None:
+            ssh_command = _ssh_command_from_env(env)
         if ssh_command is not None:
             transport_kwargs["ssh_command"] = ssh_command
         (client, path) = get_transport_and_path(
@@ -3248,6 +3345,7 @@ def push(
     set_upstream: bool = False,
     follow_tags: bool = False,
     mirror: bool = False,
+    env: Mapping[str, str] | None = None,
     **kwargs: object,
 ) -> SendPackResult:
     """Remote push with dulwich via dulwich.client.
@@ -3271,6 +3369,7 @@ def push(
       follow_tags: If True, push annotated tags reachable from pushed commits
       mirror: If True, mirror all refs (implies force, push all refs and
         delete remote refs not present locally)
+      env: Environment to read Git variables from (defaults to os.environ)
       **kwargs: Additional keyword arguments for the client
     """
     if delete and not refspecs:
@@ -3296,6 +3395,8 @@ def push(
 
         # Get the client and path
         transport_kwargs = _filter_transport_kwargs(**kwargs)
+        if transport_kwargs.get("ssh_command") is None:
+            transport_kwargs["ssh_command"] = _ssh_command_from_env(env)
         client, path = get_transport_and_path(
             remote_location,
             config=r.get_config_stack(),
@@ -3481,6 +3582,7 @@ def pull(
     force: bool = False,
     filter_spec: str | None = None,
     protocol_version: int | None = None,
+    env: Mapping[str, str] | None = None,
     **kwargs: object,
 ) -> None:
     """Pull from remote via dulwich.client.
@@ -3500,10 +3602,15 @@ def pull(
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
-      protocol_version: desired Git protocol version. By default the highest
-        mutually supported protocol version will be used
+      protocol_version: desired Git protocol version. Defaults to the version
+        requested in ``env``, and otherwise to the highest mutually supported
+        protocol version.
+      env: Environment to read Git variables from (defaults to os.environ)
       **kwargs: Additional keyword arguments for the client
     """
+    if protocol_version is None:
+        protocol_version = _protocol_version_from_env(env)
+
     # Open the repo
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
@@ -3542,6 +3649,8 @@ def pull(
             ]
 
         transport_kwargs = _filter_transport_kwargs(**kwargs)
+        if transport_kwargs.get("ssh_command") is None:
+            transport_kwargs["ssh_command"] = _ssh_command_from_env(env)
         client, path = get_transport_and_path(
             remote_location,
             config=r.get_config_stack(),
@@ -4742,15 +4851,19 @@ def fetch(
       username: Username for authentication
       password: Password for authentication
       key_filename: SSH key filename
-      ssh_command: SSH command to use
+      ssh_command: SSH command to use. Defaults to the command configured in
+        ``env``.
       shallow_since: Deepen or shorten the history to include commits after this date
       shallow_exclude: Deepen or shorten the history to exclude commits reachable from these refs
       unshallow: Convert a shallow repository to a complete one
-      env: Environment to read GIT_REFLOG_ACTION from (defaults to os.environ)
+      env: Environment to read Git variables from (defaults to os.environ)
 
     Returns:
       Dictionary with refs on the remote
     """
+    if ssh_command is None:
+        ssh_command = _ssh_command_from_env(env)
+
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
         default_message = b"fetch: from " + remote_location.encode(DEFAULT_ENCODING)
@@ -5269,9 +5382,9 @@ def ls_remote(
       username: Username for authentication
       password: Password for authentication
       key_filename: SSH key filename
-      ssh_command: SSH command to use
-      env: Environment to read Git configuration overrides from
-        (defaults to os.environ)
+      ssh_command: SSH command to use. Defaults to the command configured in
+        ``env``.
+      env: Environment to read Git variables from (defaults to os.environ)
 
     Returns:
       LsRemoteResult object with refs and symrefs
@@ -5281,6 +5394,8 @@ def ls_remote(
         env_override = env_config(os.environ if env is None else env)
         if env_override is not None:
             config.backends.insert(0, env_override)
+    if ssh_command is None:
+        ssh_command = _ssh_command_from_env(env)
     remote_str = remote.decode() if isinstance(remote, bytes) else remote
     client, host_path = get_transport_and_path(
         remote_str,

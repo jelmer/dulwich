@@ -1147,36 +1147,16 @@ class cmd_archive(Command):
         )
         parser.add_argument("committish", type=str, nargs="?")
         parsed_args = parser.parse_args(args)
-        if parsed_args.remote:
-            client, path = get_transport_and_path(
-                parsed_args.remote,
-                ssh_command=porcelain._ssh_command_from_env(),
-            )
-
-            def stdout_write(data: bytes) -> None:
-                sys.stdout.buffer.write(data)
-
-            def stderr_write(data: bytes) -> None:
-                sys.stderr.buffer.write(data)
-
-            client.archive(
-                path.encode("utf-8") if isinstance(path, str) else path,
-                parsed_args.committish.encode("utf-8")
-                if isinstance(parsed_args.committish, str)
-                else parsed_args.committish,
-                stdout_write,
-                write_error=stderr_write,
-            )
-        else:
-            # Use binary buffer for archive output
-            outstream: BinaryIO = sys.stdout.buffer
-            errstream: BinaryIO = sys.stderr.buffer
-            porcelain.archive(
-                ".",
-                parsed_args.committish,
-                outstream=outstream,
-                errstream=errstream,
-            )
+        # Use binary buffer for archive output
+        outstream: BinaryIO = sys.stdout.buffer
+        errstream: BinaryIO = sys.stderr.buffer
+        porcelain.archive(
+            ".",
+            parsed_args.committish,
+            remote=parsed_args.remote,
+            outstream=outstream,
+            errstream=errstream,
+        )
 
 
 class cmd_add(Command):

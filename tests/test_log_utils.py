@@ -21,6 +21,8 @@
 
 """Tests for dulwich.log_utils."""
 
+import contextlib
+import io
 import logging
 import os
 import tempfile
@@ -344,9 +346,12 @@ class LogUtilsTests(TestCase):
         root_logger.handlers = []
         root_logger.level = logging.WARNING
 
-        # Use an invalid path (directory that doesn't exist)
+        # Use an invalid path (directory that doesn't exist). The failure
+        # warning is written to stderr; capture it so it doesn't leak.
         self._set_git_trace("/nonexistent/path/trace.log")
-        result = _configure_logging_from_trace()
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            result = _configure_logging_from_trace()
 
         # Should fail
         self.assertFalse(result)
+        self.assertIn("Failed to open GIT_TRACE file", stderr.getvalue())

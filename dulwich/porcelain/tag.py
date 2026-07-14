@@ -23,6 +23,7 @@
 
 import sys
 import time
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, TextIO
 
 from dulwich.objects import Tag, parse_timezone
@@ -34,7 +35,6 @@ from ..refs import (
     Ref,
     local_tag_name,
 )
-from ..repo import get_user_identity
 
 if TYPE_CHECKING:
     from . import RepoPath
@@ -110,6 +110,7 @@ def tag_create(
     tag_timezone: int | None = None,
     sign: bool | None = None,
     encoding: str | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> None:
     """Creates a tag in git via dulwich calls.
 
@@ -126,9 +127,13 @@ def tag_create(
         pass True to use default GPG key,
         pass a str containing Key ID to use a specific GPG key)
       encoding: Encoding to use for tag messages
+      env: Environment to read the user identity and timezone from
+        (defaults to os.environ)
     """
     from . import (
         DEFAULT_ENCODING,
+        _config_stack,
+        _get_user_identity,
         get_user_timezones,
         open_repo_closing,
     )
@@ -145,7 +150,10 @@ def tag_create(
             # Create the tag object
             tag_obj = Tag()
             if author is None:
-                author = get_user_identity(r.get_config_stack())
+                # git uses the committer identity for the tagger line
+                author = _get_user_identity(
+                    _config_stack(r, env=env), kind="COMMITTER", env=env
+                )
             elif isinstance(author, str):
                 author = author.encode(encoding)
             else:
@@ -164,13 +172,13 @@ def tag_create(
                 tag_time = int(time.time())
             tag_obj.tag_time = tag_time
             if tag_timezone is None:
-                tag_timezone = get_user_timezones()[1]
+                tag_timezone = get_user_timezones(env=env)[1]
             elif isinstance(tag_timezone, str):
                 tag_timezone, _ = parse_timezone(tag_timezone.encode())
             tag_obj.tag_timezone = tag_timezone
 
             # Check if we should sign the tag
-            config = r.get_config_stack()
+            config = _config_stack(r, env=env)
 
             if sign is None:
                 # Check tag.gpgSign configuration when sign is not explicitly set

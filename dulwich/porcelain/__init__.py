@@ -302,9 +302,9 @@ import stat
 import sys
 import time
 from collections import namedtuple
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Set as AbstractSet
-from contextlib import AbstractContextManager, closing, contextmanager
+from contextlib import AbstractContextManager, closing, contextmanager, suppress
 from dataclasses import dataclass
 from io import BytesIO, RawIOBase
 from pathlib import Path
@@ -421,7 +421,7 @@ from ..refs import (
     parse_remote_ref,
     shorten_ref_name,
 )
-from ..repo import BaseRepo, Repo, get_user_identity
+from ..repo import BaseRepo, Repo, _get_default_identity
 from ..server import (
     FileSystemBackend,
     ReceivePackHandler,
@@ -706,20 +706,85 @@ def parse_timezone_format(tz_str: str) -> int:
     raise TimezoneFormatError(tz_str)
 
 
-def get_user_timezones() -> tuple[int, int]:
+def _config_stack(
+    repo: BaseRepo, env: Mapping[str, str] | None = None
+) -> "StackedConfig":
+    """Build a config stack for ``repo`` honouring the environment.
+
+    ``GIT_CONFIG_COUNT``/``GIT_CONFIG_KEY_n``/``GIT_CONFIG_VALUE_n`` take
+    precedence over every file-based backend, including the repository's own
+    config.
+    """
+    if env is None:
+        env = os.environ
+    config = repo.get_config_stack()
+    override = env_config(env)
+    if override is not None:
+        config.backends.insert(0, override)
+    return config
+
+
+def _get_user_identity(
+    config: "StackedConfig",
+    kind: str | None = None,
+    env: Mapping[str, str] | None = None,
+) -> bytes:
+    """Determine the identity to use for new commits, honouring ``env``.
+
+    Checks GIT_${KIND}_NAME/GIT_${KIND}_EMAIL, then user.name/user.email from
+    the config, then the identity of the user running the process. Resolving
+    this here rather than in :func:`dulwich.repo.get_user_identity` keeps the
+    environment lookup in porcelain, where ``env`` can override it.
+    """
+    if env is None:
+        env = os.environ
+    user: bytes | None = None
+    email: bytes | None = None
+    if kind:
+        name_var = env.get("GIT_" + kind + "_NAME")
+        if name_var is not None:
+            user = name_var.encode("utf-8")
+        email_var = env.get("GIT_" + kind + "_EMAIL")
+        if email_var is not None:
+            email = email_var.encode("utf-8")
+    if user is None:
+        with suppress(KeyError):
+            user = config.get(("user",), "name")
+    if email is None:
+        with suppress(KeyError):
+            email = config.get(("user",), "email")
+    if user is None or email is None:
+        default_user, default_email = _get_default_identity(env=env)
+        if user is None:
+            user = default_user.encode("utf-8")
+        if email is None:
+            email = default_email.encode("utf-8")
+    if email.startswith(b"<") and email.endswith(b">"):
+        email = email[1:-1]
+    return user + b" <" + email + b">"
+
+
+def get_user_timezones(env: Mapping[str, str] | None = None) -> tuple[int, int]:
     """Retrieve local timezone as described in git documentation.
 
     https://raw.githubusercontent.com/git/git/v2.3.0/Documentation/date-formats.txt
+
+    Args:
+      env: Environment to read GIT_AUTHOR_DATE and GIT_COMMITTER_DATE from
+        (defaults to os.environ)
+
     Returns: A tuple containing author timezone, committer timezone.
     """
+    if env is None:
+        env = os.environ
     local_timezone = time.localtime().tm_gmtoff
 
-    if os.environ.get("GIT_AUTHOR_DATE"):
-        author_timezone = parse_timezone_format(os.environ["GIT_AUTHOR_DATE"])
+    if env.get("GIT_AUTHOR_DATE"):
+        author_timezone = parse_timezone_format(env["GIT_AUTHOR_DATE"])
     else:
         author_timezone = local_timezone
-    if os.environ.get("GIT_COMMITTER_DATE"):
-        commit_timezone = parse_timezone_format(os.environ["GIT_COMMITTER_DATE"])
+    if env.get("GIT_COMMITTER_DATE"):
+        commit_timezone = parse_timezone_format(env["GIT_COMMITTER_DATE"])
     else:
         commit_timezone = local_timezone
 
@@ -752,13 +817,16 @@ def _noop_context_manager(obj: T) -> Iterator[T]:
 
 
 def _get_reflog_message(
-    default_message: bytes, explicit_message: bytes | None = None
+    default_message: bytes,
+    explicit_message: bytes | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> bytes:
     """Get reflog message, checking GIT_REFLOG_ACTION environment variable.
 
     Args:
       default_message: Default message to use if no explicit message or env var
       explicit_message: Explicit message passed as argument (takes precedence)
+      env: Environment to read GIT_REFLOG_ACTION from (defaults to os.environ)
 
     Returns:
       The reflog message with priority:
@@ -769,7 +837,9 @@ def _get_reflog_message(
     if explicit_message is not None:
         return explicit_message
 
-    env_action = os.environ.get("GIT_REFLOG_ACTION")
+    if env is None:
+        env = os.environ
+    env_action = env.get("GIT_REFLOG_ACTION")
     if env_action is not None:
         return env_action.encode("utf-8")
 
@@ -972,24 +1042,29 @@ def pack_refs(repo: RepoPath, all: bool = False) -> None:
         repo_obj.refs.pack_refs(all=all)
 
 
-def _get_variables(repo: RepoPath = ".") -> dict[str, str]:
+def _get_variables(
+    repo: RepoPath = ".", env: Mapping[str, str] | None = None
+) -> dict[str, str]:
     """Internal function to get all Git logical variables.
 
     Args:
       repo: Path to the repository
+      env: Environment to read variables from (defaults to os.environ)
 
     Returns:
       A dictionary of all logical variables with values
     """
+    if env is None:
+        env = os.environ
     with open_repo_closing(repo) as repo_obj:
-        config = repo_obj.get_config_stack()
+        config = _config_stack(repo_obj, env=env)
 
         # Define callbacks for each logical variable
         def get_author_ident() -> str | None:
             """Get GIT_AUTHOR_IDENT."""
             try:
-                author_identity = get_user_identity(config, kind="AUTHOR")
-                author_tz, _ = get_user_timezones()
+                author_identity = _get_user_identity(config, kind="AUTHOR", env=env)
+                author_tz, _ = get_user_timezones(env=env)
                 timestamp = int(time.time())
                 return f"{author_identity.decode('utf-8', 'replace')} {timestamp} {author_tz:+05d}"
             except Exception:
@@ -998,8 +1073,10 @@ def _get_variables(repo: RepoPath = ".") -> dict[str, str]:
         def get_committer_ident() -> str | None:
             """Get GIT_COMMITTER_IDENT."""
             try:
-                committer_identity = get_user_identity(config, kind="COMMITTER")
-                _, committer_tz = get_user_timezones()
+                committer_identity = _get_user_identity(
+                    config, kind="COMMITTER", env=env
+                )
+                _, committer_tz = get_user_timezones(env=env)
                 timestamp = int(time.time())
                 return f"{committer_identity.decode('utf-8', 'replace')} {timestamp} {committer_tz:+05d}"
             except Exception:
@@ -1007,18 +1084,18 @@ def _get_variables(repo: RepoPath = ".") -> dict[str, str]:
 
         def get_editor() -> str | None:
             """Get GIT_EDITOR."""
-            editor = os.environ.get("GIT_EDITOR")
+            editor = env.get("GIT_EDITOR")
             if editor is None:
                 try:
                     editor_bytes = config.get(("core",), "editor")
                     editor = editor_bytes.decode("utf-8", "replace")
                 except KeyError:
-                    editor = os.environ.get("VISUAL") or os.environ.get("EDITOR")
+                    editor = env.get("VISUAL") or env.get("EDITOR")
             return editor
 
         def get_sequence_editor() -> str | None:
             """Get GIT_SEQUENCE_EDITOR."""
-            sequence_editor = os.environ.get("GIT_SEQUENCE_EDITOR")
+            sequence_editor = env.get("GIT_SEQUENCE_EDITOR")
             if sequence_editor is None:
                 try:
                     seq_editor_bytes = config.get(("sequence",), "editor")
@@ -1030,13 +1107,13 @@ def _get_variables(repo: RepoPath = ".") -> dict[str, str]:
 
         def get_pager() -> str | None:
             """Get GIT_PAGER."""
-            pager = os.environ.get("GIT_PAGER")
+            pager = env.get("GIT_PAGER")
             if pager is None:
                 try:
                     pager_bytes = config.get(("core",), "pager")
                     pager = pager_bytes.decode("utf-8", "replace")
                 except KeyError:
-                    pager = os.environ.get("PAGER")
+                    pager = env.get("PAGER")
             return pager
 
         def get_default_branch() -> str:
@@ -1068,24 +1145,32 @@ def _get_variables(repo: RepoPath = ".") -> dict[str, str]:
         return variables
 
 
-def var_list(repo: RepoPath = ".") -> dict[str, str]:
+def var_list(
+    repo: RepoPath = ".", env: Mapping[str, str] | None = None
+) -> dict[str, str]:
     """List all Git logical variables.
 
     Args:
       repo: Path to the repository
+      env: Environment to read variables from (defaults to os.environ)
 
     Returns:
       A dictionary of all logical variables with their values
     """
-    return _get_variables(repo)
+    return _get_variables(repo, env=env)
 
 
-def var(repo: RepoPath = ".", variable: str = "GIT_AUTHOR_IDENT") -> str:
+def var(
+    repo: RepoPath = ".",
+    variable: str = "GIT_AUTHOR_IDENT",
+    env: Mapping[str, str] | None = None,
+) -> str:
     """Get the value of a specific Git logical variable.
 
     Args:
       repo: Path to the repository
       variable: The variable to query (e.g., 'GIT_AUTHOR_IDENT')
+      env: Environment to read variables from (defaults to os.environ)
 
     Returns:
       The value of the requested variable as a string
@@ -1093,7 +1178,7 @@ def var(repo: RepoPath = ".", variable: str = "GIT_AUTHOR_IDENT") -> str:
     Raises:
       KeyError: If the requested variable has no value
     """
-    variables = _get_variables(repo)
+    variables = _get_variables(repo, env=env)
     if variable in variables:
         return variables[variable]
     else:
@@ -1115,6 +1200,7 @@ def commit(
     all: bool = False,
     amend: bool = False,
     sign: bool | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> bytes:
     """Create a new commit.
 
@@ -1135,6 +1221,7 @@ def commit(
       amend: Replace the tip of the current branch by creating a new commit
       sign: GPG sign the commit. If None, uses commit.gpgsign config.
         If True, signs with default GPG key. If False, does not sign.
+      env: Environment to read Git variables from (defaults to os.environ)
     Returns: SHA1 of the new commit
     """
     encoding_str = encoding.decode("ascii") if encoding else DEFAULT_ENCODING
@@ -1144,13 +1231,15 @@ def commit(
         author = author.encode(encoding_str)
     if isinstance(committer, str):
         committer = committer.encode(encoding_str)
-    local_timezone = get_user_timezones()
+    local_timezone = get_user_timezones(env=env)
     if author_timezone is None:
         author_timezone = local_timezone[0]
     if commit_timezone is None:
         commit_timezone = local_timezone[1]
 
     with open_repo_closing(repo) as r:
+        commit_config = _config_stack(r, env=env)
+
         # Handle amend logic
         merge_heads = None
         if amend:
@@ -1173,8 +1262,8 @@ def commit(
 
         # If -a flag is used, stage all modified tracked files
         if all:
-            index = r.open_index(config=r.get_config_stack())
-            normalizer = r.get_blob_normalizer(config=r.get_config_stack())
+            index = r.open_index(config=commit_config)
+            normalizer = r.get_blob_normalizer(config=commit_config)
 
             # Pass the normalizer's checkin_normalize method directly
             if normalizer is not None:
@@ -1182,9 +1271,7 @@ def commit(
             else:
                 filter_callback = None
 
-            # Read config once for filesystem compatibility options
-            config = r.get_config_stack()
-            trust_ctime = config.get_boolean(b"core", b"trustctime", True)
+            trust_ctime = commit_config.get_boolean(b"core", b"trustctime", True)
 
             unstaged_changes = list(
                 get_unstaged_changes(
@@ -1203,6 +1290,13 @@ def commit(
 
                 add(r, paths=modified_files)
 
+        # Resolve identities here so the worktree does not fall back to
+        # get_user_identity(), which reads os.environ directly.
+        if author is None:
+            author = _get_user_identity(commit_config, kind="AUTHOR", env=env)
+        if committer is None:
+            committer = _get_user_identity(commit_config, kind="COMMITTER", env=env)
+
         # For amend, create dangling commit to avoid adding current HEAD as parent
         if amend:
             commit_sha = r.get_worktree().commit(
@@ -1219,7 +1313,7 @@ def commit(
                 signoff=signoff,
                 merge_heads=merge_heads,
                 ref=None,
-                config=r.get_config_stack(),
+                config=commit_config,
             )
             # Update HEAD to point to the new commit with reflog message
             try:
@@ -1235,11 +1329,23 @@ def commit(
             # Truncate message if too long for reflog
             if len(default_message) > 100:
                 default_message = default_message[:97] + b"..."
-            reflog_message = _get_reflog_message(default_message)
+            reflog_message = _get_reflog_message(default_message, env=env)
 
-            r.refs.set_if_equals(HEADREF, old_head, commit_sha, message=reflog_message)
+            # Pass committer explicitly: Repo._write_reflog would otherwise
+            # resolve it via get_user_identity(), which reads os.environ.
+            r.refs.set_if_equals(
+                HEADREF,
+                old_head,
+                commit_sha,
+                committer=committer,
+                message=reflog_message,
+            )
             return commit_sha
         else:
+            # TODO(jelmer): WorkTree.commit() hardcodes the "commit: <message>"
+            # reflog message, so GIT_REFLOG_ACTION is not honoured here (nor was
+            # it before `env` was added). Threading it through needs a
+            # WorkTree.commit() signature change.
             return r.get_worktree().commit(
                 message=message,
                 author=author,
@@ -1253,7 +1359,7 @@ def commit(
                 sign=sign,
                 signoff=signoff,
                 merge_heads=merge_heads,
-                config=r.get_config_stack(),
+                config=commit_config,
             )
 
 
@@ -1512,6 +1618,7 @@ def clone(
     protocol_version: int | None = None,
     recurse_submodules: bool = False,
     ssh_command: str | None = None,
+    env: Mapping[str, str] | None = None,
     **kwargs: str | bytes | Sequence[str | bytes],
 ) -> Repo:
     """Clone a local or remote git repository.
@@ -1535,6 +1642,8 @@ def clone(
         mutually supported protocol version will be used.
       recurse_submodules: Whether to initialize and clone submodules
       ssh_command: Optional custom SSH command
+      env: Environment to read Git configuration overrides from
+        (defaults to os.environ)
       **kwargs: Additional keyword arguments including refspecs to fetch.
         Can be a bytestring, a string, or a list of bytestring/string.
 
@@ -1552,7 +1661,7 @@ def clone(
 
     if config is None:
         config = StackedConfig.default()
-        env_override = env_config(os.environ)
+        env_override = env_config(os.environ if env is None else env)
         if env_override is not None:
             config.backends.insert(0, env_override)
 
@@ -2847,6 +2956,7 @@ def reset(
     repo: str | os.PathLike[str] | Repo,
     mode: str,
     treeish: str | bytes | Commit | Tree | Tag = "HEAD",
+    env: Mapping[str, str] | None = None,
 ) -> None:
     """Reset current HEAD to the specified state.
 
@@ -2854,6 +2964,7 @@ def reset(
       repo: Path to repository
       mode: Mode ("hard", "soft", "mixed")
       treeish: Treeish to reset to
+      env: Environment to read GIT_REFLOG_ACTION from (defaults to os.environ)
     """
     with open_repo_closing(repo) as r:
         # Parse the target tree
@@ -2882,11 +2993,18 @@ def reset(
                 else target_commit.id.hex()
             )
             default_message = f"reset: moving to {treeish_str}".encode()
-            reflog_message = _get_reflog_message(default_message)
+            reflog_message = _get_reflog_message(default_message, env=env)
 
-            # Update HEAD with reflog message
+            # Pass committer explicitly: Repo._write_reflog would otherwise
+            # resolve it via get_user_identity(), which reads os.environ.
             r.refs.set_if_equals(
-                HEADREF, old_head, target_commit.id, message=reflog_message
+                HEADREF,
+                old_head,
+                target_commit.id,
+                committer=_get_user_identity(
+                    _config_stack(r, env=env), kind="COMMITTER", env=env
+                ),
+                message=reflog_message,
             )
 
         if mode == "soft":
@@ -4189,6 +4307,7 @@ def branch_create(
     name: str | bytes,
     objectish: str | bytes | None = None,
     force: bool = False,
+    env: Mapping[str, str] | None = None,
 ) -> None:
     """Create a branch.
 
@@ -4197,6 +4316,7 @@ def branch_create(
       name: Name of the new branch
       objectish: Target object to point new branch at (defaults to HEAD)
       force: Force creation of branch, even if it already exists
+      env: Environment to read GIT_REFLOG_ACTION from (defaults to os.environ)
     """
     with open_repo_closing(repo) as r:
         if objectish is None:
@@ -4222,11 +4342,20 @@ def branch_create(
             if isinstance(original_objectish, str)
             else b"branch: Created from " + original_objectish
         )
-        ref_message = _get_reflog_message(default_message)
+        ref_message = _get_reflog_message(default_message, env=env)
+        # Pass committer explicitly: Repo._write_reflog would otherwise resolve
+        # it via get_user_identity(), which reads os.environ.
+        ref_committer = _get_user_identity(
+            _config_stack(r, env=env), kind="COMMITTER", env=env
+        )
         if force:
-            r.refs.set_if_equals(refname, None, object.id, message=ref_message)
+            r.refs.set_if_equals(
+                refname, None, object.id, committer=ref_committer, message=ref_message
+            )
         else:
-            if not r.refs.add_if_new(refname, object.id, message=ref_message):
+            if not r.refs.add_if_new(
+                refname, object.id, committer=ref_committer, message=ref_message
+            ):
                 name_str = name.decode() if isinstance(name, bytes) else name
                 raise Error(f"Branch with name {name_str} already exists.")
 
@@ -4591,6 +4720,7 @@ def fetch(
     shallow_since: str | None = None,
     shallow_exclude: list[str] | None = None,
     unshallow: bool = False,
+    env: Mapping[str, str] | None = None,
 ) -> FetchPackResult:
     """Fetch objects from a remote server.
 
@@ -4616,13 +4746,15 @@ def fetch(
       shallow_since: Deepen or shorten the history to include commits after this date
       shallow_exclude: Deepen or shorten the history to exclude commits reachable from these refs
       unshallow: Convert a shallow repository to a complete one
+      env: Environment to read GIT_REFLOG_ACTION from (defaults to os.environ)
+
     Returns:
       Dictionary with refs on the remote
     """
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)
         default_message = b"fetch: from " + remote_location.encode(DEFAULT_ENCODING)
-        message = _get_reflog_message(default_message, message)
+        message = _get_reflog_message(default_message, message, env=env)
 
         # Handle unshallow option
         if unshallow:
@@ -5122,6 +5254,7 @@ def ls_remote(
     password: str | None = None,
     key_filename: str | None = None,
     ssh_command: str | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> LsRemoteResult:
     """List the refs in a remote.
 
@@ -5137,12 +5270,15 @@ def ls_remote(
       password: Password for authentication
       key_filename: SSH key filename
       ssh_command: SSH command to use
+      env: Environment to read Git configuration overrides from
+        (defaults to os.environ)
+
     Returns:
       LsRemoteResult object with refs and symrefs
     """
     if config is None:
         config = StackedConfig.default()
-        env_override = env_config(os.environ)
+        env_override = env_config(os.environ if env is None else env)
         if env_override is not None:
             config.backends.insert(0, env_override)
     remote_str = remote.decode() if isinstance(remote, bytes) else remote
@@ -6768,6 +6904,7 @@ def _do_merge(
     message: bytes | None = None,
     author: bytes | None = None,
     committer: bytes | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> tuple[ObjectID | None, list[bytes]]:
     """Internal merge implementation that operates on an open repository.
 
@@ -6779,6 +6916,7 @@ def _do_merge(
       message: Optional merge commit message
       author: Optional author for merge commit
       committer: Optional committer for merge commit
+      env: Environment to read the user identity from (defaults to os.environ)
 
     Returns:
       Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
@@ -6862,7 +7000,7 @@ def _do_merge(
 
     # Set author/committer
     if author is None:
-        author = get_user_identity(r.get_config_stack())
+        author = _get_user_identity(_config_stack(r, env=env), kind="AUTHOR", env=env)
     if committer is None:
         committer = author
 
@@ -6899,6 +7037,7 @@ def _do_octopus_merge(
     message: bytes | None = None,
     author: bytes | None = None,
     committer: bytes | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> tuple[ObjectID | None, list[bytes]]:
     """Internal octopus merge implementation that operates on an open repository.
 
@@ -6910,6 +7049,7 @@ def _do_octopus_merge(
       message: Optional merge commit message
       author: Optional author for merge commit
       committer: Optional committer for merge commit
+      env: Environment to read the user identity from (defaults to os.environ)
 
     Returns:
       Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
@@ -6947,7 +7087,7 @@ def _do_octopus_merge(
     # If only one commit to merge, use regular merge
     if len(other_commits) == 1:
         return _do_merge(
-            r, other_commits[0].id, no_commit, no_ff, message, author, committer
+            r, other_commits[0].id, no_commit, no_ff, message, author, committer, env
         )
 
     # Find the octopus merge base
@@ -6996,7 +7136,7 @@ def _do_octopus_merge(
 
     # Set author/committer
     if author is None:
-        author = get_user_identity(r.get_config_stack())
+        author = _get_user_identity(_config_stack(r, env=env), kind="AUTHOR", env=env)
     if committer is None:
         committer = author
 
@@ -7037,6 +7177,7 @@ def merge(
     message: bytes | None = None,
     author: bytes | None = None,
     committer: bytes | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> tuple[bytes | None, list[bytes]]:
     """Merge one or more commits into the current branch.
 
@@ -7049,6 +7190,7 @@ def merge(
       message: Optional merge commit message
       author: Optional author for merge commit
       committer: Optional committer for merge commit
+      env: Environment to read the user identity from (defaults to os.environ)
 
     Returns:
       Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
@@ -7073,12 +7215,26 @@ def merge(
             if len(merge_commit_ids) == 1:
                 # Only one commit, use regular merge
                 result = _do_merge(
-                    r, merge_commit_ids[0], no_commit, no_ff, message, author, committer
+                    r,
+                    merge_commit_ids[0],
+                    no_commit,
+                    no_ff,
+                    message,
+                    author,
+                    committer,
+                    env,
                 )
             else:
                 # Multiple commits, use octopus merge
                 result = _do_octopus_merge(
-                    r, merge_commit_ids, no_commit, no_ff, message, author, committer
+                    r,
+                    merge_commit_ids,
+                    no_commit,
+                    no_ff,
+                    message,
+                    author,
+                    committer,
+                    env,
                 )
         else:
             # Single commit - use regular merge
@@ -7092,7 +7248,7 @@ def merge(
                 )
 
             result = _do_merge(
-                r, merge_commit_id, no_commit, no_ff, message, author, committer
+                r, merge_commit_id, no_commit, no_ff, message, author, committer, env
             )
 
         # Trigger auto GC if needed
@@ -7609,6 +7765,7 @@ def revert(
     message: str | bytes | None = None,
     author: bytes | None = None,
     committer: bytes | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> bytes | None:
     """Revert one or more commits.
 
@@ -7623,6 +7780,7 @@ def revert(
       message: Optional commit message (default: "Revert <original subject>")
       author: Optional author for revert commit
       committer: Optional committer for revert commit
+      env: Environment to read the user identity from (defaults to os.environ)
 
     Returns:
       SHA1 of the new revert commit, or None if no_commit=True
@@ -7723,7 +7881,9 @@ def revert(
 
                 # Set author/committer
                 if author is None:
-                    author = get_user_identity(r.get_config_stack())
+                    author = _get_user_identity(
+                        _config_stack(r, env=env), kind="AUTHOR", env=env
+                    )
                 if committer is None:
                     committer = author
 

@@ -198,11 +198,14 @@ class DefaultIdentityNotFound(Exception):
 
 
 # TODO(jelmer): Cache?
-def _get_default_identity() -> tuple[str, str]:
+def _get_default_identity(env: Mapping[str, str] | None = None) -> tuple[str, str]:
     import socket
 
+    if env is None:
+        env = os.environ
+
     for name in ("LOGNAME", "USER", "LNAME", "USERNAME"):
-        username = os.environ.get(name)
+        username = env.get(name)
         if username:
             break
     else:
@@ -228,7 +231,7 @@ def _get_default_identity() -> tuple[str, str]:
         if username is None:
             raise DefaultIdentityNotFound("no username found")
         fullname = username
-    email = os.environ.get("EMAIL")
+    email = env.get("EMAIL")
     if email is None:
         if username is None:
             raise DefaultIdentityNotFound("no username found")

@@ -13455,3 +13455,145 @@ class RequestPullTests(PorcelainTestCase):
         # The tag message appears between the first and second separators.
         body = out.getvalue().split("-" * 64 + "\n")
         self.assertEqual("Release version 1.0\n", body[1])
+
+
+class EnvOverrideTests(PorcelainTestCase):
+    """Tests for the porcelain env parameter overriding os.environ."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        config = self.repo.get_config()
+        config.set((b"user",), b"name", b"Config Name")
+        config.set((b"user",), b"email", b"config@example.com")
+        config.write_to_path()
+        # Poison the process environment: nothing below should pick these up
+        # when an explicit env is passed.
+        self.overrideEnv("GIT_AUTHOR_NAME", "Poison")
+        self.overrideEnv("GIT_AUTHOR_EMAIL", "poison@example.com")
+        self.overrideEnv("GIT_COMMITTER_NAME", "Poison")
+        self.overrideEnv("GIT_COMMITTER_EMAIL", "poison@example.com")
+
+    def _stage_file(self, name="foo") -> None:
+        path = os.path.join(self.repo.path, name)
+        with open(path, "w") as f:
+            f.write("contents")
+        porcelain.add(self.repo.path, paths=[path])
+
+    def test_commit_identity_from_env(self) -> None:
+        self._stage_file()
+        sha = porcelain.commit(
+            self.repo.path,
+            message=b"msg",
+            env={
+                "GIT_AUTHOR_NAME": "Env Author",
+                "GIT_AUTHOR_EMAIL": "author@example.com",
+                "GIT_COMMITTER_NAME": "Env Committer",
+                "GIT_COMMITTER_EMAIL": "committer@example.com",
+            },
+        )
+        commit = self.repo[sha]
+        self.assertEqual(b"Env Author <author@example.com>", commit.author)
+        self.assertEqual(b"Env Committer <committer@example.com>", commit.committer)
+
+    def test_commit_empty_env_ignores_os_environ(self) -> None:
+        self._stage_file()
+        sha = porcelain.commit(self.repo.path, message=b"msg", env={})
+        commit = self.repo[sha]
+        self.assertEqual(b"Config Name <config@example.com>", commit.author)
+        self.assertEqual(b"Config Name <config@example.com>", commit.committer)
+
+    def test_commit_default_env_uses_os_environ(self) -> None:
+        self._stage_file()
+        sha = porcelain.commit(self.repo.path, message=b"msg")
+        commit = self.repo[sha]
+        self.assertEqual(b"Poison <poison@example.com>", commit.author)
+
+    def test_commit_env_partial_override(self) -> None:
+        self._stage_file()
+        sha = porcelain.commit(
+            self.repo.path, message=b"msg", env={"GIT_AUTHOR_NAME": "Env Author"}
+        )
+        commit = self.repo[sha]
+        self.assertEqual(b"Env Author <config@example.com>", commit.author)
+
+    def test_default_identity_from_env(self) -> None:
+        # With no user.name/user.email anywhere, the identity falls back to the
+        # user running the process, which must also come from env.
+        self.assertEqual(
+            b"envuser <envuser@example.com>",
+            porcelain._get_user_identity(
+                porcelain.StackedConfig([]),
+                kind="AUTHOR",
+                env={"USER": "envuser", "EMAIL": "envuser@example.com"},
+            ),
+        )
+
+    def test_commit_config_override_from_env(self) -> None:
+        self._stage_file()
+        sha = porcelain.commit(
+            self.repo.path,
+            message=b"msg",
+            env={
+                "GIT_CONFIG_COUNT": "2",
+                "GIT_CONFIG_KEY_0": "user.name",
+                "GIT_CONFIG_VALUE_0": "Override Name",
+                "GIT_CONFIG_KEY_1": "user.email",
+                "GIT_CONFIG_VALUE_1": "override@example.com",
+            },
+        )
+        commit = self.repo[sha]
+        self.assertEqual(b"Override Name <override@example.com>", commit.author)
+
+    def test_get_user_timezones_env(self) -> None:
+        author_tz, commit_tz = porcelain.get_user_timezones(
+            env={"GIT_AUTHOR_DATE": "2005-04-07T22:13:13 +0300"}
+        )
+        self.assertEqual(10800, author_tz)
+        self.assertEqual(time.localtime().tm_gmtoff, commit_tz)
+
+    def test_var_env(self) -> None:
+        self.assertEqual(
+            "my-editor",
+            porcelain.var(
+                self.repo.path, "GIT_EDITOR", env={"GIT_EDITOR": "my-editor"}
+            ),
+        )
+
+    def test_var_list_env(self) -> None:
+        variables = porcelain.var_list(self.repo.path, env={"GIT_PAGER": "my-pager"})
+        self.assertEqual("my-pager", variables["GIT_PAGER"])
+
+    def test_reset_reflog_action_from_env(self) -> None:
+        self._stage_file("foo")
+        first = porcelain.commit(self.repo.path, message=b"first", env={})
+        self._stage_file("bar")
+        porcelain.commit(self.repo.path, message=b"second", env={})
+        # Reset back to the first commit so HEAD actually moves and a reflog
+        # entry gets written.
+        porcelain.reset(
+            self.repo.path,
+            "hard",
+            treeish=first,
+            env={"GIT_REFLOG_ACTION": "custom action"},
+        )
+        # HEAD is a symref, so the entry lands in the reflog of the branch it
+        # points at.
+        refnames, _ = self.repo.refs.follow(b"HEAD")
+        entries = list(self.repo.read_reflog(refnames[-1]))
+        self.assertEqual(b"custom action", entries[-1].message)
+
+    def test_tag_create_tagger_from_env(self) -> None:
+        self._stage_file()
+        porcelain.commit(self.repo.path, message=b"msg", env={})
+        porcelain.tag_create(
+            self.repo.path,
+            b"v1",
+            annotated=True,
+            message=b"tag message",
+            env={
+                "GIT_COMMITTER_NAME": "Env Tagger",
+                "GIT_COMMITTER_EMAIL": "tagger@example.com",
+            },
+        )
+        tag = self.repo[self.repo.refs[b"refs/tags/v1"]]
+        self.assertEqual(b"Env Tagger <tagger@example.com>", tag.tagger)

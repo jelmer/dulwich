@@ -6,6 +6,13 @@
    and ``merge``/``revert`` honour ``GIT_AUTHOR_NAME``/``GIT_AUTHOR_EMAIL``,
    matching git. (Jelmer Vernooĳ)
 
+ * Read ``GIT_SSH_COMMAND``/``GIT_SSH`` in porcelain rather than only in the
+   command line interface, so ``clone``, ``fetch``, ``ls_remote``, ``pull``
+   and ``push`` honour them again when called as a library. Since 1.2.1 only
+   the CLI resolved these, so ``porcelain.clone()`` silently ignored them. An
+   explicit ``ssh_command`` argument still wins, and ``push`` and ``pull``
+   gained an ``env`` argument. (Jelmer Vernooĳ, #2209)
+
  * Recurse into subtrees when merging trees, so non-overlapping changes on
    different sides of a shared directory merge cleanly instead of being
    reported as a directory-level conflict. (Jelmer Vernooĳ, #2295)

@@ -231,9 +231,13 @@ def submodule_update(
                 with open(git_file_path, "w") as f:
                     f.write(f"gitdir: {relative_git_dir}\n")
 
-                # Set up working directory configuration
+                # Set up working directory configuration. The submodule was
+                # cloned bare to keep its control directory separate from the
+                # checkout, but it does have a working tree, so clear core.bare
+                # as git does: the two are incompatible.
                 with open_repo_closing(submodule_git_dir) as sub_repo:
                     sub_config = sub_repo.get_config()
+                    sub_config.set((b"core",), b"bare", False)
                     sub_config.set(
                         (b"core",),
                         b"worktree",

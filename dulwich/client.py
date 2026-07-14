@@ -3887,9 +3887,9 @@ class SSHGitClient(TraditionalGitClient):
         self.password = password
         self.key_filename = key_filename
         # Priority: ssh_command parameter, then core.sshCommand config.
-        # GIT_SSH_COMMAND / GIT_SSH env vars are read at the CLI layer
-        # (see dulwich.cli._ssh_command_from_env) so the transport library
-        # stays free of process-environment reads.
+        # GIT_SSH_COMMAND / GIT_SSH env vars are read in porcelain
+        # (see dulwich.porcelain._ssh_command_from_env) so the transport
+        # library stays free of process-environment reads.
         if ssh_command:
             self.ssh_command = ssh_command
         elif config is not None:

@@ -1929,6 +1929,7 @@ def add(
                         str(repo_path),
                         index,
                         precompose_unicode=precompose_unicode,
+                        repo=r,
                     )
                 )
                 for untracked_path in current_untracked:
@@ -3814,6 +3815,7 @@ def status(
             exclude_ignored=not ignored,
             untracked_files=untracked_files,
             precompose_unicode=precompose_unicode,
+            repo=r,
         )
 
         # Convert all paths to filesystem encoding
@@ -3945,6 +3947,7 @@ def get_untracked_paths(
     exclude_ignored: bool = False,
     untracked_files: str = "all",
     precompose_unicode: bool = False,
+    repo: Repo | None = None,
 ) -> Iterator[str]:
     """Get untracked paths.
 
@@ -3959,6 +3962,9 @@ def get_untracked_paths(
         - "normal": return untracked directories without listing their contents
       precompose_unicode: If True, normalize filesystem paths to NFC Unicode
         form. This is needed on macOS where the filesystem returns NFD paths.
+      repo: Repository to read ignore patterns from. Required when the working
+        tree is not the repository root, as it is with ``core.worktree``;
+        defaults to opening a repository at ``basepath``.
 
     Note: ignored directories will never be walked for performance reasons.
       If exclude_ignored is False, only the path to an ignored directory will
@@ -3974,7 +3980,7 @@ def get_untracked_paths(
     frompath_str = os.fsdecode(os.fspath(frompath))
     basepath_str = os.fsdecode(os.fspath(basepath))
 
-    with open_repo_closing(basepath_str) as r:
+    with open_repo_closing(repo if repo is not None else basepath_str) as r:
         ignore_manager = IgnoreFilterManager.from_repo(r, config=r.get_config_stack())
 
     ignored_dirs = []

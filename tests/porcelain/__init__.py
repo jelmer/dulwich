@@ -13770,3 +13770,41 @@ class ProtocolVersionFromEnvTests(TestCase):
     def test_defaults_to_os_environ(self) -> None:
         self.overrideEnv("GIT_PROTOCOL", "version=2")
         self.assertEqual(2, _protocol_version_from_env())
+
+
+class CoreWorktreeTests(PorcelainTestCase):
+    """Porcelain operates on the tree named by core.worktree."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.worktree = os.path.join(self.test_dir, "worktree")
+        os.mkdir(self.worktree)
+
+        with open(os.path.join(self.repo_path, "tracked"), "w") as f:
+            f.write("contents")
+        porcelain.add(self.repo_path, paths=["tracked"])
+        porcelain.commit(
+            self.repo_path,
+            message=b"initial",
+            author=b"T <t@example.com>",
+            committer=b"T <t@example.com>",
+        )
+
+        c = self.repo.get_config()
+        c.set((b"core",), b"worktree", self.worktree.encode())
+        c.write_to_path()
+
+    def test_status_reads_configured_worktree(self) -> None:
+        # The committed file lives in the original directory, not in the
+        # configured worktree, so it reads as deleted -- matching git.
+        with Repo(self.repo_path) as r:
+            self.assertEqual(self.worktree, r.path)
+            status = porcelain.status(r)
+            self.assertEqual([b"tracked"], status.unstaged)
+            self.assertEqual([], status.untracked)
+
+    def test_untracked_files_found_in_configured_worktree(self) -> None:
+        with open(os.path.join(self.worktree, "new"), "w") as f:
+            f.write("contents")
+        with Repo(self.repo_path) as r:
+            self.assertEqual([b"new"], porcelain.status(r).untracked)

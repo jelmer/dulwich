@@ -1421,6 +1421,10 @@ class UnsupportedExtension(Exception):
         self.extension = extension
 
 
+class InvalidWorktreeConfiguration(Exception):
+    """core.worktree is set on a bare repository."""
+
+
 class Repo(BaseRepo):
     """A git repository backed by local disk.
 
@@ -1435,7 +1439,8 @@ class Repo(BaseRepo):
 
     Attributes:
       path: Path to the working copy (if it exists) or repository control
-        directory (if the repository is bare)
+        directory (if the repository is bare). ``core.worktree`` overrides
+        this, so it is not necessarily the parent of the control directory.
       bare: Whether this is a bare repository
     """
 
@@ -1520,6 +1525,24 @@ class Repo(BaseRepo):
 
         if format_version not in (0, 1):
             raise UnsupportedVersion(format_version)
+
+        try:
+            worktree = config.get((b"core",), b"worktree")
+        except KeyError:
+            pass
+        else:
+            # A repository is bare because core.bare says so, not because it
+            # was opened at its control directory: a submodule or a
+            # --separate-git-dir repository is opened that way but still has a
+            # working tree, named here.
+            if config.get_boolean((b"core",), b"bare", False):
+                raise InvalidWorktreeConfiguration(
+                    "core.bare and core.worktree are incompatible"
+                )
+            self.bare = False
+            # Relative paths are resolved against the control directory, not
+            # against the current directory or the repository root.
+            self.path = os.path.join(self._controldir, os.fsdecode(worktree))
 
         # Track extensions we encounter
         has_reftable_extension = False

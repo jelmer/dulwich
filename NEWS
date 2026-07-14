@@ -6,6 +6,16 @@
    and ``merge``/``revert`` honour ``GIT_AUTHOR_NAME``/``GIT_AUTHOR_EMAIL``,
    matching git. (Jelmer Vernooĳ)
 
+ * Honour the ``core.worktree`` configuration option, so the working tree can
+   live somewhere other than the parent of the control directory. Relative
+   paths are resolved against the control directory, and ``core.bare`` and
+   ``core.worktree`` are now rejected as incompatible. (Jelmer Vernooĳ, #1785)
+
+ * Clear ``core.bare`` when setting up a submodule's working tree.
+   ``submodule_update`` cloned the submodule bare and then set
+   ``core.worktree`` on it, leaving a configuration git considers invalid.
+   (Jelmer Vernooĳ)
+
  * Read ``GIT_PROTOCOL`` in porcelain rather than only in the command line
    interface, so ``clone`` and ``pull`` honour it when called as a library.
    An explicit ``protocol_version`` argument still wins. (Jelmer Vernooĳ)

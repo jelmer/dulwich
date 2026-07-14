@@ -346,11 +346,14 @@ class LogUtilsTests(TestCase):
         root_logger.handlers = []
         root_logger.level = logging.WARNING
 
-        # Use an invalid path (directory that doesn't exist). The failure
-        # warning is written to stderr; capture it so it doesn't leak.
-        self._set_git_trace("/nonexistent/path/trace.log")
-        with contextlib.redirect_stderr(io.StringIO()) as stderr:
-            result = _configure_logging_from_trace()
+        # Use an invalid path (directory that doesn't exist). It has to be
+        # absolute, or _get_trace_target() will treat tracing as disabled.
+        # The failure warning is written to stderr; capture it so it doesn't
+        # leak.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self._set_git_trace(os.path.join(tmpdir, "nonexistent", "trace.log"))
+            with contextlib.redirect_stderr(io.StringIO()) as stderr:
+                result = _configure_logging_from_trace()
 
         # Should fail
         self.assertFalse(result)

@@ -43,6 +43,7 @@ from dulwich.index import get_unstaged_changes as _get_unstaged_changes
 from dulwich.object_store import tree_lookup_path
 from dulwich.repo import (
     InvalidUserIdentity,
+    InvalidWorktreeConfiguration,
     MemoryRepo,
     Repo,
     UnsupportedExtension,
@@ -2510,3 +2511,72 @@ class SharedRepositoryTests(TestCase):
             actual_dir_mode,
             f"reflog dir mode: expected {oct(expected_dir_mode)}, got {oct(actual_dir_mode)}",
         )
+
+
+class WorktreeConfigTests(TestCase):
+    """Tests for the core.worktree configuration option."""
+
+    def _make_repo(self):
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo_dir = os.path.join(tmp_dir, "repo")
+        os.mkdir(repo_dir)
+        r = Repo.init(repo_dir)
+        self.addCleanup(r.close)
+        return tmp_dir, repo_dir, r
+
+    def _set_worktree(self, repo, value):
+        c = repo.get_config()
+        c.set((b"core",), b"worktree", value.encode())
+        c.write_to_path()
+
+    def test_absolute_path(self) -> None:
+        tmp_dir, repo_dir, r = self._make_repo()
+        worktree = os.path.join(tmp_dir, "worktree")
+        os.mkdir(worktree)
+        self._set_worktree(r, worktree)
+
+        with Repo(repo_dir) as reopened:
+            self.assertEqual(worktree, reopened.path)
+            # The control directory is unaffected.
+            self.assertEqual(os.path.join(repo_dir, ".git"), reopened.controldir())
+
+    def test_relative_path_is_relative_to_controldir(self) -> None:
+        # Git resolves a relative core.worktree against the .git directory,
+        # not against the repository root or the current directory.
+        _tmp_dir, repo_dir, r = self._make_repo()
+        worktree = os.path.join(repo_dir, "tree")
+        os.mkdir(worktree)
+        self._set_worktree(r, "../tree")
+
+        with Repo(repo_dir) as reopened:
+            self.assertEqual(worktree, os.path.normpath(reopened.path))
+
+    def test_worktree_used_by_get_worktree(self) -> None:
+        tmp_dir, repo_dir, r = self._make_repo()
+        worktree = os.path.join(tmp_dir, "worktree")
+        os.mkdir(worktree)
+        self._set_worktree(r, worktree)
+
+        with Repo(repo_dir) as reopened:
+            self.assertEqual(worktree, reopened.get_worktree().path)
+
+    def test_bare_repository_rejected(self) -> None:
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo_dir = os.path.join(tmp_dir, "repo.git")
+        os.mkdir(repo_dir)
+        r = Repo.init_bare(repo_dir)
+        self.addCleanup(r.close)
+        self._set_worktree(r, os.path.join(tmp_dir, "worktree"))
+
+        self.assertRaises(InvalidWorktreeConfiguration, Repo, repo_dir)
+
+    def test_core_bare_rejected(self) -> None:
+        tmp_dir, repo_dir, r = self._make_repo()
+        c = r.get_config()
+        c.set((b"core",), b"worktree", os.path.join(tmp_dir, "worktree").encode())
+        c.set((b"core",), b"bare", True)
+        c.write_to_path()
+
+        self.assertRaises(InvalidWorktreeConfiguration, Repo, repo_dir)

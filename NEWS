@@ -6,6 +6,10 @@
    and ``merge``/``revert`` honour ``GIT_AUTHOR_NAME``/``GIT_AUTHOR_EMAIL``,
    matching git. (Jelmer Vernooĳ)
 
+ * Deprecate letting ``WorkTree.commit()`` and ``MemoryRepo.do_commit()`` take
+   the author or committer from ``GIT_AUTHOR_*``/``GIT_COMMITTER_*``; pass them
+   explicitly instead. (Jelmer Vernooĳ)
+
  * Recurse into subtrees when merging trees, so non-overlapping changes on
    different sides of a shared directory merge cleanly instead of being
    reported as a directory-level conflict. (Jelmer Vernooĳ, #2295)

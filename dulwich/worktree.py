@@ -61,6 +61,7 @@ from .repo import (
     GITDIR,
     WORKTREES,
     Repo,
+    _warn_if_identity_from_env,
     check_user_identity,
     get_user_identity,
 )
@@ -595,6 +596,7 @@ class WorkTree:
         if merge_heads is None:
             merge_heads = self._repo._read_heads("MERGE_HEAD")
         if committer is None:
+            _warn_if_identity_from_env("COMMITTER")
             committer = get_user_identity(config, kind="COMMITTER")
         check_user_identity(committer)
         c.committer = committer
@@ -607,6 +609,7 @@ class WorkTree:
             commit_timezone = 0
         c.commit_timezone = commit_timezone
         if author is None:
+            _warn_if_identity_from_env("AUTHOR")
             author = get_user_identity(config, kind="AUTHOR")
         c.author = author
         check_user_identity(author)

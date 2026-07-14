@@ -104,57 +104,6 @@ else:
 logger = logging.getLogger(__name__)
 
 
-def _ssh_command_from_env() -> str | None:
-    """Return the ssh command requested via ``GIT_SSH_COMMAND`` / ``GIT_SSH``.
-
-    ``GIT_SSH_COMMAND`` wins over ``GIT_SSH``, matching git's own precedence.
-    Returns ``None`` when neither is set, so callers can fall through to the
-    ``core.sshCommand`` config or the transport default.
-
-    Env lookup lives here in the CLI layer rather than in the transport
-    library so that :mod:`dulwich.client` stays process-environment-free.
-    """
-    env_ssh_command = os.environ.get("GIT_SSH_COMMAND")
-    if env_ssh_command:
-        return env_ssh_command
-    env_ssh = os.environ.get("GIT_SSH")
-    if env_ssh:
-        return env_ssh
-    return None
-
-
-def _protocol_version_from_env() -> int | None:
-    """Parse the version from the ``GIT_PROTOCOL`` environment variable.
-
-    Git uses a colon-separated ``key=value`` format for ``GIT_PROTOCOL``
-    (for example ``version=2`` or ``feature=extra:version=2``). Return the
-    requested version as an ``int`` when present and parseable, otherwise
-    ``None``.
-
-    Env lookup lives here in the CLI layer rather than in the transport
-    library so that :mod:`dulwich.client` and :mod:`dulwich.porcelain`
-    remain process-environment-free.
-    """
-    value = os.environ.get("GIT_PROTOCOL")
-    if not value:
-        return None
-    for pair in value.split(":"):
-        key, sep, raw_val = pair.partition("=")
-        if not sep or key.strip() != "version":
-            # TODO: extract and surface features (e.g. ``feature=extra``).
-            # For now dulwich only consumes ``version``; other keys are
-            # ignored rather than being forwarded to the transport.
-            logger.warning("Ignoring unsupported GIT_PROTOCOL pair %r", pair)
-            continue
-        try:
-            return int(raw_val.strip())
-        except ValueError:
-            logger.warning("Ignoring unparsable GIT_PROTOCOL version %r", raw_val)
-            return None
-    logger.warning("GIT_PROTOCOL %r has no version= pair; ignoring", value)
-    return None
-
-
 def to_display_str(value: bytes | str) -> str:
     """Convert a bytes or string value to a display string.
 
@@ -1166,35 +1115,16 @@ class cmd_archive(Command):
         )
         parser.add_argument("committish", type=str, nargs="?")
         parsed_args = parser.parse_args(args)
-        if parsed_args.remote:
-            client, path = get_transport_and_path(
-                parsed_args.remote, ssh_command=_ssh_command_from_env()
-            )
-
-            def stdout_write(data: bytes) -> None:
-                sys.stdout.buffer.write(data)
-
-            def stderr_write(data: bytes) -> None:
-                sys.stderr.buffer.write(data)
-
-            client.archive(
-                path.encode("utf-8") if isinstance(path, str) else path,
-                parsed_args.committish.encode("utf-8")
-                if isinstance(parsed_args.committish, str)
-                else parsed_args.committish,
-                stdout_write,
-                write_error=stderr_write,
-            )
-        else:
-            # Use binary buffer for archive output
-            outstream: BinaryIO = sys.stdout.buffer
-            errstream: BinaryIO = sys.stderr.buffer
-            porcelain.archive(
-                ".",
-                parsed_args.committish,
-                outstream=outstream,
-                errstream=errstream,
-            )
+        # Use binary buffer for archive output
+        outstream: BinaryIO = sys.stdout.buffer
+        errstream: BinaryIO = sys.stderr.buffer
+        porcelain.archive(
+            ".",
+            parsed_args.committish,
+            remote=parsed_args.remote,
+            outstream=outstream,
+            errstream=errstream,
+        )
 
 
 class cmd_add(Command):
@@ -1312,7 +1242,7 @@ class cmd_fetch_pack(Command):
         parser.add_argument("refs", nargs="*", type=str)
         args = parser.parse_args(argv)
         client, path = get_transport_and_path(
-            args.location, ssh_command=_ssh_command_from_env()
+            args.location, ssh_command=porcelain._ssh_command_from_env()
         )
         r = Repo(".")
         if args.all:
@@ -2126,9 +2056,8 @@ class cmd_clone(Command):
                 branch=parsed_args.branch,
                 refspec=parsed_args.refspec,
                 filter_spec=parsed_args.filter_spec,
-                protocol_version=parsed_args.protocol or _protocol_version_from_env(),
+                protocol_version=parsed_args.protocol,
                 recurse_submodules=parsed_args.recurse_submodules,
-                ssh_command=_ssh_command_from_env(),
             )
         except GitProtocolError as e:
             logger.exception(e)
@@ -3816,8 +3745,7 @@ class cmd_pull(Command):
                 remote_location=parsed_args.from_location or None,
                 refspecs=parsed_args.refspec or None,
                 filter_spec=parsed_args.filter,
-                protocol_version=parsed_args.protocol or _protocol_version_from_env(),
-                ssh_command=_ssh_command_from_env(),
+                protocol_version=parsed_args.protocol,
             )
         except InvalidPathError as e:
             logger.exception("unable to checkout working tree: %s", e)

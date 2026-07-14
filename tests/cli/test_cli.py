@@ -40,9 +40,7 @@ from dulwich import cli, porcelain
 from dulwich.cli import (
     AutoFlushBinaryIOWrapper,
     AutoFlushTextIOWrapper,
-    _protocol_version_from_env,
     _should_auto_flush,
-    _ssh_command_from_env,
     detect_terminal_width,
     format_bytes,
     launch_editor,
@@ -227,43 +225,6 @@ class HelperFunctionsTest(TestCase):
         expected = now - 86400
         # Allow 2 second tolerance for test execution time
         self.assertAlmostEqual(expected, result, delta=2)
-
-
-class ProtocolVersionFromEnvTest(TestCase):
-    """Tests for :func:`dulwich.cli._protocol_version_from_env`.
-
-    Env lookup lives in the CLI layer so the transport library stays free
-    of process-environment reads.
-    """
-
-    def test_unset_returns_none(self):
-        self.overrideEnv("GIT_PROTOCOL", None)
-        self.assertIsNone(_protocol_version_from_env())
-
-    def test_empty_returns_none(self):
-        self.overrideEnv("GIT_PROTOCOL", "")
-        self.assertIsNone(_protocol_version_from_env())
-
-    def test_version_2(self):
-        self.overrideEnv("GIT_PROTOCOL", "version=2")
-        self.assertEqual(_protocol_version_from_env(), 2)
-
-    def test_version_1(self):
-        self.overrideEnv("GIT_PROTOCOL", "version=1")
-        self.assertEqual(_protocol_version_from_env(), 1)
-
-    def test_version_in_compound_value(self):
-        # GIT_PROTOCOL can carry multiple colon-separated key=value entries.
-        self.overrideEnv("GIT_PROTOCOL", "feature=extra:version=2")
-        self.assertEqual(_protocol_version_from_env(), 2)
-
-    def test_non_version_key_returns_none(self):
-        self.overrideEnv("GIT_PROTOCOL", "feature=extra")
-        self.assertIsNone(_protocol_version_from_env())
-
-    def test_unparsable_version_returns_none(self):
-        self.overrideEnv("GIT_PROTOCOL", "version=nope")
-        self.assertIsNone(_protocol_version_from_env())
 
 
 class AddCommandTest(DulwichCliTestCase):
@@ -5224,36 +5185,6 @@ class DiagnoseCommandTest(DulwichCliTestCase):
 
             # Check that at least core dependencies are listed
             self.assertIn("urllib3:", log_output)
-
-
-class SshCommandFromEnvTest(TestCase):
-    """Tests for :func:`dulwich.cli._ssh_command_from_env`.
-
-    GIT_SSH_COMMAND / GIT_SSH are read here in the CLI layer so the transport
-    library stays free of process-environment reads. GIT_SSH_COMMAND wins over
-    GIT_SSH, matching git's own precedence.
-    """
-
-    def test_both_unset_returns_none(self):
-        self.overrideEnv("GIT_SSH_COMMAND", None)
-        self.overrideEnv("GIT_SSH", None)
-        self.assertIsNone(_ssh_command_from_env())
-
-    def test_git_ssh_command_wins(self):
-        self.overrideEnv("GIT_SSH_COMMAND", "/usr/bin/ssh -v")
-        self.overrideEnv("GIT_SSH", "/path/to/ssh")
-        self.assertEqual(_ssh_command_from_env(), "/usr/bin/ssh -v")
-
-    def test_git_ssh_alone(self):
-        self.overrideEnv("GIT_SSH_COMMAND", None)
-        self.overrideEnv("GIT_SSH", "/path/to/ssh")
-        self.assertEqual(_ssh_command_from_env(), "/path/to/ssh")
-
-    def test_empty_git_ssh_command_falls_back(self):
-        # An empty string is effectively unset; fall back to GIT_SSH.
-        self.overrideEnv("GIT_SSH_COMMAND", "")
-        self.overrideEnv("GIT_SSH", "/path/to/ssh")
-        self.assertEqual(_ssh_command_from_env(), "/path/to/ssh")
 
 
 if __name__ == "__main__":

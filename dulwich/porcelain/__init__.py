@@ -727,6 +727,39 @@ def _ssh_command_from_env(env: Mapping[str, str] | None = None) -> str | None:
     return None
 
 
+def _protocol_version_from_env(env: Mapping[str, str] | None = None) -> int | None:
+    """Parse the version from the ``GIT_PROTOCOL`` environment variable.
+
+    Git uses a colon-separated ``key=value`` format for ``GIT_PROTOCOL``
+    (for example ``version=2`` or ``feature=extra:version=2``). Return the
+    requested version as an ``int`` when present and parseable, otherwise
+    ``None``.
+
+    Env lookup lives here in porcelain rather than in the transport library so
+    that :mod:`dulwich.client` stays process-environment-free.
+    """
+    if env is None:
+        env = os.environ
+    value = env.get("GIT_PROTOCOL")
+    if not value:
+        return None
+    for pair in value.split(":"):
+        key, sep, raw_val = pair.partition("=")
+        if not sep or key.strip() != "version":
+            # TODO: extract and surface features (e.g. ``feature=extra``).
+            # For now dulwich only consumes ``version``; other keys are
+            # ignored rather than being forwarded to the transport.
+            logger.warning("Ignoring unsupported GIT_PROTOCOL pair %r", pair)
+            continue
+        try:
+            return int(raw_val.strip())
+        except ValueError:
+            logger.warning("Ignoring unparsable GIT_PROTOCOL version %r", raw_val)
+            return None
+    logger.warning("GIT_PROTOCOL %r has no version= pair; ignoring", value)
+    return None
+
+
 def _config_stack(
     repo: BaseRepo, env: Mapping[str, str] | None = None
 ) -> "StackedConfig":
@@ -1696,8 +1729,9 @@ def clone(
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
-      protocol_version: desired Git protocol version. By default the highest
-        mutually supported protocol version will be used.
+      protocol_version: desired Git protocol version. Defaults to the version
+        requested in ``env``, and otherwise to the highest mutually supported
+        protocol version.
       recurse_submodules: Whether to initialize and clone submodules
       ssh_command: Optional custom SSH command. Defaults to the command
         configured in ``env``.
@@ -1722,6 +1756,9 @@ def clone(
         env_override = env_config(os.environ if env is None else env)
         if env_override is not None:
             config.backends.insert(0, env_override)
+
+    if protocol_version is None:
+        protocol_version = _protocol_version_from_env(env)
 
     if checkout is None:
         checkout = not bare
@@ -3565,11 +3602,15 @@ def pull(
       filter_spec: A git-rev-list-style object filter spec, as an ASCII string.
         Only used if the server supports the Git protocol-v2 'filter'
         feature, and ignored otherwise.
-      protocol_version: desired Git protocol version. By default the highest
-        mutually supported protocol version will be used
+      protocol_version: desired Git protocol version. Defaults to the version
+        requested in ``env``, and otherwise to the highest mutually supported
+        protocol version.
       env: Environment to read Git variables from (defaults to os.environ)
       **kwargs: Additional keyword arguments for the client
     """
+    if protocol_version is None:
+        protocol_version = _protocol_version_from_env(env)
+
     # Open the repo
     with open_repo_closing(repo) as r:
         (remote_name, remote_location) = get_remote_repo(r, remote_location)

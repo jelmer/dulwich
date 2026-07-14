@@ -59,6 +59,7 @@ from dulwich.porcelain import (
     CheckoutError,  # Hypothetical or real error class
     CountObjectsResult,
     _checked_worktree_path,
+    _protocol_version_from_env,
     _ssh_command_from_env,
     add,
     commit,
@@ -13669,6 +13670,30 @@ class EnvOverrideTests(PorcelainTestCase):
             self._captured_ssh_command(lambda: porcelain.ls_remote(self.repo.path)),
         )
 
+    def test_clone_protocol_version_from_env(self) -> None:
+        captured = {}
+        real = porcelain.get_transport_and_path
+
+        def get_transport_and_path(location, **kwargs):
+            client, path = real(location, **kwargs)
+            real_clone = client.clone
+
+            def clone(*args, **clone_kwargs):
+                captured["protocol_version"] = clone_kwargs.get("protocol_version")
+                return real_clone(*args, **clone_kwargs)
+
+            client.clone = clone
+            return client, path
+
+        porcelain.get_transport_and_path = get_transport_and_path
+        self.addCleanup(setattr, porcelain, "get_transport_and_path", real)
+
+        target = os.path.join(self.test_dir, "proto-target")
+        porcelain.clone(
+            self.repo.path, target, env={"GIT_PROTOCOL": "version=2"}
+        ).close()
+        self.assertEqual(2, captured["protocol_version"])
+
     def test_clone_ssh_command_from_os_environ(self) -> None:
         # porcelain.clone() ignored GIT_SSH_COMMAND when the env var was only
         # consulted by the CLI (#2209).
@@ -13713,3 +13738,35 @@ class SshCommandFromEnvTests(TestCase):
         self.overrideEnv("GIT_SSH_COMMAND", "/usr/bin/ssh -v")
         self.overrideEnv("GIT_SSH", None)
         self.assertEqual("/usr/bin/ssh -v", _ssh_command_from_env())
+
+
+class ProtocolVersionFromEnvTests(TestCase):
+    """Tests for :func:`dulwich.porcelain._protocol_version_from_env`."""
+
+    def test_unset_returns_none(self) -> None:
+        self.assertIsNone(_protocol_version_from_env({}))
+
+    def test_empty_returns_none(self) -> None:
+        self.assertIsNone(_protocol_version_from_env({"GIT_PROTOCOL": ""}))
+
+    def test_version_2(self) -> None:
+        self.assertEqual(2, _protocol_version_from_env({"GIT_PROTOCOL": "version=2"}))
+
+    def test_version_1(self) -> None:
+        self.assertEqual(1, _protocol_version_from_env({"GIT_PROTOCOL": "version=1"}))
+
+    def test_version_in_compound_value(self) -> None:
+        # GIT_PROTOCOL can carry multiple colon-separated key=value entries.
+        self.assertEqual(
+            2, _protocol_version_from_env({"GIT_PROTOCOL": "feature=extra:version=2"})
+        )
+
+    def test_non_version_key_returns_none(self) -> None:
+        self.assertIsNone(_protocol_version_from_env({"GIT_PROTOCOL": "feature=extra"}))
+
+    def test_unparsable_version_returns_none(self) -> None:
+        self.assertIsNone(_protocol_version_from_env({"GIT_PROTOCOL": "version=nope"}))
+
+    def test_defaults_to_os_environ(self) -> None:
+        self.overrideEnv("GIT_PROTOCOL", "version=2")
+        self.assertEqual(2, _protocol_version_from_env())

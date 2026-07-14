@@ -6,6 +6,10 @@
    and ``merge``/``revert`` honour ``GIT_AUTHOR_NAME``/``GIT_AUTHOR_EMAIL``,
    matching git. (Jelmer Vernooĳ)
 
+ * Read ``GIT_PROTOCOL`` in porcelain rather than only in the command line
+   interface, so ``clone`` and ``pull`` honour it when called as a library.
+   An explicit ``protocol_version`` argument still wins. (Jelmer Vernooĳ)
+
  * Add a ``remote`` argument to ``porcelain.archive()``, so an archive can be
    retrieved from a remote repository without dropping down to
    ``dulwich.client``. (Jelmer Vernooĳ)

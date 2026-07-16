@@ -1,4 +1,4 @@
-1.2.11	UNRELEASED
+1.2.11	2026-07-16
 
  * Let porcelain functions that consult the environment take an ``env``
    argument overriding ``os.environ``. As a side effect ``tag_create`` now

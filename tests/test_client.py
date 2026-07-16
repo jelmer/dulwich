@@ -64,6 +64,7 @@ from dulwich.client import (
     _extract_symrefs_and_agent,
     _handle_upload_pack_head,
     _handle_upload_pack_tail,
+    _IteratorReader,
     _remote_error_from_stderr,
     _win32_url_to_path,
     build_fetch_request_v2,
@@ -2788,6 +2789,45 @@ class AuthCallbackPoolManagerTest(TestCase):
 
         # Result should be the last 401 response
         self.assertEqual(result.status, 401)
+
+
+class IteratorReaderTests(TestCase):
+    def test_read_all(self) -> None:
+        r = _IteratorReader(iter([b"ab", b"cd", b"ef"]))
+        self.assertEqual(b"abcdef", r.read())
+
+    def test_read_all_after_partial(self) -> None:
+        r = _IteratorReader(iter([b"abcd", b"ef"]))
+        self.assertEqual(b"ab", r.read(2))
+        self.assertEqual(b"cdef", r.read())
+
+    def test_read_serves_requested_block_size(self) -> None:
+        # Regardless of how the source yields, urllib3 must see reads of the
+        # requested block size (except the last one). This is the whole point
+        # of the reader: it decouples HTTP chunk framing from source-iterator
+        # yield boundaries.
+        r = _IteratorReader(iter([b"a", b"b", b"c", b"d", b"e"] * 100))
+        parts = []
+        while True:
+            block = r.read(16)
+            if not block:
+                break
+            parts.append(block)
+        self.assertEqual(b"abcde" * 100, b"".join(parts))
+        self.assertTrue(all(len(p) == 16 for p in parts[:-1]))
+        self.assertLessEqual(len(parts[-1]), 16)
+
+    def test_read_from_empty(self) -> None:
+        r = _IteratorReader(iter([]))
+        self.assertEqual(b"", r.read())
+        self.assertEqual(b"", r.read(8))
+
+    def test_read_across_chunk_boundary(self) -> None:
+        r = _IteratorReader(iter([b"ab", b"cd", b"ef"]))
+        self.assertEqual(b"abc", r.read(3))
+        self.assertEqual(b"de", r.read(2))
+        self.assertEqual(b"f", r.read(4))
+        self.assertEqual(b"", r.read(1))
 
 
 class DefaultUrllib3ManagerTest(TestCase):

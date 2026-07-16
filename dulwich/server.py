@@ -1744,7 +1744,16 @@ class ReceivePackHandler(PackHandler):
 
         # client will now send us a list of (oldsha, newsha, ref)
         while ref_line:
-            (oldsha, newsha, ref_name) = ref_line.split()
+            fields = ref_line.rstrip(b"\n").split(b" ")
+            if (
+                len(fields) != 3
+                or not valid_hexsha(fields[0])
+                or not valid_hexsha(fields[1])
+            ):
+                raise GitProtocolError(
+                    f"Invalid ref update line from client: {ref_line!r}"
+                )
+            oldsha, newsha, ref_name = fields
             client_refs.append((ObjectID(oldsha), ObjectID(newsha), Ref(ref_name)))
             ref_line = self.proto.read_pkt_line()
 

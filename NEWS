@@ -1,3 +1,14 @@
+1.2.12	UNRELEASED
+
+ * SECURITY: Refuse to write a checkout entry whose leading path resolves
+   through a symlink. ``build_index_from_tree`` (used by ``reset_index`` and
+   thus by ``clone``/``checkout``) materialized a tree in sorted order without
+   checking leading components, so a tree pairing a symlink ``link`` with a
+   descendant ``link/foo`` wrote ``foo`` through the link to an arbitrary
+   absolute path. The same ``verify_leading_dirs`` guard already used by
+   porcelain and stash is now applied here.
+   (Jelmer Vernooĳ, reported by Hugh Lewis)
+
 1.2.11	2026-07-16
 
  * Let porcelain functions that consult the environment take an ``env``

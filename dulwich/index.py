@@ -2297,6 +2297,10 @@ def build_index_from_tree(
     if not isinstance(root_path, bytes):
         root_path = os.fsencode(root_path)
 
+    # Cache of leading directory components already verified to be real
+    # directories, shared across the sorted iteration. See verify_leading_dirs.
+    safe_prefix: list[bytes] = []
+
     for entry in iter_tree_contents(object_store, tree_id):
         assert (
             entry.path is not None and entry.mode is not None and entry.sha is not None
@@ -2305,6 +2309,10 @@ def build_index_from_tree(
         # leaving any files already written in place.
         if not validate_path(entry.path, validate_path_element):
             raise InvalidPathError(entry.path)
+        # Refuse to write an entry whose leading path resolves through a
+        # symlink materialized by an earlier entry; open(..., "wb") would
+        # otherwise follow it and write outside the work tree.
+        verify_leading_dirs(entry.path, safe_prefix, root_path)
         full_path = _tree_to_fs_path(root_path, entry.path, tree_encoding)
 
         if not os.path.exists(os.path.dirname(full_path)):

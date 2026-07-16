@@ -803,6 +803,42 @@ class BuildIndexTests(TestCase):
             with open(outside_file, "rb") as f:
                 self.assertEqual(f.read(), b"original")
 
+    @skipIf(not can_symlink(), "Requires symlink support")
+    def test_leading_symlink_not_followed(self) -> None:
+        # A tree that first materializes a symlink ``link`` pointing outside
+        # the work tree and then a descendant regular file ``link/payload``
+        # must not write the file through the symlink to an arbitrary path.
+        # C git rejects such a tree; dulwich must refuse it rather than
+        # resolving the leading component through the link.
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        outside_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside_dir)
+        outside_file = os.path.join(outside_dir, "payload")
+        self.assertFalse(os.path.exists(outside_file))
+
+        with Repo.init(repo_dir) as repo:
+            link = Blob.from_string(os.fsencode(outside_dir))
+            regular = Blob.from_string(b"pwned")
+
+            tree = Tree()
+            tree[b"link"] = (stat.S_IFLNK, link.id)
+            tree[b"link/payload"] = (stat.S_IFREG | 0o644, regular.id)
+            repo.object_store.add_objects([(o, None) for o in [link, regular, tree]])
+
+            self.assertRaises(
+                InvalidPathError,
+                build_index_from_tree,
+                repo.path,
+                repo.index_path(),
+                repo.object_store,
+                tree.id,
+            )
+
+            # Nothing was written through the symlink to the outside path.
+            self.assertFalse(os.path.exists(outside_file))
+
     def test_nonempty(self) -> None:
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)

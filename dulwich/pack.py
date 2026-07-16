@@ -108,6 +108,7 @@ try:
 except ModuleNotFoundError:
     from difflib import SequenceMatcher
 
+import logging
 import os
 import struct
 import sys
@@ -156,6 +157,8 @@ if TYPE_CHECKING:
     from .commit_graph import CommitGraph
     from .object_store import BaseObjectStore
     from .refs import Ref
+
+logger = logging.getLogger(__name__)
 
 # Some platforms (e.g. plan9) don't support mmap properly
 has_mmap = sys.platform != "Plan9"
@@ -4198,7 +4201,8 @@ class Pack:
         """The bitmap being used, if available.
 
         Returns:
-            PackBitmap instance or None if no bitmap exists
+            PackBitmap instance, or None if no bitmap exists or the bitmap
+            was built for a different pack
 
         Raises:
             ValueError: If bitmap file is invalid or corrupt
@@ -4206,7 +4210,23 @@ class Pack:
         if self._bitmap is None:
             from .bitmap import read_bitmap
 
-            self._bitmap = read_bitmap(self._bitmap_path, pack_index=self.index)
+            try:
+                self._bitmap = read_bitmap(
+                    self._bitmap_path,
+                    pack_index=self.index,
+                    pack_checksum=self.get_stored_checksum(),
+                )
+            except ChecksumMismatch:
+                # The bitmap records the checksum of the pack it was built for.
+                # A mismatch means it is stale or was swapped in from another
+                # pack, so its positions no longer describe this pack's objects.
+                # Ignore it and let callers fall back to graph traversal, the
+                # same as git.
+                logger.warning(
+                    "Ignoring bitmap %s: checksum does not match pack",
+                    self._bitmap_path,
+                )
+                return None
         return self._bitmap
 
     def ensure_bitmap(

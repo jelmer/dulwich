@@ -35,6 +35,15 @@
    different sides of a shared directory merge cleanly instead of being
    reported as a directory-level conflict. (Jelmer Vernooĳ, #2295)
 
+ * HARDEN: Verify that a ``.bitmap`` index matches the pack it is loaded for.
+   The bitmap header records the checksum of its pack, but ``Pack.bitmap``
+   never checked it, so a stale or swapped-in bitmap (built for a different
+   object set) was used against this pack's index and silently produced a
+   wrong reachable-object set during fetch negotiation. ``Pack.bitmap`` now
+   compares the recorded checksum and ignores a mismatched bitmap, falling
+   back to graph traversal, matching git's ``load_bitmap_header``.
+   (netliomax25-code)
+
  * HARDEN: Parse commit-message trailers in linear time. ``parse_trailers``
    located the trailer block by re-slicing and re-stripping the tail of the
    message for every blank line, which is cubic on a message made mostly of

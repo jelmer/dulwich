@@ -388,6 +388,35 @@ class ReceivePackHandlerTestCase(TestCase):
         self.assertEqual(status[1][0], b"refs/heads/fake-branch")
         self.assertEqual(status[1][1], b"ok")
 
+    def test_handle_invalid_ref_line(self) -> None:
+        """A ref-update line without three fields is rejected, not crashed on."""
+        self._handler.proto.set_output(
+            [ONE + b" " + TWO + b" refs/heads/master extra", None]
+        )
+        self.assertRaises(GitProtocolError, self._handler.handle)
+
+    def test_handle_invalid_object_id(self) -> None:
+        """A ref-update line with a non-hex object id is rejected."""
+        self._handler.proto.set_output(
+            [b"nothexsha " + TWO + b" refs/heads/master", None]
+        )
+        self.assertRaises(GitProtocolError, self._handler.handle)
+
+    def test_handle_valid_ref_line(self) -> None:
+        """A well-formed ref-update line is still parsed and applied."""
+        self._repo.refs._update({b"refs/heads/todelete": ONE})
+        self._handler.proto.set_output(
+            [
+                ONE
+                + b" "
+                + ZERO_SHA
+                + b" refs/heads/todelete\x00delete-refs report-status",
+                None,
+            ]
+        )
+        self._handler.handle()
+        self.assertNotIn(b"refs/heads/todelete", self._repo.refs.allkeys())
+
     def test_pre_receive_hook_success(self) -> None:
         """Test that pre-receive hook is called and can succeed."""
 

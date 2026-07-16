@@ -45,6 +45,7 @@ from dulwich.bitmap import (
     write_bitmap_file,
 )
 from dulwich.config import ConfigFile
+from dulwich.errors import ChecksumMismatch
 from dulwich.object_store import (
     BitmapReachability,
     DiskObjectStore,
@@ -488,6 +489,28 @@ class BitmapFileTests(unittest.TestCase):
         self.assertIn(1, bitmap2.tree_bitmap)
         self.assertIn(2, bitmap2.blob_bitmap)
         self.assertIn(3, bitmap2.tag_bitmap)
+
+    def test_pack_checksum_match(self):
+        """A matching pack_checksum loads the bitmap normally."""
+        bitmap = PackBitmap()
+        bitmap.pack_checksum = b"\xaa" * 20
+        f = BytesIO()
+        write_bitmap_file(f, bitmap)
+
+        f.seek(0)
+        bitmap2 = read_bitmap_file(f, pack_checksum=b"\xaa" * 20)
+        self.assertEqual(b"\xaa" * 20, bitmap2.pack_checksum)
+
+    def test_pack_checksum_mismatch_rejected(self):
+        """A bitmap whose header checksum names another pack is rejected."""
+        bitmap = PackBitmap()
+        bitmap.pack_checksum = b"\xaa" * 20
+        f = BytesIO()
+        write_bitmap_file(f, bitmap)
+
+        f.seek(0)
+        with self.assertRaises(ChecksumMismatch):
+            read_bitmap_file(f, pack_checksum=b"\xbb" * 20)
 
     def test_invalid_signature(self):
         """Test reading file with invalid signature."""
@@ -1255,6 +1278,38 @@ class PackEnsureBitmapTests(unittest.TestCase):
         refs = {b"refs/heads/master": self.commit.id}
         bitmap = self.pack.ensure_bitmap(self.store, refs, commit_interval=50)
         self.assertIsNotNone(bitmap)
+
+    def test_bitmap_with_wrong_pack_checksum_is_ignored(self):
+        """Pack.bitmap ignores a .bitmap built for a different pack."""
+        refs = {b"refs/heads/master": self.commit.id}
+        self.pack.ensure_bitmap(self.store, refs, commit_interval=1)
+
+        # Rewrite the on-disk bitmap so its recorded pack checksum names a
+        # different pack, as a stale or swapped-in bitmap would.
+        bitmap_path = self.pack._bitmap_path
+        loaded = read_bitmap(bitmap_path)
+        loaded.pack_checksum = b"\x00" * 20
+        write_bitmap(bitmap_path, loaded)
+        self.store.close()
+
+        reopened = DiskObjectStore(self.temp_dir)
+        self.addCleanup(reopened.close)
+        pack = reopened.packs[0]
+        self.assertNotEqual(b"\x00" * 20, pack.get_stored_checksum())
+        self.assertIsNone(pack.bitmap)
+
+    def test_bitmap_with_matching_pack_checksum_loads(self):
+        """Pack.bitmap loads a bitmap whose checksum matches the pack."""
+        refs = {b"refs/heads/master": self.commit.id}
+        self.pack.ensure_bitmap(self.store, refs, commit_interval=1)
+        self.store.close()
+
+        reopened = DiskObjectStore(self.temp_dir)
+        self.addCleanup(reopened.close)
+        pack = reopened.packs[0]
+        bitmap = pack.bitmap
+        self.assertIsNotNone(bitmap)
+        self.assertEqual(pack.get_stored_checksum(), bitmap.pack_checksum)
 
 
 class GeneratePackBitmapsTests(unittest.TestCase):

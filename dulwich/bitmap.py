@@ -62,6 +62,7 @@ from collections.abc import Callable, Iterable, Iterator
 from io import BytesIO
 from typing import IO, TYPE_CHECKING
 
+from .errors import ChecksumMismatch
 from .file import GitFile
 from .objects import (
     Blob,
@@ -522,36 +523,48 @@ class PackBitmap:
 def read_bitmap(
     filename: str | os.PathLike[str],
     pack_index: "PackIndex | None" = None,
+    pack_checksum: bytes | None = None,
 ) -> PackBitmap:
     """Read a bitmap index file.
 
     Args:
         filename: Path to the .bitmap file
         pack_index: Optional PackIndex to resolve object positions to SHAs
+        pack_checksum: Optional checksum of the pack this bitmap belongs to.
+            When given, the checksum stored in the bitmap header must match it.
 
     Returns:
         Loaded PackBitmap
 
     Raises:
         ValueError: If file format is invalid
-        ChecksumMismatch: If checksum verification fails
+        ChecksumMismatch: If pack_checksum is given and does not match the
+            checksum recorded in the bitmap header
     """
     with GitFile(filename, "rb") as f:
-        return read_bitmap_file(f, pack_index=pack_index)
+        return read_bitmap_file(f, pack_index=pack_index, pack_checksum=pack_checksum)
 
 
-def read_bitmap_file(f: IO[bytes], pack_index: "PackIndex | None" = None) -> PackBitmap:
+def read_bitmap_file(
+    f: IO[bytes],
+    pack_index: "PackIndex | None" = None,
+    pack_checksum: bytes | None = None,
+) -> PackBitmap:
     """Read bitmap data from a file object.
 
     Args:
         f: File object to read from
         pack_index: Optional PackIndex to resolve object positions to SHAs
+        pack_checksum: Optional checksum of the pack this bitmap belongs to.
+            When given, the checksum stored in the bitmap header must match it.
 
     Returns:
         Loaded PackBitmap
 
     Raises:
         ValueError: If file format is invalid
+        ChecksumMismatch: If pack_checksum is given and does not match the
+            checksum recorded in the bitmap header
     """
     # Read header
     signature = f.read(4)
@@ -579,12 +592,14 @@ def read_bitmap_file(f: IO[bytes], pack_index: "PackIndex | None" = None) -> Pac
     entry_count = struct.unpack(">I", entry_count_bytes)[0]
 
     # Read pack checksum
-    pack_checksum = f.read(20)
-    if len(pack_checksum) < 20:
+    stored_pack_checksum = f.read(20)
+    if len(stored_pack_checksum) < 20:
         raise ValueError("Missing pack checksum")
+    if pack_checksum is not None and stored_pack_checksum != pack_checksum:
+        raise ChecksumMismatch(pack_checksum, stored_pack_checksum)
 
     bitmap = PackBitmap(version=version, flags=flags)
-    bitmap.pack_checksum = pack_checksum
+    bitmap.pack_checksum = stored_pack_checksum
 
     # Read type bitmaps (EWAH bitmaps are self-describing)
     for i, type_bitmap in enumerate(

@@ -97,7 +97,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Set
-from contextlib import closing
+from contextlib import closing, suppress
 from io import BufferedReader, BytesIO
 from struct import unpack_from
 from typing import (
@@ -2340,6 +2340,9 @@ class TraditionalGitClient(GitClient):
                 shallow_since=shallow_since,
                 shallow_exclude=shallow_exclude,
             )
+            # Nothing more will be written on a fetch; half-close so the
+            # server sees EOF and closes gracefully rather than RST-ing.
+            proto.shutdown_write()
             _handle_upload_pack_tail(
                 proto,
                 negotiated_capabilities,
@@ -2622,11 +2625,17 @@ class TCPGitClient(TraditionalGitClient):
             wfile.close()
             s.close()
 
+        def shutdown_write() -> None:
+            wfile.flush()
+            with suppress(OSError):
+                s.shutdown(socket.SHUT_WR)
+
         proto = Protocol(
             rfile.read,
             wfile.write,
             close,
             report_activity=self._report_activity,
+            shutdown_write=shutdown_write,
         )
         if path.startswith(b"/~"):
             path = path[1:]

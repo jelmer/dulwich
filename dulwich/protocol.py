@@ -422,6 +422,7 @@ class Protocol:
         write: Callable[[bytes], int | None],
         close: Callable[[], None] | None = None,
         report_activity: Callable[[int, str], None] | None = None,
+        shutdown_write: Callable[[], None] | None = None,
     ) -> None:
         """Initialize Protocol.
 
@@ -430,12 +431,26 @@ class Protocol:
           write: Function to write bytes to the transport
           close: Optional function to close the transport
           report_activity: Optional function to report activity
+          shutdown_write: Optional function to half-close the write side of
+            the transport once the request has been fully sent
         """
         self.read = read
         self.write = write
         self._close = close
         self.report_activity = report_activity
+        self._shutdown_write = shutdown_write
         self._readahead: BytesIO | None = None
+
+    def shutdown_write(self) -> None:
+        """Half-close the write side of the transport, if supported.
+
+        Signals to the peer that no more data will be sent. On Windows a
+        server that closes a socket with client data still unread aborts with
+        an RST rather than a clean FIN; letting it read to EOF avoids that.
+        """
+        if self._shutdown_write is not None:
+            self._shutdown_write()
+            self._shutdown_write = None
 
     def close(self) -> None:
         """Close the underlying transport if a close function was provided."""

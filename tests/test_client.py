@@ -2636,6 +2636,30 @@ class TCPGitClientTests(TestCase):
         url = c.get_url(path)
         self.assertEqual("git://[2001:db8::1]/jelmer/dulwich", url)
 
+    def test_connect_shutdown_write_half_closes_socket(self) -> None:
+        # shutdown_write must make the server's read side see EOF.
+        import socket
+
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.bind(("localhost", 0))
+        listener.listen(1)
+        self.addCleanup(listener.close)
+        port = listener.getsockname()[1]
+
+        c = TCPGitClient("localhost", port=port)
+        proto, _, _ = c._connect(b"upload-pack", b"/repo")
+        self.addCleanup(proto.close)
+        server_conn, _ = listener.accept()
+        self.addCleanup(server_conn.close)
+        # Drain the git-upload-pack request line _connect just sent.
+        self.assertNotEqual(b"", server_conn.recv(4096))
+
+        proto.shutdown_write()
+
+        # With the write side shut down, the server reads to EOF.
+        server_conn.settimeout(5)
+        self.assertEqual(b"", server_conn.recv(4096))
+
     def test_proxy_command(self) -> None:
         c = TCPGitClient("example.com", proxy_command="my-proxy")
         self.assertEqual("my-proxy", c._proxy_command)

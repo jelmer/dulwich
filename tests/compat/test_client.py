@@ -58,6 +58,18 @@ from .utils import (
 if sys.platform == "win32":
     import ctypes
 
+# Number of ports to try before giving up on starting git-daemon. Each
+# attempt uses a fresh port, so this only needs to absorb collisions with
+# other tests starting concurrently.
+_DAEMON_START_ATTEMPTS = 5
+
+# Markers git-daemon logs once it has decided the fate of its listening
+# socket. Whether it exits on a failed bind varies, so its exit status is no
+# help: this is the only way to tell that we, and not a concurrently starting
+# test, own the port.
+_DAEMON_READY = "Ready to rumble"
+_DAEMON_BIND_FAILED = "Could not bind"
+
 
 class DulwichClientTestBase:
     """Tests for client/server compatibility."""
@@ -525,18 +537,37 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
     def setUp(self) -> None:
         CompatTestCase.setUp(self)
         DulwichClientTestBase.setUp(self)
-        # Bind to a per-test ephemeral port instead of the global 9418 so
-        # parallel test runs and leftover daemons from previous failures
-        # cannot collide. We grab a free port by binding to 0, then close
-        # the probe socket and immediately reuse the number for git-daemon.
-        probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        probe.bind(("localhost", 0))
-        self.port = probe.getsockname()[1]
-        probe.close()
         fd, self.pidfile = tempfile.mkstemp(
             prefix="dulwich-test-git-client", suffix=".pid"
         )
         os.fdopen(fd).close()
+        for _ in range(_DAEMON_START_ATTEMPTS):
+            if self._start_daemon():
+                break
+        else:
+            raise SkipTest("git-daemon failed to start")
+
+    def _free_port(self) -> int:
+        """Pick a port that is free right now.
+
+        There is an unavoidable gap between releasing the probe socket and
+        git-daemon binding the port: git-daemon can only be told a port
+        number, it cannot inherit a listening socket or report what it bound.
+        _start_daemon closes the gap by detecting a lost race afterwards.
+        """
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.bind(("localhost", 0))
+            return probe.getsockname()[1]
+
+    def _start_daemon(self) -> bool:
+        """Try to start git-daemon on a free port.
+
+        Returns whether the daemon bound the port we asked for. Deliberately
+        no --reuseaddr: if a concurrently starting test won the same port
+        first, we must lose the bind and retry elsewhere rather than silently
+        serving that test's --base-path and racing its tearDown rmtree.
+        """
+        self.port = self._free_port()
         args = [
             _DEFAULT_GIT,
             "-c",
@@ -554,7 +585,6 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
             "--enable=upload-archive",
             "--listen=localhost",
             f"--port={self.port}",
-            "--reuseaddr",
             self.gitroot,
         ]
         # Prevent receive-pack/upload-pack children spawned by git-daemon
@@ -562,20 +592,48 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
         # rmtree in tearDown.
         daemon_env = os.environ.copy()
         daemon_env["GIT_AUTO_GC"] = "0"
-        # Redirect daemon output to DEVNULL: we never read it, and leaving
-        # it on PIPE risks the daemon blocking on a full pipe buffer if a
-        # noisy test session ever fills the ~64KB kernel buffer.
+        # git-daemon reports the outcome of its bind on stderr and cannot be
+        # asked what it bound, so read it rather than infer from liveness: on
+        # a lost bind it keeps running, serving nothing, and a plain
+        # check_for_daemon would happily connect to the *other* test's daemon.
         self.process = subprocess.Popen(
             args,
             cwd=self.gitroot,
             env=daemon_env,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
         )
+        if not self._await_bind():
+            self._stop_daemon()
+            return False
         if not check_for_daemon(port=self.port):
-            raise SkipTest("git-daemon failed to start")
+            self._stop_daemon()
+            return False
+        # Keep draining --verbose's per-connection logging: nothing reads it
+        # from here on, and a full pipe buffer would block the daemon.
+        self._drain = threading.Thread(target=self._drain_stderr, daemon=True)
+        self._drain.start()
+        return True
 
-    def tearDown(self) -> None:
+    def _drain_stderr(self) -> None:
+        assert self.process.stderr is not None
+        with suppress(ValueError):
+            for _ in self.process.stderr:
+                pass
+
+    def _await_bind(self) -> bool:
+        """Read git-daemon's stderr until it reports the result of its bind."""
+        assert self.process.stderr is not None
+        for line in self.process.stderr:
+            if _DAEMON_READY in line:
+                return True
+            if _DAEMON_BIND_FAILED in line:
+                return False
+        # stderr closed without either marker: the daemon died on startup.
+        return False
+
+    def _stop_daemon(self) -> None:
         # If the daemon failed to start it may not have written the pidfile;
         # fall back to the Popen handle so we still clean up the subprocess
         # without raising and masking the real test failure.
@@ -599,7 +657,12 @@ class DulwichTCPClientTest(CompatTestCase, DulwichClientTestBase):
                 os.kill(pid, signal.SIGKILL)
             with suppress(OSError):
                 os.unlink(self.pidfile)
+        # Wait for the daemon to be gone before returning: on Windows a
+        # surviving handle on gitroot blocks the tearDown rmtree.
         self.process.wait()
+
+    def tearDown(self) -> None:
+        self._stop_daemon()
         CompatTestCase.tearDown(self)
 
     def _client(self):

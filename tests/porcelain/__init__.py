@@ -36,6 +36,7 @@ import tempfile
 import threading
 import time
 import unicodedata
+import warnings
 from io import BytesIO, StringIO
 from pathlib import Path
 from unittest import skipIf
@@ -113,6 +114,21 @@ class PorcelainTestCase(TestCase):
         # On some slow CIs it does actually take more than 5 seconds to go from
         # creating the tag to here.
         self.assertLess(time.time() - ts, 50)
+
+
+class DeprecatedImportTests(TestCase):
+    def test_get_user_identity(self) -> None:
+        from dulwich.repo import get_user_identity
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            obj = porcelain.get_user_identity
+        self.assertIs(obj, get_user_identity)
+        self.assertEqual(1, len(w))
+        self.assertIs(DeprecationWarning, w[0].category)
+
+    def test_unknown_attribute(self) -> None:
+        self.assertRaises(AttributeError, getattr, porcelain, "nonexistent_attribute")
 
 
 @skipIf(gpg is None, "gpg is not available")

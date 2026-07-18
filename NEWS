@@ -1,5 +1,12 @@
 1.2.12	UNRELEASED
 
+ * Fix ``Bundle.store_objects()`` silently dropping every OFS_DELTA/REF_DELTA
+   object in the bundle's pack instead of resolving it, leaving the target
+   object store missing most objects with no error raised. Delta resolution
+   now goes through ``PackInflater``, matching how packs are ingested
+   elsewhere in the object store code.
+   (theVinchi, #2312)
+
  * SECURITY: Refuse to write a checkout entry whose leading path resolves
    through a symlink. ``build_index_from_tree`` (used by ``reset_index`` and
    thus by ``clone``/``checkout``) materialized a tree in sorted order without

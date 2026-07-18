@@ -49,8 +49,8 @@ else:
 if TYPE_CHECKING:
     from .object_format import ObjectFormat
 
-from .objects import ObjectID, ShaFile
-from .pack import PackData, UnpackedObject, write_pack_data
+from .objects import ObjectID
+from .pack import PackData, PackInflater, UnpackedObject, write_pack_data
 from .refs import Ref
 
 
@@ -157,18 +157,23 @@ class Bundle:
         """
         if self.pack_data is None:
             raise ValueError("pack_data is not loaded")
+        if not isinstance(self.pack_data, PackData):
+            # PackInflater resolves deltas by seeking into the pack's
+            # backing file, which only a real PackData has.
+            raise TypeError(
+                f"store_objects() requires file-backed pack data, got "
+                f"{type(self.pack_data).__name__}"
+            )
         count = 0
-        for unpacked in self.pack_data.iter_unpacked():
-            # Convert the unpacked object to a proper git object
-            if unpacked.decomp_chunks and unpacked.obj_type_num is not None:
-                git_obj = ShaFile.from_raw_chunks(
-                    unpacked.obj_type_num, unpacked.decomp_chunks
-                )
-                object_store.add_object(git_obj)
-                count += 1
+        # PackInflater resolves OFS_DELTA/REF_DELTA entries against the rest
+        # of this pack; iterating pack_data directly skips them; see
+        # https://github.com/jelmer/dulwich/issues/2312.
+        for git_obj in PackInflater.for_pack_data(self.pack_data):
+            object_store.add_object(git_obj)
+            count += 1
 
-                if progress and count % 100 == 0:
-                    progress(f"Stored {count} objects")
+            if progress and count % 100 == 0:
+                progress(f"Stored {count} objects")
 
         if progress:
             progress(f"Stored {count} objects total")

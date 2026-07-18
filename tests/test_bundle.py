@@ -27,6 +27,7 @@ from io import BytesIO
 
 from dulwich.bundle import Bundle, create_bundle_from_repo, read_bundle, write_bundle
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.pack import PackData, write_pack_objects
 from dulwich.refs import Ref
@@ -540,3 +541,84 @@ class BundleTests(TestCase):
         # Verify the prerequisite was added correctly
         self.assertEqual(len(bundle.prerequisites), 1)
         self.assertEqual(bundle.prerequisites[0][0], prereq_hex)
+
+    def test_store_objects_resolves_deltas(self) -> None:
+        """store_objects() must resolve OFS_DELTA/REF_DELTA entries.
+
+        Regression test for https://github.com/jelmer/dulwich/issues/2312:
+        store_objects() used to skip any pack entry whose obj_type_num was
+        still None (i.e. not yet delta-resolved), silently dropping every
+        deltified object instead of raising or resolving it.
+        """
+        # Two revisions of a large, similar blob so write_pack_objects has
+        # a strong incentive to emit one of them as a delta.
+        data1 = (b"x" * 2000 + b"\n") * 50
+        data2 = data1 + b"tail line\n"
+
+        blob1 = Blob.from_string(data1)
+        blob2 = Blob.from_string(data2)
+
+        tree1 = Tree()
+        tree1.add(b"f.txt", 0o100644, blob1.id)
+        tree2 = Tree()
+        tree2.add(b"f.txt", 0o100644, blob2.id)
+
+        commit1 = Commit()
+        commit1.tree = tree1.id
+        commit1.message = b"one"
+        commit1.author = commit1.committer = b"Test User <test@example.com>"
+        commit1.commit_time = commit1.author_time = 1234567890
+        commit1.commit_timezone = commit1.author_timezone = 0
+
+        commit2 = Commit()
+        commit2.tree = tree2.id
+        commit2.parents = [commit1.id]
+        commit2.message = b"two"
+        commit2.author = commit2.committer = b"Test User <test@example.com>"
+        commit2.commit_time = commit2.author_time = 1234567891
+        commit2.commit_timezone = commit2.author_timezone = 0
+
+        objects = [
+            (blob1, None),
+            (tree1, None),
+            (commit1, None),
+            (blob2, None),
+            (tree2, None),
+            (commit2, None),
+        ]
+
+        b = BytesIO()
+        write_pack_objects(
+            b.write, objects, deltify=True, object_format=DEFAULT_OBJECT_FORMAT
+        )
+        b.seek(0)
+
+        # Sanity check the constructed pack actually contains a delta,
+        # otherwise this test wouldn't exercise the bug.
+        probe = PackData.from_file(
+            BytesIO(b.getvalue()), object_format=DEFAULT_OBJECT_FORMAT
+        )
+        try:
+            self.assertTrue(
+                any(u.obj_type_num is None for u in probe.iter_unpacked()),
+                "test pack does not contain a delta; test is not exercising the bug",
+            )
+        finally:
+            probe.close()
+
+        bundle = Bundle()
+        self.addCleanup(bundle.close)
+        bundle.version = 2
+        bundle.capabilities = {}
+        bundle.references = {b"refs/heads/master": commit2.id}
+        bundle.prerequisites = []
+        bundle.pack_data = PackData.from_file(b, object_format=DEFAULT_OBJECT_FORMAT)
+
+        store = MemoryObjectStore()
+        bundle.store_objects(store)
+
+        for obj in (blob1, tree1, commit1, blob2, tree2, commit2):
+            self.assertIn(
+                obj.id, store, f"{obj.__class__.__name__} {obj.id!r} missing from store"
+            )
+        self.assertEqual(6, len(list(store)))

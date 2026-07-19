@@ -535,7 +535,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             ]
             build_pack(f, objects_spec, store=store)
             commit()
-        except:
+        except Exception:
             abort()
             raise
 
@@ -566,7 +566,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             objects_spec2 = [(b3.type_num, b3.as_raw_string())]
             build_pack(f2, objects_spec2, store=store2)
             commit2()
-        except:
+        except Exception:
             abort2()
             raise
 

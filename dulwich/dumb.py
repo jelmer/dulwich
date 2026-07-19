@@ -30,7 +30,6 @@ import logging
 import os
 import shutil
 import tempfile
-import zlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
@@ -44,6 +43,7 @@ if TYPE_CHECKING:
 from .errors import NotGitRepository, ObjectFormatException
 from .object_store import BaseObjectStore
 from .objects import (
+    DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     ZERO_SHA,
     Blob,
     Commit,
@@ -52,6 +52,7 @@ from .objects import (
     ShaFile,
     Tag,
     Tree,
+    _decompress,
     hex_to_sha,
     sha_to_hex,
 )
@@ -72,6 +73,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
             [str, dict[str, str]], tuple[Any, Callable[..., bytes]]
         ],
         object_format: "ObjectFormat | None" = None,
+        max_object_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     ) -> None:
         """Initialize a DumbHTTPObjectStore.
 
@@ -80,10 +82,14 @@ class DumbHTTPObjectStore(BaseObjectStore):
           http_request_func: Function to make HTTP requests, should accept (url, headers)
                            and return (response, read_func).
           object_format: Object format to use (defaults to DEFAULT_OBJECT_FORMAT)
+          max_object_size: Maximum inflated size of a loose object fetched over
+                           dumb HTTP, in bytes (defaults to the same limit used
+                           for on-disk loose objects)
         """
         super().__init__(object_format=object_format)
         self.base_url = base_url.rstrip("/") + "/"
         self._http_request = http_request_func
+        self._max_object_size = max_object_size
         self._packs: list[tuple[str, PackIndex | None]] | None = None
         self._cached_objects: dict[bytes, tuple[int, bytes]] = {}
         self._temp_pack_dir: str | None = None
@@ -142,8 +148,10 @@ class DumbHTTPObjectStore(BaseObjectStore):
         except OSError:
             raise KeyError(sha)
 
-        # Decompress and parse the object
-        decompressed = zlib.decompress(compressed)
+        # Decompress and parse the object, bounding the inflated size so a
+        # malicious dumb server cannot expand a small response into an
+        # unbounded amount of memory before the size check below runs.
+        decompressed = _decompress(compressed, max_size=self._max_object_size)
 
         # Parse header
         header_end = decompressed.find(b"\x00")

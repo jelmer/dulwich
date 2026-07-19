@@ -1,3 +1,14 @@
+1.2.13	UNRELEASED
+
+ * SECURITY: Bound the inflated size of loose objects fetched over dumb HTTP.
+   ``DumbHTTPObjectStore._fetch_loose_object`` inflated the server's response
+   with an unbounded ``zlib.decompress`` before checking the declared object
+   size, so a malicious or man-in-the-middle dumb server could expand a small
+   response into gigabytes of memory during clone/fetch. Inflation now goes
+   through the same bounded ``_decompress`` helper (capped at
+   ``DEFAULT_LOOSE_OBJECT_SIZE_LIMIT``) already used for on-disk loose objects.
+   (netliomax25-code)
+
 1.2.12	2026-07-19
 
  * Fix ``Bundle.store_objects()`` silently dropping every OFS_DELTA/REF_DELTA

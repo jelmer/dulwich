@@ -131,6 +131,21 @@ class DumbHTTPObjectStoreTests(TestCase):
 
         self.assertRaises(Exception, self.store._fetch_loose_object, sha)
 
+    def test_fetch_loose_object_rejects_oversized(self) -> None:
+        # A dumb server can return a small compressed body that inflates to a
+        # much larger object; the store must reject it rather than buffer the
+        # whole inflated result in memory.
+        store = DumbHTTPObjectStore(
+            self.base_url, self._mock_http_request, max_object_size=1024
+        )
+        blob = Blob()
+        blob.data = b"A" * 4096
+        hex_sha = blob.id
+        path = f"objects/{hex_sha[:2].decode('ascii')}/{hex_sha[2:].decode('ascii')}"
+        self._add_response(path, self._make_object(blob))
+
+        self.assertRaises(zlib.error, store._fetch_loose_object, blob.id)
+
     def test_load_packs_empty(self) -> None:
         # No packs file
         self.store._load_packs()

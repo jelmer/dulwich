@@ -6,4 +6,4 @@ resolver = "2"
 pyo3 = ">=0.25, <0.30"
 
 [workspace.package]
-version = "1.2.10"
+version = "1.2.12"

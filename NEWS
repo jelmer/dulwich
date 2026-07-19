@@ -1,4 +1,4 @@
-1.2.12	UNRELEASED
+1.2.12	2026-07-19
 
  * Fix ``Bundle.store_objects()`` silently dropping every OFS_DELTA/REF_DELTA
    object in the bundle's pack instead of resolving it, leaving the target

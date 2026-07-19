@@ -515,7 +515,7 @@ while True:
                 os.chmod(path, 0o755)
 
             return path
-        except:
+        except Exception:
             if os.path.exists(path):
                 os.unlink(path)
             raise
@@ -940,7 +940,7 @@ while True:
                 os.chmod(path, 0o755)
 
             return path
-        except:
+        except Exception:
             if os.path.exists(path):
                 os.unlink(path)
             raise

@@ -1224,7 +1224,7 @@ class Index:
                     extensions=meaningful_extensions,
                 )
                 sha1_writer.close()
-        except:
+        except Exception:
             f.close()
             raise
 

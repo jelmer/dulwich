@@ -4965,7 +4965,9 @@ class AbstractHttpGitClient(GitClient):
 
             # Pass http_request function
             with DumbRemoteHTTPRepo(
-                url, functools.partial(self._http_request, raise_for_status=False)
+                url,
+                functools.partial(self._http_request, raise_for_status=False),
+                config=getattr(self, "config", None),
             ) as dumb_repo:
                 # Fetch pack data from dumb remote
                 pack_data_list = list(

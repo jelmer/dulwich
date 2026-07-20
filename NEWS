@@ -4,9 +4,9 @@
    ``DumbHTTPObjectStore._fetch_loose_object`` inflated the server's response
    with an unbounded ``zlib.decompress`` before checking the declared object
    size, so a malicious or man-in-the-middle dumb server could expand a small
-   response into gigabytes of memory during clone/fetch. Inflation now goes
-   through the same bounded ``_decompress`` helper (capped at
-   ``DEFAULT_LOOSE_OBJECT_SIZE_LIMIT``) already used for on-disk loose objects.
+   response into gigabytes of memory during clone/fetch. Fetched loose objects
+   are now parsed with the regular ``ShaFile.from_file`` machinery, bounded by
+   ``core.bigFileThreshold`` (default 512 MiB) like on-disk loose objects.
    (netliomax25-code)
 
 1.2.12	2026-07-19

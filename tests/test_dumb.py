@@ -26,6 +26,7 @@ from collections.abc import Callable, Mapping
 from unittest import TestCase
 from unittest.mock import Mock
 
+from dulwich.config import ConfigDict
 from dulwich.dumb import DumbHTTPObjectStore, DumbRemoteHTTPRepo
 from dulwich.errors import NotGitRepository
 from dulwich.objects import ZERO_SHA, Blob, Commit, ShaFile, Tag, Tree, sha_to_hex
@@ -134,9 +135,12 @@ class DumbHTTPObjectStoreTests(TestCase):
     def test_fetch_loose_object_rejects_oversized(self) -> None:
         # A dumb server can return a small compressed body that inflates to a
         # much larger object; the store must reject it rather than buffer the
-        # whole inflated result in memory.
+        # whole inflated result in memory. The limit comes from
+        # core.bigFileThreshold, as for on-disk loose objects.
+        config = ConfigDict()
+        config.set((b"core",), b"bigFileThreshold", b"1024")
         store = DumbHTTPObjectStore(
-            self.base_url, self._mock_http_request, max_object_size=1024
+            self.base_url, self._mock_http_request, config=config
         )
         blob = Blob()
         blob.data = b"A" * 4096

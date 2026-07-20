@@ -38,21 +38,20 @@ from urllib.parse import urljoin
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from .config import Config
     from .object_format import ObjectFormat
 
-from .errors import NotGitRepository, ObjectFormatException
+from .errors import NotGitRepository
 from .object_store import BaseObjectStore
 from .objects import (
     DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
     ZERO_SHA,
-    Blob,
     Commit,
     ObjectID,
     RawObjectID,
     ShaFile,
     Tag,
     Tree,
-    _decompress,
     hex_to_sha,
     sha_to_hex,
 )
@@ -73,7 +72,7 @@ class DumbHTTPObjectStore(BaseObjectStore):
             [str, dict[str, str]], tuple[Any, Callable[..., bytes]]
         ],
         object_format: "ObjectFormat | None" = None,
-        max_object_size: int = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
+        config: "Config | None" = None,
     ) -> None:
         """Initialize a DumbHTTPObjectStore.
 
@@ -82,14 +81,23 @@ class DumbHTTPObjectStore(BaseObjectStore):
           http_request_func: Function to make HTTP requests, should accept (url, headers)
                            and return (response, read_func).
           object_format: Object format to use (defaults to DEFAULT_OBJECT_FORMAT)
-          max_object_size: Maximum inflated size of a loose object fetched over
-                           dumb HTTP, in bytes (defaults to the same limit used
-                           for on-disk loose objects)
+          config: Configuration to read settings from; core.bigFileThreshold
+                  bounds the inflated size of fetched loose objects, as it does
+                  for on-disk loose objects
         """
         super().__init__(object_format=object_format)
         self.base_url = base_url.rstrip("/") + "/"
         self._http_request = http_request_func
-        self._max_object_size = max_object_size
+        # Read core.bigFileThreshold like DiskObjectStore.from_config; used as
+        # the upper bound for inflating a fetched loose object.
+        self.loose_object_size_limit = DEFAULT_LOOSE_OBJECT_SIZE_LIMIT
+        if config is not None:
+            try:
+                self.loose_object_size_limit = int(
+                    config.get((b"core",), b"bigFileThreshold").decode()
+                )
+            except KeyError:
+                pass
         self._packs: list[tuple[str, PackIndex | None]] | None = None
         self._cached_objects: dict[bytes, tuple[int, bytes]] = {}
         self._temp_pack_dir: str | None = None
@@ -148,41 +156,15 @@ class DumbHTTPObjectStore(BaseObjectStore):
         except OSError:
             raise KeyError(sha)
 
-        # Decompress and parse the object, bounding the inflated size so a
-        # malicious dumb server cannot expand a small response into an
-        # unbounded amount of memory before the size check below runs.
-        decompressed = _decompress(compressed, max_size=self._max_object_size)
-
-        # Parse header
-        header_end = decompressed.find(b"\x00")
-        if header_end == -1:
-            raise ObjectFormatException("Invalid object header")
-
-        header = decompressed[:header_end]
-        content = decompressed[header_end + 1 :]
-
-        parts = header.split(b" ", 1)
-        if len(parts) != 2:
-            raise ObjectFormatException("Invalid object header")
-
-        obj_type = parts[0]
-        obj_size = int(parts[1])
-
-        if len(content) != obj_size:
-            raise ObjectFormatException("Object size mismatch")
-
-        # Convert type name to type number
-        type_map = {
-            b"blob": Blob.type_num,
-            b"tree": Tree.type_num,
-            b"commit": Commit.type_num,
-            b"tag": Tag.type_num,
-        }
-
-        if obj_type not in type_map:
-            raise ObjectFormatException(f"Unknown object type: {obj_type!r}")
-
-        return type_map[obj_type], content
+        # Parse with the regular loose-object machinery, which bounds the
+        # inflated size so a malicious dumb server cannot expand a small
+        # response into an unbounded amount of memory.
+        obj = ShaFile.from_file(
+            BytesIO(compressed),
+            object_format=self.object_format,
+            max_size=self.loose_object_size_limit,
+        )
+        return obj.type_num, obj.as_raw_string()
 
     def _load_packs(self) -> None:
         """Load the list of available packs from the remote."""
@@ -416,18 +398,22 @@ class DumbRemoteHTTPRepo:
         http_request_func: Callable[
             [str, dict[str, str]], tuple[Any, Callable[..., bytes]]
         ],
+        config: "Config | None" = None,
     ) -> None:
         """Initialize a DumbRemoteHTTPRepo.
 
         Args:
           base_url: Base URL of the remote repository
           http_request_func: Function to make HTTP requests.
+          config: Configuration to read settings from.
         """
         self.base_url = base_url.rstrip("/") + "/"
         self._http_request = http_request_func
         self._refs: dict[Ref, ObjectID] | None = None
         self._peeled: dict[Ref, ObjectID] | None = None
-        self.object_store = DumbHTTPObjectStore(base_url, http_request_func)
+        self.object_store = DumbHTTPObjectStore(
+            base_url, http_request_func, config=config
+        )
 
     def close(self) -> None:
         """Close the repository and release resources."""

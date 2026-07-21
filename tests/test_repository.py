@@ -38,7 +38,7 @@ from dulwich import errors, objects
 from dulwich.attrs import GitAttributes
 from dulwich.client import LocalGitClient
 from dulwich.config import Config
-from dulwich.errors import NotGitRepository
+from dulwich.errors import NotGitRepository, ObjectFormatException
 from dulwich.index import get_unstaged_changes as _get_unstaged_changes
 from dulwich.object_store import tree_lookup_path
 from dulwich.repo import (
@@ -1188,6 +1188,29 @@ class BuildRepoRootTests(TestCase):
             False,
             os.path.exists(os.path.join(self._repo.controldir(), "shallow")),
         )
+
+    def test_update_shallow_rejects_malformed_id(self) -> None:
+        # A hostile server can advertise a "shallow <sha>" pkt-line whose
+        # length-framed payload embeds a newline; sha.strip() in
+        # _read_shallow_updates keeps the internal newline, so writing it to
+        # .git/shallow would forge an extra graft line. Reject non-hex ids at
+        # the sink instead.
+        malformed = (
+            b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"
+            b"\nb90fa2d900a17e99b433217e988c4eb4a2e9a097"
+        )
+        self.assertRaises(
+            ObjectFormatException, self._repo.update_shallow, [malformed], None
+        )
+        self.assertEqual(set(), self._repo.get_shallow())
+        self.assertFalse(
+            os.path.exists(os.path.join(self._repo.controldir(), "shallow"))
+        )
+
+    def test_get_shallow_rejects_malformed_id(self) -> None:
+        with open(os.path.join(self._repo.path, ".git", "shallow"), "wb") as f:
+            f.write(b"a90fa2d900a17e99b433217e988c4eb4a2e9a097\nnothex\n")
+        self.assertRaises(ObjectFormatException, self._repo.get_shallow)
 
     def test_fetch_deepen_local(self) -> None:
         r = self._repo

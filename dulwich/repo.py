@@ -1147,7 +1147,14 @@ class BaseRepo:
         if f is None:
             return set()
         with f:
-            return {ObjectID(line.strip()) for line in f}
+            shallow: set[ObjectID] = set()
+            for line in f:
+                sha = line.strip()
+                if not sha:
+                    continue
+                check_hexsha(sha, "invalid shallow object id")
+                shallow.add(ObjectID(sha))
+            return shallow
 
     def update_shallow(
         self, new_shallow: set[ObjectID] | None, new_unshallow: set[ObjectID] | None
@@ -1158,6 +1165,8 @@ class BaseRepo:
           new_shallow: Newly shallow objects
           new_unshallow: Newly no longer shallow objects
         """
+        for sha in (*(new_shallow or ()), *(new_unshallow or ())):
+            check_hexsha(sha, "invalid shallow object id")
         shallow = self.get_shallow()
         if new_shallow:
             shallow.update(new_shallow)

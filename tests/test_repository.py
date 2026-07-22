@@ -1191,10 +1191,9 @@ class BuildRepoRootTests(TestCase):
 
     def test_update_shallow_rejects_malformed_id(self) -> None:
         # A hostile server can advertise a "shallow <sha>" pkt-line whose
-        # length-framed payload embeds a newline; sha.strip() in
-        # _read_shallow_updates keeps the internal newline, so writing it to
-        # .git/shallow would forge an extra graft line. Reject non-hex ids at
-        # the sink instead.
+        # length-framed payload embeds a newline; the client rejects that at
+        # parse time, but writing an unvalidated id to .git/shallow would
+        # forge an extra graft line, so reject non-hex ids at the sink too.
         malformed = (
             b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"
             b"\nb90fa2d900a17e99b433217e988c4eb4a2e9a097"

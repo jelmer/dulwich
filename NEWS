@@ -1,3 +1,17 @@
+1.2.13	UNRELEASED
+
+ * SECURITY: Validate shallow object ids received from the remote.
+   ``_read_shallow_updates`` parsed a ``shallow <sha>`` pkt-line with
+   ``sha.strip()``, which only trims the surrounding whitespace; because
+   pkt-lines are length-framed a single packet may carry an internal newline, so
+   a hostile server (any clone/fetch of an untrusted repo) could inject a forged
+   graft line into ``.git/shallow`` and mark an arbitrary commit as a
+   parent-less boundary, silently truncating history. The client now rejects a
+   non-hex shallow/unshallow id with ``GitProtocolError``, and ``update_shallow``
+   and ``get_shallow`` additionally validate ids via ``check_hexsha`` as
+   hardening, matching git's ``get_oid_hex`` handling of shallow lines.
+   (netliomax25-code)
+
 1.2.12	2026-07-19
 
  * Fix ``Bundle.store_objects()`` silently dropping every OFS_DELTA/REF_DELTA

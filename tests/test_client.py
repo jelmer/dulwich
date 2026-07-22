@@ -64,6 +64,7 @@ from dulwich.client import (
     _extract_symrefs_and_agent,
     _handle_upload_pack_head,
     _handle_upload_pack_tail,
+    _read_shallow_updates,
     _remote_error_from_stderr,
     _win32_url_to_path,
     build_fetch_request_v2,
@@ -3455,6 +3456,41 @@ class CheckWantsTests(TestCase):
                 b"refs/heads/blah": b"3f3dc7a53fb752a6961d3a56683df46d4d3bf262",
                 b"refs/heads/blah^{}": b"2f3dc7a53fb752a6961d3a56683df46d4d3bf262",
             },
+        )
+
+
+class ReadShallowUpdatesTests(TestCase):
+    def test_fine(self) -> None:
+        (new_shallow, new_unshallow) = _read_shallow_updates(
+            [
+                b"shallow 2f3dc7a53fb752a6961d3a56683df46d4d3bf262\n",
+                b"unshallow 3f3dc7a53fb752a6961d3a56683df46d4d3bf262\n",
+            ]
+        )
+        self.assertEqual({b"2f3dc7a53fb752a6961d3a56683df46d4d3bf262"}, new_shallow)
+        self.assertEqual({b"3f3dc7a53fb752a6961d3a56683df46d4d3bf262"}, new_unshallow)
+
+    def test_embedded_newline(self) -> None:
+        # pkt-lines are length-framed, so a single packet can carry an
+        # internal newline that strip() leaves in place
+        self.assertRaises(
+            GitProtocolError,
+            _read_shallow_updates,
+            [b"shallow " + b"a" * 40 + b"\n" + b"b" * 40 + b"\n"],
+        )
+
+    def test_non_hex(self) -> None:
+        self.assertRaises(
+            GitProtocolError,
+            _read_shallow_updates,
+            [b"shallow " + b"z" * 40 + b"\n"],
+        )
+
+    def test_unknown_command(self) -> None:
+        self.assertRaises(
+            GitProtocolError,
+            _read_shallow_updates,
+            [b"deepen 2f3dc7a53fb752a6961d3a56683df46d4d3bf262\n"],
         )
 
 

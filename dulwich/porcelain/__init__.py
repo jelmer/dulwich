@@ -1082,7 +1082,7 @@ def check_diverged(repo: BaseRepo, current_sha: ObjectID, new_sha: ObjectID) -> 
 
 
 def archive(
-    repo: str | BaseRepo = ".",
+    repo: str | BaseRepo | None = None,
     committish: str | bytes | Commit | Tag | None = None,
     outstream: BinaryIO | RawIOBase = default_bytes_out_stream,
     errstream: BinaryIO | RawIOBase = default_bytes_err_stream,
@@ -1142,7 +1142,7 @@ def archive(
             outstream.write(chunk)
 
 
-def update_server_info(repo: RepoPath = ".") -> None:
+def update_server_info(repo: RepoPath | None = None) -> None:
     """Update server info files for a repository.
 
     Args:
@@ -1152,7 +1152,7 @@ def update_server_info(repo: RepoPath = ".") -> None:
         server_update_server_info(r)
 
 
-def write_commit_graph(repo: RepoPath = ".", reachable: bool = True) -> None:
+def write_commit_graph(repo: RepoPath | None = None, reachable: bool = True) -> None:
     """Write a commit graph file for a repository.
 
     Args:
@@ -1194,7 +1194,7 @@ def pack_refs(repo: RepoPath, all: bool = False) -> None:
 
 
 def _get_variables(
-    repo: RepoPath = ".", env: Mapping[str, str] | None = None
+    repo: RepoPath | None = None, env: Mapping[str, str] | None = None
 ) -> dict[str, str]:
     """Internal function to get all Git logical variables.
 
@@ -1297,7 +1297,7 @@ def _get_variables(
 
 
 def var_list(
-    repo: RepoPath = ".", env: Mapping[str, str] | None = None
+    repo: RepoPath | None = None, env: Mapping[str, str] | None = None
 ) -> dict[str, str]:
     """List all Git logical variables.
 
@@ -1312,7 +1312,7 @@ def var_list(
 
 
 def var(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     variable: str = "GIT_AUTHOR_IDENT",
     env: Mapping[str, str] | None = None,
 ) -> str:
@@ -1337,7 +1337,7 @@ def var(
 
 
 def commit(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     message: str | bytes | Callable[[Any, Commit], bytes] | None = None,
     author: bytes | None = None,
     author_timestamp: float | None = None,
@@ -1893,7 +1893,7 @@ def clone(
 
 
 def add(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     paths: Sequence[str | bytes | os.PathLike[str]]
     | str
     | bytes
@@ -2047,7 +2047,7 @@ def _is_subdir(
 
 # TODO: option to remove ignored files also, in line with `git clean -fdx`
 def clean(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     target_dir: str | os.PathLike[str] | None = None,
 ) -> None:
     """Remove any untracked files from the target directory recursively.
@@ -2098,7 +2098,7 @@ def clean(
 
 
 def remove(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     paths: Sequence[str | bytes | os.PathLike[str]] = [],
     cached: bool = False,
 ) -> None:
@@ -2625,7 +2625,7 @@ def print_stat(
 
 
 def log(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     paths: Sequence[str | bytes] | None = None,
     outstream: TextIO = sys.stdout,
     max_entries: int | None = None,
@@ -2785,7 +2785,7 @@ def log(
 
 # TODO(jelmer): better default for encoding?
 def show(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     objects: Sequence[str | bytes] | None = None,
     outstream: TextIO = sys.stdout,
     default_encoding: str = DEFAULT_ENCODING,
@@ -2849,7 +2849,7 @@ def diff_tree(
 
 
 def diff(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     commit: str | bytes | Commit | None = None,
     commit2: str | bytes | Commit | None = None,
     staged: bool = False,
@@ -3810,7 +3810,7 @@ def pull(
 
 
 def status(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     ignored: bool = False,
     untracked_files: str = "normal",
 ) -> GitStatus:
@@ -4987,7 +4987,7 @@ def fetch(
 
 
 def for_each_ref(
-    repo: Repo | str = ".",
+    repo: Repo | str | None = None,
     pattern: str | bytes | None = None,
 ) -> list[tuple[bytes, bytes, bytes]]:
     """Iterate over all refs that match the (optional) pattern.
@@ -5040,7 +5040,7 @@ def for_each_ref(
 
 
 def show_ref(
-    repo: Repo | str = ".",
+    repo: Repo | str | None = None,
     patterns: list[str | bytes] | None = None,
     head: bool = False,
     branches: bool = False,
@@ -5143,7 +5143,7 @@ def show_ref(
 
 
 def show_branch(
-    repo: Repo | str = ".",
+    repo: Repo | str | None = None,
     branches: list[str | bytes] | None = None,
     all_branches: bool = False,
     remotes: bool = False,
@@ -6786,7 +6786,8 @@ def mktag(repo: str | os.PathLike[str] | Repo, tag_data: bytes) -> bytes:
 
 
 def show_index(
-    index_path: str | os.PathLike[str], repo: str | os.PathLike[str] | Repo = "."
+    index_path: str | os.PathLike[str],
+    repo: str | os.PathLike[str] | Repo | None = None,
 ) -> "list[tuple[int, RawObjectID, int | None]]":
     """Show the contents of a pack index file.
 
@@ -8221,7 +8222,9 @@ def maintenance_unregister(repo: RepoPath, force: bool = False) -> None:
         unregister_repository(r, force=force)
 
 
-def count_objects(repo: RepoPath = ".", verbose: bool = False) -> CountObjectsResult:
+def count_objects(
+    repo: RepoPath | None = None, verbose: bool = False
+) -> CountObjectsResult:
     """Count unpacked objects and their disk usage.
 
     Args:
@@ -8481,7 +8484,7 @@ blame = annotate
 
 
 def filter_branch(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     branch: str | bytes = "HEAD",
     *,
     filter_fn: Callable[[Commit], "CommitData | None"] | None = None,
@@ -8613,7 +8616,7 @@ def filter_branch(
 
 
 def format_patch(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     committish: ObjectID | tuple[ObjectID, ObjectID] | None = None,
     outstream: TextIO = sys.stdout,
     outdir: str | os.PathLike[str] | None = None,
@@ -8943,7 +8946,7 @@ def request_pull(
 
 
 def bisect_start(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     bad: str | bytes | Commit | Tag | None = None,
     good: str
     | bytes
@@ -9004,7 +9007,7 @@ def bisect_start(
 
 
 def bisect_bad(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     rev: str | bytes | Commit | Tag | None = None,
 ) -> bytes | None:
     """Mark a commit as bad.
@@ -9042,7 +9045,7 @@ def bisect_bad(
 
 
 def bisect_good(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     rev: str | bytes | Commit | Tag | None = None,
 ) -> bytes | None:
     """Mark a commit as good.
@@ -9080,7 +9083,7 @@ def bisect_good(
 
 
 def bisect_skip(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     revs: str
     | bytes
     | Commit
@@ -9131,7 +9134,7 @@ def bisect_skip(
 
 
 def bisect_reset(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     commit: str | bytes | Commit | Tag | None = None,
 ) -> None:
     """Reset bisect state and return to original branch/commit.
@@ -9172,7 +9175,7 @@ def bisect_reset(
             pass
 
 
-def bisect_log(repo: str | os.PathLike[str] | Repo = ".") -> str:
+def bisect_log(repo: str | os.PathLike[str] | Repo | None = None) -> str:
     """Get the bisect log.
 
     Args:
@@ -9210,7 +9213,7 @@ def bisect_replay(
 
 
 def reflog(
-    repo: RepoPath = ".", ref: str | bytes = b"HEAD", all: bool = False
+    repo: RepoPath | None = None, ref: str | bytes = b"HEAD", all: bool = False
 ) -> Iterator[Any | tuple[bytes, Any]]:
     """Show reflog entries for a reference or all references.
 
@@ -9243,7 +9246,7 @@ def reflog(
 
 
 def reflog_expire(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     ref: str | bytes | None = None,
     all: bool = False,
     expire_time: int | None = None,
@@ -9354,7 +9357,7 @@ def reflog_expire(
 
 
 def reflog_delete(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     ref: str | bytes = b"HEAD",
     index: int = 0,
     rewrite: bool = False,
@@ -9384,7 +9387,7 @@ def reflog_delete(
 
 
 def merge_base(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     committishes: Sequence[str | bytes] | None = None,
     all: bool = False,
     octopus: bool = False,
@@ -9428,7 +9431,7 @@ def merge_base(
 
 
 def is_ancestor(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     ancestor: str | bytes | None = None,
     descendant: str | bytes | None = None,
 ) -> bool:
@@ -9465,7 +9468,7 @@ def is_ancestor(
 
 
 def independent_commits(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     committishes: Sequence[str | bytes] | None = None,
 ) -> list[ObjectID]:
     """Filter commits to only those that are not reachable from others.
@@ -9650,7 +9653,7 @@ def mailinfo(
     return result
 
 
-def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
+def rerere(repo: RepoPath | None = None) -> tuple[list[tuple[bytes, str]], list[bytes]]:
     """Record current conflict resolutions and apply known resolutions.
 
     This reads conflicted files from the working tree and records them
@@ -9695,7 +9698,7 @@ def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
         return rerere_auto(r, working_tree, conflicts, config=r.get_config_stack())
 
 
-def rerere_status(repo: RepoPath = ".") -> list[tuple[str, bool]]:
+def rerere_status(repo: RepoPath | None = None) -> list[tuple[str, bool]]:
     """Get the status of all conflicts in the rerere cache.
 
     Args:
@@ -9712,7 +9715,7 @@ def rerere_status(repo: RepoPath = ".") -> list[tuple[str, bool]]:
 
 
 def rerere_diff(
-    repo: RepoPath = ".", conflict_id: str | None = None
+    repo: RepoPath | None = None, conflict_id: str | None = None
 ) -> list[tuple[str, bytes, bytes | None]]:
     """Show differences for recorded rerere conflicts.
 
@@ -9743,7 +9746,9 @@ def rerere_diff(
         return results
 
 
-def rerere_forget(repo: RepoPath = ".", pathspec: str | bytes | None = None) -> None:
+def rerere_forget(
+    repo: RepoPath | None = None, pathspec: str | bytes | None = None
+) -> None:
     """Forget recorded rerere resolutions for a pathspec.
 
     Args:
@@ -9764,7 +9769,7 @@ def rerere_forget(repo: RepoPath = ".", pathspec: str | bytes | None = None) -> 
         cache.clear()
 
 
-def rerere_clear(repo: RepoPath = ".") -> None:
+def rerere_clear(repo: RepoPath | None = None) -> None:
     """Clear all recorded rerere resolutions.
 
     Args:
@@ -9777,7 +9782,7 @@ def rerere_clear(repo: RepoPath = ".") -> None:
         cache.clear()
 
 
-def rerere_gc(repo: RepoPath = ".", max_age_days: int = 60) -> None:
+def rerere_gc(repo: RepoPath | None = None, max_age_days: int = 60) -> None:
     """Garbage collect old rerere resolutions.
 
     Args:
@@ -9792,7 +9797,7 @@ def rerere_gc(repo: RepoPath = ".", max_age_days: int = 60) -> None:
 
 
 def apply_patch(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     patch_file: str | bytes | BinaryIO | None = None,
     cached: bool = False,
     reverse: bool = False,
@@ -9854,7 +9859,7 @@ def apply_patch(
 
 
 def am(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     patches: str | bytes | BinaryIO | list[str | bytes | BinaryIO] | None = None,
     three_way: bool = False,
     keep_subject: bool = False,
@@ -9959,7 +9964,7 @@ def am(
 
 
 def am_continue(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
@@ -9989,7 +9994,7 @@ def am_continue(
 
 
 def am_skip(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
@@ -10016,7 +10021,7 @@ def am_skip(
         )
 
 
-def am_abort(repo: RepoPath = ".") -> None:
+def am_abort(repo: RepoPath | None = None) -> None:
     """Abort the current am and restore the original state.
 
     Resets HEAD, index, and working tree to the state before am started.
@@ -10030,7 +10035,7 @@ def am_abort(repo: RepoPath = ".") -> None:
         am_abort_impl(r)
 
 
-def am_quit(repo: RepoPath = ".") -> None:
+def am_quit(repo: RepoPath | None = None) -> None:
     """Quit the current am without reverting changes.
 
     Removes am state but keeps HEAD, index, and working tree as-is.

@@ -13932,3 +13932,65 @@ class OpenRepoEnvTests(TestCase):
         self.overrideEnv("GIT_WORK_TREE", self.repo_path)
         result = porcelain.count_objects()
         self.assertEqual(0, result.count)
+
+    def test_git_alternate_object_directories(self) -> None:
+        # An alternate object dir named via env is consulted for object
+        # lookups on top of the primary object store.
+        from dulwich.objects import Blob
+
+        alt_repo_path = os.path.join(self.test_dir, "alt.git")
+        alt_repo = Repo.init_bare(alt_repo_path, mkdir=True)
+        self.addCleanup(alt_repo.close)
+        blob = Blob()
+        blob.data = b"lives in alternate"
+        alt_repo.object_store.add_object(blob)
+
+        env = {
+            "GIT_DIR": os.path.join(self.repo_path, ".git"),
+            "GIT_WORK_TREE": self.repo_path,
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES": os.path.join(alt_repo_path, "objects"),
+        }
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertIn(blob.id, r.object_store)
+
+    def test_git_alternate_object_directories_pathsep(self) -> None:
+        # Multiple alternates separated by os.pathsep.
+        from dulwich.objects import Blob
+
+        alt1_path = os.path.join(self.test_dir, "alt1.git")
+        alt1 = Repo.init_bare(alt1_path, mkdir=True)
+        self.addCleanup(alt1.close)
+        blob1 = Blob()
+        blob1.data = b"alt1 payload"
+        alt1.object_store.add_object(blob1)
+
+        alt2_path = os.path.join(self.test_dir, "alt2.git")
+        alt2 = Repo.init_bare(alt2_path, mkdir=True)
+        self.addCleanup(alt2.close)
+        blob2 = Blob()
+        blob2.data = b"alt2 payload"
+        alt2.object_store.add_object(blob2)
+
+        env = {
+            "GIT_DIR": os.path.join(self.repo_path, ".git"),
+            "GIT_WORK_TREE": self.repo_path,
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES": os.pathsep.join(
+                [
+                    os.path.join(alt1_path, "objects"),
+                    os.path.join(alt2_path, "objects"),
+                ]
+            ),
+        }
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertIn(blob1.id, r.object_store)
+            self.assertIn(blob2.id, r.object_store)
+
+    def test_git_index_file(self) -> None:
+        custom_index = os.path.join(self.test_dir, "custom-index")
+        env = {
+            "GIT_DIR": os.path.join(self.repo_path, ".git"),
+            "GIT_WORK_TREE": self.repo_path,
+            "GIT_INDEX_FILE": custom_index,
+        }
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertEqual(custom_index, r.index_path())

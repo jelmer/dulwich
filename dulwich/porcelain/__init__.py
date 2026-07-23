@@ -855,8 +855,10 @@ def _repo_from_env(
     An explicit ``path_or_repo`` always wins over environment variables so
     that callers who pass a path get what they asked for. Otherwise the
     Git environment variables ``GIT_DIR``, ``GIT_COMMON_DIR``,
-    ``GIT_WORK_TREE`` and ``GIT_OBJECT_DIRECTORY`` are consulted, and if
-    none of them are set discovery walks up from the current directory.
+    ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` and ``GIT_INDEX_FILE`` are
+    consulted; if none of them are set, discovery walks up from the
+    current directory.
     """
     if path_or_repo is not None:
         return Repo(path_or_repo)
@@ -866,11 +868,18 @@ def _repo_from_env(
     git_common_dir = env.get("GIT_COMMON_DIR")
     git_work_tree = env.get("GIT_WORK_TREE")
     git_object_dir = env.get("GIT_OBJECT_DIRECTORY")
+    git_alternates = env.get("GIT_ALTERNATE_OBJECT_DIRECTORIES")
+    git_index_file = env.get("GIT_INDEX_FILE")
+    alternates = (
+        [p for p in git_alternates.split(os.pathsep) if p] if git_alternates else None
+    )
     if (
         git_dir is None
         and git_work_tree is None
         and git_common_dir is None
         and git_object_dir is None
+        and alternates is None
+        and git_index_file is None
     ):
         return Repo.discover()
     if git_dir is None:
@@ -888,6 +897,8 @@ def _repo_from_env(
         commondir=git_common_dir,
         worktree=git_work_tree,
         object_directory=git_object_dir,
+        alternates=alternates,
+        index_file=git_index_file,
     )
 
 
@@ -909,8 +920,10 @@ def open_repo(
     """Open an argument that can be a repository or a path for a repository.
 
     When ``path_or_repo`` is ``None`` the ``GIT_DIR``, ``GIT_COMMON_DIR``,
-    ``GIT_WORK_TREE`` and ``GIT_OBJECT_DIRECTORY`` environment variables
-    are consulted, falling back to discovery from the current directory.
+    ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` and ``GIT_INDEX_FILE`` environment
+    variables are consulted, falling back to discovery from the current
+    directory.
     """
     if isinstance(path_or_repo, BaseRepo):
         return _noop_context_manager(path_or_repo)
@@ -975,8 +988,10 @@ def open_repo_closing(
     variables), else does nothing if the argument is an already-open repo.
 
     When ``path_or_repo`` is ``None`` the ``GIT_DIR``, ``GIT_COMMON_DIR``,
-    ``GIT_WORK_TREE`` and ``GIT_OBJECT_DIRECTORY`` environment variables
-    are consulted, falling back to discovery from the current directory.
+    ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` and ``GIT_INDEX_FILE`` environment
+    variables are consulted, falling back to discovery from the current
+    directory.
     """
     if isinstance(path_or_repo, BaseRepo):
         return _noop_context_manager(path_or_repo)

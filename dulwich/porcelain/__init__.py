@@ -1153,7 +1153,7 @@ def archive(
         remote_str = remote.decode() if isinstance(remote, bytes) else remote
         client, path = get_transport_and_path(remote_str, ssh_command=ssh_command)
         committish_bytes: bytes
-        if isinstance(committish, (Commit, Tag)):
+        if isinstance(committish, Commit | Tag):
             committish_bytes = committish.id
         elif isinstance(committish, str):
             committish_bytes = committish.encode(DEFAULT_ENCODING)

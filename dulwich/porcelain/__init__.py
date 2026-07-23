@@ -846,23 +846,75 @@ def get_user_timezones(env: Mapping[str, str] | None = None) -> tuple[int, int]:
     return author_timezone, commit_timezone
 
 
+def _repo_from_env(
+    path_or_repo: str | bytes | os.PathLike[str] | None,
+    env: Mapping[str, str] | None,
+) -> Repo:
+    """Resolve a Repo from a path or from the Git environment variables.
+
+    An explicit ``path_or_repo`` always wins over environment variables so
+    that callers who pass a path get what they asked for. Otherwise the
+    Git environment variables ``GIT_DIR``, ``GIT_COMMON_DIR``,
+    ``GIT_WORK_TREE`` and ``GIT_OBJECT_DIRECTORY`` are consulted, and if
+    none of them are set discovery walks up from the current directory.
+    """
+    if path_or_repo is not None:
+        return Repo(path_or_repo)
+    if env is None:
+        env = os.environ
+    git_dir = env.get("GIT_DIR")
+    git_common_dir = env.get("GIT_COMMON_DIR")
+    git_work_tree = env.get("GIT_WORK_TREE")
+    git_object_dir = env.get("GIT_OBJECT_DIRECTORY")
+    if (
+        git_dir is None
+        and git_work_tree is None
+        and git_common_dir is None
+        and git_object_dir is None
+    ):
+        return Repo.discover()
+    if git_dir is None:
+        # An override without GIT_DIR: fall back to discovery from cwd for
+        # the control dir, then layer the overrides on top. Preserve the
+        # discovered worktree so we don't silently downgrade a non-bare
+        # repo when only GIT_OBJECT_DIRECTORY (etc.) is set.
+        found = Repo.discover()
+        git_dir = found.controldir()
+        if git_work_tree is None and not found.bare:
+            git_work_tree = found.path
+        found.close()
+    return Repo(
+        controldir=git_dir,
+        commondir=git_common_dir,
+        worktree=git_work_tree,
+        object_directory=git_object_dir,
+    )
+
+
 @overload
 def open_repo(path_or_repo: T) -> AbstractContextManager[T]: ...
 
 
 @overload
 def open_repo(
-    path_or_repo: str | os.PathLike[str],
+    path_or_repo: str | os.PathLike[str] | None = ...,
+    env: Mapping[str, str] | None = ...,
 ) -> AbstractContextManager[Repo]: ...
 
 
 def open_repo(
-    path_or_repo: str | os.PathLike[str] | T,
+    path_or_repo: str | os.PathLike[str] | T | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> AbstractContextManager[T | Repo]:
-    """Open an argument that can be a repository or a path for a repository."""
+    """Open an argument that can be a repository or a path for a repository.
+
+    When ``path_or_repo`` is ``None`` the ``GIT_DIR``, ``GIT_COMMON_DIR``,
+    ``GIT_WORK_TREE`` and ``GIT_OBJECT_DIRECTORY`` environment variables
+    are consulted, falling back to discovery from the current directory.
+    """
     if isinstance(path_or_repo, BaseRepo):
         return _noop_context_manager(path_or_repo)
-    return Repo(path_or_repo)
+    return _repo_from_env(path_or_repo, env)
 
 
 @contextmanager
@@ -907,21 +959,28 @@ def open_repo_closing(path_or_repo: T) -> AbstractContextManager[T]: ...
 
 @overload
 def open_repo_closing(
-    path_or_repo: str | bytes | os.PathLike[str],
+    path_or_repo: str | bytes | os.PathLike[str] | None = ...,
+    env: Mapping[str, str] | None = ...,
 ) -> AbstractContextManager[Repo]: ...
 
 
 def open_repo_closing(
-    path_or_repo: str | bytes | os.PathLike[str] | T,
+    path_or_repo: str | bytes | os.PathLike[str] | T | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> AbstractContextManager[T | Repo]:
     """Open an argument that can be a repository or a path for a repository.
 
-    returns a context manager that will close the repo on exit if the argument
-    is a path, else does nothing if the argument is a repo.
+    Returns a context manager that will close the repo on exit if the
+    argument is a path (or the repo was resolved from environment
+    variables), else does nothing if the argument is an already-open repo.
+
+    When ``path_or_repo`` is ``None`` the ``GIT_DIR``, ``GIT_COMMON_DIR``,
+    ``GIT_WORK_TREE`` and ``GIT_OBJECT_DIRECTORY`` environment variables
+    are consulted, falling back to discovery from the current directory.
     """
     if isinstance(path_or_repo, BaseRepo):
         return _noop_context_manager(path_or_repo)
-    return closing(Repo(path_or_repo))
+    return closing(_repo_from_env(path_or_repo, env))
 
 
 def path_to_tree_path(

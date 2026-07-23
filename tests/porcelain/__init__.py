@@ -13824,3 +13824,103 @@ class CoreWorktreeTests(PorcelainTestCase):
             f.write("contents")
         with Repo(self.repo_path) as r:
             self.assertEqual([b"new"], porcelain.status(r).untracked)
+
+
+class OpenRepoEnvTests(TestCase):
+    """Tests for GIT_DIR / GIT_WORK_TREE / GIT_COMMON_DIR / GIT_OBJECT_DIRECTORY."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.repo_path = os.path.join(self.test_dir, "repo")
+        self.repo = Repo.init(self.repo_path, mkdir=True)
+        self.addCleanup(self.repo.close)
+
+    def test_explicit_path_wins_over_env(self) -> None:
+        # An explicit path bypasses the env vars entirely.
+        env = {"GIT_DIR": "/nonexistent/should-not-be-read"}
+        with porcelain.open_repo_closing(self.repo_path, env=env) as r:
+            self.assertEqual(os.path.realpath(self.repo_path), os.path.realpath(r.path))
+
+    def test_git_dir_bare(self) -> None:
+        bare_path = os.path.join(self.test_dir, "bare.git")
+        bare = Repo.init_bare(bare_path, mkdir=True)
+        bare.close()
+        env = {"GIT_DIR": bare_path}
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertTrue(r.bare)
+            self.assertEqual(bare_path, r.controldir())
+
+    def test_git_dir_with_git_work_tree(self) -> None:
+        gitdir = os.path.join(self.repo_path, ".git")
+        env = {"GIT_DIR": gitdir, "GIT_WORK_TREE": self.repo_path}
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertFalse(r.bare)
+            self.assertEqual(gitdir, r.controldir())
+            self.assertEqual(self.repo_path, r.path)
+
+    def test_git_object_directory(self) -> None:
+        alt_objects = os.path.join(self.test_dir, "alt-objects")
+        shutil.copytree(os.path.join(self.repo_path, ".git", "objects"), alt_objects)
+        env = {
+            "GIT_DIR": os.path.join(self.repo_path, ".git"),
+            "GIT_WORK_TREE": self.repo_path,
+            "GIT_OBJECT_DIRECTORY": alt_objects,
+        }
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertEqual(alt_objects, r.object_store.path)
+
+    def test_git_common_dir_relative(self) -> None:
+        # A linked-worktree style layout: primary controldir has its own
+        # HEAD, but refs/objects come from the common dir.
+        common = os.path.join(self.test_dir, "common.git")
+        Repo.init_bare(common, mkdir=True).close()
+        primary = os.path.join(self.test_dir, "linked")
+        os.mkdir(primary)
+        with open(os.path.join(primary, "HEAD"), "wb") as f:
+            f.write(b"ref: refs/heads/main\n")
+        env = {"GIT_DIR": primary, "GIT_COMMON_DIR": "../common.git"}
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertEqual(os.path.realpath(common), os.path.realpath(r.commondir()))
+
+    def test_falls_back_to_discovery(self) -> None:
+        # No env vars, no explicit path -> discover from cwd.
+        subdir = os.path.join(self.repo_path, "sub")
+        os.mkdir(subdir)
+        old_cwd = os.getcwd()
+        os.chdir(subdir)
+        try:
+            with porcelain.open_repo_closing(None, env={}) as r:
+                self.assertEqual(
+                    os.path.realpath(self.repo_path), os.path.realpath(r.path)
+                )
+        finally:
+            os.chdir(old_cwd)
+
+    def test_baserepo_passthrough_ignores_env(self) -> None:
+        # Passing an already-open repo skips env resolution entirely.
+        env = {"GIT_DIR": "/nonexistent"}
+        with porcelain.open_repo_closing(self.repo, env=env) as r:
+            self.assertIs(self.repo, r)
+
+    def test_git_object_directory_alone_triggers_discovery(self) -> None:
+        # GIT_OBJECT_DIRECTORY set without GIT_DIR must still trigger
+        # discovery rather than fall through to a plain discover() that
+        # ignores the override.
+        alt_objects = os.path.join(self.test_dir, "alt-objects")
+        shutil.copytree(os.path.join(self.repo_path, ".git", "objects"), alt_objects)
+        subdir = os.path.join(self.repo_path, "sub")
+        os.mkdir(subdir)
+        old_cwd = os.getcwd()
+        os.chdir(subdir)
+        try:
+            env = {"GIT_OBJECT_DIRECTORY": alt_objects}
+            with porcelain.open_repo_closing(None, env=env) as r:
+                self.assertEqual(alt_objects, r.object_store.path)
+                self.assertFalse(r.bare)
+                self.assertEqual(
+                    os.path.realpath(self.repo_path), os.path.realpath(r.path)
+                )
+        finally:
+            os.chdir(old_cwd)

@@ -1143,7 +1143,7 @@ class SSHGitClientTests(TestCase):
         try:
             self.assertEqual(b"username", server.username)
             self.assertEqual(1337, server.port)
-            self.assertEqual(b"git-command /path/to/repo", server.command)
+            self.assertEqual(b"git-command '/path/to/repo'", server.command)
         finally:
             proto.close()
 
@@ -1162,8 +1162,31 @@ class SSHGitClientTests(TestCase):
         proto, _, _ = client._connect(b"command", b"/repo'; touch pwned; '")
         try:
             self.assertEqual(
-                b"git-command '/repo'\"'\"'; touch pwned; '\"'\"''", server.command
+                b"git-command '/repo'\\''; touch pwned; '\\'''", server.command
             )
+        finally:
+            proto.close()
+
+    def test_connect_always_quotes_path(self) -> None:
+        # git's sq_quote() wraps the path in single quotes unconditionally,
+        # even when it contains nothing a shell would treat specially. Servers
+        # that parse the command themselves rather than passing it to a shell
+        # (such as Bitbucket Server) reject the unquoted form. The expected
+        # values below are what git itself sends for these URLs.
+        server = self.server
+        client = self.client
+
+        proto, _, _ = client._connect(b"upload-pack", b"/some-project/some-repo.git")
+        try:
+            self.assertEqual(
+                b"git-upload-pack '/some-project/some-repo.git'", server.command
+            )
+        finally:
+            proto.close()
+
+        proto, _, _ = client._connect(b"upload-pack", b"foo/bar.git")
+        try:
+            self.assertEqual(b"git-upload-pack 'foo/bar.git'", server.command)
         finally:
             proto.close()
 

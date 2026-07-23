@@ -846,6 +846,29 @@ def get_user_timezones(env: Mapping[str, str] | None = None) -> tuple[int, int]:
     return author_timezone, commit_timezone
 
 
+def _parse_ceiling_dirs(env: Mapping[str, str]) -> list[str] | None:
+    """Parse ``GIT_CEILING_DIRECTORIES`` into an absolute-path list.
+
+    Entries are separated by ``os.pathsep``. Non-empty entries are
+    resolved through :func:`os.path.realpath` by default, matching
+    git's default behaviour of following symlinks in ceiling
+    directories. An empty entry acts as a mode toggle: entries that
+    follow it are kept as-is (only made absolute) so that symlinks
+    on the walking path can be compared against a symlinked ceiling.
+    """
+    raw = env.get("GIT_CEILING_DIRECTORIES")
+    if not raw:
+        return None
+    resolve = True
+    result: list[str] = []
+    for part in raw.split(os.pathsep):
+        if not part:
+            resolve = False
+            continue
+        result.append(os.path.realpath(part) if resolve else os.path.abspath(part))
+    return result
+
+
 def _repo_from_env(
     path_or_repo: str | bytes | os.PathLike[str] | None,
     env: Mapping[str, str] | None,
@@ -856,9 +879,10 @@ def _repo_from_env(
     that callers who pass a path get what they asked for. Otherwise the
     Git environment variables ``GIT_DIR``, ``GIT_COMMON_DIR``,
     ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
-    ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` and ``GIT_INDEX_FILE`` are
-    consulted; if none of them are set, discovery walks up from the
-    current directory.
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE`` and
+    ``GIT_CEILING_DIRECTORIES`` are consulted; if none of the locator
+    vars are set, discovery walks up from the current directory (bounded
+    by ``GIT_CEILING_DIRECTORIES`` when set).
     """
     if path_or_repo is not None:
         return Repo(path_or_repo)
@@ -870,6 +894,7 @@ def _repo_from_env(
     git_object_dir = env.get("GIT_OBJECT_DIRECTORY")
     git_alternates = env.get("GIT_ALTERNATE_OBJECT_DIRECTORIES")
     git_index_file = env.get("GIT_INDEX_FILE")
+    ceilings = _parse_ceiling_dirs(env)
     alternates = (
         [p for p in git_alternates.split(os.pathsep) if p] if git_alternates else None
     )
@@ -881,13 +906,13 @@ def _repo_from_env(
         and alternates is None
         and git_index_file is None
     ):
-        return Repo.discover()
+        return Repo.discover(ceiling_dirs=ceilings)
     if git_dir is None:
         # An override without GIT_DIR: fall back to discovery from cwd for
         # the control dir, then layer the overrides on top. Preserve the
         # discovered worktree so we don't silently downgrade a non-bare
         # repo when only GIT_OBJECT_DIRECTORY (etc.) is set.
-        found = Repo.discover()
+        found = Repo.discover(ceiling_dirs=ceilings)
         git_dir = found.controldir()
         if git_work_tree is None and not found.bare:
             git_work_tree = found.path
@@ -921,9 +946,9 @@ def open_repo(
 
     When ``path_or_repo`` is ``None`` the ``GIT_DIR``, ``GIT_COMMON_DIR``,
     ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
-    ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` and ``GIT_INDEX_FILE`` environment
-    variables are consulted, falling back to discovery from the current
-    directory.
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE`` and
+    ``GIT_CEILING_DIRECTORIES`` environment variables are consulted,
+    falling back to discovery from the current directory.
     """
     if isinstance(path_or_repo, BaseRepo):
         return _noop_context_manager(path_or_repo)
@@ -989,9 +1014,9 @@ def open_repo_closing(
 
     When ``path_or_repo`` is ``None`` the ``GIT_DIR``, ``GIT_COMMON_DIR``,
     ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
-    ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` and ``GIT_INDEX_FILE`` environment
-    variables are consulted, falling back to discovery from the current
-    directory.
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE`` and
+    ``GIT_CEILING_DIRECTORIES`` environment variables are consulted,
+    falling back to discovery from the current directory.
     """
     if isinstance(path_or_repo, BaseRepo):
         return _noop_context_manager(path_or_repo)

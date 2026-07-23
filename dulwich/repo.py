@@ -1797,7 +1797,12 @@ class Repo(BaseRepo):
             return
 
     @classmethod
-    def discover(cls, start: str | bytes | os.PathLike[str] = ".") -> "Repo":
+    def discover(
+        cls,
+        start: str | bytes | os.PathLike[str] = ".",
+        *,
+        ceiling_dirs: "Iterable[str | os.PathLike[str]] | None" = None,
+    ) -> "Repo":
         """Iterate parent directories to discover a repository.
 
         Return a Repo object for the first parent directory that looks like a
@@ -1805,9 +1810,20 @@ class Repo(BaseRepo):
 
         Args:
           start: The directory to start discovery from (defaults to '.')
+          ceiling_dirs: Iterable of absolute paths that discovery must not
+            cross (analogous to ``GIT_CEILING_DIRECTORIES``). The ceiling
+            directories themselves are not searched. Callers are expected
+            to pass already-resolved absolute paths.
         """
+        ceilings = (
+            {os.path.abspath(os.fsdecode(os.fspath(p))) for p in ceiling_dirs}
+            if ceiling_dirs is not None
+            else set()
+        )
         path = os.path.abspath(start)
         while True:
+            if path in ceilings:
+                break
             try:
                 return cls(path)
             except NotGitRepository:

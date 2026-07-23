@@ -2684,5 +2684,29 @@ class RepoOverrideTests(TestCase):
         with Repo(repo_dir, index_file=custom_index) as opened:
             self.assertEqual(custom_index, opened.index_path())
 
+    def test_discover_stops_at_ceiling(self) -> None:
+        # Discovery starting inside the repo would normally find it; a
+        # ceiling directory placed between start and repo prevents that.
+        tmp_dir, repo_dir, _r = self._make_repo()
+        subdir = os.path.join(repo_dir, "a", "b")
+        os.makedirs(subdir)
+        # A ceiling at repo_dir stops discovery before it enters repo_dir.
+        self.assertRaises(
+            NotGitRepository,
+            Repo.discover,
+            subdir,
+            ceiling_dirs=[repo_dir],
+        )
+
+    def test_discover_ignores_unrelated_ceiling(self) -> None:
+        tmp_dir, repo_dir, _r = self._make_repo()
+        subdir = os.path.join(repo_dir, "a", "b")
+        os.makedirs(subdir)
+        # A ceiling that is never crossed does not interfere.
+        unrelated = os.path.join(tmp_dir, "unrelated")
+        os.mkdir(unrelated)
+        with Repo.discover(subdir, ceiling_dirs=[unrelated]) as opened:
+            self.assertEqual(os.path.realpath(repo_dir), os.path.realpath(opened.path))
+
     def test_requires_root_or_controldir(self) -> None:
         self.assertRaises(TypeError, Repo)

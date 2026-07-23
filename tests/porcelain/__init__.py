@@ -60,6 +60,7 @@ from dulwich.porcelain import (
     CheckoutError,  # Hypothetical or real error class
     CountObjectsResult,
     _checked_worktree_path,
+    _parse_ceiling_dirs,
     _protocol_version_from_env,
     _ssh_command_from_env,
     add,
@@ -13994,3 +13995,93 @@ class OpenRepoEnvTests(TestCase):
         }
         with porcelain.open_repo_closing(None, env=env) as r:
             self.assertEqual(custom_index, r.index_path())
+
+    def test_git_ceiling_directories_blocks_discovery(self) -> None:
+        # Start from inside the repo. A ceiling at repo_path prevents
+        # discovery from stepping into it, so the fallback discovery
+        # raises NotGitRepository.
+        from dulwich.errors import NotGitRepository
+
+        subdir = os.path.join(self.repo_path, "sub")
+        os.mkdir(subdir)
+        old_cwd = os.getcwd()
+        os.chdir(subdir)
+        try:
+            env = {"GIT_CEILING_DIRECTORIES": self.repo_path}
+            self.assertRaises(
+                NotGitRepository, porcelain.open_repo_closing, None, env=env
+            )
+        finally:
+            os.chdir(old_cwd)
+
+    def test_git_ceiling_directories_unrelated(self) -> None:
+        # A ceiling on an unrelated path does not block discovery.
+        subdir = os.path.join(self.repo_path, "sub")
+        os.mkdir(subdir)
+        old_cwd = os.getcwd()
+        os.chdir(subdir)
+        try:
+            env = {"GIT_CEILING_DIRECTORIES": os.path.join(self.test_dir, "nope")}
+            with porcelain.open_repo_closing(None, env=env) as r:
+                self.assertEqual(
+                    os.path.realpath(self.repo_path), os.path.realpath(r.path)
+                )
+        finally:
+            os.chdir(old_cwd)
+
+
+class ParseCeilingDirsTests(TestCase):
+    """Tests for :func:`dulwich.porcelain._parse_ceiling_dirs`."""
+
+    def test_unset_returns_none(self) -> None:
+        self.assertIsNone(_parse_ceiling_dirs({}))
+
+    def test_empty_returns_none(self) -> None:
+        self.assertIsNone(_parse_ceiling_dirs({"GIT_CEILING_DIRECTORIES": ""}))
+
+    def test_single_entry_is_realpathed(self) -> None:
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        real = os.path.join(tmp, "real")
+        os.mkdir(real)
+        link = os.path.join(tmp, "link")
+        try:
+            os.symlink(real, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks not supported")
+        env = {"GIT_CEILING_DIRECTORIES": link}
+        self.assertEqual([os.path.realpath(real)], _parse_ceiling_dirs(env))
+
+    def test_empty_entry_disables_symlink_resolution(self) -> None:
+        # An empty entry acts as a toggle: entries that follow it are
+        # kept as-is (only made absolute) rather than realpath-resolved.
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        real = os.path.join(tmp, "real")
+        os.mkdir(real)
+        link = os.path.join(tmp, "link")
+        try:
+            os.symlink(real, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks not supported")
+        raw = os.pathsep.join([link, "", link])
+        env = {"GIT_CEILING_DIRECTORIES": raw}
+        self.assertEqual(
+            [os.path.realpath(real), os.path.abspath(link)],
+            _parse_ceiling_dirs(env),
+        )
+
+    def test_multiple_entries(self) -> None:
+        raw = os.pathsep.join(["/a", "/b/c"])
+        self.assertEqual(
+            [os.path.realpath("/a"), os.path.realpath("/b/c")],
+            _parse_ceiling_dirs({"GIT_CEILING_DIRECTORIES": raw}),
+        )
+
+    def test_leading_empty_entry(self) -> None:
+        # A leading empty entry means no entries are realpath-resolved.
+        raw = os.pathsep.join(["", "/a"])
+        self.assertEqual(
+            [os.path.abspath("/a")],
+            _parse_ceiling_dirs({"GIT_CEILING_DIRECTORIES": raw}),
+        )

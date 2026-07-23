@@ -1,3 +1,11 @@
+1.2.13	UNRELEASED
+
+ * Always single-quote the repository path in the SSH command, matching git's
+   ``sq_quote()``. ``shlex.quote`` left paths without shell metacharacters
+   bare, which broke cloning from servers that parse the command themselves
+   rather than handing it to a shell, such as Bitbucket Server.
+   (Jelmer Vernooĳ, #2319)
+
 1.2.12	2026-07-19
 
  * Fix ``Bundle.store_objects()`` silently dropping every OFS_DELTA/REF_DELTA

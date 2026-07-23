@@ -13924,3 +13924,11 @@ class OpenRepoEnvTests(TestCase):
                 )
         finally:
             os.chdir(old_cwd)
+
+    def test_porcelain_function_default_uses_git_dir(self) -> None:
+        # With no repo= argument, a porcelain function that goes through
+        # open_repo_closing picks up GIT_DIR from os.environ.
+        self.overrideEnv("GIT_DIR", os.path.join(self.repo_path, ".git"))
+        self.overrideEnv("GIT_WORK_TREE", self.repo_path)
+        result = porcelain.count_objects()
+        self.assertEqual(0, result.count)

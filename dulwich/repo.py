@@ -1448,6 +1448,7 @@ class Repo(BaseRepo):
     bare: bool
     object_store: DiskObjectStore
     filter_context: "FilterContext | None"
+    _index_file_override: "str | None"
 
     def __init__(
         self,
@@ -1459,6 +1460,8 @@ class Repo(BaseRepo):
         commondir: str | bytes | os.PathLike[str] | None = None,
         worktree: str | bytes | os.PathLike[str] | None = None,
         object_directory: str | bytes | os.PathLike[str] | None = None,
+        alternates: "Iterable[str | os.PathLike[str]] | None" = None,
+        index_file: str | bytes | os.PathLike[str] | None = None,
     ) -> None:
         """Open a repository on disk.
 
@@ -1480,6 +1483,11 @@ class Repo(BaseRepo):
           object_directory: Explicit path to the primary object store
             (analogous to ``GIT_OBJECT_DIRECTORY``). Overrides
             ``<common_dir>/objects``.
+          alternates: Extra alternate object directory paths (analogous to
+            ``GIT_ALTERNATE_OBJECT_DIRECTORIES``). Appended to any listed
+            in ``objects/info/alternates``.
+          index_file: Path to the index file (analogous to
+            ``GIT_INDEX_FILE``). Overrides ``<controldir>/index``.
         """
         if controldir is None:
             if root is None:
@@ -1565,6 +1573,14 @@ class Repo(BaseRepo):
                 worktree_path = os.fsdecode(worktree_path)
             self.path = worktree_path
 
+        if index_file is not None:
+            index_file_str = os.fspath(index_file)
+            if isinstance(index_file_str, bytes):
+                index_file_str = os.fsdecode(index_file_str)
+            self._index_file_override = index_file_str
+        else:
+            self._index_file_override = None
+
         # Initialize refs early so they're available for config condition matchers
         self.refs = DiskRefsContainer(
             self.commondir(), self._controldir, logger=self._write_reflog
@@ -1645,6 +1661,7 @@ class Repo(BaseRepo):
                 config,
                 file_mode=file_mode,
                 dir_mode=dir_mode,
+                alternates=alternates,
             )
 
         # Use reftable if extension is configured
@@ -1922,6 +1939,8 @@ class Repo(BaseRepo):
 
     def index_path(self) -> str:
         """Return path to the index file."""
+        if self._index_file_override is not None:
+            return self._index_file_override
         return os.path.join(self.controldir(), INDEX_FILENAME)
 
     def open_index(self, config: "Config | None" = None) -> "Index":

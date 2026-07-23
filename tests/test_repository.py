@@ -2664,5 +2664,25 @@ class RepoOverrideTests(TestCase):
         with Repo(controldir=repo_dir, object_directory=alt_objects) as opened:
             self.assertEqual(alt_objects, opened.object_store.path)
 
+    def test_alternates_kwarg_resolves_missing_objects(self) -> None:
+        # An alternate object dir passed via kwarg lets the repo find
+        # objects that don't live in its own object store.
+        _tmp_dir, primary, _r = self._make_repo(bare=True)
+        _tmp2, alt_repo_path, alt_repo = self._make_repo(bare=True)
+        blob = objects.Blob()
+        blob.data = b"content from alternate"
+        alt_repo.object_store.add_object(blob)
+        alt_objects = os.path.join(alt_repo_path, "objects")
+
+        with Repo(controldir=primary, alternates=[alt_objects]) as opened:
+            self.assertIn(blob.id, opened.object_store)
+            self.assertEqual(blob.data, opened.object_store[blob.id].data)
+
+    def test_index_file_override(self) -> None:
+        tmp_dir, repo_dir, _r = self._make_repo()
+        custom_index = os.path.join(tmp_dir, "custom-index")
+        with Repo(repo_dir, index_file=custom_index) as opened:
+            self.assertEqual(custom_index, opened.index_path())
+
     def test_requires_root_or_controldir(self) -> None:
         self.assertRaises(TypeError, Repo)

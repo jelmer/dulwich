@@ -60,6 +60,7 @@ from dulwich.porcelain import (
     CheckoutError,  # Hypothetical or real error class
     CountObjectsResult,
     _checked_worktree_path,
+    _parse_ceiling_dirs,
     _protocol_version_from_env,
     _ssh_command_from_env,
     add,
@@ -13824,3 +13825,263 @@ class CoreWorktreeTests(PorcelainTestCase):
             f.write("contents")
         with Repo(self.repo_path) as r:
             self.assertEqual([b"new"], porcelain.status(r).untracked)
+
+
+class OpenRepoEnvTests(TestCase):
+    """Tests for GIT_DIR / GIT_WORK_TREE / GIT_COMMON_DIR / GIT_OBJECT_DIRECTORY."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.repo_path = os.path.join(self.test_dir, "repo")
+        self.repo = Repo.init(self.repo_path, mkdir=True)
+        self.addCleanup(self.repo.close)
+
+    def test_explicit_path_wins_over_env(self) -> None:
+        # An explicit path bypasses the env vars entirely.
+        env = {"GIT_DIR": "/nonexistent/should-not-be-read"}
+        with porcelain.open_repo_closing(self.repo_path, env=env) as r:
+            self.assertEqual(os.path.realpath(self.repo_path), os.path.realpath(r.path))
+
+    def test_git_dir_bare(self) -> None:
+        bare_path = os.path.join(self.test_dir, "bare.git")
+        bare = Repo.init_bare(bare_path, mkdir=True)
+        bare.close()
+        env = {"GIT_DIR": bare_path}
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertTrue(r.bare)
+            self.assertEqual(bare_path, r.controldir())
+
+    def test_git_dir_with_git_work_tree(self) -> None:
+        gitdir = os.path.join(self.repo_path, ".git")
+        env = {"GIT_DIR": gitdir, "GIT_WORK_TREE": self.repo_path}
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertFalse(r.bare)
+            self.assertEqual(gitdir, r.controldir())
+            self.assertEqual(self.repo_path, r.path)
+
+    def test_git_object_directory(self) -> None:
+        alt_objects = os.path.join(self.test_dir, "alt-objects")
+        shutil.copytree(os.path.join(self.repo_path, ".git", "objects"), alt_objects)
+        env = {
+            "GIT_DIR": os.path.join(self.repo_path, ".git"),
+            "GIT_WORK_TREE": self.repo_path,
+            "GIT_OBJECT_DIRECTORY": alt_objects,
+        }
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertEqual(alt_objects, r.object_store.path)
+
+    def test_git_common_dir_relative(self) -> None:
+        # A linked-worktree style layout: primary controldir has its own
+        # HEAD, but refs/objects come from the common dir.
+        common = os.path.join(self.test_dir, "common.git")
+        Repo.init_bare(common, mkdir=True).close()
+        primary = os.path.join(self.test_dir, "linked")
+        os.mkdir(primary)
+        with open(os.path.join(primary, "HEAD"), "wb") as f:
+            f.write(b"ref: refs/heads/main\n")
+        env = {"GIT_DIR": primary, "GIT_COMMON_DIR": "../common.git"}
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertEqual(os.path.realpath(common), os.path.realpath(r.commondir()))
+
+    def test_falls_back_to_discovery(self) -> None:
+        # No env vars, no explicit path -> discover from cwd.
+        subdir = os.path.join(self.repo_path, "sub")
+        os.mkdir(subdir)
+        old_cwd = os.getcwd()
+        os.chdir(subdir)
+        try:
+            with porcelain.open_repo_closing(None, env={}) as r:
+                self.assertEqual(
+                    os.path.realpath(self.repo_path), os.path.realpath(r.path)
+                )
+        finally:
+            os.chdir(old_cwd)
+
+    def test_baserepo_passthrough_ignores_env(self) -> None:
+        # Passing an already-open repo skips env resolution entirely.
+        env = {"GIT_DIR": "/nonexistent"}
+        with porcelain.open_repo_closing(self.repo, env=env) as r:
+            self.assertIs(self.repo, r)
+
+    def test_git_object_directory_alone_triggers_discovery(self) -> None:
+        # GIT_OBJECT_DIRECTORY set without GIT_DIR must still trigger
+        # discovery rather than fall through to a plain discover() that
+        # ignores the override.
+        alt_objects = os.path.join(self.test_dir, "alt-objects")
+        shutil.copytree(os.path.join(self.repo_path, ".git", "objects"), alt_objects)
+        subdir = os.path.join(self.repo_path, "sub")
+        os.mkdir(subdir)
+        old_cwd = os.getcwd()
+        os.chdir(subdir)
+        try:
+            env = {"GIT_OBJECT_DIRECTORY": alt_objects}
+            with porcelain.open_repo_closing(None, env=env) as r:
+                self.assertEqual(alt_objects, r.object_store.path)
+                self.assertFalse(r.bare)
+                self.assertEqual(
+                    os.path.realpath(self.repo_path), os.path.realpath(r.path)
+                )
+        finally:
+            os.chdir(old_cwd)
+
+    def test_porcelain_function_default_uses_git_dir(self) -> None:
+        # With no repo= argument, a porcelain function that goes through
+        # open_repo_closing picks up GIT_DIR from os.environ.
+        self.overrideEnv("GIT_DIR", os.path.join(self.repo_path, ".git"))
+        self.overrideEnv("GIT_WORK_TREE", self.repo_path)
+        result = porcelain.count_objects()
+        self.assertEqual(0, result.count)
+
+    def test_git_alternate_object_directories(self) -> None:
+        # An alternate object dir named via env is consulted for object
+        # lookups on top of the primary object store.
+        from dulwich.objects import Blob
+
+        alt_repo_path = os.path.join(self.test_dir, "alt.git")
+        alt_repo = Repo.init_bare(alt_repo_path, mkdir=True)
+        self.addCleanup(alt_repo.close)
+        blob = Blob()
+        blob.data = b"lives in alternate"
+        alt_repo.object_store.add_object(blob)
+
+        env = {
+            "GIT_DIR": os.path.join(self.repo_path, ".git"),
+            "GIT_WORK_TREE": self.repo_path,
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES": os.path.join(alt_repo_path, "objects"),
+        }
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertIn(blob.id, r.object_store)
+
+    def test_git_alternate_object_directories_pathsep(self) -> None:
+        # Multiple alternates separated by os.pathsep.
+        from dulwich.objects import Blob
+
+        alt1_path = os.path.join(self.test_dir, "alt1.git")
+        alt1 = Repo.init_bare(alt1_path, mkdir=True)
+        self.addCleanup(alt1.close)
+        blob1 = Blob()
+        blob1.data = b"alt1 payload"
+        alt1.object_store.add_object(blob1)
+
+        alt2_path = os.path.join(self.test_dir, "alt2.git")
+        alt2 = Repo.init_bare(alt2_path, mkdir=True)
+        self.addCleanup(alt2.close)
+        blob2 = Blob()
+        blob2.data = b"alt2 payload"
+        alt2.object_store.add_object(blob2)
+
+        env = {
+            "GIT_DIR": os.path.join(self.repo_path, ".git"),
+            "GIT_WORK_TREE": self.repo_path,
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES": os.pathsep.join(
+                [
+                    os.path.join(alt1_path, "objects"),
+                    os.path.join(alt2_path, "objects"),
+                ]
+            ),
+        }
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertIn(blob1.id, r.object_store)
+            self.assertIn(blob2.id, r.object_store)
+
+    def test_git_index_file(self) -> None:
+        custom_index = os.path.join(self.test_dir, "custom-index")
+        env = {
+            "GIT_DIR": os.path.join(self.repo_path, ".git"),
+            "GIT_WORK_TREE": self.repo_path,
+            "GIT_INDEX_FILE": custom_index,
+        }
+        with porcelain.open_repo_closing(None, env=env) as r:
+            self.assertEqual(custom_index, r.index_path())
+
+    def test_git_ceiling_directories_blocks_discovery(self) -> None:
+        # Start from inside the repo. A ceiling at repo_path prevents
+        # discovery from stepping into it, so the fallback discovery
+        # raises NotGitRepository.
+        from dulwich.errors import NotGitRepository
+
+        subdir = os.path.join(self.repo_path, "sub")
+        os.mkdir(subdir)
+        old_cwd = os.getcwd()
+        os.chdir(subdir)
+        try:
+            env = {"GIT_CEILING_DIRECTORIES": self.repo_path}
+            self.assertRaises(
+                NotGitRepository, porcelain.open_repo_closing, None, env=env
+            )
+        finally:
+            os.chdir(old_cwd)
+
+    def test_git_ceiling_directories_unrelated(self) -> None:
+        # A ceiling on an unrelated path does not block discovery.
+        subdir = os.path.join(self.repo_path, "sub")
+        os.mkdir(subdir)
+        old_cwd = os.getcwd()
+        os.chdir(subdir)
+        try:
+            env = {"GIT_CEILING_DIRECTORIES": os.path.join(self.test_dir, "nope")}
+            with porcelain.open_repo_closing(None, env=env) as r:
+                self.assertEqual(
+                    os.path.realpath(self.repo_path), os.path.realpath(r.path)
+                )
+        finally:
+            os.chdir(old_cwd)
+
+
+class ParseCeilingDirsTests(TestCase):
+    """Tests for :func:`dulwich.porcelain._parse_ceiling_dirs`."""
+
+    def test_unset_returns_none(self) -> None:
+        self.assertIsNone(_parse_ceiling_dirs({}))
+
+    def test_empty_returns_none(self) -> None:
+        self.assertIsNone(_parse_ceiling_dirs({"GIT_CEILING_DIRECTORIES": ""}))
+
+    def test_single_entry_is_realpathed(self) -> None:
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        real = os.path.join(tmp, "real")
+        os.mkdir(real)
+        link = os.path.join(tmp, "link")
+        try:
+            os.symlink(real, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks not supported")
+        env = {"GIT_CEILING_DIRECTORIES": link}
+        self.assertEqual([os.path.realpath(real)], _parse_ceiling_dirs(env))
+
+    def test_empty_entry_disables_symlink_resolution(self) -> None:
+        # An empty entry acts as a toggle: entries that follow it are
+        # kept as-is (only made absolute) rather than realpath-resolved.
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        real = os.path.join(tmp, "real")
+        os.mkdir(real)
+        link = os.path.join(tmp, "link")
+        try:
+            os.symlink(real, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks not supported")
+        raw = os.pathsep.join([link, "", link])
+        env = {"GIT_CEILING_DIRECTORIES": raw}
+        self.assertEqual(
+            [os.path.realpath(real), os.path.abspath(link)],
+            _parse_ceiling_dirs(env),
+        )
+
+    def test_multiple_entries(self) -> None:
+        raw = os.pathsep.join(["/a", "/b/c"])
+        self.assertEqual(
+            [os.path.realpath("/a"), os.path.realpath("/b/c")],
+            _parse_ceiling_dirs({"GIT_CEILING_DIRECTORIES": raw}),
+        )
+
+    def test_leading_empty_entry(self) -> None:
+        # A leading empty entry means no entries are realpath-resolved.
+        raw = os.pathsep.join(["", "/a"])
+        self.assertEqual(
+            [os.path.abspath("/a")],
+            _parse_ceiling_dirs({"GIT_CEILING_DIRECTORIES": raw}),
+        )

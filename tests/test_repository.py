@@ -2580,3 +2580,133 @@ class WorktreeConfigTests(TestCase):
         c.write_to_path()
 
         self.assertRaises(InvalidWorktreeConfiguration, Repo, repo_dir)
+
+
+class RepoOverrideTests(TestCase):
+    """Tests for the controldir/commondir/worktree/object_directory kwargs."""
+
+    def _make_repo(self, bare=False):
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo_dir = os.path.join(tmp_dir, "repo.git" if bare else "repo")
+        os.mkdir(repo_dir)
+        if bare:
+            r = Repo.init_bare(repo_dir)
+        else:
+            r = Repo.init(repo_dir)
+        self.addCleanup(r.close)
+        return tmp_dir, repo_dir, r
+
+    def test_controldir_opens_bare_layout(self) -> None:
+        _tmp_dir, repo_dir, _r = self._make_repo(bare=True)
+        with Repo(controldir=repo_dir) as opened:
+            self.assertTrue(opened.bare)
+            self.assertEqual(repo_dir, opened.controldir())
+            self.assertEqual(repo_dir, opened.commondir())
+            # No implicit cwd: a bare-like Repo built from just a control
+            # dir uses the control dir as its path.
+            self.assertEqual(repo_dir, opened.path)
+
+    def test_controldir_points_at_dot_git(self) -> None:
+        _tmp_dir, repo_dir, _r = self._make_repo()
+        gitdir = os.path.join(repo_dir, ".git")
+        with Repo(controldir=gitdir, worktree=repo_dir) as opened:
+            self.assertFalse(opened.bare)
+            self.assertEqual(gitdir, opened.controldir())
+            self.assertEqual(repo_dir, opened.path)
+
+    def test_worktree_kw_wins_over_core_worktree(self) -> None:
+        tmp_dir, repo_dir, r = self._make_repo()
+        configured = os.path.join(tmp_dir, "configured")
+        os.mkdir(configured)
+        explicit = os.path.join(tmp_dir, "explicit")
+        os.mkdir(explicit)
+        c = r.get_config()
+        c.set((b"core",), b"worktree", configured.encode())
+        c.write_to_path()
+
+        with Repo(repo_dir, worktree=explicit) as opened:
+            self.assertEqual(explicit, opened.path)
+            self.assertFalse(opened.bare)
+
+    def test_commondir_override_absolute(self) -> None:
+        # Point commondir at a second repo's control directory so refs and
+        # objects come from there rather than the one addressed by controldir.
+        tmp_dir, primary_dir, _primary = self._make_repo(bare=True)
+        secondary_dir = os.path.join(tmp_dir, "secondary.git")
+        os.mkdir(secondary_dir)
+        secondary = Repo.init_bare(secondary_dir)
+        self.addCleanup(secondary.close)
+
+        with Repo(controldir=primary_dir, commondir=secondary_dir) as opened:
+            self.assertEqual(secondary_dir, opened.commondir())
+            self.assertEqual(primary_dir, opened.controldir())
+
+    def test_commondir_override_relative_to_controldir(self) -> None:
+        tmp_dir, primary_dir, _primary = self._make_repo(bare=True)
+        secondary_dir = os.path.join(tmp_dir, "secondary.git")
+        os.mkdir(secondary_dir)
+        secondary = Repo.init_bare(secondary_dir)
+        self.addCleanup(secondary.close)
+
+        with Repo(controldir=primary_dir, commondir="../secondary.git") as opened:
+            self.assertEqual(
+                os.path.realpath(secondary_dir),
+                os.path.realpath(opened.commondir()),
+            )
+
+    def test_object_directory_override(self) -> None:
+        tmp_dir, repo_dir, _r = self._make_repo(bare=True)
+        alt_objects = os.path.join(tmp_dir, "alt-objects")
+        # Copy the empty objects layout so DiskObjectStore can attach to it.
+        shutil.copytree(os.path.join(repo_dir, "objects"), alt_objects)
+
+        with Repo(controldir=repo_dir, object_directory=alt_objects) as opened:
+            self.assertEqual(alt_objects, opened.object_store.path)
+
+    def test_alternates_kwarg_resolves_missing_objects(self) -> None:
+        # An alternate object dir passed via kwarg lets the repo find
+        # objects that don't live in its own object store.
+        _tmp_dir, primary, _r = self._make_repo(bare=True)
+        _tmp2, alt_repo_path, alt_repo = self._make_repo(bare=True)
+        blob = objects.Blob()
+        blob.data = b"content from alternate"
+        alt_repo.object_store.add_object(blob)
+        alt_objects = os.path.join(alt_repo_path, "objects")
+
+        with Repo(controldir=primary, alternates=[alt_objects]) as opened:
+            self.assertIn(blob.id, opened.object_store)
+            self.assertEqual(blob.data, opened.object_store[blob.id].data)
+
+    def test_index_file_override(self) -> None:
+        tmp_dir, repo_dir, _r = self._make_repo()
+        custom_index = os.path.join(tmp_dir, "custom-index")
+        with Repo(repo_dir, index_file=custom_index) as opened:
+            self.assertEqual(custom_index, opened.index_path())
+
+    def test_discover_stops_at_ceiling(self) -> None:
+        # Discovery starting inside the repo would normally find it; a
+        # ceiling directory placed between start and repo prevents that.
+        _tmp_dir, repo_dir, _r = self._make_repo()
+        subdir = os.path.join(repo_dir, "a", "b")
+        os.makedirs(subdir)
+        # A ceiling at repo_dir stops discovery before it enters repo_dir.
+        self.assertRaises(
+            NotGitRepository,
+            Repo.discover,
+            subdir,
+            ceiling_dirs=[repo_dir],
+        )
+
+    def test_discover_ignores_unrelated_ceiling(self) -> None:
+        tmp_dir, repo_dir, _r = self._make_repo()
+        subdir = os.path.join(repo_dir, "a", "b")
+        os.makedirs(subdir)
+        # A ceiling that is never crossed does not interfere.
+        unrelated = os.path.join(tmp_dir, "unrelated")
+        os.mkdir(unrelated)
+        with Repo.discover(subdir, ceiling_dirs=[unrelated]) as opened:
+            self.assertEqual(os.path.realpath(repo_dir), os.path.realpath(opened.path))
+
+    def test_requires_root_or_controldir(self) -> None:
+        self.assertRaises(TypeError, Repo)

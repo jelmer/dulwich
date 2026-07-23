@@ -1448,59 +1448,138 @@ class Repo(BaseRepo):
     bare: bool
     object_store: DiskObjectStore
     filter_context: "FilterContext | None"
+    _index_file_override: "str | None"
 
     def __init__(
         self,
-        root: str | bytes | os.PathLike[str],
+        root: str | bytes | os.PathLike[str] | None = None,
         object_store: PackBasedObjectStore | None = None,
         bare: bool | None = None,
+        *,
+        controldir: str | bytes | os.PathLike[str] | None = None,
+        commondir: str | bytes | os.PathLike[str] | None = None,
+        worktree: str | bytes | os.PathLike[str] | None = None,
+        object_directory: str | bytes | os.PathLike[str] | None = None,
+        alternates: "Iterable[str | os.PathLike[str]] | None" = None,
+        index_file: str | bytes | os.PathLike[str] | None = None,
     ) -> None:
         """Open a repository on disk.
 
         Args:
-          root: Path to the repository's root.
+          root: Path to the repository's root. Optional if ``controldir`` is
+            given, in which case ``self.path`` defaults to ``worktree`` when
+            provided and to ``controldir`` otherwise. ``core.worktree`` in
+            config may still override it.
           object_store: ObjectStore to use; if omitted, we use the
             repository's default object store
           bare: True if this is a bare repository.
+          controldir: Explicit path to the control directory (analogous to
+            ``GIT_DIR``). When set, discovery based on ``root`` is skipped.
+          commondir: Explicit path to the common directory (analogous to
+            ``GIT_COMMON_DIR``). Relative paths are resolved against the
+            control directory.
+          worktree: Explicit worktree path (analogous to ``GIT_WORK_TREE``).
+            Forces the repository to be treated as non-bare.
+          object_directory: Explicit path to the primary object store
+            (analogous to ``GIT_OBJECT_DIRECTORY``). Overrides
+            ``<common_dir>/objects``.
+          alternates: Extra alternate object directory paths (analogous to
+            ``GIT_ALTERNATE_OBJECT_DIRECTORIES``). Appended to any listed
+            in ``objects/info/alternates``.
+          index_file: Path to the index file (analogous to
+            ``GIT_INDEX_FILE``). Overrides ``<controldir>/index``.
         """
-        root = os.fspath(root)
-        if isinstance(root, bytes):
-            root = os.fsdecode(root)
-        hidden_path = os.path.join(root, CONTROLDIR)
-        if bare is None:
-            if os.path.isfile(hidden_path) or os.path.isdir(
-                os.path.join(hidden_path, OBJECTDIR)
-            ):
+        if controldir is None:
+            if root is None:
+                raise TypeError("Repo() requires either root or controldir")
+            root = os.fspath(root)
+            if isinstance(root, bytes):
+                root = os.fsdecode(root)
+            hidden_path = os.path.join(root, CONTROLDIR)
+            if worktree is not None:
                 bare = False
-            elif os.path.isdir(os.path.join(root, OBJECTDIR)) and os.path.isdir(
-                os.path.join(root, REFSDIR)
-            ):
-                bare = True
-            else:
-                raise NotGitRepository(
-                    "No git repository was found at {path}".format(**dict(path=root))
-                )
+            if bare is None:
+                if os.path.isfile(hidden_path) or os.path.isdir(
+                    os.path.join(hidden_path, OBJECTDIR)
+                ):
+                    bare = False
+                elif os.path.isdir(os.path.join(root, OBJECTDIR)) and os.path.isdir(
+                    os.path.join(root, REFSDIR)
+                ):
+                    bare = True
+                else:
+                    raise NotGitRepository(
+                        "No git repository was found at {path}".format(
+                            **dict(path=root)
+                        )
+                    )
 
-        self.bare = bare
-        if bare is False:
-            if os.path.isfile(hidden_path):
-                with open(hidden_path, "rb") as f:
-                    path = read_gitfile(f)
-                self._controldir = os.path.join(root, path)
+            self.bare = bare
+            if bare is False:
+                if os.path.isfile(hidden_path):
+                    with open(hidden_path, "rb") as f:
+                        gitfile_path = read_gitfile(f)
+                    self._controldir = os.path.join(root, gitfile_path)
+                else:
+                    self._controldir = hidden_path
             else:
-                self._controldir = hidden_path
+                self._controldir = root
         else:
-            self._controldir = root
-        commondir = self.get_named_file(COMMONDIR)
+            controldir = os.fspath(controldir)
+            if isinstance(controldir, bytes):
+                controldir = os.fsdecode(controldir)
+            self._controldir = controldir
+            if root is None:
+                # Without an explicit root, default to the worktree if given,
+                # else to the control dir (bare layout). We deliberately do
+                # not fall back to os.getcwd() here: a library-level ``Repo``
+                # should not silently latch onto the current directory.
+                # Callers that want git's ``GIT_DIR``-implies-cwd-worktree
+                # semantics pass ``worktree`` explicitly.
+                root = os.fspath(worktree) if worktree is not None else controldir
+            else:
+                root = os.fspath(root)
+            if isinstance(root, bytes):
+                root = os.fsdecode(root)
+            if worktree is not None:
+                bare = False
+            if bare is None:
+                # With an explicit control dir and no worktree override,
+                # default to bare. core.bare / core.worktree parsed from
+                # config below may still flip this.
+                bare = True
+            self.bare = bare
         if commondir is not None:
-            with commondir:
-                self._commondir = os.path.join(
-                    self.controldir(),
-                    os.fsdecode(commondir.read().rstrip(b"\r\n")),
-                )
+            commondir_path = os.fspath(commondir)
+            if isinstance(commondir_path, bytes):
+                commondir_path = os.fsdecode(commondir_path)
+            if not os.path.isabs(commondir_path):
+                commondir_path = os.path.join(self._controldir, commondir_path)
+            self._commondir = commondir_path
         else:
-            self._commondir = self._controldir
+            commondir_file = self.get_named_file(COMMONDIR)
+            if commondir_file is not None:
+                with commondir_file:
+                    self._commondir = os.path.join(
+                        self.controldir(),
+                        os.fsdecode(commondir_file.read().rstrip(b"\r\n")),
+                    )
+            else:
+                self._commondir = self._controldir
         self.path = root
+        if worktree is not None:
+            worktree_path = os.fspath(worktree)
+            if isinstance(worktree_path, bytes):
+                worktree_path = os.fsdecode(worktree_path)
+            self.path = worktree_path
+
+        if index_file is not None:
+            index_file_str = os.fspath(index_file)
+            if isinstance(index_file_str, bytes):
+                index_file_str = os.fsdecode(index_file_str)
+            self._index_file_override = index_file_str
+        else:
+            self._index_file_override = None
 
         # Initialize refs early so they're available for config condition matchers
         self.refs = DiskRefsContainer(
@@ -1527,10 +1606,10 @@ class Repo(BaseRepo):
             raise UnsupportedVersion(format_version)
 
         try:
-            worktree = config.get((b"core",), b"worktree")
+            configured_worktree = config.get((b"core",), b"worktree")
         except KeyError:
-            pass
-        else:
+            configured_worktree = None
+        if configured_worktree is not None:
             # A repository is bare because core.bare says so, not because it
             # was opened at its control directory: a submodule or a
             # --separate-git-dir repository is opened that way but still has a
@@ -1540,9 +1619,13 @@ class Repo(BaseRepo):
                     "core.bare and core.worktree are incompatible"
                 )
             self.bare = False
-            # Relative paths are resolved against the control directory, not
-            # against the current directory or the repository root.
-            self.path = os.path.join(self._controldir, os.fsdecode(worktree))
+            # An explicit worktree argument takes precedence over core.worktree.
+            if worktree is None:
+                # Relative paths are resolved against the control directory,
+                # not against the current directory or the repository root.
+                self.path = os.path.join(
+                    self._controldir, os.fsdecode(configured_worktree)
+                )
 
         # Track extensions we encounter
         has_reftable_extension = False
@@ -1567,11 +1650,18 @@ class Repo(BaseRepo):
             except KeyError:
                 file_mode, dir_mode = None, None
 
+            if object_directory is not None:
+                object_dir_path = os.fspath(object_directory)
+                if isinstance(object_dir_path, bytes):
+                    object_dir_path = os.fsdecode(object_dir_path)
+            else:
+                object_dir_path = os.path.join(self.commondir(), OBJECTDIR)
             object_store = DiskObjectStore.from_config(
-                os.path.join(self.commondir(), OBJECTDIR),
+                object_dir_path,
                 config,
                 file_mode=file_mode,
                 dir_mode=dir_mode,
+                alternates=alternates,
             )
 
         # Use reftable if extension is configured
@@ -1707,7 +1797,12 @@ class Repo(BaseRepo):
             return
 
     @classmethod
-    def discover(cls, start: str | bytes | os.PathLike[str] = ".") -> "Repo":
+    def discover(
+        cls,
+        start: str | bytes | os.PathLike[str] = ".",
+        *,
+        ceiling_dirs: "Iterable[str | os.PathLike[str]] | None" = None,
+    ) -> "Repo":
         """Iterate parent directories to discover a repository.
 
         Return a Repo object for the first parent directory that looks like a
@@ -1715,9 +1810,23 @@ class Repo(BaseRepo):
 
         Args:
           start: The directory to start discovery from (defaults to '.')
+          ceiling_dirs: Iterable of absolute paths that discovery must not
+            cross (analogous to ``GIT_CEILING_DIRECTORIES``). The ceiling
+            directories themselves are not searched. Callers are expected
+            to pass already-resolved absolute paths.
         """
+        ceilings = (
+            {
+                os.path.normcase(os.path.abspath(os.fsdecode(os.fspath(p))))
+                for p in ceiling_dirs
+            }
+            if ceiling_dirs is not None
+            else set()
+        )
         path = os.path.abspath(start)
         while True:
+            if os.path.normcase(path) in ceilings:
+                break
             try:
                 return cls(path)
             except NotGitRepository:
@@ -1849,6 +1958,8 @@ class Repo(BaseRepo):
 
     def index_path(self) -> str:
         """Return path to the index file."""
+        if self._index_file_override is not None:
+            return self._index_file_override
         return os.path.join(self.controldir(), INDEX_FILENAME)
 
     def open_index(self, config: "Config | None" = None) -> "Index":

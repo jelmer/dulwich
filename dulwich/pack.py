@@ -4541,6 +4541,9 @@ class Pack:
         base_type = type
         base_obj = obj
         delta_stack = []
+        # Offsets of REF_DELTA bases already followed on this chain, used to
+        # detect delta cycles.
+        seen_ref_offsets: set[int] = {offset}
         while base_type in DELTA_TYPES:
             prev_offset = base_offset
             if get_ref is None:
@@ -4570,6 +4573,16 @@ class Pack:
                 base_offset = base_offset_temp
                 if base_offset == prev_offset:  # object is based on itself
                     raise UnresolvedDeltas([basename])
+                # A REF_DELTA base already followed on this chain means the
+                # deltas form a cycle (e.g. two objects that delta against each
+                # other). Every cycle crosses at least one REF_DELTA edge, so
+                # tracking resolved REF base offsets is enough to break it.
+                # Without this the loop spins forever while delta_stack grows
+                # without bound; git rejects such packs.
+                if base_offset is not None:
+                    if base_offset in seen_ref_offsets:
+                        raise UnresolvedDeltas([basename])
+                    seen_ref_offsets.add(base_offset)
             else:
                 raise AssertionError(f"Unexpected delta type: {base_type}")
             delta_stack.append((prev_offset, base_type, delta))

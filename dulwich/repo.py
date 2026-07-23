@@ -1816,13 +1816,16 @@ class Repo(BaseRepo):
             to pass already-resolved absolute paths.
         """
         ceilings = (
-            {os.path.abspath(os.fsdecode(os.fspath(p))) for p in ceiling_dirs}
+            {
+                os.path.normcase(os.path.abspath(os.fsdecode(os.fspath(p))))
+                for p in ceiling_dirs
+            }
             if ceiling_dirs is not None
             else set()
         )
         path = os.path.abspath(start)
         while True:
-            if path in ceilings:
+            if os.path.normcase(path) in ceilings:
                 break
             try:
                 return cls(path)

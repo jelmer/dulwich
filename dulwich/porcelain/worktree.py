@@ -22,14 +22,14 @@
 """Porcelain-like interface for Git worktrees."""
 
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from ..worktree import WorkTreeInfo
     from . import RepoPath
 
 
-def worktree_list(repo: "RepoPath" | None = None) -> list["WorkTreeInfo"]:
+def worktree_list(repo: Optional["RepoPath"] = None) -> list["WorkTreeInfo"]:
     """List all worktrees for a repository.
 
     Args:
@@ -46,7 +46,7 @@ def worktree_list(repo: "RepoPath" | None = None) -> list["WorkTreeInfo"]:
 
 
 def worktree_add(
-    repo: "RepoPath" | None = None,
+    repo: Optional["RepoPath"] = None,
     path: str | os.PathLike[str] | None = None,
     branch: str | bytes | None = None,
     commit: str | bytes | None = None,
@@ -83,7 +83,7 @@ def worktree_add(
 
 
 def worktree_remove(
-    repo: "RepoPath" | None = None,
+    repo: Optional["RepoPath"] = None,
     path: str | os.PathLike[str] | None = None,
     force: bool = False,
 ) -> None:
@@ -105,7 +105,7 @@ def worktree_remove(
 
 
 def worktree_prune(
-    repo: "RepoPath" | None = None, dry_run: bool = False, expire: int | None = None
+    repo: Optional["RepoPath"] = None, dry_run: bool = False, expire: int | None = None
 ) -> list[str]:
     """Prune worktree administrative files.
 
@@ -125,7 +125,7 @@ def worktree_prune(
 
 
 def worktree_lock(
-    repo: "RepoPath" | None = None,
+    repo: Optional["RepoPath"] = None,
     path: str | os.PathLike[str] | None = None,
     reason: str | None = None,
 ) -> None:
@@ -147,7 +147,7 @@ def worktree_lock(
 
 
 def worktree_unlock(
-    repo: "RepoPath" | None = None, path: str | os.PathLike[str] | None = None
+    repo: Optional["RepoPath"] = None, path: str | os.PathLike[str] | None = None
 ) -> None:
     """Unlock a worktree.
 
@@ -166,7 +166,7 @@ def worktree_unlock(
 
 
 def worktree_move(
-    repo: "RepoPath" | None = None,
+    repo: Optional["RepoPath"] = None,
     old_path: str | os.PathLike[str] | None = None,
     new_path: str | os.PathLike[str] | None = None,
 ) -> None:
@@ -188,7 +188,7 @@ def worktree_move(
 
 
 def worktree_repair(
-    repo: "RepoPath" | None = None,
+    repo: Optional["RepoPath"] = None,
     paths: list[str | os.PathLike[str]] | None = None,
 ) -> list[str]:
     """Repair worktree administrative files.

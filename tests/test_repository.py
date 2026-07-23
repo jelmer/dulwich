@@ -2687,7 +2687,7 @@ class RepoOverrideTests(TestCase):
     def test_discover_stops_at_ceiling(self) -> None:
         # Discovery starting inside the repo would normally find it; a
         # ceiling directory placed between start and repo prevents that.
-        tmp_dir, repo_dir, _r = self._make_repo()
+        _tmp_dir, repo_dir, _r = self._make_repo()
         subdir = os.path.join(repo_dir, "a", "b")
         os.makedirs(subdir)
         # A ceiling at repo_dir stops discovery before it enters repo_dir.

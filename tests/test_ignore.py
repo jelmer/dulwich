@@ -40,6 +40,7 @@ from dulwich.ignore import (
     translate,
 )
 from dulwich.repo import Repo
+from dulwich.wildmatch import MalformedPattern
 
 from . import TestCase
 
@@ -61,6 +62,10 @@ POSITIVE_MATCH_TESTS = [
     (b"foo/bar/", b"bar/"),
     (b"foo/bar/", b"bar"),
     (b"foo/bar/something", b"foo/bar/*"),
+    (b"foo.d", b"foo.[^ch]"),
+    (b"foo.5", b"foo.[[:digit:]]"),
+    (b"a-c", b"a[a\\-c]c"),
+    (b"a]c", b"a[]x]c"),
 ]
 
 NEGATIVE_MATCH_TESTS = [
@@ -70,6 +75,9 @@ NEGATIVE_MATCH_TESTS = [
     (b"foo/bar/", b"/bar/"),
     (b"foo/bar/", b"foo/bar/*"),
     (b"foo/bar", b"foo?bar"),
+    (b"foo.c", b"foo.[^ch]"),
+    (b"foo.x", b"foo.[[:digit:]]"),
+    (b"a/b", b"a[!x]b"),
 ]
 
 
@@ -89,6 +97,13 @@ TRANSLATE_TESTS = [
     (b"/foo\\[bar\\]", b"(?ms)foo\\[bar\\]/?\\Z"),
     (b"/foo[bar]", b"(?ms)foo[bar]/?\\Z"),
     (b"/foo[0-9]", b"(?ms)foo[0-9]/?\\Z"),
+    (b"/[!a-c]", b"(?ms)[^/a-c]/?\\Z"),
+    (b"/[^a-c]", b"(?ms)[^/a-c]/?\\Z"),
+    (b"/[[:digit:]]", b"(?ms)[0-9]/?\\Z"),
+    (b"/[![:digit:]x]", b"(?ms)[^/x0-9]/?\\Z"),
+    (b"/[a\\-c]", b"(?ms)[a\\-c]/?\\Z"),
+    (b"/[]a]", b"(?ms)[\\]a]/?\\Z"),
+    (b"/[a/c]", b"(?ms)[ac]/?\\Z"),
 ]
 
 
@@ -104,6 +119,10 @@ class TranslateTests(TestCase):
                 translate(pattern),
                 f"orig pattern: {pattern!r}, regex: {translate(pattern)!r}, expected: {regex!r}",
             )
+
+    def test_malformed_raises(self) -> None:
+        self.assertRaises(MalformedPattern, translate, b"/[abc")
+        self.assertRaises(MalformedPattern, translate, b"/[[:foo:]]")
 
     def test_collapses_consecutive_stars(self) -> None:
         # A run of '*' in a segment is redundant and must collapse to a
@@ -157,6 +176,114 @@ class MatchPatternTests(TestCase):
                 match_pattern(path, pattern),
                 f"path: {path!r}, pattern: {pattern!r}",
             )
+
+
+class BracketExpressionTests(TestCase):
+    """Bracket expressions follow Git's wildmatch(), not fnmatch.
+
+    The same patterns are checked against the real ``git check-ignore`` in
+    tests/compat/test_check_ignore.py.
+    """
+
+    def assertMatches(
+        self, pattern: bytes, matching: list[bytes], non_matching: list[bytes]
+    ) -> None:
+        for path in matching:
+            self.assertTrue(
+                match_pattern(path, pattern),
+                f"{pattern!r} should match {path!r}",
+            )
+        for path in non_matching:
+            self.assertFalse(
+                match_pattern(path, pattern),
+                f"{pattern!r} should not match {path!r}",
+            )
+
+    def test_caret_negates_class(self) -> None:
+        # wildmatch.c has NEGATE_CLASS '!' and NEGATE_CLASS2 '^'; both spellings
+        # invert the class rather than adding a literal member.
+        for pattern in (b"[!a-c]", b"[^a-c]"):
+            self.assertMatches(
+                pattern, [b"d", b"0", b"!", b"^", b"]"], [b"a", b"b", b"c"]
+            )
+        self.assertMatches(b"[^0-9]", [b"a", b"^"], [b"0", b"5", b"9"])
+
+    def test_posix_classes(self) -> None:
+        cases = [
+            (b"[[:alnum:]]", [b"a", b"Q", b"0"], [b"_", b"-"]),
+            (b"[[:alpha:]]", [b"a", b"Q"], [b"0", b"_"]),
+            (b"[[:blank:]]", [b" ", b"\t"], [b"a", b"\r"]),
+            (b"[[:cntrl:]]", [b"\x01", b"\x7f"], [b"a", b" "]),
+            (b"[[:digit:]]", [b"0", b"9"], [b"a", b"_"]),
+            (b"[[:graph:]]", [b"a", b"!", b"~"], [b" ", b"\t"]),
+            (b"[[:lower:]]", [b"a", b"z"], [b"Q", b"0"]),
+            (b"[[:print:]]", [b"a", b" "], [b"\x01", b"\x7f"]),
+            (b"[[:punct:]]", [b"!", b"_", b"]"], [b"a", b"0", b" "]),
+            (b"[[:space:]]", [b" ", b"\t", b"\r"], [b"a", b"0"]),
+            (b"[[:upper:]]", [b"Q"], [b"a", b"0"]),
+            (b"[[:xdigit:]]", [b"0", b"f", b"F"], [b"g", b"_"]),
+        ]
+        for pattern, matching, non_matching in cases:
+            self.assertMatches(pattern, matching, non_matching)
+
+    def test_posix_class_combined_with_members(self) -> None:
+        self.assertMatches(b"[[:digit:]abc]", [b"0", b"a"], [b"d", b"_"])
+        self.assertMatches(b"[![:digit:]]", [b"a", b"_"], [b"0", b"9"])
+        self.assertMatches(b"[[:digit:][:upper:]]", [b"0", b"Q"], [b"a"])
+
+    def test_posix_class_ascii_only(self) -> None:
+        # Git classifies through sane-ctype.h, whose table has no entries
+        # above 0x7f, so no high byte belongs to any class.
+        self.assertMatches(b"[[:alpha:]]", [b"a"], [b"\xc3", b"\xa9"])
+
+    def test_closing_bracket_first(self) -> None:
+        # A ']' straight after '[' or after the negation character is a member.
+        self.assertMatches(b"[]]", [b"]"], [b"a", b"["])
+        self.assertMatches(b"[]a]", [b"]", b"a"], [b"b"])
+        self.assertMatches(b"[!]]", [b"a", b"["], [b"]"])
+        self.assertMatches(b"[^]]", [b"a", b"["], [b"]"])
+
+    def test_backslash_escapes_member(self) -> None:
+        # A backslash escapes the next member, so [a\-c] is a, - and c -- not
+        # the range '\' to 'c'.
+        self.assertMatches(b"[a\\-c]", [b"a", b"-", b"c"], [b"b", b"\\", b"]"])
+        self.assertMatches(b"[\\]]", [b"]"], [b"\\", b"a"])
+        self.assertMatches(b"[x\\]y]", [b"x", b"]", b"y"], [b"\\"])
+        self.assertMatches(b"[\\\\]", [b"\\"], [b"a"])
+
+    def test_dash_is_literal_at_either_end(self) -> None:
+        self.assertMatches(b"[a-]", [b"a", b"-"], [b"b"])
+        self.assertMatches(b"[-a]", [b"a", b"-"], [b"b"])
+        self.assertMatches(b"[a-c-]", [b"a", b"b", b"c", b"-"], [b"d"])
+
+    def test_inverted_range(self) -> None:
+        # wildmatch() takes 'z' as a plain member before it reaches the '-',
+        # then the inverted range adds nothing, so only 'z' matches. re would
+        # reject the range outright.
+        self.assertMatches(b"[z-a]", [b"z"], [b"a", b"b", b"-"])
+        self.assertMatches(b"[9-0]", [b"9"], [b"0", b"5", b"-"])
+        self.assertMatches(b"[!z-a]", [b"a", b"-"], [b"z"])
+
+    def test_range_low_end_is_also_a_member(self) -> None:
+        self.assertMatches(b"[/-9]", [b"0", b"9"], [b"a", b"a/b"])
+        self.assertMatches(b"[\\a-c]", [b"a", b"b", b"c"], [b"\\"])
+
+    def test_never_matches_slash(self) -> None:
+        # WM_PATHNAME makes a bracket expression fail on '/' whether it is
+        # negated or lists the slash explicitly.
+        self.assertMatches(b"a[!x]b", [b"acb"], [b"a/b"])
+        self.assertMatches(b"a[^x]b", [b"acb"], [b"a/b"])
+        self.assertMatches(b"/[a/c]", [b"a", b"c"], [b"b"])
+        self.assertMatches(b"/[!/]", [b"a", b"0"], [b"a/b"])
+
+    def test_malformed_raises(self) -> None:
+        # wildmatch() returns WM_ABORT_ALL on these; constructing a Pattern
+        # from one raises rather than silently matching nothing.
+        for pattern in (b"[abc", b"[", b"[]", b"[!]", b"[^]", b"foo["):
+            self.assertRaises(MalformedPattern, match_pattern, b"a", pattern)
+
+    def test_unknown_posix_class_raises(self) -> None:
+        self.assertRaises(MalformedPattern, match_pattern, b"a", b"[[:foo:]]")
 
 
 class ParentExclusionTests(TestCase):
@@ -258,6 +385,16 @@ class IgnoreFilterTests(TestCase):
         self.assertIs(None, filter.is_ignored(b"c.c"))
         self.assertEqual([Pattern(b"a.c")], list(filter.find_matching(b"a.c")))
         self.assertEqual([], list(filter.find_matching(b"c.c")))
+
+    def test_malformed_pattern_raises(self) -> None:
+        self.assertRaises(MalformedPattern, Pattern, b"a[bc")
+
+    def test_malformed_pattern_skipped_with_warning(self) -> None:
+        with self.assertLogs("dulwich.ignore", level="WARNING"):
+            filter = IgnoreFilter([b"a.c", b"a[bc", b"b.c"])
+        # The malformed pattern is dropped; the good ones on either side load.
+        self.assertTrue(filter.is_ignored(b"a.c"))
+        self.assertTrue(filter.is_ignored(b"b.c"))
 
     def test_included_ignorecase(self) -> None:
         filter = IgnoreFilter([b"a.c", b"b.c"], ignorecase=False)

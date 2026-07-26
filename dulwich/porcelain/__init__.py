@@ -869,6 +869,29 @@ def _parse_ceiling_dirs(env: Mapping[str, str]) -> list[str] | None:
     return result
 
 
+def _parse_env_bool(env: Mapping[str, str], name: str) -> bool:
+    """Parse a boolean Git environment variable.
+
+    Follows git's rules: ``true``/``yes``/``on`` and any non-zero integer
+    are true, ``false``/``no``/``off``, ``0`` and the empty string are
+    false, all case-insensitively. Anything else is an error, as in git.
+    """
+    raw = env.get(name)
+    if raw is None:
+        return False
+    value = raw.strip().lower()
+    if value in ("true", "yes", "on"):
+        return True
+    if value in ("", "false", "no", "off"):
+        return False
+    try:
+        return int(value) != 0
+    except ValueError:
+        raise ValueError(
+            f"bad boolean environment value {raw!r} for {name!r}"
+        ) from None
+
+
 def _repo_from_env(
     path_or_repo: str | bytes | os.PathLike[str] | None,
     env: Mapping[str, str] | None,
@@ -879,10 +902,12 @@ def _repo_from_env(
     that callers who pass a path get what they asked for. Otherwise the
     Git environment variables ``GIT_DIR``, ``GIT_COMMON_DIR``,
     ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
-    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE`` and
-    ``GIT_CEILING_DIRECTORIES`` are consulted; if none of the locator
-    vars are set, discovery walks up from the current directory (bounded
-    by ``GIT_CEILING_DIRECTORIES`` when set).
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE``,
+    ``GIT_CEILING_DIRECTORIES`` and ``GIT_DISCOVERY_ACROSS_FILESYSTEM``
+    are consulted; if none of the locator vars are set, discovery walks up
+    from the current directory, bounded by ``GIT_CEILING_DIRECTORIES`` and,
+    unless ``GIT_DISCOVERY_ACROSS_FILESYSTEM`` is true, by filesystem
+    boundaries.
     """
     if path_or_repo is not None:
         return Repo(path_or_repo)
@@ -895,6 +920,7 @@ def _repo_from_env(
     git_alternates = env.get("GIT_ALTERNATE_OBJECT_DIRECTORIES")
     git_index_file = env.get("GIT_INDEX_FILE")
     ceilings = _parse_ceiling_dirs(env)
+    across_fs = _parse_env_bool(env, "GIT_DISCOVERY_ACROSS_FILESYSTEM")
     alternates = (
         [p for p in git_alternates.split(os.pathsep) if p] if git_alternates else None
     )
@@ -906,13 +932,15 @@ def _repo_from_env(
         and alternates is None
         and git_index_file is None
     ):
-        return Repo.discover(ceiling_dirs=ceilings)
+        return Repo.discover(ceiling_dirs=ceilings, across_filesystem=across_fs)
     if git_dir is None:
         # An override without GIT_DIR: fall back to discovery from cwd for
         # the control dir, then layer the overrides on top. Preserve the
         # discovered worktree so we don't silently downgrade a non-bare
         # repo when only GIT_OBJECT_DIRECTORY (etc.) is set.
-        with closing(Repo.discover(ceiling_dirs=ceilings)) as found:
+        with closing(
+            Repo.discover(ceiling_dirs=ceilings, across_filesystem=across_fs)
+        ) as found:
             git_dir = found.controldir()
             if git_work_tree is None and not found.bare:
                 git_work_tree = found.path
@@ -945,9 +973,10 @@ def open_repo(
 
     When ``path_or_repo`` is ``None`` the ``GIT_DIR``, ``GIT_COMMON_DIR``,
     ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
-    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE`` and
-    ``GIT_CEILING_DIRECTORIES`` environment variables are consulted,
-    falling back to discovery from the current directory.
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE``,
+    ``GIT_CEILING_DIRECTORIES`` and ``GIT_DISCOVERY_ACROSS_FILESYSTEM``
+    environment variables are consulted, falling back to discovery from
+    the current directory.
     """
     if isinstance(path_or_repo, BaseRepo):
         return _noop_context_manager(path_or_repo)
@@ -1013,9 +1042,10 @@ def open_repo_closing(
 
     When ``path_or_repo`` is ``None`` the ``GIT_DIR``, ``GIT_COMMON_DIR``,
     ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
-    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE`` and
-    ``GIT_CEILING_DIRECTORIES`` environment variables are consulted,
-    falling back to discovery from the current directory.
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE``,
+    ``GIT_CEILING_DIRECTORIES`` and ``GIT_DISCOVERY_ACROSS_FILESYSTEM``
+    environment variables are consulted, falling back to discovery from
+    the current directory.
     """
     if isinstance(path_or_repo, BaseRepo):
         return _noop_context_manager(path_or_repo)

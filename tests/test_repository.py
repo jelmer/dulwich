@@ -2698,6 +2698,69 @@ class RepoOverrideTests(TestCase):
             ceiling_dirs=[repo_dir],
         )
 
+    def _patch_boundary_at(self, boundary: str) -> None:
+        """Make ``boundary`` and everything above it look like another device.
+
+        Creating a real mount point needs privileges, so the device numbers
+        are faked instead: the boundary directory and its ancestors report a
+        different ``st_dev`` than the directories below it.
+        """
+        real_stat = os.stat
+        boundary = os.path.abspath(boundary)
+
+        def fake_stat(path, *args, **kwargs):  # type: ignore[no-untyped-def]
+            result = real_stat(path, *args, **kwargs)
+            abs_path = os.path.abspath(os.fsdecode(path))
+            if abs_path == boundary or abs_path.startswith(boundary + os.sep):
+                return result
+            return os.stat_result(
+                (
+                    result.st_mode,
+                    result.st_ino,
+                    result.st_dev + 1,
+                    result.st_nlink,
+                    result.st_uid,
+                    result.st_gid,
+                    result.st_size,
+                    int(result.st_atime),
+                    int(result.st_mtime),
+                    int(result.st_ctime),
+                )
+            )
+
+        os.stat = fake_stat
+        self.addCleanup(setattr, os, "stat", real_stat)
+
+    def test_discover_stops_at_filesystem_boundary(self) -> None:
+        # The repo sits above a filesystem boundary, so discovery started
+        # below it must not reach the repo.
+        _tmp_dir, repo_dir, _r = self._make_repo()
+        start = os.path.join(repo_dir, "a", "b")
+        os.makedirs(start)
+        # Everything from `a` down is a "different device" than the repo.
+        self._patch_boundary_at(os.path.join(repo_dir, "a"))
+        self.assertRaises(
+            NotGitRepository, Repo.discover, start, across_filesystem=False
+        )
+
+    def test_discover_across_filesystem_boundary(self) -> None:
+        # The same walk finds the repo when crossing boundaries is allowed.
+        _tmp_dir, repo_dir, _r = self._make_repo()
+        start = os.path.join(repo_dir, "a", "b")
+        os.makedirs(start)
+        self._patch_boundary_at(os.path.join(repo_dir, "a"))
+        with Repo.discover(start, across_filesystem=True) as opened:
+            self.assertEqual(os.path.realpath(repo_dir), os.path.realpath(opened.path))
+
+    def test_discover_defaults_to_crossing_filesystems(self) -> None:
+        # The default preserves dulwich's historical behaviour.
+        _tmp_dir, repo_dir, _r = self._make_repo()
+        start = os.path.join(repo_dir, "a", "b")
+        os.makedirs(start)
+        self._patch_boundary_at(os.path.join(repo_dir, "a"))
+        with Repo.discover(start) as opened:
+            self.assertEqual(os.path.realpath(repo_dir), os.path.realpath(opened.path))
+
     def test_discover_ignores_ceiling_at_start(self) -> None:
         # Like git, a ceiling matching the starting directory itself is not
         # applied: only directories walked up into are checked.

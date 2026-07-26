@@ -35,6 +35,7 @@ from dulwich.attrs import (
     parse_gitattributes_file,
     read_gitattributes,
 )
+from dulwich.wildmatch import MalformedPattern
 
 from . import TestCase
 
@@ -183,6 +184,10 @@ class ParseGitAttributesTests(TestCase):
 class PatternTests(TestCase):
     """Test the Pattern class."""
 
+    def test_malformed_raises(self):
+        """A malformed bracket expression raises rather than matching nothing."""
+        self.assertRaises(MalformedPattern, Pattern, b"a[bc")
+
     def test_exact_match(self):
         """Test exact filename matching without path."""
         pattern = Pattern(b"README.txt")
@@ -233,6 +238,58 @@ class PatternTests(TestCase):
         self.assertTrue(pattern.match(b"file_.txt"))
         self.assertFalse(pattern.match(b"file0.txt"))
         self.assertFalse(pattern.match(b"file5.txt"))
+
+    def test_caret_negated_character_class(self):
+        """Test '^' as a negation character, like git's wildmatch()."""
+        pattern = Pattern(b"file[^0-9].txt")
+        self.assertTrue(pattern.match(b"fileA.txt"))
+        self.assertTrue(pattern.match(b"file_.txt"))
+        self.assertFalse(pattern.match(b"file0.txt"))
+        self.assertFalse(pattern.match(b"file5.txt"))
+
+    def test_posix_character_class(self):
+        """Test POSIX [:name:] character classes."""
+        pattern = Pattern(b"file[[:digit:]].txt")
+        self.assertTrue(pattern.match(b"file0.txt"))
+        self.assertTrue(pattern.match(b"file9.txt"))
+        self.assertFalse(pattern.match(b"fileA.txt"))
+        self.assertFalse(pattern.match(b"file_.txt"))
+
+        pattern = Pattern(b"file[![:digit:]].txt")
+        self.assertTrue(pattern.match(b"fileA.txt"))
+        self.assertFalse(pattern.match(b"file0.txt"))
+
+    def test_character_class_escapes_and_brackets(self):
+        """Test escaped members and ']' as the first member."""
+        pattern = Pattern(b"file[a\\-c].txt")
+        self.assertTrue(pattern.match(b"filea.txt"))
+        self.assertTrue(pattern.match(b"file-.txt"))
+        self.assertTrue(pattern.match(b"filec.txt"))
+        self.assertFalse(pattern.match(b"fileb.txt"))
+        self.assertFalse(pattern.match(b"file\\.txt"))
+
+        pattern = Pattern(b"file[]a].txt")
+        self.assertTrue(pattern.match(b"file].txt"))
+        self.assertTrue(pattern.match(b"filea.txt"))
+        self.assertFalse(pattern.match(b"fileb.txt"))
+
+    def test_character_class_never_matches_slash(self):
+        """A bracket expression cannot match '/' under WM_PATHNAME."""
+        for pattern in (Pattern(b"a[!x]b"), Pattern(b"a[^x]b")):
+            self.assertTrue(pattern.match(b"acb"))
+            self.assertFalse(pattern.match(b"a/b"))
+
+    def test_malformed_character_class_raises(self):
+        """wildmatch() gives up on these; compiling one raises rather than
+        silently matching nothing."""
+        for pattern in (b"file[0-9.txt", b"file[", b"file[[:foo:]].txt"):
+            self.assertRaises(MalformedPattern, Pattern, pattern)
+
+    def test_double_asterisk_within_component(self):
+        """'**' is only special as a whole path component."""
+        pattern = Pattern(b"a**b")
+        self.assertTrue(pattern.match(b"axb"))
+        self.assertFalse(pattern.match(b"a/x/b"))
 
     def test_directory_pattern(self):
         """Test pattern with directory."""
@@ -343,6 +400,20 @@ class FileOperationsTests(TestCase):
         pattern, attrs = patterns[1]
         self.assertEqual(pattern.pattern, b"*.jpg")
         self.assertEqual(attrs, {b"text": False, b"binary": True})
+
+    def test_parse_gitattributes_file_skips_malformed_pattern(self):
+        """A malformed line is logged and skipped; the rest of the file still loads."""
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as f:
+            f.write(b"*.txt text\n")
+            f.write(b"a[bc binary\n")
+            f.write(b"*.jpg -text binary\n")
+            temp_path = f.name
+
+        self.addCleanup(os.unlink, temp_path)
+
+        with self.assertLogs("dulwich.attrs", level="WARNING"):
+            patterns = parse_gitattributes_file(temp_path)
+        self.assertEqual([p.pattern for p, _ in patterns], [b"*.txt", b"*.jpg"])
 
     def test_read_gitattributes(self):
         """Test reading gitattributes from a directory."""

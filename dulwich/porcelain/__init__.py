@@ -912,11 +912,10 @@ def _repo_from_env(
         # the control dir, then layer the overrides on top. Preserve the
         # discovered worktree so we don't silently downgrade a non-bare
         # repo when only GIT_OBJECT_DIRECTORY (etc.) is set.
-        found = Repo.discover(ceiling_dirs=ceilings)
-        git_dir = found.controldir()
-        if git_work_tree is None and not found.bare:
-            git_work_tree = found.path
-        found.close()
+        with closing(Repo.discover(ceiling_dirs=ceilings)) as found:
+            git_dir = found.controldir()
+            if git_work_tree is None and not found.bare:
+                git_work_tree = found.path
     return Repo(
         controldir=git_dir,
         commondir=git_common_dir,

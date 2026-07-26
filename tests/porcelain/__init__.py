@@ -14014,6 +14014,20 @@ class OpenRepoEnvTests(TestCase):
         finally:
             os.chdir(old_cwd)
 
+    def test_git_ceiling_directories_ignores_start_directory(self) -> None:
+        # git never applies ceilings to the starting directory itself, so a
+        # ceiling equal to the directory we start in still finds the repo.
+        old_cwd = os.getcwd()
+        os.chdir(self.repo_path)
+        try:
+            env = {"GIT_CEILING_DIRECTORIES": self.repo_path}
+            with porcelain.open_repo_closing(None, env=env) as r:
+                self.assertEqual(
+                    os.path.realpath(self.repo_path), os.path.realpath(r.path)
+                )
+        finally:
+            os.chdir(old_cwd)
+
     def test_git_ceiling_directories_unrelated(self) -> None:
         # A ceiling on an unrelated path does not block discovery.
         subdir = os.path.join(self.repo_path, "sub")

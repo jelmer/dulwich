@@ -1812,8 +1812,9 @@ class Repo(BaseRepo):
           start: The directory to start discovery from (defaults to '.')
           ceiling_dirs: Iterable of absolute paths that discovery must not
             cross (analogous to ``GIT_CEILING_DIRECTORIES``). The ceiling
-            directories themselves are not searched. Callers are expected
-            to pass already-resolved absolute paths.
+            directories themselves are not searched. As in git, a ceiling
+            matching ``start`` itself is ignored. Callers are expected to
+            pass already-resolved absolute paths.
         """
         ceilings = (
             {
@@ -1824,9 +1825,11 @@ class Repo(BaseRepo):
             else set()
         )
         path = os.path.abspath(start)
+        first = True
         while True:
-            if os.path.normcase(path) in ceilings:
+            if not first and os.path.normcase(path) in ceilings:
                 break
+            first = False
             try:
                 return cls(path)
             except NotGitRepository:

@@ -2698,6 +2698,13 @@ class RepoOverrideTests(TestCase):
             ceiling_dirs=[repo_dir],
         )
 
+    def test_discover_ignores_ceiling_at_start(self) -> None:
+        # Like git, a ceiling matching the starting directory itself is not
+        # applied: only directories walked up into are checked.
+        _tmp_dir, repo_dir, _r = self._make_repo()
+        with Repo.discover(repo_dir, ceiling_dirs=[repo_dir]) as opened:
+            self.assertEqual(os.path.realpath(repo_dir), os.path.realpath(opened.path))
+
     def test_discover_ignores_unrelated_ceiling(self) -> None:
         tmp_dir, repo_dir, _r = self._make_repo()
         subdir = os.path.join(repo_dir, "a", "b")

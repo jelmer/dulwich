@@ -1802,6 +1802,7 @@ class Repo(BaseRepo):
         start: str | bytes | os.PathLike[str] = ".",
         *,
         ceiling_dirs: "Iterable[str | os.PathLike[str]] | None" = None,
+        across_filesystem: bool = True,
     ) -> "Repo":
         """Iterate parent directories to discover a repository.
 
@@ -1815,6 +1816,10 @@ class Repo(BaseRepo):
             directories themselves are not searched. As in git, a ceiling
             matching ``start`` itself is ignored. Callers are expected to
             pass already-resolved absolute paths.
+          across_filesystem: Whether to keep walking up past a filesystem
+            boundary (analogous to ``GIT_DISCOVERY_ACROSS_FILESYSTEM``).
+            When False, discovery stops before entering a parent directory
+            that lives on a different device than ``start``.
         """
         ceilings = (
             {
@@ -1825,6 +1830,10 @@ class Repo(BaseRepo):
             else set()
         )
         path = os.path.abspath(start)
+        # Device of the starting directory, only tracked when we must not
+        # cross filesystem boundaries. Errors stat'ing it propagate: if the
+        # start directory is unreadable, discovery from it is meaningless.
+        start_dev = None if across_filesystem else os.stat(path).st_dev
         first = True
         while True:
             if not first and os.path.normcase(path) in ceilings:
@@ -1836,6 +1845,15 @@ class Repo(BaseRepo):
                 new_path, _tail = os.path.split(path)
                 if new_path == path:  # Root reached
                     break
+                if start_dev is not None:
+                    try:
+                        parent_dev = os.stat(new_path).st_dev
+                    except FileNotFoundError:
+                        # Raced with the parent being removed; nothing left
+                        # to walk up into.
+                        break
+                    if parent_dev != start_dev:
+                        break
                 path = new_path
         start_str = os.fspath(start)
         if isinstance(start_str, bytes):

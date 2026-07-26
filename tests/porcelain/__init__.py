@@ -61,6 +61,7 @@ from dulwich.porcelain import (
     CountObjectsResult,
     _checked_worktree_path,
     _parse_ceiling_dirs,
+    _parse_env_bool,
     _protocol_version_from_env,
     _ssh_command_from_env,
     add,
@@ -14028,6 +14029,63 @@ class OpenRepoEnvTests(TestCase):
         finally:
             os.chdir(old_cwd)
 
+    def _fake_boundary_at(self, boundary: str) -> None:
+        """Report a different device for everything below ``boundary``."""
+        real_stat = os.stat
+        boundary = os.path.abspath(boundary)
+
+        def fake_stat(path, *args, **kwargs):  # type: ignore[no-untyped-def]
+            result = real_stat(path, *args, **kwargs)
+            abs_path = os.path.abspath(os.fsdecode(path))
+            if abs_path == boundary or abs_path.startswith(boundary + os.sep):
+                return result
+            values = list(result)
+            values[2] = result.st_dev + 1
+            return os.stat_result(tuple(values[:10]))
+
+        os.stat = fake_stat
+        self.addCleanup(setattr, os, "stat", real_stat)
+
+    def test_discovery_stops_at_filesystem_boundary_by_default(self) -> None:
+        # Like git, discovery does not cross filesystem boundaries unless
+        # GIT_DISCOVERY_ACROSS_FILESYSTEM says so.
+        from dulwich.errors import NotGitRepository
+
+        subdir = os.path.join(self.repo_path, "a", "b")
+        os.makedirs(subdir)
+        old_cwd = os.getcwd()
+        os.chdir(subdir)
+        try:
+            self._fake_boundary_at(os.path.join(self.repo_path, "a"))
+            self.assertRaises(
+                NotGitRepository, porcelain.open_repo_closing, None, env={}
+            )
+        finally:
+            os.chdir(old_cwd)
+
+    def test_git_discovery_across_filesystem(self) -> None:
+        subdir = os.path.join(self.repo_path, "a", "b")
+        os.makedirs(subdir)
+        old_cwd = os.getcwd()
+        os.chdir(subdir)
+        try:
+            self._fake_boundary_at(os.path.join(self.repo_path, "a"))
+            env = {"GIT_DISCOVERY_ACROSS_FILESYSTEM": "1"}
+            with porcelain.open_repo_closing(None, env=env) as r:
+                self.assertEqual(
+                    os.path.realpath(self.repo_path), os.path.realpath(r.path)
+                )
+        finally:
+            os.chdir(old_cwd)
+
+    def test_git_discovery_across_filesystem_invalid(self) -> None:
+        self.assertRaises(
+            ValueError,
+            porcelain.open_repo_closing,
+            None,
+            env={"GIT_DISCOVERY_ACROSS_FILESYSTEM": "bogus"},
+        )
+
     def test_git_ceiling_directories_unrelated(self) -> None:
         # A ceiling on an unrelated path does not block discovery.
         subdir = os.path.join(self.repo_path, "sub")
@@ -14042,6 +14100,35 @@ class OpenRepoEnvTests(TestCase):
                 )
         finally:
             os.chdir(old_cwd)
+
+
+class ParseEnvBoolTests(TestCase):
+    """Tests for :func:`dulwich.porcelain._parse_env_bool`.
+
+    The accepted spellings match those git accepts for boolean
+    environment variables.
+    """
+
+    def _parse(self, value: str) -> bool:
+        return _parse_env_bool({"VAR": value}, "VAR")
+
+    def test_unset_is_false(self) -> None:
+        self.assertEqual(False, _parse_env_bool({}, "VAR"))
+
+    def test_true_spellings(self) -> None:
+        for value in ("true", "TRUE", "True", "yes", "on", "1", "2", "-1"):
+            self.assertEqual(True, self._parse(value), value)
+
+    def test_false_spellings(self) -> None:
+        for value in ("", "false", "FALSE", "no", "off", "0"):
+            self.assertEqual(False, self._parse(value), value)
+
+    def test_surrounding_whitespace_ignored(self) -> None:
+        self.assertEqual(True, self._parse("  true "))
+
+    def test_invalid_value_raises(self) -> None:
+        # git errors out rather than guessing.
+        self.assertRaises(ValueError, self._parse, "bogus")
 
 
 class ParseCeilingDirsTests(TestCase):

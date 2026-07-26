@@ -37,6 +37,8 @@ import re
 from collections.abc import Generator, Iterator, Mapping, Sequence
 from typing import IO
 
+from ._wildmatch import NO_MATCH, MalformedPattern, translate_bracket_expression
+
 AttributeValue = bytes | bool | None
 
 
@@ -147,24 +149,8 @@ def _translate_pattern(pattern: bytes) -> bytes:
         elif c == b"?":
             res += b"[^/]"
         elif c == b"[":
-            # Character class
-            j = i
-            if j < n and pattern[j : j + 1] == b"!":
-                j += 1
-            if j < n and pattern[j : j + 1] == b"]":
-                j += 1
-            while j < n and pattern[j : j + 1] != b"]":
-                j += 1
-            if j >= n:
-                res += b"\\["
-            else:
-                stuff = pattern[i:j].replace(b"\\", b"\\\\")
-                i = j + 1
-                if stuff.startswith(b"!"):
-                    stuff = b"^" + stuff[1:]
-                elif stuff.startswith(b"^"):
-                    stuff = b"\\" + stuff
-                res += b"[" + stuff + b"]"
+            i, bracket = translate_bracket_expression(pattern, i)
+            res += bracket
         else:
             res += re.escape(c)
 
@@ -186,7 +172,12 @@ class Pattern:
 
     def _compile(self) -> None:
         """Compile the pattern to a regular expression."""
-        regex_pattern = _translate_pattern(self.pattern)
+        try:
+            regex_pattern = _translate_pattern(self.pattern)
+        except MalformedPattern:
+            # wildmatch() aborts on a malformed bracket expression, which
+            # leaves the whole pattern matching nothing at all.
+            regex_pattern = NO_MATCH
         # Add anchors
         regex_pattern = b"^" + regex_pattern + b"$"
         self._regex = re.compile(regex_pattern)

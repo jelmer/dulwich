@@ -234,6 +234,52 @@ class PatternTests(TestCase):
         self.assertFalse(pattern.match(b"file0.txt"))
         self.assertFalse(pattern.match(b"file5.txt"))
 
+    def test_caret_negated_character_class(self):
+        """Test '^' as a negation character, like git's wildmatch()."""
+        pattern = Pattern(b"file[^0-9].txt")
+        self.assertTrue(pattern.match(b"fileA.txt"))
+        self.assertTrue(pattern.match(b"file_.txt"))
+        self.assertFalse(pattern.match(b"file0.txt"))
+        self.assertFalse(pattern.match(b"file5.txt"))
+
+    def test_posix_character_class(self):
+        """Test POSIX [:name:] character classes."""
+        pattern = Pattern(b"file[[:digit:]].txt")
+        self.assertTrue(pattern.match(b"file0.txt"))
+        self.assertTrue(pattern.match(b"file9.txt"))
+        self.assertFalse(pattern.match(b"fileA.txt"))
+        self.assertFalse(pattern.match(b"file_.txt"))
+
+        pattern = Pattern(b"file[![:digit:]].txt")
+        self.assertTrue(pattern.match(b"fileA.txt"))
+        self.assertFalse(pattern.match(b"file0.txt"))
+
+    def test_character_class_escapes_and_brackets(self):
+        """Test escaped members and ']' as the first member."""
+        pattern = Pattern(b"file[a\\-c].txt")
+        self.assertTrue(pattern.match(b"filea.txt"))
+        self.assertTrue(pattern.match(b"file-.txt"))
+        self.assertTrue(pattern.match(b"filec.txt"))
+        self.assertFalse(pattern.match(b"fileb.txt"))
+        self.assertFalse(pattern.match(b"file\\.txt"))
+
+        pattern = Pattern(b"file[]a].txt")
+        self.assertTrue(pattern.match(b"file].txt"))
+        self.assertTrue(pattern.match(b"filea.txt"))
+        self.assertFalse(pattern.match(b"fileb.txt"))
+
+    def test_character_class_never_matches_slash(self):
+        """A bracket expression cannot match '/' under WM_PATHNAME."""
+        for pattern in (Pattern(b"a[!x]b"), Pattern(b"a[^x]b")):
+            self.assertTrue(pattern.match(b"acb"))
+            self.assertFalse(pattern.match(b"a/b"))
+
+    def test_malformed_character_class(self):
+        """wildmatch() gives up on these, so the pattern matches nothing."""
+        for pattern in (b"file[0-9.txt", b"file[", b"file[[:foo:]].txt"):
+            self.assertFalse(Pattern(pattern).match(pattern))
+            self.assertFalse(Pattern(pattern).match(b"file0.txt"))
+
     def test_directory_pattern(self):
         """Test pattern with directory."""
         pattern = Pattern(b"src/*.py")

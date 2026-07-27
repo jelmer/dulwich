@@ -14032,11 +14032,11 @@ class OpenRepoEnvTests(TestCase):
     def _fake_boundary_at(self, boundary: str) -> None:
         """Report a different device for everything below ``boundary``."""
         real_stat = os.stat
-        boundary = os.path.abspath(boundary)
+        boundary = os.path.realpath(boundary)
 
         def fake_stat(path, *args, **kwargs):  # type: ignore[no-untyped-def]
             result = real_stat(path, *args, **kwargs)
-            abs_path = os.path.abspath(os.fsdecode(path))
+            abs_path = os.path.realpath(os.fsdecode(path))
             if abs_path == boundary or abs_path.startswith(boundary + os.sep):
                 return result
             values = list(result)

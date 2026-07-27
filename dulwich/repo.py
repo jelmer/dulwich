@@ -1814,8 +1814,9 @@ class Repo(BaseRepo):
           ceiling_dirs: Iterable of absolute paths that discovery must not
             cross (analogous to ``GIT_CEILING_DIRECTORIES``). The ceiling
             directories themselves are not searched. As in git, a ceiling
-            matching ``start`` itself is ignored. Callers are expected to
-            pass already-resolved absolute paths.
+            matching ``start`` itself is ignored. Entries are compared
+            against the resolved walking path, so callers wanting git's
+            default behaviour should pass ``realpath``-resolved entries.
           across_filesystem: Whether to keep walking up past a filesystem
             boundary (analogous to ``GIT_DISCOVERY_ACROSS_FILESYSTEM``).
             When False, discovery stops before entering a parent directory
@@ -1829,7 +1830,10 @@ class Repo(BaseRepo):
             if ceiling_dirs is not None
             else set()
         )
-        path = os.path.abspath(start)
+        # Walk resolved paths so that comparisons against ceiling entries,
+        # which git resolves by default, are made in the same form. This
+        # mirrors git, which starts discovery from the kernel-resolved cwd.
+        path = os.path.realpath(start)
         # Device of the starting directory, only tracked when we must not
         # cross filesystem boundaries. Errors stat'ing it propagate: if the
         # start directory is unreadable, discovery from it is meaningless.

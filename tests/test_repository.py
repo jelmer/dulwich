@@ -2706,11 +2706,11 @@ class RepoOverrideTests(TestCase):
         different ``st_dev`` than the directories below it.
         """
         real_stat = os.stat
-        boundary = os.path.abspath(boundary)
+        boundary = os.path.realpath(boundary)
 
         def fake_stat(path, *args, **kwargs):  # type: ignore[no-untyped-def]
             result = real_stat(path, *args, **kwargs)
-            abs_path = os.path.abspath(os.fsdecode(path))
+            abs_path = os.path.realpath(os.fsdecode(path))
             if abs_path == boundary or abs_path.startswith(boundary + os.sep):
                 return result
             return os.stat_result(

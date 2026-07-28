@@ -2698,6 +2698,24 @@ class RepoOverrideTests(TestCase):
             ceiling_dirs=[repo_dir],
         )
 
+    def test_discover_ceiling_reached_through_symlink(self) -> None:
+        # The ceiling and the start path may be given in different forms:
+        # here both are reached through a symlink, while discovery walks
+        # resolved paths. This is the situation on macOS, where the
+        # temporary directory sits under a symlinked /var, and on Windows,
+        # where paths may carry 8.3 short names.
+        tmp_dir, repo_dir, _r = self._make_repo()
+        link = os.path.join(tmp_dir, "link")
+        os.symlink(repo_dir, link)
+        subdir = os.path.join(link, "a", "b")
+        os.makedirs(subdir)
+        self.assertRaises(
+            NotGitRepository,
+            Repo.discover,
+            subdir,
+            ceiling_dirs=[link],
+        )
+
     def _patch_boundary_at(self, boundary: str) -> None:
         """Make ``boundary`` and everything above it look like another device.
 

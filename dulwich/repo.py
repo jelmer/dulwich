@@ -1811,28 +1811,30 @@ class Repo(BaseRepo):
 
         Args:
           start: The directory to start discovery from (defaults to '.')
-          ceiling_dirs: Iterable of absolute paths that discovery must not
-            cross (analogous to ``GIT_CEILING_DIRECTORIES``). The ceiling
+          ceiling_dirs: Iterable of paths that discovery must not cross
+            (analogous to ``GIT_CEILING_DIRECTORIES``). The ceiling
             directories themselves are not searched. As in git, a ceiling
-            matching ``start`` itself is ignored. Entries are compared
-            against the resolved walking path, so callers wanting git's
-            default behaviour should pass ``realpath``-resolved entries.
+            matching ``start`` itself is ignored. Entries are resolved the
+            same way as the walking path, so passing either a symlinked or
+            a resolved form works.
           across_filesystem: Whether to keep walking up past a filesystem
             boundary (analogous to ``GIT_DISCOVERY_ACROSS_FILESYSTEM``).
             When False, discovery stops before entering a parent directory
             that lives on a different device than ``start``.
         """
+        # Both sides of the ceiling comparison are resolved so that they are
+        # in the same form: os.getcwd() already returns a resolved path on
+        # POSIX, and on Windows realpath() expands 8.3 short names that
+        # abspath() leaves alone. This also mirrors git, which walks up from
+        # the kernel-resolved cwd.
         ceilings = (
             {
-                os.path.normcase(os.path.abspath(os.fsdecode(os.fspath(p))))
+                os.path.normcase(os.path.realpath(os.fsdecode(os.fspath(p))))
                 for p in ceiling_dirs
             }
             if ceiling_dirs is not None
             else set()
         )
-        # Walk resolved paths so that comparisons against ceiling entries,
-        # which git resolves by default, are made in the same form. This
-        # mirrors git, which starts discovery from the kernel-resolved cwd.
         path = os.path.realpath(start)
         # Device of the starting directory, only tracked when we must not
         # cross filesystem boundaries. Errors stat'ing it propagate: if the

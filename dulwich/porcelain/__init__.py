@@ -846,23 +846,141 @@ def get_user_timezones(env: Mapping[str, str] | None = None) -> tuple[int, int]:
     return author_timezone, commit_timezone
 
 
+def _parse_ceiling_dirs(env: Mapping[str, str]) -> list[str] | None:
+    """Parse ``GIT_CEILING_DIRECTORIES`` into an absolute-path list.
+
+    Entries are separated by ``os.pathsep``. Non-empty entries are
+    resolved through :func:`os.path.realpath` by default, matching
+    git's default behaviour of following symlinks in ceiling
+    directories. An empty entry acts as a mode toggle: entries that
+    follow it are kept as-is (only made absolute) so that symlinks
+    on the walking path can be compared against a symlinked ceiling.
+    """
+    raw = env.get("GIT_CEILING_DIRECTORIES")
+    if not raw:
+        return None
+    resolve = True
+    result: list[str] = []
+    for part in raw.split(os.pathsep):
+        if not part:
+            resolve = False
+            continue
+        result.append(os.path.realpath(part) if resolve else os.path.abspath(part))
+    return result
+
+
+def _parse_env_bool(env: Mapping[str, str], name: str) -> bool:
+    """Parse a boolean Git environment variable.
+
+    Follows git's rules: ``true``/``yes``/``on`` and any non-zero integer
+    are true, ``false``/``no``/``off``, ``0`` and the empty string are
+    false, all case-insensitively. Anything else is an error, as in git.
+    """
+    raw = env.get(name)
+    if raw is None:
+        return False
+    value = raw.strip().lower()
+    if value in ("true", "yes", "on"):
+        return True
+    if value in ("", "false", "no", "off"):
+        return False
+    try:
+        return int(value) != 0
+    except ValueError:
+        raise ValueError(
+            f"bad boolean environment value {raw!r} for {name!r}"
+        ) from None
+
+
+def _repo_from_env(
+    path_or_repo: str | bytes | os.PathLike[str] | None,
+    env: Mapping[str, str] | None,
+) -> Repo:
+    """Resolve a Repo from a path or from the Git environment variables.
+
+    An explicit ``path_or_repo`` always wins over environment variables so
+    that callers who pass a path get what they asked for. Otherwise the
+    Git environment variables ``GIT_DIR``, ``GIT_COMMON_DIR``,
+    ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE``,
+    ``GIT_CEILING_DIRECTORIES`` and ``GIT_DISCOVERY_ACROSS_FILESYSTEM``
+    are consulted; if none of the locator vars are set, discovery walks up
+    from the current directory, bounded by ``GIT_CEILING_DIRECTORIES`` and,
+    unless ``GIT_DISCOVERY_ACROSS_FILESYSTEM`` is true, by filesystem
+    boundaries.
+    """
+    if path_or_repo is not None:
+        return Repo(path_or_repo)
+    if env is None:
+        env = os.environ
+    git_dir = env.get("GIT_DIR")
+    git_common_dir = env.get("GIT_COMMON_DIR")
+    git_work_tree = env.get("GIT_WORK_TREE")
+    git_object_dir = env.get("GIT_OBJECT_DIRECTORY")
+    git_alternates = env.get("GIT_ALTERNATE_OBJECT_DIRECTORIES")
+    git_index_file = env.get("GIT_INDEX_FILE")
+    ceilings = _parse_ceiling_dirs(env)
+    across_fs = _parse_env_bool(env, "GIT_DISCOVERY_ACROSS_FILESYSTEM")
+    alternates = (
+        [p for p in git_alternates.split(os.pathsep) if p] if git_alternates else None
+    )
+    if (
+        git_dir is None
+        and git_work_tree is None
+        and git_common_dir is None
+        and git_object_dir is None
+        and alternates is None
+        and git_index_file is None
+    ):
+        return Repo.discover(ceiling_dirs=ceilings, across_filesystem=across_fs)
+    if git_dir is None:
+        # An override without GIT_DIR: fall back to discovery from cwd for
+        # the control dir, then layer the overrides on top. Preserve the
+        # discovered worktree so we don't silently downgrade a non-bare
+        # repo when only GIT_OBJECT_DIRECTORY (etc.) is set.
+        with closing(
+            Repo.discover(ceiling_dirs=ceilings, across_filesystem=across_fs)
+        ) as found:
+            git_dir = found.controldir()
+            if git_work_tree is None and not found.bare:
+                git_work_tree = found.path
+    return Repo(
+        controldir=git_dir,
+        commondir=git_common_dir,
+        worktree=git_work_tree,
+        object_directory=git_object_dir,
+        alternates=alternates,
+        index_file=git_index_file,
+    )
+
+
 @overload
 def open_repo(path_or_repo: T) -> AbstractContextManager[T]: ...
 
 
 @overload
 def open_repo(
-    path_or_repo: str | os.PathLike[str],
+    path_or_repo: str | os.PathLike[str] | None = ...,
+    env: Mapping[str, str] | None = ...,
 ) -> AbstractContextManager[Repo]: ...
 
 
 def open_repo(
-    path_or_repo: str | os.PathLike[str] | T,
+    path_or_repo: str | os.PathLike[str] | T | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> AbstractContextManager[T | Repo]:
-    """Open an argument that can be a repository or a path for a repository."""
+    """Open an argument that can be a repository or a path for a repository.
+
+    When ``path_or_repo`` is ``None`` the ``GIT_DIR``, ``GIT_COMMON_DIR``,
+    ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE``,
+    ``GIT_CEILING_DIRECTORIES`` and ``GIT_DISCOVERY_ACROSS_FILESYSTEM``
+    environment variables are consulted, falling back to discovery from
+    the current directory.
+    """
     if isinstance(path_or_repo, BaseRepo):
         return _noop_context_manager(path_or_repo)
-    return Repo(path_or_repo)
+    return _repo_from_env(path_or_repo, env)
 
 
 @contextmanager
@@ -907,21 +1025,31 @@ def open_repo_closing(path_or_repo: T) -> AbstractContextManager[T]: ...
 
 @overload
 def open_repo_closing(
-    path_or_repo: str | bytes | os.PathLike[str],
+    path_or_repo: str | bytes | os.PathLike[str] | None = ...,
+    env: Mapping[str, str] | None = ...,
 ) -> AbstractContextManager[Repo]: ...
 
 
 def open_repo_closing(
-    path_or_repo: str | bytes | os.PathLike[str] | T,
+    path_or_repo: str | bytes | os.PathLike[str] | T | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> AbstractContextManager[T | Repo]:
     """Open an argument that can be a repository or a path for a repository.
 
-    returns a context manager that will close the repo on exit if the argument
-    is a path, else does nothing if the argument is a repo.
+    Returns a context manager that will close the repo on exit if the
+    argument is a path (or the repo was resolved from environment
+    variables), else does nothing if the argument is an already-open repo.
+
+    When ``path_or_repo`` is ``None`` the ``GIT_DIR``, ``GIT_COMMON_DIR``,
+    ``GIT_WORK_TREE``, ``GIT_OBJECT_DIRECTORY``,
+    ``GIT_ALTERNATE_OBJECT_DIRECTORIES``, ``GIT_INDEX_FILE``,
+    ``GIT_CEILING_DIRECTORIES`` and ``GIT_DISCOVERY_ACROSS_FILESYSTEM``
+    environment variables are consulted, falling back to discovery from
+    the current directory.
     """
     if isinstance(path_or_repo, BaseRepo):
         return _noop_context_manager(path_or_repo)
-    return closing(Repo(path_or_repo))
+    return closing(_repo_from_env(path_or_repo, env))
 
 
 def path_to_tree_path(
@@ -1023,7 +1151,7 @@ def check_diverged(repo: BaseRepo, current_sha: ObjectID, new_sha: ObjectID) -> 
 
 
 def archive(
-    repo: str | BaseRepo = ".",
+    repo: str | BaseRepo | None = None,
     committish: str | bytes | Commit | Tag | None = None,
     outstream: BinaryIO | RawIOBase = default_bytes_out_stream,
     errstream: BinaryIO | RawIOBase = default_bytes_err_stream,
@@ -1054,7 +1182,7 @@ def archive(
         remote_str = remote.decode() if isinstance(remote, bytes) else remote
         client, path = get_transport_and_path(remote_str, ssh_command=ssh_command)
         committish_bytes: bytes
-        if isinstance(committish, (Commit, Tag)):
+        if isinstance(committish, Commit | Tag):
             committish_bytes = committish.id
         elif isinstance(committish, str):
             committish_bytes = committish.encode(DEFAULT_ENCODING)
@@ -1083,7 +1211,7 @@ def archive(
             outstream.write(chunk)
 
 
-def update_server_info(repo: RepoPath = ".") -> None:
+def update_server_info(repo: RepoPath | None = None) -> None:
     """Update server info files for a repository.
 
     Args:
@@ -1093,7 +1221,7 @@ def update_server_info(repo: RepoPath = ".") -> None:
         server_update_server_info(r)
 
 
-def write_commit_graph(repo: RepoPath = ".", reachable: bool = True) -> None:
+def write_commit_graph(repo: RepoPath | None = None, reachable: bool = True) -> None:
     """Write a commit graph file for a repository.
 
     Args:
@@ -1135,7 +1263,7 @@ def pack_refs(repo: RepoPath, all: bool = False) -> None:
 
 
 def _get_variables(
-    repo: RepoPath = ".", env: Mapping[str, str] | None = None
+    repo: RepoPath | None = None, env: Mapping[str, str] | None = None
 ) -> dict[str, str]:
     """Internal function to get all Git logical variables.
 
@@ -1238,7 +1366,7 @@ def _get_variables(
 
 
 def var_list(
-    repo: RepoPath = ".", env: Mapping[str, str] | None = None
+    repo: RepoPath | None = None, env: Mapping[str, str] | None = None
 ) -> dict[str, str]:
     """List all Git logical variables.
 
@@ -1253,7 +1381,7 @@ def var_list(
 
 
 def var(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     variable: str = "GIT_AUTHOR_IDENT",
     env: Mapping[str, str] | None = None,
 ) -> str:
@@ -1278,7 +1406,7 @@ def var(
 
 
 def commit(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     message: str | bytes | Callable[[Any, Commit], bytes] | None = None,
     author: bytes | None = None,
     author_timestamp: float | None = None,
@@ -1834,7 +1962,7 @@ def clone(
 
 
 def add(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     paths: Sequence[str | bytes | os.PathLike[str]]
     | str
     | bytes
@@ -1988,7 +2116,7 @@ def _is_subdir(
 
 # TODO: option to remove ignored files also, in line with `git clean -fdx`
 def clean(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     target_dir: str | os.PathLike[str] | None = None,
 ) -> None:
     """Remove any untracked files from the target directory recursively.
@@ -2039,7 +2167,7 @@ def clean(
 
 
 def remove(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     paths: Sequence[str | bytes | os.PathLike[str]] = [],
     cached: bool = False,
 ) -> None:
@@ -2566,7 +2694,7 @@ def print_stat(
 
 
 def log(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     paths: Sequence[str | bytes] | None = None,
     outstream: TextIO = sys.stdout,
     max_entries: int | None = None,
@@ -2726,7 +2854,7 @@ def log(
 
 # TODO(jelmer): better default for encoding?
 def show(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     objects: Sequence[str | bytes] | None = None,
     outstream: TextIO = sys.stdout,
     default_encoding: str = DEFAULT_ENCODING,
@@ -2790,7 +2918,7 @@ def diff_tree(
 
 
 def diff(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     commit: str | bytes | Commit | None = None,
     commit2: str | bytes | Commit | None = None,
     staged: bool = False,
@@ -3751,7 +3879,7 @@ def pull(
 
 
 def status(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     ignored: bool = False,
     untracked_files: str = "normal",
 ) -> GitStatus:
@@ -4928,7 +5056,7 @@ def fetch(
 
 
 def for_each_ref(
-    repo: Repo | str = ".",
+    repo: Repo | str | None = None,
     pattern: str | bytes | None = None,
 ) -> list[tuple[bytes, bytes, bytes]]:
     """Iterate over all refs that match the (optional) pattern.
@@ -4981,7 +5109,7 @@ def for_each_ref(
 
 
 def show_ref(
-    repo: Repo | str = ".",
+    repo: Repo | str | None = None,
     patterns: list[str | bytes] | None = None,
     head: bool = False,
     branches: bool = False,
@@ -5084,7 +5212,7 @@ def show_ref(
 
 
 def show_branch(
-    repo: Repo | str = ".",
+    repo: Repo | str | None = None,
     branches: list[str | bytes] | None = None,
     all_branches: bool = False,
     remotes: bool = False,
@@ -6727,7 +6855,8 @@ def mktag(repo: str | os.PathLike[str] | Repo, tag_data: bytes) -> bytes:
 
 
 def show_index(
-    index_path: str | os.PathLike[str], repo: str | os.PathLike[str] | Repo = "."
+    index_path: str | os.PathLike[str],
+    repo: str | os.PathLike[str] | Repo | None = None,
 ) -> "list[tuple[int, RawObjectID, int | None]]":
     """Show the contents of a pack index file.
 
@@ -8162,7 +8291,9 @@ def maintenance_unregister(repo: RepoPath, force: bool = False) -> None:
         unregister_repository(r, force=force)
 
 
-def count_objects(repo: RepoPath = ".", verbose: bool = False) -> CountObjectsResult:
+def count_objects(
+    repo: RepoPath | None = None, verbose: bool = False
+) -> CountObjectsResult:
     """Count unpacked objects and their disk usage.
 
     Args:
@@ -8422,7 +8553,7 @@ blame = annotate
 
 
 def filter_branch(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     branch: str | bytes = "HEAD",
     *,
     filter_fn: Callable[[Commit], "CommitData | None"] | None = None,
@@ -8554,7 +8685,7 @@ def filter_branch(
 
 
 def format_patch(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     committish: ObjectID | tuple[ObjectID, ObjectID] | None = None,
     outstream: TextIO = sys.stdout,
     outdir: str | os.PathLike[str] | None = None,
@@ -8884,7 +9015,7 @@ def request_pull(
 
 
 def bisect_start(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     bad: str | bytes | Commit | Tag | None = None,
     good: str
     | bytes
@@ -8945,7 +9076,7 @@ def bisect_start(
 
 
 def bisect_bad(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     rev: str | bytes | Commit | Tag | None = None,
 ) -> bytes | None:
     """Mark a commit as bad.
@@ -8983,7 +9114,7 @@ def bisect_bad(
 
 
 def bisect_good(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     rev: str | bytes | Commit | Tag | None = None,
 ) -> bytes | None:
     """Mark a commit as good.
@@ -9021,7 +9152,7 @@ def bisect_good(
 
 
 def bisect_skip(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     revs: str
     | bytes
     | Commit
@@ -9072,7 +9203,7 @@ def bisect_skip(
 
 
 def bisect_reset(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     commit: str | bytes | Commit | Tag | None = None,
 ) -> None:
     """Reset bisect state and return to original branch/commit.
@@ -9113,7 +9244,7 @@ def bisect_reset(
             pass
 
 
-def bisect_log(repo: str | os.PathLike[str] | Repo = ".") -> str:
+def bisect_log(repo: str | os.PathLike[str] | Repo | None = None) -> str:
     """Get the bisect log.
 
     Args:
@@ -9151,7 +9282,7 @@ def bisect_replay(
 
 
 def reflog(
-    repo: RepoPath = ".", ref: str | bytes = b"HEAD", all: bool = False
+    repo: RepoPath | None = None, ref: str | bytes = b"HEAD", all: bool = False
 ) -> Iterator[Any | tuple[bytes, Any]]:
     """Show reflog entries for a reference or all references.
 
@@ -9184,7 +9315,7 @@ def reflog(
 
 
 def reflog_expire(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     ref: str | bytes | None = None,
     all: bool = False,
     expire_time: int | None = None,
@@ -9295,7 +9426,7 @@ def reflog_expire(
 
 
 def reflog_delete(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     ref: str | bytes = b"HEAD",
     index: int = 0,
     rewrite: bool = False,
@@ -9325,7 +9456,7 @@ def reflog_delete(
 
 
 def merge_base(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     committishes: Sequence[str | bytes] | None = None,
     all: bool = False,
     octopus: bool = False,
@@ -9369,7 +9500,7 @@ def merge_base(
 
 
 def is_ancestor(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     ancestor: str | bytes | None = None,
     descendant: str | bytes | None = None,
 ) -> bool:
@@ -9406,7 +9537,7 @@ def is_ancestor(
 
 
 def independent_commits(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     committishes: Sequence[str | bytes] | None = None,
 ) -> list[ObjectID]:
     """Filter commits to only those that are not reachable from others.
@@ -9591,7 +9722,7 @@ def mailinfo(
     return result
 
 
-def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
+def rerere(repo: RepoPath | None = None) -> tuple[list[tuple[bytes, str]], list[bytes]]:
     """Record current conflict resolutions and apply known resolutions.
 
     This reads conflicted files from the working tree and records them
@@ -9636,7 +9767,7 @@ def rerere(repo: RepoPath = ".") -> tuple[list[tuple[bytes, str]], list[bytes]]:
         return rerere_auto(r, working_tree, conflicts, config=r.get_config_stack())
 
 
-def rerere_status(repo: RepoPath = ".") -> list[tuple[str, bool]]:
+def rerere_status(repo: RepoPath | None = None) -> list[tuple[str, bool]]:
     """Get the status of all conflicts in the rerere cache.
 
     Args:
@@ -9653,7 +9784,7 @@ def rerere_status(repo: RepoPath = ".") -> list[tuple[str, bool]]:
 
 
 def rerere_diff(
-    repo: RepoPath = ".", conflict_id: str | None = None
+    repo: RepoPath | None = None, conflict_id: str | None = None
 ) -> list[tuple[str, bytes, bytes | None]]:
     """Show differences for recorded rerere conflicts.
 
@@ -9684,7 +9815,9 @@ def rerere_diff(
         return results
 
 
-def rerere_forget(repo: RepoPath = ".", pathspec: str | bytes | None = None) -> None:
+def rerere_forget(
+    repo: RepoPath | None = None, pathspec: str | bytes | None = None
+) -> None:
     """Forget recorded rerere resolutions for a pathspec.
 
     Args:
@@ -9705,7 +9838,7 @@ def rerere_forget(repo: RepoPath = ".", pathspec: str | bytes | None = None) -> 
         cache.clear()
 
 
-def rerere_clear(repo: RepoPath = ".") -> None:
+def rerere_clear(repo: RepoPath | None = None) -> None:
     """Clear all recorded rerere resolutions.
 
     Args:
@@ -9718,7 +9851,7 @@ def rerere_clear(repo: RepoPath = ".") -> None:
         cache.clear()
 
 
-def rerere_gc(repo: RepoPath = ".", max_age_days: int = 60) -> None:
+def rerere_gc(repo: RepoPath | None = None, max_age_days: int = 60) -> None:
     """Garbage collect old rerere resolutions.
 
     Args:
@@ -9733,7 +9866,7 @@ def rerere_gc(repo: RepoPath = ".", max_age_days: int = 60) -> None:
 
 
 def apply_patch(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     patch_file: str | bytes | BinaryIO | None = None,
     cached: bool = False,
     reverse: bool = False,
@@ -9795,7 +9928,7 @@ def apply_patch(
 
 
 def am(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     patches: str | bytes | BinaryIO | list[str | bytes | BinaryIO] | None = None,
     three_way: bool = False,
     keep_subject: bool = False,
@@ -9900,7 +10033,7 @@ def am(
 
 
 def am_continue(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
@@ -9930,7 +10063,7 @@ def am_continue(
 
 
 def am_skip(
-    repo: RepoPath = ".",
+    repo: RepoPath | None = None,
     committer: bytes | None = None,
     commit_timestamp: float | None = None,
     commit_timezone: int | None = None,
@@ -9957,7 +10090,7 @@ def am_skip(
         )
 
 
-def am_abort(repo: RepoPath = ".") -> None:
+def am_abort(repo: RepoPath | None = None) -> None:
     """Abort the current am and restore the original state.
 
     Resets HEAD, index, and working tree to the state before am started.
@@ -9971,7 +10104,7 @@ def am_abort(repo: RepoPath = ".") -> None:
         am_abort_impl(r)
 
 
-def am_quit(repo: RepoPath = ".") -> None:
+def am_quit(repo: RepoPath | None = None) -> None:
     """Quit the current am without reverting changes.
 
     Removes am state but keeps HEAD, index, and working tree as-is.

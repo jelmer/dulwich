@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 def lfs_track(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     patterns: Sequence[str] | None = None,
 ) -> list[str]:
     """Track file patterns with Git LFS.
@@ -94,7 +94,7 @@ def lfs_track(
 
 
 def lfs_untrack(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     patterns: Sequence[str] | None = None,
 ) -> list[str]:
     """Untrack file patterns from Git LFS.
@@ -143,7 +143,7 @@ def lfs_untrack(
         return lfs_track(r)  # Return updated list
 
 
-def lfs_init(repo: str | os.PathLike[str] | Repo = ".") -> None:
+def lfs_init(repo: str | os.PathLike[str] | Repo | None = None) -> None:
     """Initialize Git LFS in a repository.
 
     Args:
@@ -169,7 +169,7 @@ def lfs_init(repo: str | os.PathLike[str] | Repo = ".") -> None:
 
 
 def lfs_clean(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     path: str | os.PathLike[str] | None = None,
 ) -> bytes:
     """Clean a file by converting it to an LFS pointer.
@@ -202,7 +202,7 @@ def lfs_clean(
 
 
 def lfs_smudge(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     pointer_content: bytes | None = None,
 ) -> bytes:
     """Smudge an LFS pointer by retrieving the actual content.
@@ -230,7 +230,7 @@ def lfs_smudge(
 
 
 def lfs_ls_files(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     ref: str | bytes | None = None,
 ) -> list[tuple[bytes, str, int]]:
     """List files tracked by Git LFS.
@@ -283,7 +283,7 @@ def lfs_ls_files(
 
 
 def lfs_migrate(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     include: list[str] | None = None,
     exclude: list[str] | None = None,
     everything: bool = False,
@@ -387,7 +387,7 @@ def lfs_migrate(
 
 
 def lfs_pointer_check(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     paths: Sequence[str] | None = None,
 ) -> dict[str, Any | None]:
     """Check if files are valid LFS pointers.
@@ -428,7 +428,7 @@ def lfs_pointer_check(
 
 
 def lfs_fetch(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     remote: str = "origin",
     refs: list[str | bytes] | None = None,
 ) -> int:
@@ -519,7 +519,9 @@ def lfs_fetch(
         return fetched
 
 
-def lfs_pull(repo: str | os.PathLike[str] | Repo = ".", remote: str = "origin") -> int:
+def lfs_pull(
+    repo: str | os.PathLike[str] | Repo | None = None, remote: str = "origin"
+) -> int:
     """Pull LFS objects for current checkout.
 
     Args:
@@ -563,7 +565,7 @@ def lfs_pull(repo: str | os.PathLike[str] | Repo = ".", remote: str = "origin") 
 
 
 def lfs_push(
-    repo: str | os.PathLike[str] | Repo = ".",
+    repo: str | os.PathLike[str] | Repo | None = None,
     remote: str = "origin",
     refs: list[str | bytes] | None = None,
 ) -> int:
@@ -657,7 +659,9 @@ def lfs_push(
         return pushed
 
 
-def lfs_status(repo: str | os.PathLike[str] | Repo = ".") -> dict[str, list[str]]:
+def lfs_status(
+    repo: str | os.PathLike[str] | Repo | None = None,
+) -> dict[str, list[str]]:
     """Show status of LFS files.
 
     Args:

@@ -3431,6 +3431,45 @@ class TestUpdateWorkingTree(TestCase):
         update_working_tree(self.repo, tree1.id, tree3.id, change_iterator=changes)
         self.assertFalse(os.path.exists(link_path))
 
+    def test_update_working_tree_leading_symlink_not_followed(self):
+        """An entry below an on-disk symlink must not be written through it."""
+        if sys.platform == "win32":
+            self.skipTest("Symlinks not fully supported on Windows")
+
+        outside_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside_dir)
+        outside_file = os.path.join(outside_dir, "payload")
+
+        link = Blob.from_string(os.fsencode(outside_dir))
+        self.repo.object_store.add_object(link)
+
+        tree1 = Tree()
+        tree1[b"link"] = (0o120000, link.id)
+        self.repo.object_store.add_object(tree1)
+
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
+        self.assertTrue(os.path.islink(os.path.join(self.tempdir, "link")))
+
+        # The symlink is retained and a descendant "link/payload" is added.
+        regular = Blob.from_string(b"pwned")
+        self.repo.object_store.add_object(regular)
+        tree2 = Tree()
+        tree2[b"link"] = (0o120000, link.id)
+        tree2[b"link/payload"] = (0o100644, regular.id)
+        self.repo.object_store.add_object(tree2)
+
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        self.assertRaises(
+            InvalidPathError,
+            update_working_tree,
+            self.repo,
+            tree1.id,
+            tree2.id,
+            change_iterator=changes,
+        )
+        self.assertFalse(os.path.exists(outside_file))
+
     def test_update_working_tree_modified_file_to_dir_transition(self):
         """Test that modified files are not removed when they should be directories."""
         # Create tree with file

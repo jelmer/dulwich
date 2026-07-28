@@ -3125,6 +3125,9 @@ def update_working_tree(
             # leaving any changes already applied in place.
             if not validate_path(path, validate_path_element):
                 raise InvalidPathError(path)
+            # Refuse to write through a symlinked leading directory that
+            # would let open(..., "wb") escape the work tree.
+            verify_leading_dirs(path, [], repo_path)
             full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
             try:
                 modify_stat: os.stat_result | None = os.lstat(full_path)

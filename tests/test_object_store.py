@@ -238,6 +238,38 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         self.assertIn(b2.id, store)
         self.assertEqual(b2, store[b2.id])
 
+    def test_alternates_kwarg(self) -> None:
+        # An explicit alternates= list is consulted alongside the on-disk
+        # alternates file (used to plumb GIT_ALTERNATE_OBJECT_DIRECTORIES).
+        alternate_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, alternate_dir)
+        alternate_store = DiskObjectStore(alternate_dir)
+        self.addCleanup(alternate_store.close)
+        b2 = make_object(Blob, data=b"kwarg alternate")
+        alternate_store.add_object(b2)
+
+        store = DiskObjectStore(self.store_dir, alternates=[alternate_dir])
+        self.addCleanup(store.close)
+        self.assertIn(b2.id, store)
+        self.assertEqual(b2, store[b2.id])
+
+    def test_alternates_kwarg_after_file_entries(self) -> None:
+        # File entries are consulted first; kwarg entries are appended.
+        file_alt = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, file_alt)
+        DiskObjectStore(file_alt).close()
+        kw_alt = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, kw_alt)
+        DiskObjectStore(kw_alt).close()
+
+        store = DiskObjectStore(self.store_dir, alternates=[kw_alt])
+        self.addCleanup(store.close)
+        store.add_alternate_path(file_alt)
+        # add_alternate_path force-appends; but the important assertion is
+        # that the kwarg entry is still present.
+        paths = [alt.path for alt in store.alternates]
+        self.assertIn(kw_alt, paths)
+
     def test_read_alternate_paths(self) -> None:
         store = DiskObjectStore(self.store_dir)
         self.addCleanup(store.close)

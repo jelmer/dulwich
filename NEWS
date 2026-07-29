@@ -1,5 +1,13 @@
 1.2.13	UNRELEASED
 
+ * SECURITY: Stop granting write permission to other users for
+   ``core.sharedRepository = all``. ``parse_shared_repository`` returned masks
+   of ``0o666``/``0o2777``, so the control directory, loose objects, packs,
+   refs, the index and reflogs were chmodded world-writable, letting any local
+   user drop a hook or rewrite a ref in the repository. Git's
+   ``PERM_EVERYBODY`` grants others read, and execute on directories, but never
+   write. (Kartik Kenchi)
+
  * Always single-quote the repository path in the SSH command, matching git's
    ``sq_quote()``. ``shlex.quote`` left paths without shell metacharacters
    bare, which broke cloning from servers that parse the command themselves

@@ -1,5 +1,12 @@
 1.2.13	UNRELEASED
 
+ * Extend the ``verify_leading_dirs`` symlink guard to
+   ``update_working_tree`` (used by ``pull``, ``merge`` and ``checkout``).
+   The 1.2.12 fix only covered ``build_index_from_tree``, so a tree pairing a
+   symlink ``x`` with a descendant ``x/config`` could still write through the
+   link and overwrite ``.git/config`` on pull.
+   (Jelmer Vernooĳ, reported by Hugh Lewis)
+
  * Always single-quote the repository path in the SSH command, matching git's
    ``sq_quote()``. ``shlex.quote`` left paths without shell metacharacters
    bare, which broke cloning from servers that parse the command themselves

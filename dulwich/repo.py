@@ -422,8 +422,9 @@ def parse_shared_repository(
         return (0o664, 0o2775)
 
     if value_lower in ("all", "world", "everybody", "2"):
-        # World readable/writable (with setgid bit)
-        return (0o666, 0o2777)
+        # World readable (with setgid bit). Like git's PERM_EVERYBODY, others
+        # gain read, and execute on directories, but never write.
+        return (0o664, 0o2775)
 
     if value_lower == "umask":
         # Explicitly use umask

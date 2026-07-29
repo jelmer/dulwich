@@ -2246,11 +2246,31 @@ class SharedRepositoryTests(TestCase):
         repo = Repo.init_bare(tmp_dir, shared_repository="all")
         self.addCleanup(repo.close)
 
-        # Expected permissions for world sharing
-        expected_dir_mode = 0o2777  # setgid + rwxrwxrwx
-        expected_file_mode = 0o666  # rw-rw-rw-
+        # Expected permissions for world sharing. Others get read, and
+        # execute on directories, but no write bit.
+        expected_dir_mode = 0o2775  # setgid + rwxrwxr-x
+        expected_file_mode = 0o664  # rw-rw-r--
 
         self._check_permissions(repo, expected_file_mode, expected_dir_mode)
+
+    def test_init_bare_shared_all_not_world_writable(self):
+        """Test that sharedRepository=all never grants write to others."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+
+        os.umask(0)
+
+        repo = Repo.init_bare(tmp_dir, shared_repository="all")
+        self.addCleanup(repo.close)
+
+        for name in ("hooks", "refs", "objects", "info"):
+            path = os.path.join(repo.commondir(), name)
+            mode = self._get_file_mode(path)
+            self.assertEqual(
+                0,
+                mode & stat.S_IWOTH,
+                f"{name} is world-writable: {oct(mode)}",
+            )
 
     def test_init_bare_shared_umask(self):
         """Test initializing bare repo with sharedRepository=umask (default)."""
@@ -2326,7 +2346,7 @@ class SharedRepositoryTests(TestCase):
 
         # Check file permissions
         actual_mode = self._get_file_mode(obj_path)
-        expected_mode = 0o666  # rw-rw-rw-
+        expected_mode = 0o664  # rw-rw-r--
         self.assertEqual(
             expected_mode,
             actual_mode,

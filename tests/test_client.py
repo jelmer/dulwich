@@ -2180,20 +2180,19 @@ class HttpGitClientTests(TestCase):
     def test_fetch_pack_dumb_http(self) -> None:
         from urllib3.response import HTTPResponse
 
-        # Mock responses for dumb HTTP
-        info_refs_content = (
-            b"0123456789abcdef0123456789abcdef01234567\trefs/heads/master\n"
-        )
-        head_content = b"ref: refs/heads/master"
-
-        # Create a blob object for testing
+        # Create a blob object for testing; the advertised ref must use the
+        # blob's real sha, since fetched loose objects are verified against
+        # the requested object id.
         blob_content = b"Hello, dumb HTTP!"
-        blob_sha = b"0123456789abcdef0123456789abcdef01234567"
-        blob_hex = blob_sha.decode("ascii")
         blob_obj_data = (
             b"blob " + str(len(blob_content)).encode() + b"\x00" + blob_content
         )
+        blob_hex = hashlib.sha1(blob_obj_data).hexdigest()
         blob_compressed = zlib.compress(blob_obj_data)
+
+        # Mock responses for dumb HTTP
+        info_refs_content = blob_hex.encode("ascii") + b"\trefs/heads/master\n"
+        head_content = b"ref: refs/heads/master"
 
         responses = {
             "/HEAD": {

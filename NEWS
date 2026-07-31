@@ -17,16 +17,10 @@
    symlink ``x`` with a descendant ``x/config`` could still write through the
    link and overwrite ``.git/config`` on pull.
    (Jelmer Vernooĳ, reported by Hugh Lewis)
- * Translate ``.gitignore`` and ``.gitattributes`` bracket expressions the way
-   Git's ``wildmatch()`` does instead of the way ``fnmatch`` does. ``[^a-c]``
-   compiled to the *positive* class ``{^, a, b, c}``, the twelve POSIX classes
-   such as ``[[:digit:]]`` were not implemented, a backslash inside a class was
-   doubled rather than escaping the next member (so ``[a\-c]`` silently became
-   the range ``\``-``c``), a class could match ``/``, and a malformed class was
-   matched literally instead of disabling the pattern. 60 of 111 probed bracket
-   forms disagreed with ``git check-ignore``, and an inverted range such as
-   ``[z-a]`` raised ``re.error``. ``dulwich/ignore.py`` and ``dulwich/attrs.py``
-   carried the same bracket code and now share one scanner.
+ * Translate ``.gitignore``/``.gitattributes`` bracket expressions with Git's
+   ``wildmatch()`` semantics: ``[^...]`` negation, POSIX classes, backslash
+   escapes, and malformed-class handling. ``ignore.py`` and ``attrs.py`` now
+   share one scanner in ``dulwich.wildmatch``.
    (Vincent Gao)
 
  * Always single-quote the repository path in the SSH command, matching git's

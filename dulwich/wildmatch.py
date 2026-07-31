@@ -1,4 +1,4 @@
-# _wildmatch.py -- Bracket expressions from Git's wildmatch() pattern language
+# wildmatch.py -- Bracket expressions from Git's wildmatch() pattern language
 # Copyright (C) 2026 Vincent Gao <gaobing1230@gmail.com>
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later

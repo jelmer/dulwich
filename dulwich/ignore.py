@@ -46,7 +46,7 @@ from typing import TYPE_CHECKING, BinaryIO
 if TYPE_CHECKING:
     from .repo import Repo
 
-from ._wildmatch import NO_MATCH, MalformedPattern, translate_bracket_expression
+from .wildmatch import NO_MATCH, MalformedPattern, translate_bracket_expression
 from .config import Config, get_xdg_config_home_path
 
 

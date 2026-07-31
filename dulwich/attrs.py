@@ -37,7 +37,7 @@ import re
 from collections.abc import Generator, Iterator, Mapping, Sequence
 from typing import IO
 
-from ._wildmatch import NO_MATCH, MalformedPattern, translate_bracket_expression
+from .wildmatch import NO_MATCH, MalformedPattern, translate_bracket_expression
 
 AttributeValue = bytes | bool | None
 

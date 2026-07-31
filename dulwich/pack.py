@@ -4504,6 +4504,20 @@ class Pack:
                 keepfile.write(b"\n")
         return keepfile_name
 
+    def unkeep(self) -> bool:
+        """Remove the .keep file for the pack, allowing git to garbage collect it.
+
+        This is the counterpart of :meth:`keep`. It is not an error to call
+        this on a pack that has no .keep file.
+
+        Returns: True if a .keep file was removed, False if there was none.
+        """
+        try:
+            os.unlink(f"{self._basename}.keep")
+        except FileNotFoundError:
+            return False
+        return True
+
     def get_ref(
         self, sha: RawObjectID | ObjectID
     ) -> tuple[int | None, int, OldUnpackedObject]:

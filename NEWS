@@ -1,5 +1,15 @@
 1.2.13	UNRELEASED
 
+ * SECURITY: Stream loose objects fetched over dumb HTTP.
+   ``DumbHTTPObjectStore._fetch_loose_object`` inflated the server's response
+   with a single unbounded ``zlib.decompress``, so a malicious or
+   man-in-the-middle dumb server could expand a small response into gigabytes
+   of memory during clone/fetch. The response is now inflated incrementally
+   through a bounded buffer, spooling large objects to a temporary file, and
+   the result is only returned once it hashes to the requested object ID,
+   matching how C git's dumb-http walker fetches loose objects.
+   (netliomax25-code, #2315)
+
  * Extend the ``verify_leading_dirs`` symlink guard to
    ``update_working_tree`` (used by ``pull``, ``merge`` and ``checkout``).
    The 1.2.12 fix only covered ``build_index_from_tree``, so a tree pairing a

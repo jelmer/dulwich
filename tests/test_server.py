@@ -561,17 +561,22 @@ class UploadPackSHA1InWantTestCase(TestCase):
         self.assertFalse(handler.is_want_allowed(TWO))
         self.assertFalse(handler.is_want_allowed(SIX))
 
-    def test_allow_tip_does_not_include_peeled_tag_target(self) -> None:
+    def test_annotated_tag_policy(self) -> None:
         target = self._repo.object_store[SIX]
         tag = make_tag(target, name=b"hidden-tag")
         self._repo.object_store.add_object(tag)
-        self._repo.refs[b"refs/tags/hidden"] = tag.id
+        outer_tag = make_tag(tag, name=b"outer-hidden-tag")
+        self._repo.object_store.add_object(outer_tag)
+        self._repo.refs[b"refs/tags/hidden"] = outer_tag.id
 
         handler = self._handler(b"allowTipSHA1InWant")
-        self.assertTrue(handler.is_want_allowed(tag.id))
+        self.assertTrue(handler.is_want_allowed(outer_tag.id))
+        self.assertFalse(handler.is_want_allowed(tag.id))
         self.assertFalse(handler.is_want_allowed(SIX))
 
         reachable_handler = self._handler(b"allowReachableSHA1InWant")
+        self.assertTrue(reachable_handler.is_want_allowed(outer_tag.id))
+        self.assertTrue(reachable_handler.is_want_allowed(tag.id))
         self.assertTrue(reachable_handler.is_want_allowed(SIX))
 
     def test_allow_reachable(self) -> None:

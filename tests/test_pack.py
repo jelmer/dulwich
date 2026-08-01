@@ -829,6 +829,25 @@ class TestPack(PackTests):
             buf = f.read()
             self.assertEqual(msg + b"\n", buf)
 
+    def test_unkeep(self) -> None:
+        with self.get_pack(pack1_sha) as p:
+            p = self._copy_pack(p)
+
+        with p:
+            keepfile_name = p.keep()
+            self.assertTrue(os.path.exists(keepfile_name))
+
+            self.assertTrue(p.unkeep())
+            self.assertFalse(os.path.exists(keepfile_name))
+
+    def test_unkeep_no_keepfile(self) -> None:
+        with self.get_pack(pack1_sha) as p:
+            p = self._copy_pack(p)
+
+        # Removing a .keep file that was never created is not an error.
+        with p:
+            self.assertFalse(p.unkeep())
+
     def test_name(self) -> None:
         with self.get_pack(pack1_sha) as p:
             self.assertEqual(pack1_sha, p.name())

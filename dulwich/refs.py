@@ -857,6 +857,26 @@ class DictRefsContainer(RefsContainer):
         self._peeled.update(peeled)
 
 
+#: Identity of a particular packed-refs file, used to detect that the file a
+#: cache was populated from has since been replaced.
+_PackedRefsKey = tuple[int, int, int, int, int]
+
+
+def _packed_refs_key(st: os.stat_result) -> _PackedRefsKey:
+    """Build a key identifying the packed-refs file described by ``st``.
+
+    The fields mirror those git compares in ``match_stat_data()`` when
+    deciding whether a file it has cached has been replaced. Size alone is a
+    weak signal here, since repacking refs often produces a file of identical
+    length, so the inode and timestamps do most of the work.
+
+    Args:
+      st: Stat result for a packed-refs file.
+    Returns: An opaque, comparable key.
+    """
+    return (st.st_ino, st.st_dev, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+
 class DiskRefsContainer(RefsContainer):
     """Refs container that reads refs from disk."""
 
@@ -879,6 +899,7 @@ class DiskRefsContainer(RefsContainer):
             self.worktree_path = os.fsencode(os.fspath(worktree_path))
         self._packed_refs: dict[Ref, ObjectID] | None = None
         self._peeled_refs: dict[Ref, ObjectID] | None = None
+        self._packed_refs_key: _PackedRefsKey | None = None
 
     def __repr__(self) -> str:
         """Return string representation of DiskRefsContainer."""
@@ -957,6 +978,24 @@ class DiskRefsContainer(RefsContainer):
         root_dir = self.worktree_path if is_per_worktree_ref(name) else self.path
         return os.path.join(root_dir, path)
 
+    def _current_packed_refs_key(self) -> _PackedRefsKey | None:
+        """Identify the packed-refs file currently on disk.
+
+        Returns: An opaque key for the current packed-refs file, or None if
+            no packed-refs file is present.
+        """
+        try:
+            st = os.stat(os.path.join(self.path, b"packed-refs"))
+        except FileNotFoundError:
+            return None
+        return _packed_refs_key(st)
+
+    def _invalidate_packed_refs_cache(self) -> None:
+        """Discard cached packed and peeled refs."""
+        self._packed_refs = None
+        self._peeled_refs = None
+        self._packed_refs_key = None
+
     def get_packed_refs(self) -> dict[Ref, ObjectID]:
         """Get contents of the packed-refs file.
 
@@ -965,12 +1004,21 @@ class DiskRefsContainer(RefsContainer):
         Note: Will return an empty dictionary when no packed-refs file is
             present.
         """
-        # TODO: invalidate the cache on repacking
+        if (
+            self._packed_refs is not None
+            and self._packed_refs_key != self._current_packed_refs_key()
+        ):
+            # The packed-refs file was replaced underneath us, most likely by
+            # another process packing or unpacking refs. Drop the stale cache
+            # so that it is reloaded below.
+            self._invalidate_packed_refs_cache()
+
         if self._packed_refs is None:
             # set both to empty because we want _peeled_refs to be
             # None if and only if _packed_refs is also None.
             self._packed_refs = {}
             self._peeled_refs = {}
+            self._packed_refs_key = None
             path = os.path.join(self.path, b"packed-refs")
             try:
                 f = GitFile(path, "rb")
@@ -987,6 +1035,11 @@ class DiskRefsContainer(RefsContainer):
                     f.seek(0)
                     for sha, name in read_packed_refs(f):
                         self._packed_refs[name] = sha
+                # Record which file the cache was populated from, so that a
+                # later replacement of it can be detected. Stat the open file
+                # rather than the path to avoid picking up a newer file that
+                # was renamed into place while we were reading.
+                self._packed_refs_key = _packed_refs_key(os.fstat(f.fileno()))
         return self._packed_refs
 
     def add_packed_refs(self, new_refs: Mapping[Ref, ObjectID | None]) -> None:
@@ -1001,29 +1054,34 @@ class DiskRefsContainer(RefsContainer):
 
         path = os.path.join(self.path, b"packed-refs")
 
-        with GitFile(path, "wb") as f:
-            # reread cached refs from disk, while holding the lock
-            packed_refs = self.get_packed_refs().copy()
+        try:
+            with GitFile(path, "wb") as f:
+                # reread cached refs from disk, while holding the lock
+                packed_refs = self.get_packed_refs().copy()
 
-            for ref, target in new_refs.items():
-                # sanity check
-                if ref == HEADREF:
-                    raise ValueError("cannot pack HEAD")
+                for ref, target in new_refs.items():
+                    # sanity check
+                    if ref == HEADREF:
+                        raise ValueError("cannot pack HEAD")
 
-                # remove any loose refs pointing to this one -- please
-                # note that this bypasses remove_if_equals as we don't
-                # want to affect packed refs in here
-                with suppress(OSError):
-                    os.remove(self.refpath(ref))
+                    # remove any loose refs pointing to this one -- please
+                    # note that this bypasses remove_if_equals as we don't
+                    # want to affect packed refs in here
+                    with suppress(OSError):
+                        os.remove(self.refpath(ref))
 
-                if target is not None:
-                    packed_refs[ref] = target
-                else:
-                    packed_refs.pop(ref, None)
+                    if target is not None:
+                        packed_refs[ref] = target
+                    else:
+                        packed_refs.pop(ref, None)
 
-            write_packed_refs(f, packed_refs, self._peeled_refs)
-
-            self._packed_refs = packed_refs
+                write_packed_refs(f, packed_refs, self._peeled_refs)
+        finally:
+            # Do not stat the path and associate that identity with the data
+            # just written: another writer can replace packed-refs after the
+            # lock is released but before the stat. Reload on the next access
+            # instead.
+            self._invalidate_packed_refs_cache()
 
     def get_peeled(self, name: Ref) -> ObjectID | None:
         """Return the cached peeled value of a ref, if available.
@@ -1093,22 +1151,25 @@ class DiskRefsContainer(RefsContainer):
         # reread cached refs from disk, while holding the lock
         f = GitFile(filename, "wb")
         try:
-            self._packed_refs = None
-            self.get_packed_refs()
+            self._invalidate_packed_refs_cache()
+            packed_refs = self.get_packed_refs().copy()
+            peeled_refs = (
+                self._peeled_refs.copy() if self._peeled_refs is not None else None
+            )
 
-            if self._packed_refs is None or name not in self._packed_refs:
+            if name not in packed_refs:
                 f.abort()
                 return
 
-            del self._packed_refs[name]
-            if self._peeled_refs is not None:
-                with suppress(KeyError):
-                    del self._peeled_refs[name]
-            write_packed_refs(f, self._packed_refs, self._peeled_refs)
+            del packed_refs[name]
+            if peeled_refs is not None:
+                peeled_refs.pop(name, None)
+            write_packed_refs(f, packed_refs, peeled_refs)
             f.close()
-        except BaseException:
-            f.abort()
-            raise
+        finally:
+            if not f.closed:
+                f.abort()
+            self._invalidate_packed_refs_cache()
 
     def set_symbolic_ref(
         self,

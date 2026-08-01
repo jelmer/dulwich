@@ -1,5 +1,9 @@
 1.2.13	UNRELEASED
 
+ * SECURITY: Refuse patch targets addressing the ``.git`` control directory.
+   ``apply_patches`` (via ``porcelain.am``/``apply_patch``) previously wrote and
+   ran ``.git/hooks/pre-commit``. (Jelmer Vernooĳ, reported by @bhaswanthc)
+
  * Extend the ``verify_leading_dirs`` symlink guard to
    ``update_working_tree`` (used by ``pull``, ``merge`` and ``checkout``).
    The 1.2.12 fix only covered ``build_index_from_tree``, so a tree pairing a

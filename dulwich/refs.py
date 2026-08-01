@@ -1086,8 +1086,9 @@ class DiskRefsContainer(RefsContainer):
             return None
 
     def _remove_packed_ref(self, name: Ref) -> None:
-        if self._packed_refs is None:
+        if name not in self.get_packed_refs():
             return
+
         filename = os.path.join(self.path, b"packed-refs")
         # reread cached refs from disk, while holding the lock
         f = GitFile(filename, "wb")

@@ -1382,6 +1382,38 @@ def _ensure_within_repo(repo_path: bytes, fs_path: bytes, rel_path: bytes) -> No
         raise ValueError(f"patch affects file outside repository: {rel_path!r}")
 
 
+def _validate_patch_target(r: "Repo", repo_path: bytes, tree_path: bytes) -> bytes:
+    """Validate a patch target path and return its filesystem path.
+
+    ``_ensure_within_repo`` alone only refuses paths that escape the work tree;
+    a target like ``.git/hooks/pre-commit`` stays inside it and would otherwise
+    be written (and later executed as a hook). On top of that containment check,
+    apply the same name and symlink checks git uses for checkout, so patch
+    application cannot reach the control directory. Mirrors
+    ``porcelain._checked_worktree_path``.
+
+    Returns:
+      The filesystem path under ``repo_path``, as bytes.
+    """
+    from .index import (
+        InvalidPathError,
+        get_path_element_validator,
+        validate_path,
+        verify_leading_dirs,
+    )
+
+    fs_path = os.path.join(repo_path, tree_path)
+    _ensure_within_repo(repo_path, fs_path, tree_path)
+    validator = get_path_element_validator(r.get_config_stack())
+    if not validate_path(tree_path, validator):
+        raise ValueError(f"refusing to write unsafe path: {tree_path!r}")
+    try:
+        verify_leading_dirs(tree_path, [], repo_path)
+    except InvalidPathError:
+        raise ValueError(f"refusing to write through symlink: {tree_path!r}")
+    return fs_path
+
+
 def _apply_rename_or_copy(
     r: "Repo",
     src_path: bytes,
@@ -1430,10 +1462,8 @@ def _apply_rename_or_copy(
             dst_stripped = b"/".join(dst_parts[strip:])
 
     repo_path_bytes = r.path.encode("utf-8") if isinstance(r.path, str) else r.path
-    src_fs_path = os.path.join(repo_path_bytes, src_stripped)
-    dst_fs_path = os.path.join(repo_path_bytes, dst_stripped)
-    _ensure_within_repo(repo_path_bytes, src_fs_path, src_stripped)
-    _ensure_within_repo(repo_path_bytes, dst_fs_path, dst_stripped)
+    src_fs_path = _validate_patch_target(r, repo_path_bytes, src_stripped)
+    dst_fs_path = _validate_patch_target(r, repo_path_bytes, dst_stripped)
 
     # Read content from source file
     op_name = "rename" if is_rename else "copy"
@@ -1592,8 +1622,7 @@ def apply_patches(
         # Convert to filesystem path
         tree_path = file_path
         repo_path_bytes = r.path.encode("utf-8") if isinstance(r.path, str) else r.path
-        fs_path = os.path.join(repo_path_bytes, file_path)
-        _ensure_within_repo(repo_path_bytes, fs_path, file_path)
+        fs_path = _validate_patch_target(r, repo_path_bytes, file_path)
 
         # Handle renames and copies
         original_lines: list[bytes] | None = None

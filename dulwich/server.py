@@ -76,6 +76,7 @@ import zlib
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Set as AbstractSet
+from dataclasses import dataclass
 from functools import partial
 from typing import IO, TYPE_CHECKING
 from typing import Protocol as TypingProtocol
@@ -106,7 +107,12 @@ from .object_filters import (
     filter_pack_objects_with_paths,
     parse_filter_spec,
 )
-from .object_store import MissingObjectFinder, PackBasedObjectStore, find_shallow
+from .object_store import (
+    MissingObjectFinder,
+    PackBasedObjectStore,
+    find_shallow,
+    peel_sha,
+)
 from .objects import Commit, ObjectID, Tree, valid_hexsha
 from .pack import ObjectContainer, write_pack_from_container
 from .protocol import (
@@ -161,12 +167,9 @@ from .protocol import (
     write_info_refs,
 )
 from .refs import Ref, RefsContainer
-from .repo import Repo
+from .repo import BaseRepo, Repo
 
 logger = log_utils.getLogger(__name__)
-
-# Maximum number of nested tag objects to follow when peeling to a commit.
-_MAX_TAG_PEEL_DEPTH = 100
 
 
 class Backend:
@@ -460,27 +463,13 @@ class PackHandler(Handler):
         self._done_received = True
 
 
-def _peel_to_commit(object_store: "BaseObjectStore", sha: ObjectID) -> ObjectID | None:
-    """Peel an object down to a commit.
+@dataclass(frozen=True)
+class _SHA1InWantPolicy:
+    """Configured policy for unadvertised object requests."""
 
-    Args:
-      object_store: Object store to look objects up in.
-      sha: Object ID to peel.
-    Returns: The object ID of the commit, or None if sha is missing or does
-        not peel to a commit.
-    """
-    # Bounded so that a cycle of tag objects cannot spin forever.
-    for _ in range(_MAX_TAG_PEEL_DEPTH):
-        try:
-            obj = object_store[sha]
-        except KeyError:
-            return None
-        if obj.type_name == b"commit":
-            return sha
-        if obj.type_name != b"tag":
-            return None
-        sha = obj.object[1]  # type: ignore[attr-defined]
-    return None
+    allow_any: bool = False
+    allow_reachable: bool = False
+    allow_tip: bool = False
 
 
 class UploadPackHandler(PackHandler):
@@ -513,7 +502,7 @@ class UploadPackHandler(PackHandler):
         self._processing_have_lines = False
         # Filter specification for partial clone support
         self.filter_spec: FilterSpec | None = None
-        self._sha1_in_want_policy: tuple[bool, bool, bool] | None = None
+        self._sha1_in_want_policy: _SHA1InWantPolicy | None = None
         self._sha1_in_want_ref_tips: set[ObjectID] | None = None
 
     def capabilities(self) -> list[bytes]:
@@ -535,28 +524,27 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_FILTER,
             capability_object_format(self.repo.object_format.name),
         ]
-        _allow_any, allow_reachable, allow_tip = self._get_sha1_in_want_policy()
-        if allow_tip:
+        policy = self._get_sha1_in_want_policy()
+        if policy.allow_tip:
             caps.append(CAPABILITY_ALLOW_TIP_SHA1_IN_WANT)
-        if allow_reachable:
+        if policy.allow_reachable:
             caps.append(CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT)
         return caps
 
-    def _get_sha1_in_want_policy(self) -> tuple[bool, bool, bool]:
+    def _get_sha1_in_want_policy(self) -> _SHA1InWantPolicy:
         """Read the uploadpack.allow*SHA1InWant settings for this repository.
 
-        Returns: A (any, reachable, tip) tuple of booleans. Setting
-            ``allowAnySHA1InWant`` implies the other two, as in git.
+        Returns: The configured policy. ``allowAnySHA1InWant`` implies the
+            other two options, as in git.
         """
         if self._sha1_in_want_policy is None:
-            get_config_stack = getattr(self.repo, "get_config_stack", None)
-            if not callable(get_config_stack):
+            if not isinstance(self.repo, BaseRepo):
                 # BackendRepo intentionally does not require configuration
                 # access. Preserve compatibility with custom backends by
                 # leaving all opt-in policies disabled when it is unavailable.
-                self._sha1_in_want_policy = (False, False, False)
+                self._sha1_in_want_policy = _SHA1InWantPolicy()
                 return self._sha1_in_want_policy
-            config = get_config_stack()
+            config = self.repo.get_config_stack()
 
             def get(name: bytes) -> bool:
                 try:
@@ -568,10 +556,10 @@ class UploadPackHandler(PackHandler):
                     return False
 
             allow_any = get(b"allowAnySHA1InWant")
-            self._sha1_in_want_policy = (
-                allow_any,
-                allow_any or get(b"allowReachableSHA1InWant"),
-                allow_any or get(b"allowTipSHA1InWant"),
+            self._sha1_in_want_policy = _SHA1InWantPolicy(
+                allow_any=allow_any,
+                allow_reachable=allow_any or get(b"allowReachableSHA1InWant"),
+                allow_tip=allow_any or get(b"allowTipSHA1InWant"),
             )
         return self._sha1_in_want_policy
 
@@ -606,19 +594,19 @@ class UploadPackHandler(PackHandler):
         if not wants:
             return set()
 
-        allow_any, allow_reachable, allow_tip = self._get_sha1_in_want_policy()
-        if not (allow_any or allow_reachable or allow_tip):
+        policy = self._get_sha1_in_want_policy()
+        if not (policy.allow_any or policy.allow_reachable or policy.allow_tip):
             return set()
 
         existing = {sha for sha in wants if sha in self.repo.object_store}
-        if allow_any:
+        if policy.allow_any:
             return existing
 
         # Both of the remaining options accept the tip of any ref, including
         # refs that were never advertised to this client.
         tips = self._ref_tips()
         allowed = existing & tips
-        if not allow_reachable:
+        if not policy.allow_reachable:
             return allowed
         allowed.update(self._reachable_wants(existing - allowed, tips))
         return allowed
@@ -635,16 +623,24 @@ class UploadPackHandler(PackHandler):
         """Return wants that peel to commits reachable from the ref tips."""
         object_store = self.repo.object_store
         targets: dict[ObjectID, set[ObjectID]] = {}
+        # Match git-rev-list semantics: annotated tags on either side are
+        # peeled before walking the commit graph.
         for want in wants:
-            target = _peel_to_commit(object_store, want)
-            if target is not None:
-                targets.setdefault(target, set()).add(want)
+            try:
+                _unpeeled, target = peel_sha(object_store, want)
+            except KeyError:
+                continue
+            if isinstance(target, Commit):
+                targets.setdefault(target.id, set()).add(want)
 
         pending = []
         for tip in tips:
-            commit_id = _peel_to_commit(object_store, tip)
-            if commit_id is not None:
-                pending.append(commit_id)
+            try:
+                _unpeeled, target = peel_sha(object_store, tip)
+            except KeyError:
+                continue
+            if isinstance(target, Commit):
+                pending.append(target.id)
 
         seen: set[ObjectID] = set()
         reachable: set[ObjectID] = set()
@@ -660,7 +656,8 @@ class UploadPackHandler(PackHandler):
                 commit = object_store[commit_id]
             except KeyError:
                 continue
-            pending.extend(commit.parents)  # type: ignore[attr-defined]
+            assert isinstance(commit, Commit)
+            pending.extend(commit.parents)
         return reachable
 
     @classmethod

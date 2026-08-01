@@ -28,6 +28,13 @@
    read from a buffer; the existing read-callable variants remain for streams.
    (Bojan Zivanovic, Jelmer Vernooĳ)
 
+ * Support ``uploadpack.allowTipSHA1InWant``,
+   ``uploadpack.allowReachableSHA1InWant`` and
+   ``uploadpack.allowAnySHA1InWant`` in ``UploadPackHandler``: unadvertised
+   wants are validated against the configured policy and the corresponding
+   capabilities are advertised. All three remain disabled by default.
+   (Bojan Zivanovic)
+
  * Deduplicate the commit walk in ``find_shallow`` and ``get_depth``
    (``dulwich.object_store``). Both re-expanded a commit once per path that
    reached it, so a merge-heavy history walked in exponential time.

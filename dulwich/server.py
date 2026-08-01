@@ -76,6 +76,7 @@ import zlib
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Set as AbstractSet
+from dataclasses import dataclass
 from functools import partial
 from typing import IO, TYPE_CHECKING
 from typing import Protocol as TypingProtocol
@@ -106,12 +107,19 @@ from .object_filters import (
     filter_pack_objects_with_paths,
     parse_filter_spec,
 )
-from .object_store import MissingObjectFinder, PackBasedObjectStore, find_shallow
+from .object_store import (
+    MissingObjectFinder,
+    PackBasedObjectStore,
+    find_shallow,
+    peel_sha,
+)
 from .objects import Commit, ObjectID, Tree, valid_hexsha
 from .pack import ObjectContainer, write_pack_from_container
 from .protocol import (
     CAPABILITIES_REF,
     CAPABILITY_AGENT,
+    CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT,
+    CAPABILITY_ALLOW_TIP_SHA1_IN_WANT,
     CAPABILITY_ATOMIC,
     CAPABILITY_DELETE_REFS,
     CAPABILITY_FILTER,
@@ -159,7 +167,7 @@ from .protocol import (
     write_info_refs,
 )
 from .refs import Ref, RefsContainer
-from .repo import Repo
+from .repo import BaseRepo, Repo
 
 logger = log_utils.getLogger(__name__)
 
@@ -455,6 +463,15 @@ class PackHandler(Handler):
         self._done_received = True
 
 
+@dataclass(frozen=True)
+class _SHA1InWantPolicy:
+    """Configured policy for unadvertised object requests."""
+
+    allow_any: bool = False
+    allow_reachable: bool = False
+    allow_tip: bool = False
+
+
 class UploadPackHandler(PackHandler):
     """Protocol handler for uploading a pack to the client."""
 
@@ -485,6 +502,8 @@ class UploadPackHandler(PackHandler):
         self._processing_have_lines = False
         # Filter specification for partial clone support
         self.filter_spec: FilterSpec | None = None
+        self._sha1_in_want_policy: _SHA1InWantPolicy | None = None
+        self._sha1_in_want_ref_tips: set[ObjectID] | None = None
 
     def capabilities(self) -> list[bytes]:
         """Return the list of capabilities supported by upload-pack.
@@ -492,7 +511,7 @@ class UploadPackHandler(PackHandler):
         Returns:
             List of capabilities including object-format for the repository
         """
-        return [
+        caps = [
             CAPABILITY_MULTI_ACK_DETAILED,
             CAPABILITY_MULTI_ACK,
             CAPABILITY_SIDE_BAND_64K,
@@ -505,6 +524,141 @@ class UploadPackHandler(PackHandler):
             CAPABILITY_FILTER,
             capability_object_format(self.repo.object_format.name),
         ]
+        policy = self._get_sha1_in_want_policy()
+        if policy.allow_tip:
+            caps.append(CAPABILITY_ALLOW_TIP_SHA1_IN_WANT)
+        if policy.allow_reachable:
+            caps.append(CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT)
+        return caps
+
+    def _get_sha1_in_want_policy(self) -> _SHA1InWantPolicy:
+        """Read the uploadpack.allow*SHA1InWant settings for this repository.
+
+        Returns: The configured policy. ``allowAnySHA1InWant`` implies the
+            other two options, as in git.
+        """
+        if self._sha1_in_want_policy is None:
+            if not isinstance(self.repo, BaseRepo):
+                # BackendRepo intentionally does not require configuration
+                # access. Preserve compatibility with custom backends by
+                # leaving all opt-in policies disabled when it is unavailable.
+                self._sha1_in_want_policy = _SHA1InWantPolicy()
+                return self._sha1_in_want_policy
+            config = self.repo.get_config_stack()
+
+            def get(name: bytes) -> bool:
+                try:
+                    return bool(config.get_boolean((b"uploadpack",), name, False))
+                except ValueError:
+                    logger.warning(
+                        "Ignoring invalid uploadpack.%s value", name.decode()
+                    )
+                    return False
+
+            allow_any = get(b"allowAnySHA1InWant")
+            self._sha1_in_want_policy = _SHA1InWantPolicy(
+                allow_any=allow_any,
+                allow_reachable=allow_any or get(b"allowReachableSHA1InWant"),
+                allow_tip=allow_any or get(b"allowTipSHA1InWant"),
+            )
+        return self._sha1_in_want_policy
+
+    def is_want_allowed(self, sha: ObjectID) -> bool:
+        """Check whether the client may ask for an object that was not advertised.
+
+        Mirrors git's ``uploadpack.allowAnySHA1InWant``,
+        ``uploadpack.allowReachableSHA1InWant`` and
+        ``uploadpack.allowTipSHA1InWant`` options. All default to false, so by
+        default a client may only ask for objects that were advertised to it.
+
+        Note that ``allowReachableSHA1InWant`` may need to walk the whole
+        commit graph to answer a single want, which is why git leaves it off
+        by default.
+
+        Args:
+          sha: Object ID the client asked for.
+        Returns: True if the object may be served to the client.
+        """
+        return sha in self.allowed_wants({sha})
+
+    def allowed_wants(self, wants: set[ObjectID]) -> set[ObjectID]:
+        """Return the unadvertised wants permitted by this repository.
+
+        Reachability for the entire request is checked in one graph walk so
+        its cost does not grow linearly with the number of want lines.
+
+        Args:
+          wants: Distinct, unadvertised object IDs requested by the client.
+        Returns: The subset of wants that may be served to the client.
+        """
+        if not wants:
+            return set()
+
+        policy = self._get_sha1_in_want_policy()
+        if not (policy.allow_any or policy.allow_reachable or policy.allow_tip):
+            return set()
+
+        existing = {sha for sha in wants if sha in self.repo.object_store}
+        if policy.allow_any:
+            return existing
+
+        # Both of the remaining options accept the tip of any ref, including
+        # refs that were never advertised to this client.
+        tips = self._ref_tips()
+        allowed = existing & tips
+        if not policy.allow_reachable:
+            return allowed
+        allowed.update(self._reachable_wants(existing - allowed, tips))
+        return allowed
+
+    def _ref_tips(self) -> set[ObjectID]:
+        """Return the exact object IDs at the tips of every ref."""
+        if self._sha1_in_want_ref_tips is None:
+            self._sha1_in_want_ref_tips = set(self.repo.get_refs().values())
+        return self._sha1_in_want_ref_tips
+
+    def _reachable_wants(
+        self, wants: set[ObjectID], tips: set[ObjectID]
+    ) -> set[ObjectID]:
+        """Return wants that peel to commits reachable from the ref tips."""
+        object_store = self.repo.object_store
+        targets: dict[ObjectID, set[ObjectID]] = {}
+        # Match git-rev-list semantics: annotated tags on either side are
+        # peeled before walking the commit graph.
+        for want in wants:
+            try:
+                _unpeeled, target = peel_sha(object_store, want)
+            except KeyError:
+                continue
+            if isinstance(target, Commit):
+                targets.setdefault(target.id, set()).add(want)
+
+        pending = []
+        for tip in tips:
+            try:
+                _unpeeled, target = peel_sha(object_store, tip)
+            except KeyError:
+                continue
+            if isinstance(target, Commit):
+                pending.append(target.id)
+
+        seen: set[ObjectID] = set()
+        reachable: set[ObjectID] = set()
+        while pending and targets:
+            commit_id = pending.pop()
+            if commit_id in seen:
+                continue
+            seen.add(commit_id)
+            matching_wants = targets.pop(commit_id, None)
+            if matching_wants is not None:
+                reachable.update(matching_wants)
+            try:
+                commit = object_store[commit_id]
+            except KeyError:
+                continue
+            assert isinstance(commit, Commit)
+            pending.extend(commit.parents)
+        return reachable
 
     @classmethod
     def required_capabilities(cls) -> tuple[bytes, ...]:
@@ -949,12 +1103,20 @@ class _ProtocolGraphWalker:
         command, sha_result = _split_proto_line(line, allowed)
 
         want_revs: list[ObjectID] = []
+        seen_wants: set[ObjectID] = set()
         while command == COMMAND_WANT:
             assert isinstance(sha_result, bytes)
-            if sha_result not in values:
-                raise GitProtocolError(f"Client wants invalid object {sha_result!r}")
-            want_revs.append(ObjectID(sha_result))
+            want = ObjectID(sha_result)
+            if want not in seen_wants:
+                seen_wants.add(want)
+                want_revs.append(want)
             command, sha_result = self.read_proto_line(allowed)
+
+        unadvertised = {want for want in want_revs if want not in values}
+        allowed_wants = self.handler.allowed_wants(unadvertised)
+        for want in want_revs:
+            if want in unadvertised and want not in allowed_wants:
+                raise GitProtocolError(f"Client wants invalid object {want!r}")
 
         self.set_wants(want_revs)
 

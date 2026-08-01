@@ -437,7 +437,7 @@ class UnpackedObject:
 
     obj_type_num: int | None
     obj_chunks: list[bytes] | None
-    delta_base: None | bytes | int
+    delta_base: bytes | int | None
     decomp_chunks: list[bytes]
     comp_chunks: list[bytes] | None
     decomp_len: int | None
@@ -453,7 +453,7 @@ class UnpackedObject:
         self,
         pack_type_num: int,
         *,
-        delta_base: None | bytes | int = None,
+        delta_base: bytes | int | None = None,
         decomp_len: int | None = None,
         crc32: int | None = None,
         sha: bytes | None = None,

@@ -1608,6 +1608,7 @@ class DiskObjectStore(PackBasedObjectStore):
         dir_mode: int | None = None,
         object_format: "ObjectFormat | None" = None,
         loose_object_size_limit: int | None = None,
+        alternates: "Iterable[str | os.PathLike[str]] | None" = None,
     ) -> None:
         """Open an object store.
 
@@ -1635,6 +1636,9 @@ class DiskObjectStore(PackBasedObjectStore):
             object. Defaults to core.bigFileThreshold's Git default (512 MiB)
             via :data:`DEFAULT_LOOSE_OBJECT_SIZE_LIMIT` when None. Guards against
             decompression-bomb attacks.
+          alternates: Extra alternate object directory paths to consult, in
+            addition to those listed in ``objects/info/alternates``. Used to
+            plumb ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` through from porcelain.
         """
         # Import here to avoid circular dependency
         from .object_format import DEFAULT_OBJECT_FORMAT
@@ -1655,6 +1659,11 @@ class DiskObjectStore(PackBasedObjectStore):
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
         self._alternates = None
+        self._extra_alternate_paths: list[str] = (
+            [os.fsdecode(os.fspath(p)) for p in alternates]
+            if alternates is not None
+            else []
+        )
         self.loose_compression_level = loose_compression_level
         self.pack_compression_level = pack_compression_level
         self.pack_index_version = pack_index_version
@@ -1694,6 +1703,7 @@ class DiskObjectStore(PackBasedObjectStore):
         *,
         file_mode: int | None = None,
         dir_mode: int | None = None,
+        alternates: "Iterable[str | os.PathLike[str]] | None" = None,
     ) -> "DiskObjectStore":
         """Create a DiskObjectStore from a configuration object.
 
@@ -1702,6 +1712,8 @@ class DiskObjectStore(PackBasedObjectStore):
           config: Configuration object to read settings from
           file_mode: Optional file permission mask for shared repository
           dir_mode: Optional directory permission mask for shared repository
+          alternates: Extra alternate object directory paths to consult,
+            appended to those listed in ``objects/info/alternates``.
 
         Returns:
           New DiskObjectStore instance configured according to config
@@ -1846,6 +1858,7 @@ class DiskObjectStore(PackBasedObjectStore):
             dir_mode=dir_mode,
             object_format=object_format,
             loose_object_size_limit=loose_object_size_limit,
+            alternates=alternates,
         )
         instance._use_commit_graph = use_commit_graph
         instance._use_midx = use_midx
@@ -1864,6 +1877,8 @@ class DiskObjectStore(PackBasedObjectStore):
             return self._alternates
         self._alternates = []
         for path in self._read_alternate_paths():
+            self._alternates.append(DiskObjectStore(path))
+        for path in self._extra_alternate_paths:
             self._alternates.append(DiskObjectStore(path))
         return self._alternates
 

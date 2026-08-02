@@ -1566,6 +1566,49 @@ class ApplyPatchesPathTests(TestCase):
         )
         self.assertFalse(os.path.exists(target))
 
+    def test_rejects_dotgit_target(self) -> None:
+        # A target inside the .git control directory stays within the work tree
+        # so the parent-traversal check alone would allow it, but writing e.g.
+        # .git/hooks/pre-commit installs a hook that later runs as the user.
+        # git refuses such a patch with "invalid path".
+        r = self._make_repo()
+        diff = (
+            b"diff --git a/.git/hooks/pre-commit b/.git/hooks/pre-commit\n"
+            b"new file mode 100755\n"
+            b"--- /dev/null\n"
+            b"+++ b/.git/hooks/pre-commit\n"
+            b"@@ -0,0 +1 @@\n"
+            b"+#!/bin/sh\n"
+        )
+        self.assertRaises(
+            ValueError, apply_patches, r, parse_unified_diff(diff), strip=1
+        )
+        self.assertFalse(
+            os.path.exists(os.path.join(r.path, ".git", "hooks", "pre-commit"))
+        )
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_symlinked_leading_dir(self) -> None:
+        # A patch that first creates ``sub`` as a symlink to .git/hooks and then
+        # writes ``sub/pre-commit`` would land the second write in the control
+        # directory through the link. Refuse it.
+        r = self._make_repo()
+        os.symlink(".git/hooks", os.path.join(r.path, "sub"))
+        diff = (
+            b"diff --git a/sub/pre-commit b/sub/pre-commit\n"
+            b"new file mode 100755\n"
+            b"--- /dev/null\n"
+            b"+++ b/sub/pre-commit\n"
+            b"@@ -0,0 +1 @@\n"
+            b"+#!/bin/sh\n"
+        )
+        self.assertRaises(
+            ValueError, apply_patches, r, parse_unified_diff(diff), strip=1
+        )
+        self.assertFalse(
+            os.path.exists(os.path.join(r.path, ".git", "hooks", "pre-commit"))
+        )
+
     def test_allows_in_tree_path(self) -> None:
         r = self._make_repo()
         diff = (

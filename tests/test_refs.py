@@ -497,6 +497,29 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
             self._refs.get_packed_refs(),
         )
 
+    def test_remove_packed_ref_with_unread_packed_refs(self) -> None:
+        # An unconditional delete never reads packed-refs on the way in, so
+        # _remove_packed_ref() is reached without the cache being populated.
+        self.assertIsNone(self._refs._packed_refs)
+        self.assertTrue(self._refs.remove_if_equals(b"refs/heads/packed", None))
+
+        self.assertNotIn(b"refs/heads/packed", self._refs.get_packed_refs())
+        self.assertNotIn(b"refs/heads/packed", DiskRefsContainer(self._refs.path))
+
+    def test_remove_loose_ref_while_packed_refs_locked(self) -> None:
+        # refs/heads/master is loose in this fixture, so removing it has no
+        # reason to touch packed-refs at all.
+        self.assertNotIn(b"refs/heads/master", self._refs.get_packed_refs())
+
+        # Simulate a concurrent `git pack-refs` holding the packed-refs lock.
+        lockpath = os.path.join(self._refs.path, b"packed-refs.lock")
+        with open(lockpath, "wb"):
+            pass
+        self.addCleanup(lambda: os.path.exists(lockpath) and os.remove(lockpath))
+
+        self.assertTrue(self._refs.remove_if_equals(b"refs/heads/master", None))
+        self.assertNotIn(b"refs/heads/master", self._refs.keys())
+
     def test_get_peeled_not_packed(self) -> None:
         # not packed
         self.assertEqual(None, self._refs.get_peeled(b"refs/tags/refs-0.2"))

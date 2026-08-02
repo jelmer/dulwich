@@ -20,8 +20,8 @@ jobs:
       matrix: ${{ steps.merged-identifiers.outputs.merged-identifiers }}
 
     steps:
-      - uses: actions/checkout@v7.0.0
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7
         with:
           python-version: 3.x
           cache: pip
@@ -71,8 +71,8 @@ jobs:
       fail-fast: true
 
     steps:
-      - uses: actions/checkout@v7.0.0
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7
         with:
           cache: pip
       - name: Install dependencies
@@ -95,8 +95,8 @@ jobs:
   build-android-wheels:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.0
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7
         with:
           cache: pip
       - name: Install dependencies
@@ -117,8 +117,8 @@ jobs:
   build-pure-wheels:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.0
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7
         with:
           cache: pip
       - run: pip install build
@@ -132,8 +132,8 @@ jobs:
   build-sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.0
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7
         with:
           cache: pip
       - name: Install dependencies
@@ -153,7 +153,7 @@ jobs:
       - build-sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           cache: pip
       - name: Install dependencies
@@ -193,4 +193,4 @@ jobs:
           pattern: artifact-*
           path: dist
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.14.0
+        uses: pypa/gh-action-pypi-publish@v1.14.2

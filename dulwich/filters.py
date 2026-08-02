@@ -191,7 +191,8 @@ class ProcessFilterDriver:
                 def read_func(size: int) -> bytes:
                     assert self._process is not None
                     assert self._process.stdout is not None
-                    return self._process.stdout.read(size)
+                    data: bytes = self._process.stdout.read(size)
+                    return data
 
                 self._protocol = Protocol(read_func, write_func)
 

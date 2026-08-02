@@ -484,7 +484,7 @@ class ShaFile:
     type_name: bytes
     type_num: int
     _chunked_text: list[bytes] | None
-    _sha: "FixedSha | None | HASH"
+    _sha: "FixedSha | HASH | None"
     object_format: ObjectFormat
 
     def __init__(self) -> None:

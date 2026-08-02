@@ -283,6 +283,15 @@ class TestPackDeltas(TestCase):
         self.assertRaises(ApplyDeltaError, apply_delta, b"", b"\x80")
         self.assertRaises(ApplyDeltaError, apply_delta, b"", b"")
 
+    def test_apply_delta_truncated_copy_op(self) -> None:
+        # A copy op declares offset and size bytes via its command byte's
+        # low nibble but the delta ends before those bytes are present. Used
+        # to crash with a generic TypeError from ``ord(b"")`` in the copy-op
+        # parsing loop; now raises ApplyDeltaError.
+        # \x00 src_size=0, \x00 dest_size=0, \x81 copy op that expects one
+        # offset byte which is missing.
+        self.assertRaises(ApplyDeltaError, apply_delta, b"", b"\x00\x00\x81")
+
     def test_create_delta_insert_only(self) -> None:
         """Test create_delta when only insertions are required."""
         base = b""
@@ -819,6 +828,25 @@ class TestPack(PackTests):
         with open(keepfile_name, "rb") as f:
             buf = f.read()
             self.assertEqual(msg + b"\n", buf)
+
+    def test_unkeep(self) -> None:
+        with self.get_pack(pack1_sha) as p:
+            p = self._copy_pack(p)
+
+        with p:
+            keepfile_name = p.keep()
+            self.assertTrue(os.path.exists(keepfile_name))
+
+            self.assertTrue(p.unkeep())
+            self.assertFalse(os.path.exists(keepfile_name))
+
+    def test_unkeep_no_keepfile(self) -> None:
+        with self.get_pack(pack1_sha) as p:
+            p = self._copy_pack(p)
+
+        # Removing a .keep file that was never created is not an error.
+        with p:
+            self.assertFalse(p.unkeep())
 
     def test_name(self) -> None:
         with self.get_pack(pack1_sha) as p:

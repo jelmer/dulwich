@@ -1,16 +1,24 @@
 1.2.13	UNRELEASED
 
- * SECURITY: Validate shallow object ids received from the remote.
-   ``_read_shallow_updates`` parsed a ``shallow <sha>`` pkt-line with
-   ``sha.strip()``, which only trims the surrounding whitespace; because
-   pkt-lines are length-framed a single packet may carry an internal newline, so
-   a hostile server (any clone/fetch of an untrusted repo) could inject a forged
-   graft line into ``.git/shallow`` and mark an arbitrary commit as a
-   parent-less boundary, silently truncating history. The client now rejects a
-   non-hex shallow/unshallow id with ``GitProtocolError``, and ``update_shallow``
-   and ``get_shallow`` additionally validate ids via ``check_hexsha`` as
-   hardening, matching git's ``get_oid_hex`` handling of shallow lines.
+ * HARDEN: Validate shallow object ids received from the remote.
    (netliomax25-code)
+
+ * SECURITY: Refuse patch targets addressing the ``.git`` control directory.
+   ``apply_patches`` (via ``porcelain.am``/``apply_patch``) previously wrote and
+   ran ``.git/hooks/pre-commit``. (Jelmer Vernooĳ, reported by @bhaswanthc)
+
+ * Extend the ``verify_leading_dirs`` symlink guard to
+   ``update_working_tree`` (used by ``pull``, ``merge`` and ``checkout``).
+   The 1.2.12 fix only covered ``build_index_from_tree``, so a tree pairing a
+   symlink ``x`` with a descendant ``x/config`` could still write through the
+   link and overwrite ``.git/config`` on pull.
+   (Jelmer Vernooĳ, reported by Hugh Lewis)
+
+ * Always single-quote the repository path in the SSH command, matching git's
+   ``sq_quote()``. ``shlex.quote`` left paths without shell metacharacters
+   bare, which broke cloning from servers that parse the command themselves
+   rather than handing it to a shell, such as Bitbucket Server.
+   (Jelmer Vernooĳ, #2319)
 
 1.2.12	2026-07-19
 

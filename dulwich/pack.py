@@ -437,7 +437,7 @@ class UnpackedObject:
 
     obj_type_num: int | None
     obj_chunks: list[bytes] | None
-    delta_base: None | bytes | int
+    delta_base: bytes | int | None
     decomp_chunks: list[bytes]
     comp_chunks: list[bytes] | None
     decomp_len: int | None
@@ -453,7 +453,7 @@ class UnpackedObject:
         self,
         pack_type_num: int,
         *,
-        delta_base: None | bytes | int = None,
+        delta_base: bytes | int | None = None,
         decomp_len: int | None = None,
         crc32: int | None = None,
         sha: bytes | None = None,
@@ -3848,6 +3848,17 @@ def apply_delta(
                 break
         return size, index
 
+    def read_byte(delta: bytes) -> int:
+        nonlocal index
+        # Bound-check explicitly: ``delta[index:index+1]`` silently returns
+        # b"" past the end, which would crash with TypeError in ``ord`` and
+        # leave the caller unable to distinguish a truncated delta from a
+        # programming bug.
+        if index >= delta_length:
+            raise ApplyDeltaError("delta truncated in copy op")
+        index += 1
+        return ord(delta[index - 1 : index])
+
     src_size, index = get_delta_header_size(delta, index)
     dest_size, index = get_delta_header_size(delta, index)
     if src_size != len(src_buf):
@@ -3861,15 +3872,13 @@ def apply_delta(
             cp_off = 0
             for i in range(4):
                 if cmd & (1 << i):
-                    x = ord(delta[index : index + 1])
-                    index += 1
+                    x = read_byte(delta)
                     cp_off |= x << (i * 8)
             cp_size = 0
             # Version 3 packs can contain copy sizes larger than 64K.
             for i in range(3):
                 if cmd & (1 << (4 + i)):
-                    x = ord(delta[index : index + 1])
-                    index += 1
+                    x = read_byte(delta)
                     cp_size |= x << (i * 8)
             if cp_size == 0:
                 cp_size = 0x10000
@@ -3881,6 +3890,8 @@ def apply_delta(
                 break
             out.append(src_buf[cp_off : cp_off + cp_size])
         elif cmd != 0:
+            if index + cmd > delta_length:
+                raise ApplyDeltaError("delta truncated in insert op")
             out.append(delta[index : index + cmd])
             index += cmd
         else:
@@ -4492,6 +4503,20 @@ class Pack:
                 keepfile.write(msg)
                 keepfile.write(b"\n")
         return keepfile_name
+
+    def unkeep(self) -> bool:
+        """Remove the .keep file for the pack, allowing git to garbage collect it.
+
+        This is the counterpart of :meth:`keep`. It is not an error to call
+        this on a pack that has no .keep file.
+
+        Returns: True if a .keep file was removed, False if there was none.
+        """
+        try:
+            os.unlink(f"{self._basename}.keep")
+        except FileNotFoundError:
+            return False
+        return True
 
     def get_ref(
         self, sha: RawObjectID | ObjectID

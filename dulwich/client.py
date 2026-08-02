@@ -181,7 +181,7 @@ from .credentials import match_partial_url, match_urls
 from .errors import GitProtocolError, HangupException, NotGitRepository, SendPackError
 from .object_format import DEFAULT_OBJECT_FORMAT
 from .object_store import GraphWalker
-from .objects import ObjectID
+from .objects import ObjectID, valid_hexsha
 from .pack import (
     PACK_SPOOL_FILE_MAX_SIZE,
     PackChunkGenerator,
@@ -773,12 +773,15 @@ def _read_shallow_updates(
             cmd, sha = pkt.split(b" ", 1)
         except ValueError:
             raise GitProtocolError(f"unknown command {pkt!r}")
-        if cmd == COMMAND_SHALLOW:
-            new_shallow.add(ObjectID(sha.strip()))
-        elif cmd == COMMAND_UNSHALLOW:
-            new_unshallow.add(ObjectID(sha.strip()))
-        else:
+        if cmd not in (COMMAND_SHALLOW, COMMAND_UNSHALLOW):
             raise GitProtocolError(f"unknown command {pkt!r}")
+        sha = sha.strip()
+        if not valid_hexsha(sha):
+            raise GitProtocolError(f"invalid shallow line {pkt!r}")
+        if cmd == COMMAND_SHALLOW:
+            new_shallow.add(ObjectID(sha))
+        else:
+            new_unshallow.add(ObjectID(sha))
     return (new_shallow, new_unshallow)
 
 

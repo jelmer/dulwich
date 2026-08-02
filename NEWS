@@ -1,5 +1,8 @@
 1.2.13	UNRELEASED
 
+ * HARDEN: Validate shallow object ids received from the remote.
+   (netliomax25-code)
+
  * SECURITY: Refuse patch targets addressing the ``.git`` control directory.
    ``apply_patches`` (via ``porcelain.am``/``apply_patch``) previously wrote and
    ran ``.git/hooks/pre-commit``. (Jelmer Vernooĳ, reported by @bhaswanthc)

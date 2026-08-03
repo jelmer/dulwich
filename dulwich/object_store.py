@@ -1065,7 +1065,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         if prev_pack is not pack:
             self._pack_cache[base_name] = pack
             if prev_pack:
-                prev_pack.close()
+                prev_pack._release_from_cache()
         self._mark_pack_used(base_name)
         self._enforce_packed_git_limit()
 
@@ -1131,8 +1131,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             oldest = self._pack_access_order.pop(0)
             pack = self._pack_cache.get(oldest)
             if pack is not None:
-                pack.close()
                 del self._pack_cache[oldest]
+                pack._release_from_cache()
 
     def _iter_cached_packs(self) -> Iterator[Pack]:
         return iter(list(self._pack_cache.values()))
@@ -1151,10 +1151,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
                     self._pack_access_order.remove(key)
                 except ValueError:
                     pass
-                try:
-                    cached.close()
-                except OSError:
-                    pass
+                cached._release_from_cache()
                 break
 
     def _lookup_in_packs(self, lookup: "Callable[[Pack], _T]") -> "_T":
@@ -1952,7 +1949,7 @@ class DiskObjectStore(PackBasedObjectStore):
                 self._mark_pack_used(basename)
         # Remove disappeared pack files
         for f in set(self._pack_cache) - pack_files:
-            self._pack_cache.pop(f).close()
+            self._pack_cache.pop(f)._release_from_cache()
             try:
                 self._pack_access_order.remove(f)
             except ValueError:
@@ -3676,7 +3673,7 @@ class BucketBasedObjectStore(PackBasedObjectStore):
                 self._pack_cache[f] = pack
         # Remove disappeared pack files
         for f in set(self._pack_cache) - pack_files:
-            self._pack_cache.pop(f).close()
+            self._pack_cache.pop(f)._release_from_cache()
         return new_packs
 
     def _upload_pack(

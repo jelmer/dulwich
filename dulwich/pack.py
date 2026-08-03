@@ -4127,6 +4127,7 @@ class Pack:
         self._data = None
         self._idx = None
         self._bitmap = None
+        self._released_from_cache = False
         self._idx_path = self._basename + ".idx"
         self._data_path = self._basename + ".pack"
         self._bitmap_path = self._basename + ".bitmap"
@@ -4315,14 +4316,27 @@ class Pack:
             self._idx.close()
             self._idx = None
 
+    def _release_from_cache(self) -> None:
+        """Release cache ownership without invalidating other users.
+
+        The pack's resources are closed by ``__del__`` once the last reference
+        is gone. Since this is an intentional ownership transfer, finalization
+        should not report the pack as leaked.
+        """
+        self._released_from_cache = True
+
     def __del__(self) -> None:
         """Ensure pack file is closed when Pack is garbage collected."""
         if self._data is not None or self._idx is not None:
             import warnings
 
-            warnings.warn(
-                f"unclosed Pack {self!r}", ResourceWarning, stacklevel=2, source=self
-            )
+            if not self._released_from_cache:
+                warnings.warn(
+                    f"unclosed Pack {self!r}",
+                    ResourceWarning,
+                    stacklevel=2,
+                    source=self,
+                )
             try:
                 self.close()
             except Exception:

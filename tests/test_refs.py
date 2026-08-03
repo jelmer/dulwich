@@ -28,9 +28,10 @@ import tempfile
 from io import BytesIO
 from pathlib import Path
 from typing import ClassVar
+from unittest.mock import patch
 
 from dulwich import errors
-from dulwich.file import FileLocked, GitFile
+from dulwich.file import FileLocked, GitFile, _GitFile
 from dulwich.objects import ZERO_SHA
 from dulwich.protocol import split_peeled_refs, strip_peeled_refs
 from dulwich.refs import (
@@ -519,6 +520,58 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
         self.assertTrue(self._refs.remove_if_equals(b"refs/heads/master", None))
         self.assertNotIn(b"refs/heads/master", self._refs.keys())
+
+    def test_get_packed_refs_reloads_when_replaced(self) -> None:
+        # Populate the cache.
+        self.assertEqual(
+            b"42d06bd4b77fed026b154d16493e5deab78f02ec",
+            self._refs.get_packed_refs()[b"refs/heads/packed"],
+        )
+
+        # Simulate another process repacking the refs behind our back.
+        other = DiskRefsContainer(self._refs.path)
+        other.add_packed_refs({b"refs/heads/packed": ONES})
+
+        self.assertEqual(ONES, self._refs.get_packed_refs()[b"refs/heads/packed"])
+
+    def test_get_packed_refs_reloads_when_created(self) -> None:
+        os.remove(os.path.join(self._refs.path, b"packed-refs"))
+
+        # Populate the cache while no packed-refs file exists.
+        self.assertEqual({}, self._refs.get_packed_refs())
+
+        other = DiskRefsContainer(self._refs.path)
+        other.add_packed_refs({b"refs/heads/packed": ONES})
+
+        self.assertEqual({b"refs/heads/packed": ONES}, self._refs.get_packed_refs())
+
+    def test_add_packed_refs_invalidates_cache(self) -> None:
+        self._refs.add_packed_refs({b"refs/heads/packed": ONES})
+
+        # The write invalidated the cache, so the subsequent read reloads it.
+        self.assertIsNone(self._refs._packed_refs)
+        self.assertEqual(ONES, self._refs.get_packed_refs()[b"refs/heads/packed"])
+
+    def test_add_packed_refs_reloads_after_concurrent_replacement(self) -> None:
+        packed_refs_path = os.path.join(self._refs.path, b"packed-refs")
+        other = DiskRefsContainer(self._refs.path)
+        original_close = _GitFile.close
+        replaced = False
+
+        def close_then_replace(f: _GitFile) -> None:
+            nonlocal replaced
+            original_close(f)
+            if os.fspath(f) == packed_refs_path and not replaced:
+                replaced = True
+                other.add_packed_refs({b"refs/heads/packed": TWOS})
+
+        # Replace packed-refs after this container releases its lock but before
+        # it can update its cache state.
+        with patch.object(_GitFile, "close", close_then_replace):
+            self._refs.add_packed_refs({b"refs/heads/packed": ONES})
+
+        self.assertTrue(replaced)
+        self.assertEqual(TWOS, self._refs.get_packed_refs()[b"refs/heads/packed"])
 
     def test_get_peeled_not_packed(self) -> None:
         # not packed

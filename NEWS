@@ -1,5 +1,13 @@
 1.2.13	UNRELEASED
 
+ * Fix reading the commit-graph extra edge list, which stores a position in a
+   list of 4-byte values rather than a byte offset. Only the first octopus
+   merge in a graph sits at position 0, where the two coincide; every later
+   one was read from a misaligned offset, so ``CommitGraph.get_parents()``
+   dropped or invented parents. This fed ``ParentsProvider`` and therefore
+   merge-base, fast-forward and shallow-depth computations.
+   (netliomax25-code)
+
  * HARDEN: Validate shallow object ids received from the remote.
    (netliomax25-code)
 

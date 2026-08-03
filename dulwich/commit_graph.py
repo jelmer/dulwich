@@ -302,8 +302,8 @@ class CommitGraph:
                 parents.append(oids[parent2_pos])
             elif parent2_pos >= GRAPH_EXTRA_EDGES_NEEDED:
                 # Handle extra edges (3+ parents)
-                edge_offset = parent2_pos & ~GRAPH_EXTRA_EDGES_NEEDED
-                parents.extend(self._parse_extra_edges(edge_offset, oids))
+                edge_index = parent2_pos & ~GRAPH_EXTRA_EDGES_NEEDED
+                parents.extend(self._parse_extra_edges(edge_index, oids))
 
             entry = CommitGraphEntry(
                 commit_id=sha_to_hex(oids[i]),
@@ -315,15 +315,23 @@ class CommitGraph:
             self.entries.append(entry)
 
     def _parse_extra_edges(
-        self, offset: int, oids: Sequence[RawObjectID]
+        self, index: int, oids: Sequence[RawObjectID]
     ) -> list[RawObjectID]:
-        """Parse extra parent edges for commits with 3+ parents."""
+        """Parse extra parent edges for commits with 3+ parents.
+
+        Args:
+          index: Position in the extra edge list, as stored in the commit
+            data chunk. The list holds 4-byte values, so this is scaled by 4
+            to reach the corresponding byte.
+          oids: Commit ids, indexed by commit graph position.
+        """
         if CHUNK_EXTRA_EDGE_LIST not in self.chunks:
             return []
 
         edge_data = self.chunks[CHUNK_EXTRA_EDGE_LIST].data
         parents = []
 
+        offset = index * 4
         while offset + 4 <= len(edge_data):
             parent_pos = struct.unpack(">L", edge_data[offset : offset + 4])[0]
             offset += 4

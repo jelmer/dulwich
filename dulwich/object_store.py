@@ -55,6 +55,7 @@ __all__ = [
 ]
 
 import binascii
+import errno
 import logging
 import os
 import stat
@@ -223,6 +224,10 @@ PACKDIR = "pack"
 # TODO: should packs also be non-writable on Windows? if so, that
 # would requite some rather significant adjustments to the test suite
 PACK_MODE = 0o444 if sys.platform != "win32" else 0o644
+
+# Number of times add_object() retries a loose object write when a concurrent
+# "git gc"/"git prune" removes the (still empty) fanout directory.
+_ADD_OBJECT_MAX_ATTEMPTS = 3
 
 # Grace period for cleaning up temporary pack files (in seconds)
 # Matches git's default of 2 weeks
@@ -2361,19 +2366,32 @@ class DiskObjectStore(PackBasedObjectStore):
         obj_id = ObjectID(obj.get_id(self.object_format))
         path = self._get_shafile_path(obj_id)
         dir = os.path.dirname(path)
-        try:
-            os.mkdir(dir)
-            if self.dir_mode is not None:
-                os.chmod(dir, self.dir_mode)
-        except FileExistsError:
-            pass
-        if os.path.exists(path):
-            return  # Already there, no need to write again
         mask = self.file_mode if self.file_mode is not None else PACK_MODE
-        with GitFile(path, "wb", mask=mask, fsync=self.fsync_object_files) as f:
-            f.write(
-                obj.as_legacy_object(compression_level=self.loose_compression_level)
-            )
+        # A concurrent "git gc"/"git prune" can rmdir() the still-empty fanout
+        # directory between our mkdir() and the lock file being created, so
+        # retry a bounded number of times rather than failing the write.
+        for _ in range(_ADD_OBJECT_MAX_ATTEMPTS):
+            try:
+                os.mkdir(dir)
+                if self.dir_mode is not None:
+                    os.chmod(dir, self.dir_mode)
+            except FileExistsError:
+                pass
+            if os.path.exists(path):
+                return  # Already there, no need to write again
+            try:
+                with GitFile(path, "wb", mask=mask, fsync=self.fsync_object_files) as f:
+                    f.write(
+                        obj.as_legacy_object(
+                            compression_level=self.loose_compression_level
+                        )
+                    )
+            except FileNotFoundError:
+                if os.path.isdir(dir):
+                    raise
+                continue
+            return
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
     @classmethod
     def init(

@@ -216,6 +216,24 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             ValueError, self.store._get_shafile_path, b"../../../../etc/passwd"
         )
 
+    def test_add_object_retries_when_fanout_dir_is_pruned(self) -> None:
+        # A concurrent "git gc"/"git prune" can remove the still-empty fanout
+        # directory between the mkdir() and the lock file being created.
+        blob = make_object(Blob, data=b"hello race")
+        real_gitfile = GitFile
+        calls = []
+
+        def racing_gitfile(path, *args, **kwargs):
+            calls.append(path)
+            if len(calls) == 1:
+                shutil.rmtree(os.path.dirname(path))
+            return real_gitfile(path, *args, **kwargs)
+
+        with patch("dulwich.object_store.GitFile", racing_gitfile):
+            self.store.add_object(blob)
+        self.assertEqual(2, len(calls))
+        self.assertEqual(blob.data, self.store[blob.id].data)
+
     def test_loose_compression_level(self) -> None:
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)

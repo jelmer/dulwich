@@ -1,4 +1,4 @@
-# wildmatch.py -- Bracket expressions from Git's wildmatch() pattern language
+# wildmatch.py -- Git's wildmatch() pattern language
 # Copyright (C) 2026 Vincent Gao <gaobing1230@gmail.com>
 #
 # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
@@ -19,14 +19,15 @@
 # License, Version 2.0.
 #
 
-r"""Bracket expressions from Git's wildmatch() pattern language.
+r"""Git's wildmatch() pattern language.
 
 Git matches ``.gitignore`` and ``.gitattributes`` patterns with the same
-``wildmatch()`` (``wildmatch.c``), so the bracket grammar is shared between
-:mod:`dulwich.ignore` and :mod:`dulwich.attrs`. It differs from
+``wildmatch()`` (``wildmatch.c``) under ``WM_PATHNAME``, so the grammar is
+shared between :mod:`dulwich.ignore` and :mod:`dulwich.attrs`. It is not
 :mod:`fnmatch`, whose semantics neither file follows:
 
-* ``^`` negates a class exactly like ``!`` (``NEGATE_CLASS2``).
+* ``*`` and ``?`` never match ``/``; only a whole ``**`` component does.
+* ``^`` negates a bracket class exactly like ``!`` (``NEGATE_CLASS2``).
 * ``[:alpha:]`` and the eleven other POSIX classes are supported.
 * A backslash escapes the following member, so ``[a\-c]`` is ``a``, ``-``, ``c``
   rather than the range ``\`` to ``c``.
@@ -34,9 +35,18 @@ Git matches ``.gitignore`` and ``.gitattributes`` patterns with the same
 * A malformed bracket expression makes the whole pattern match nothing.
 """
 
-__all__ = ["NO_MATCH", "MalformedPattern", "translate_bracket_expression"]
+__all__ = [
+    "NO_MATCH",
+    "MalformedPattern",
+    "translate",
+    "translate_bracket_expression",
+]
 
+import logging
 import re
+from collections.abc import Sequence
+
+logger = logging.getLogger(__name__)
 
 # Regex that never matches, for patterns wildmatch() rejects outright.
 NO_MATCH = b"(?!.*)"
@@ -166,3 +176,140 @@ def translate_bracket_expression(pattern: bytes, i: int) -> tuple[int, bytes]:
         # Well-formed but unmatchable, e.g. [z-a] or [/].
         return i + 1, b"(?!)"
     return i + 1, b"[" + body + b"]"
+
+
+def _translate_segment(segment: bytes) -> bytes:
+    """Translate a single path segment to regex, following Git rules exactly."""
+    if segment == b"*":
+        return b"[^/]+"
+
+    res = b""
+    i, n = 0, len(segment)
+    while i < n:
+        c = segment[i : i + 1]
+        i += 1
+        if c == b"*":
+            # Collapse a run of consecutive '*' into a single quantifier.
+            # Within a segment repeated '*' are redundant ([^/]*[^/]* is
+            # equivalent to [^/]*), and emitting one quantifier per star
+            # builds a regex with adjacent unbounded quantifiers that
+            # backtracks catastrophically on non-matching input (ReDoS).
+            while i < n and segment[i : i + 1] == b"*":
+                i += 1
+            res += b"[^/]*"
+        elif c == b"?":
+            res += b"[^/]"
+        elif c == b"\\":
+            if i < n:
+                res += re.escape(segment[i : i + 1])
+                i += 1
+            else:
+                res += re.escape(c)
+        elif c == b"[":
+            i, bracket = translate_bracket_expression(segment, i)
+            res += bracket
+        else:
+            res += re.escape(c)
+    return res
+
+
+def _split_segments(pat: bytes) -> list[bytes]:
+    """Split a pattern on ``/``, ignoring slashes inside a bracket expression.
+
+    Git never splits the pattern; it hands the whole thing to wildmatch(). A
+    bracket expression may therefore span a ``/`` (it just can never match one).
+    """
+    if b"[" not in pat:
+        return pat.split(b"/")
+    segments = []
+    start = i = 0
+    while i < len(pat):
+        c = pat[i : i + 1]
+        if c == b"\\" and i + 1 < len(pat):
+            i += 2
+        elif c == b"[":
+            i, _bracket = translate_bracket_expression(pat, i + 1)
+        else:
+            if c == b"/":
+                segments.append(pat[start:i])
+                start = i + 1
+            i += 1
+    segments.append(pat[start:])
+    return segments
+
+
+def _translate_double_asterisk(segments: Sequence[bytes], i: int) -> tuple[bytes, bool]:
+    """Handle ** segment processing, returns (regex_part, skip_next)."""
+    # Check if ** is at end
+    remaining = segments[i + 1 :]
+    if all(s == b"" for s in remaining):
+        # ** at end - matches everything
+        return b".*", False
+
+    # Check if next segment is also **
+    if i + 1 < len(segments) and segments[i + 1] == b"**":
+        # Consecutive ** segments
+        # Check if this ends with a directory pattern (trailing /)
+        remaining_after_next = segments[i + 2 :]
+        is_dir_pattern = (
+            len(remaining_after_next) == 1 and remaining_after_next[0] == b""
+        )
+
+        if is_dir_pattern:
+            # Pattern like c/**/**/ - requires at least one intermediate directory
+            return b"[^/]+/(?:[^/]+/)*", True
+        else:
+            # Pattern like c/**/**/d - allows zero intermediate directories
+            return b"(?:[^/]+/)*", True
+    else:
+        # ** in middle - handle differently depending on what follows
+        if i == 0:
+            # ** at start - any prefix
+            return b"(?:.*/)??", False
+        else:
+            # ** in middle - match zero or more complete directory segments
+            return b"(?:[^/]+/)*", False
+
+
+def _translate(pat: bytes) -> bytes:
+    if pat == b"**":
+        return b".*"
+    res = b""
+    segments = _split_segments(pat)
+    i = 0
+    while i < len(segments):
+        segment = segments[i]
+
+        # Add slash separator (except for first segment)
+        if i > 0 and segments[i - 1] != b"**":
+            res += re.escape(b"/")
+
+        if segment == b"**":
+            regex_part, skip_next = _translate_double_asterisk(segments, i)
+            res += regex_part
+            if regex_part == b".*":  # End of pattern
+                break
+            if skip_next:
+                i += 1
+        else:
+            res += _translate_segment(segment)
+
+        i += 1
+    return res
+
+
+def translate(pattern: bytes) -> bytes:
+    """Translate a wildmatch() pattern to a regular expression.
+
+    Args:
+      pattern: Pattern in Git's wildmatch() language (``WM_PATHNAME``)
+
+    Returns:
+      An unanchored regular expression, or :data:`NO_MATCH` for a pattern
+      wildmatch() aborts on (``WM_ABORT_ALL``), which matches nothing at all
+    """
+    try:
+        return _translate(pattern)
+    except MalformedPattern:
+        logger.warning("Ignoring malformed pattern %r", pattern)
+        return NO_MATCH

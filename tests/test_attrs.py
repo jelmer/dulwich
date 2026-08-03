@@ -277,8 +277,16 @@ class PatternTests(TestCase):
     def test_malformed_character_class(self):
         """wildmatch() gives up on these, so the pattern matches nothing."""
         for pattern in (b"file[0-9.txt", b"file[", b"file[[:foo:]].txt"):
-            self.assertFalse(Pattern(pattern).match(pattern))
-            self.assertFalse(Pattern(pattern).match(b"file0.txt"))
+            with self.assertLogs("dulwich.wildmatch", level="WARNING"):
+                compiled = Pattern(pattern)
+            self.assertFalse(compiled.match(pattern))
+            self.assertFalse(compiled.match(b"file0.txt"))
+
+    def test_double_asterisk_within_component(self):
+        """'**' is only special as a whole path component."""
+        pattern = Pattern(b"a**b")
+        self.assertTrue(pattern.match(b"axb"))
+        self.assertFalse(pattern.match(b"a/x/b"))
 
     def test_directory_pattern(self):
         """Test pattern with directory."""

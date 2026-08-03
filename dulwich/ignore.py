@@ -46,8 +46,9 @@ from typing import TYPE_CHECKING, BinaryIO
 if TYPE_CHECKING:
     from .repo import Repo
 
-from .wildmatch import NO_MATCH, MalformedPattern, translate_bracket_expression
 from .config import Config, get_xdg_config_home_path
+from .wildmatch import NO_MATCH
+from .wildmatch import translate as translate_wildmatch
 
 
 def _pattern_to_str(pattern: "Pattern | bytes | str") -> str:
@@ -157,99 +158,6 @@ def _pattern_excludes_parent(
     return False
 
 
-def _translate_segment(segment: bytes) -> bytes:
-    """Translate a single path segment to regex, following Git rules exactly."""
-    if segment == b"*":
-        return b"[^/]+"
-
-    res = b""
-    i, n = 0, len(segment)
-    while i < n:
-        c = segment[i : i + 1]
-        i += 1
-        if c == b"*":
-            # Collapse a run of consecutive '*' into a single quantifier.
-            # Within a segment repeated '*' are redundant ([^/]*[^/]* is
-            # equivalent to [^/]*), and emitting one quantifier per star
-            # builds a regex with adjacent unbounded quantifiers that
-            # backtracks catastrophically on non-matching input (ReDoS).
-            while i < n and segment[i : i + 1] == b"*":
-                i += 1
-            res += b"[^/]*"
-        elif c == b"?":
-            res += b"[^/]"
-        elif c == b"\\":
-            if i < n:
-                res += re.escape(segment[i : i + 1])
-                i += 1
-            else:
-                res += re.escape(c)
-        elif c == b"[":
-            i, bracket = translate_bracket_expression(segment, i)
-            res += bracket
-        else:
-            res += re.escape(c)
-    return res
-
-
-def _split_segments(pat: bytes) -> list[bytes]:
-    """Split a pattern on ``/``, ignoring slashes inside a bracket expression.
-
-    Git never splits the pattern; it hands the whole thing to wildmatch(). A
-    bracket expression may therefore span a ``/`` (it just can never match one).
-    """
-    if b"[" not in pat:
-        return pat.split(b"/")
-    segments = []
-    start = i = 0
-    while i < len(pat):
-        c = pat[i : i + 1]
-        if c == b"\\" and i + 1 < len(pat):
-            i += 2
-        elif c == b"[":
-            i, _bracket = translate_bracket_expression(pat, i + 1)
-        else:
-            if c == b"/":
-                segments.append(pat[start:i])
-                start = i + 1
-            i += 1
-    segments.append(pat[start:])
-    return segments
-
-
-def _handle_double_asterisk(segments: Sequence[bytes], i: int) -> tuple[bytes, bool]:
-    """Handle ** segment processing, returns (regex_part, skip_next)."""
-    # Check if ** is at end
-    remaining = segments[i + 1 :]
-    if all(s == b"" for s in remaining):
-        # ** at end - matches everything
-        return b".*", False
-
-    # Check if next segment is also **
-    if i + 1 < len(segments) and segments[i + 1] == b"**":
-        # Consecutive ** segments
-        # Check if this ends with a directory pattern (trailing /)
-        remaining_after_next = segments[i + 2 :]
-        is_dir_pattern = (
-            len(remaining_after_next) == 1 and remaining_after_next[0] == b""
-        )
-
-        if is_dir_pattern:
-            # Pattern like c/**/**/ - requires at least one intermediate directory
-            return b"[^/]+/(?:[^/]+/)*", True
-        else:
-            # Pattern like c/**/**/d - allows zero intermediate directories
-            return b"(?:[^/]+/)*", True
-    else:
-        # ** in middle - handle differently depending on what follows
-        if i == 0:
-            # ** at start - any prefix
-            return b"(?:.*/)??", False
-        else:
-            # ** in middle - match zero or more complete directory segments
-            return b"(?:[^/]+/)*", False
-
-
 def _handle_leading_patterns(pat: bytes, res: bytes) -> tuple[bytes, bytes]:
     """Handle leading patterns like ``/**/``, ``**/``, or ``/``."""
     if pat.startswith(b"/**/"):
@@ -267,15 +175,6 @@ def _handle_leading_patterns(pat: bytes, res: bytes) -> tuple[bytes, bytes]:
 
 def translate(pat: bytes) -> bytes:
     """Translate a gitignore pattern to a regular expression following Git rules exactly."""
-    try:
-        return _translate(pat)
-    except MalformedPattern:
-        # wildmatch() aborts on a malformed bracket expression, which leaves
-        # the whole pattern matching nothing at all.
-        return NO_MATCH
-
-
-def _translate(pat: bytes) -> bytes:
     res = b"(?ms)"
 
     # Check for invalid patterns with // - Git treats these as broken patterns
@@ -296,30 +195,11 @@ def _translate(pat: bytes) -> bytes:
     if prefix_added:
         res += prefix_added
 
-    # Process the rest of the pattern
-    if pat == b"**":
-        res += b".*"
-    else:
-        segments = _split_segments(pat)
-        i = 0
-        while i < len(segments):
-            segment = segments[i]
-
-            # Add slash separator (except for first segment)
-            if i > 0 and segments[i - 1] != b"**":
-                res += re.escape(b"/")
-
-            if segment == b"**":
-                regex_part, skip_next = _handle_double_asterisk(segments, i)
-                res += regex_part
-                if regex_part == b".*":  # End of pattern
-                    break
-                if skip_next:
-                    i += 1
-            else:
-                res += _translate_segment(segment)
-
-            i += 1
+    # Everything left of the gitignore-specific decoration is plain wildmatch
+    body = translate_wildmatch(pat)
+    if body == NO_MATCH:
+        return NO_MATCH
+    res += body
 
     # Add optional trailing slash for files
     if not pat.endswith(b"/"):

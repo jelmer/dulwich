@@ -278,10 +278,12 @@ class BracketExpressionTests(TestCase):
         # wildmatch() returns WM_ABORT_ALL on these, so the whole pattern
         # matches nothing -- not even the literal text.
         for pattern in (b"[abc", b"[", b"[]", b"[!]", b"[^]", b"foo["):
-            self.assertMatches(pattern, [], [pattern, b"a", b"[", b"foo["])
+            with self.assertLogs("dulwich.wildmatch", level="WARNING"):
+                self.assertMatches(pattern, [], [pattern, b"a", b"[", b"foo["])
 
     def test_unknown_posix_class_matches_nothing(self) -> None:
-        self.assertMatches(b"[[:foo:]]", [], [b"a", b"f", b"[", b"]"])
+        with self.assertLogs("dulwich.wildmatch", level="WARNING"):
+            self.assertMatches(b"[[:foo:]]", [], [b"a", b"f", b"[", b"]"])
 
 
 class ParentExclusionTests(TestCase):

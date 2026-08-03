@@ -37,7 +37,8 @@ import re
 from collections.abc import Generator, Iterator, Mapping, Sequence
 from typing import IO
 
-from .wildmatch import NO_MATCH, MalformedPattern, translate_bracket_expression
+from .wildmatch import NO_MATCH
+from .wildmatch import translate as translate_wildmatch
 
 AttributeValue = bytes | bool | None
 
@@ -110,8 +111,6 @@ def _translate_pattern(pattern: bytes) -> bytes:
     all the same features (e.g., no directory-only patterns with trailing /).
     """
     res = b""
-    i = 0
-    n = len(pattern)
 
     # If pattern doesn't contain /, it can match at any level
     if b"/" not in pattern:
@@ -119,42 +118,11 @@ def _translate_pattern(pattern: bytes) -> bytes:
     elif pattern.startswith(b"/"):
         # Leading / means root of repository
         pattern = pattern[1:]
-        n = len(pattern)
 
-    while i < n:
-        c = pattern[i : i + 1]
-        i += 1
-
-        if c == b"*":
-            # Consume the whole run of '*' so consecutive stars collapse to
-            # a single wildcard. Emitting one quantifier per star produces
-            # adjacent unbounded quantifiers (e.g. '.*.*.*') that backtrack
-            # catastrophically on non-matching input (ReDoS); collapsing is
-            # also semantically correct since repeated '*' are redundant.
-            double = i < n and pattern[i : i + 1] == b"*"
-            while i < n and pattern[i : i + 1] == b"*":
-                i += 1
-            if double:
-                # Double asterisk - matches across directory separators
-                if i < n and pattern[i : i + 1] == b"/":
-                    # **/ - match zero or more directories
-                    res += b"(?:.*/)??"
-                    i += 1
-                else:
-                    # ** at end or in the middle
-                    res += b".*"
-            else:
-                # Single * - match any character except /
-                res += b"[^/]*"
-        elif c == b"?":
-            res += b"[^/]"
-        elif c == b"[":
-            i, bracket = translate_bracket_expression(pattern, i)
-            res += bracket
-        else:
-            res += re.escape(c)
-
-    return res
+    body = translate_wildmatch(pattern)
+    if body == NO_MATCH:
+        return NO_MATCH
+    return res + body
 
 
 class Pattern:
@@ -172,12 +140,7 @@ class Pattern:
 
     def _compile(self) -> None:
         """Compile the pattern to a regular expression."""
-        try:
-            regex_pattern = _translate_pattern(self.pattern)
-        except MalformedPattern:
-            # wildmatch() aborts on a malformed bracket expression, which
-            # leaves the whole pattern matching nothing at all.
-            regex_pattern = NO_MATCH
+        regex_pattern = _translate_pattern(self.pattern)
         # Add anchors
         regex_pattern = b"^" + regex_pattern + b"$"
         self._regex = re.compile(regex_pattern)

@@ -17,11 +17,12 @@
    symlink ``x`` with a descendant ``x/config`` could still write through the
    link and overwrite ``.git/config`` on pull.
    (Jelmer Vernooĳ, reported by Hugh Lewis)
+
  * Translate ``.gitignore``/``.gitattributes`` bracket expressions with Git's
    ``wildmatch()`` semantics: ``[^...]`` negation, POSIX classes, backslash
-   escapes, and malformed-class handling. ``ignore.py`` and ``attrs.py`` now
-   share one scanner in ``dulwich.wildmatch``.
-   (Vincent Gao)
+   escapes and malformed-class handling. ``ignore`` and ``attrs`` now share
+   one translator, the new public ``dulwich.wildmatch``.
+   (Vincent Gao, #2326)
 
  * Always single-quote the repository path in the SSH command, matching git's
    ``sq_quote()``. ``shlex.quote`` left paths without shell metacharacters

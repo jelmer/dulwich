@@ -4,6 +4,14 @@
    list of 4-byte entries, not a byte offset, so every octopus merge after
    the first got a wrong parent list. (netliomax25-code)
 
+ * Refresh the mtime of an existing loose object in
+   ``DiskObjectStore.add_object()`` instead of only checking for its
+   existence. A stale mtime leaves the object a candidate for age-based
+   pruning, so a concurrent ``git gc`` could remove an object that
+   ``add_object()`` had reported as present and that the caller was about to
+   reference. Matches git's ``freshen_loose_object()``.
+   (Bojan Zivanovic, #2340)
+
  * HARDEN: Validate shallow object ids received from the remote.
    (netliomax25-code)
 

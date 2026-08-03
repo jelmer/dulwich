@@ -2367,8 +2367,18 @@ class DiskObjectStore(PackBasedObjectStore):
                 os.chmod(dir, self.dir_mode)
         except FileExistsError:
             pass
-        if os.path.exists(path):
-            return  # Already there, no need to write again
+        try:
+            # Refresh the mtime instead of just checking for existence. A
+            # loose object with a stale mtime is a candidate for age-based
+            # pruning, so a concurrent "git gc" could remove it before the
+            # caller has created a reference to it. If the utime() fails the
+            # object is missing or cannot be freshened, in which case it is
+            # not safe to skip the write.
+            os.utime(path, None)
+        except OSError:
+            pass
+        else:
+            return  # Already there and freshened, no need to write again
         mask = self.file_mode if self.file_mode is not None else PACK_MODE
         with GitFile(path, "wb", mask=mask, fsync=self.fsync_object_files) as f:
             f.write(

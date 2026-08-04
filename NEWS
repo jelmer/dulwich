@@ -1,5 +1,9 @@
 1.2.13	UNRELEASED
 
+ * Fix commit-graph extra edge indexing: the stored value is a position in a
+   list of 4-byte entries, not a byte offset, so every octopus merge after
+   the first got a wrong parent list. (netliomax25-code)
+
  * HARDEN: Validate shallow object ids received from the remote.
    (netliomax25-code)
 

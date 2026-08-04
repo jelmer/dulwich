@@ -24,7 +24,6 @@
 import re
 
 from dulwich.wildmatch import (
-    NO_MATCH,
     MalformedPattern,
     translate,
     translate_bracket_expression,
@@ -123,8 +122,6 @@ class TranslateTests(TestCase):
         self.assertMatches(b"a\\*c", b"a*c")
         self.assertNotMatches(b"a\\*c", b"abc")
 
-    def test_malformed_matches_nothing(self) -> None:
-        with self.assertLogs("dulwich.wildmatch", level="WARNING"):
-            self.assertEqual(NO_MATCH, translate(b"a[bc"))
-        with self.assertLogs("dulwich.wildmatch", level="WARNING"):
-            self.assertEqual(NO_MATCH, translate(b"[[:bogus:]]"))
+    def test_malformed_raises(self) -> None:
+        self.assertRaises(MalformedPattern, translate, b"a[bc")
+        self.assertRaises(MalformedPattern, translate, b"[[:bogus:]]")

@@ -37,6 +37,7 @@ __all__ = [
     "translate",
 ]
 
+import logging
 import os.path
 import re
 from collections.abc import Iterable, Sequence
@@ -47,8 +48,10 @@ if TYPE_CHECKING:
     from .repo import Repo
 
 from .config import Config, get_xdg_config_home_path
-from .wildmatch import NO_MATCH
+from .wildmatch import NO_MATCH, MalformedPattern
 from .wildmatch import translate as translate_wildmatch
+
+logger = logging.getLogger(__name__)
 
 
 def _pattern_to_str(pattern: "Pattern | bytes | str") -> str:
@@ -174,12 +177,17 @@ def _handle_leading_patterns(pat: bytes, res: bytes) -> tuple[bytes, bytes]:
 
 
 def translate(pat: bytes) -> bytes:
-    """Translate a gitignore pattern to a regular expression following Git rules exactly."""
+    """Translate a gitignore pattern to a regular expression following Git rules exactly.
+
+    Raises:
+      MalformedPattern: if wildmatch() would refuse the pattern outright;
+        see :func:`dulwich.wildmatch.translate`.
+    """
     res = b"(?ms)"
 
-    # Check for invalid patterns with // - Git treats these as broken patterns
+    # A "//" is well-formed but Git treats it as matching nothing, not as
+    # an error - distinct from a malformed pattern, which raises above.
     if b"//" in pat:
-        # Pattern with // doesn't match anything in Git
         return NO_MATCH
 
     # Don't normalize consecutive ** patterns - Git treats them specially
@@ -196,10 +204,7 @@ def translate(pat: bytes) -> bytes:
         res += prefix_added
 
     # Everything left of the gitignore-specific decoration is plain wildmatch
-    body = translate_wildmatch(pat)
-    if body == NO_MATCH:
-        return NO_MATCH
-    res += body
+    res += translate_wildmatch(pat)
 
     # Add optional trailing slash for files
     if not pat.endswith(b"/"):
@@ -256,6 +261,12 @@ class Pattern:
         Args:
             pattern: The gitignore pattern as bytes.
             ignorecase: Whether to perform case-insensitive matching.
+
+        Raises:
+            MalformedPattern: if wildmatch() would refuse the pattern
+              outright. Loading a whole file of patterns should go through
+              :meth:`IgnoreFilter.append_pattern` instead, which catches
+              this and warns.
         """
         self.pattern = pattern
         self.ignorecase = ignorecase
@@ -375,8 +386,22 @@ class IgnoreFilter:
             self.append_pattern(pattern)
 
     def append_pattern(self, pattern: bytes) -> None:
-        """Add a pattern to the set."""
-        self._patterns.append(Pattern(pattern, self._ignorecase))
+        """Add a pattern to the set.
+
+        A malformed pattern is logged and skipped rather than raised, so one
+        bad line in a gitignore file doesn't stop the rest from loading. To
+        fail loudly instead, construct the ``Pattern`` directly.
+        """
+        try:
+            compiled = Pattern(pattern, self._ignorecase)
+        except MalformedPattern:
+            logger.warning(
+                "Ignoring malformed pattern %r in %s",
+                pattern,
+                self._path or "<patterns>",
+            )
+            return
+        self._patterns.append(compiled)
 
     def find_matching(self, path: bytes | str) -> Iterable[Pattern]:
         """Yield all matching patterns for path.

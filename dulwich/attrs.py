@@ -32,13 +32,16 @@ __all__ = [
     "read_gitattributes",
 ]
 
+import logging
 import os
 import re
 from collections.abc import Generator, Iterator, Mapping, Sequence
 from typing import IO
 
-from .wildmatch import NO_MATCH
+from .wildmatch import MalformedPattern
 from .wildmatch import translate as translate_wildmatch
+
+logger = logging.getLogger(__name__)
 
 AttributeValue = bytes | bool | None
 
@@ -109,6 +112,10 @@ def _translate_pattern(pattern: bytes) -> bytes:
 
     Similar to gitignore patterns, but simpler as gitattributes doesn't support
     all the same features (e.g., no directory-only patterns with trailing /).
+
+    Raises:
+      MalformedPattern: if wildmatch() would refuse the pattern outright;
+        see :func:`dulwich.wildmatch.translate`.
     """
     res = b""
 
@@ -119,10 +126,7 @@ def _translate_pattern(pattern: bytes) -> bytes:
         # Leading / means root of repository
         pattern = pattern[1:]
 
-    body = translate_wildmatch(pattern)
-    if body == NO_MATCH:
-        return NO_MATCH
-    return res + body
+    return res + translate_wildmatch(pattern)
 
 
 class Pattern:
@@ -196,6 +200,9 @@ def parse_gitattributes_file(
 ) -> list[tuple[Pattern, Mapping[bytes, AttributeValue]]]:
     """Parse a gitattributes file and return compiled patterns.
 
+    A malformed pattern is logged and skipped rather than raised, so one bad
+    line doesn't stop the rest of the file from loading.
+
     Args:
         filename: Path to the .gitattributes file
 
@@ -209,7 +216,13 @@ def parse_gitattributes_file(
 
     with open(filename, "rb") as f:
         for pattern_bytes, attrs in parse_git_attributes(f):
-            pattern = Pattern(pattern_bytes)
+            try:
+                pattern = Pattern(pattern_bytes)
+            except MalformedPattern:
+                logger.warning(
+                    "Ignoring malformed pattern %r in %r", pattern_bytes, filename
+                )
+                continue
             patterns.append((pattern, attrs))
 
     return patterns

@@ -40,6 +40,7 @@ from dulwich.ignore import (
     translate,
 )
 from dulwich.repo import Repo
+from dulwich.wildmatch import MalformedPattern
 
 from . import TestCase
 
@@ -77,7 +78,6 @@ NEGATIVE_MATCH_TESTS = [
     (b"foo.c", b"foo.[^ch]"),
     (b"foo.x", b"foo.[[:digit:]]"),
     (b"a/b", b"a[!x]b"),
-    (b"foo[", b"foo["),
 ]
 
 
@@ -104,8 +104,6 @@ TRANSLATE_TESTS = [
     (b"/[a\\-c]", b"(?ms)[a\\-c]/?\\Z"),
     (b"/[]a]", b"(?ms)[\\]a]/?\\Z"),
     (b"/[a/c]", b"(?ms)[ac]/?\\Z"),
-    (b"/[abc", b"(?!.*)"),
-    (b"/[[:foo:]]", b"(?!.*)"),
 ]
 
 
@@ -121,6 +119,10 @@ class TranslateTests(TestCase):
                 translate(pattern),
                 f"orig pattern: {pattern!r}, regex: {translate(pattern)!r}, expected: {regex!r}",
             )
+
+    def test_malformed_raises(self) -> None:
+        self.assertRaises(MalformedPattern, translate, b"/[abc")
+        self.assertRaises(MalformedPattern, translate, b"/[[:foo:]]")
 
     def test_collapses_consecutive_stars(self) -> None:
         # A run of '*' in a segment is redundant and must collapse to a
@@ -274,16 +276,14 @@ class BracketExpressionTests(TestCase):
         self.assertMatches(b"/[a/c]", [b"a", b"c"], [b"b"])
         self.assertMatches(b"/[!/]", [b"a", b"0"], [b"a/b"])
 
-    def test_malformed_matches_nothing(self) -> None:
-        # wildmatch() returns WM_ABORT_ALL on these, so the whole pattern
-        # matches nothing -- not even the literal text.
+    def test_malformed_raises(self) -> None:
+        # wildmatch() returns WM_ABORT_ALL on these; constructing a Pattern
+        # from one raises rather than silently matching nothing.
         for pattern in (b"[abc", b"[", b"[]", b"[!]", b"[^]", b"foo["):
-            with self.assertLogs("dulwich.wildmatch", level="WARNING"):
-                self.assertMatches(pattern, [], [pattern, b"a", b"[", b"foo["])
+            self.assertRaises(MalformedPattern, match_pattern, b"a", pattern)
 
-    def test_unknown_posix_class_matches_nothing(self) -> None:
-        with self.assertLogs("dulwich.wildmatch", level="WARNING"):
-            self.assertMatches(b"[[:foo:]]", [], [b"a", b"f", b"[", b"]"])
+    def test_unknown_posix_class_raises(self) -> None:
+        self.assertRaises(MalformedPattern, match_pattern, b"a", b"[[:foo:]]")
 
 
 class ParentExclusionTests(TestCase):
@@ -385,6 +385,16 @@ class IgnoreFilterTests(TestCase):
         self.assertIs(None, filter.is_ignored(b"c.c"))
         self.assertEqual([Pattern(b"a.c")], list(filter.find_matching(b"a.c")))
         self.assertEqual([], list(filter.find_matching(b"c.c")))
+
+    def test_malformed_pattern_raises(self) -> None:
+        self.assertRaises(MalformedPattern, Pattern, b"a[bc")
+
+    def test_malformed_pattern_skipped_with_warning(self) -> None:
+        with self.assertLogs("dulwich.ignore", level="WARNING"):
+            filter = IgnoreFilter([b"a.c", b"a[bc", b"b.c"])
+        # The malformed pattern is dropped; the good ones on either side load.
+        self.assertTrue(filter.is_ignored(b"a.c"))
+        self.assertTrue(filter.is_ignored(b"b.c"))
 
     def test_included_ignorecase(self) -> None:
         filter = IgnoreFilter([b"a.c", b"b.c"], ignorecase=False)

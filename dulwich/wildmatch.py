@@ -32,7 +32,9 @@ shared between :mod:`dulwich.ignore` and :mod:`dulwich.attrs`. It is not
 * A backslash escapes the following member, so ``[a\-c]`` is ``a``, ``-``, ``c``
   rather than the range ``\`` to ``c``.
 * A bracket expression never matches ``/``, not even a negated one.
-* A malformed bracket expression makes the whole pattern match nothing.
+* A malformed bracket expression raises :exc:`MalformedPattern`; callers that
+  read a whole file of patterns should catch it per pattern and warn, rather
+  than let one bad line abort the load.
 """
 
 __all__ = [
@@ -42,13 +44,12 @@ __all__ = [
     "translate_bracket_expression",
 ]
 
-import logging
 import re
 from collections.abc import Sequence
 
-logger = logging.getLogger(__name__)
-
-# Regex that never matches, for patterns wildmatch() rejects outright.
+# Regex that never matches. Exported for callers (dulwich.ignore,
+# dulwich.attrs) with their own well-formed-but-vacuous patterns, e.g. one
+# containing a bare "//". Not produced by this module itself.
 NO_MATCH = b"(?!.*)"
 
 _SLASH = 0x2F
@@ -214,10 +215,14 @@ def _translate_segment(segment: bytes) -> bytes:
 
 
 def _split_segments(pat: bytes) -> list[bytes]:
-    """Split a pattern on ``/``, ignoring slashes inside a bracket expression.
+    """Split a pattern into path segments, skipping slashes inside brackets.
 
-    Git never splits the pattern; it hands the whole thing to wildmatch(). A
-    bracket expression may therefore span a ``/`` (it just can never match one).
+    wildmatch() itself walks the whole pattern in one pass rather than
+    splitting it, so a bracket expression may span a ``/`` (it just can
+    never match one). This function exists only so :func:`_translate` can
+    special-case ``**`` per segment; it must respect the same bracket
+    boundaries a one-pass walk would, which is why it can't just call
+    ``pat.split(b"/")``.
     """
     if b"[" not in pat:
         return pat.split(b"/")
@@ -305,11 +310,13 @@ def translate(pattern: bytes) -> bytes:
       pattern: Pattern in Git's wildmatch() language (``WM_PATHNAME``)
 
     Returns:
-      An unanchored regular expression, or :data:`NO_MATCH` for a pattern
-      wildmatch() aborts on (``WM_ABORT_ALL``), which matches nothing at all
+      An unanchored regular expression.
+
+    Raises:
+      MalformedPattern: if wildmatch() would abort on this pattern outright
+        (``WM_ABORT_ALL``, e.g. an unterminated or unknown bracket
+        expression). Callers reading a file of patterns should catch this
+        per pattern and warn rather than let one bad line fail the load;
+        see :meth:`dulwich.ignore.IgnoreFilter.append_pattern`.
     """
-    try:
-        return _translate(pattern)
-    except MalformedPattern:
-        logger.warning("Ignoring malformed pattern %r", pattern)
-        return NO_MATCH
+    return _translate(pattern)

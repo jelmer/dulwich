@@ -24,6 +24,7 @@ from dulwich.commit_graph import (
     COMMIT_GRAPH_SIGNATURE,
     COMMIT_GRAPH_VERSION,
     GRAPH_EXTRA_EDGES_NEEDED,
+    GRAPH_LAST_EDGE,
     GRAPH_PARENT_MISSING,
     HASH_VERSION_SHA1,
     CommitGraph,
@@ -37,7 +38,7 @@ from dulwich.commit_graph import (
 from dulwich.graph import can_fast_forward, find_merge_base
 from dulwich.object_format import SHA1
 from dulwich.object_store import DiskObjectStore, MemoryObjectStore
-from dulwich.objects import Commit, Tree, hex_to_sha
+from dulwich.objects import Commit, Tree, hex_to_sha, sha_to_hex
 from dulwich.repo import ParentsProvider, Repo
 
 
@@ -413,6 +414,90 @@ class CommitGraphTests(unittest.TestCase):
         # The incomplete third parent entry should be ignored
         entry3 = graph.entries[3]
         self.assertEqual(len(entry3.parents), 2)  # Should have commit0 and commit1
+
+    def test_parse_extra_edges_second_octopus_merge(self) -> None:
+        """Test that a second octopus merge reads its own extra edges.
+
+        The commit data chunk stores a position in the extra edge list, not a
+        byte offset. Only the first octopus merge sits at position 0, where the
+        two happen to coincide.
+        """
+        # 6 commits: commit0..commit3 parentless, commit4 and commit5 are
+        # octopus merges whose extra edges live at list positions 0 and 2.
+        oids = [b"\x00" + bytes([i]) + b"\x00" * 18 for i in range(6)]
+
+        header = (
+            COMMIT_GRAPH_SIGNATURE
+            + struct.pack(">B", COMMIT_GRAPH_VERSION)
+            + struct.pack(">B", HASH_VERSION_SHA1)
+            + struct.pack(">B", 4)  # 4 chunks
+            + struct.pack(">B", 0)  # 0 base graphs
+        )
+
+        # All commits start with 0x00, so every fanout entry is 6.
+        fanout = struct.pack(">L", 6) * 256
+        oid_lookup = b"".join(oids)
+
+        def commit_data_entry(index: int, parent1_pos: int, parent2_pos: int) -> bytes:
+            tree_oid = b"\xbb" + bytes([index]) + b"\x00" * 18
+            commit_time = 1234567890 + index
+            gen_and_time = (1 << 2) | (commit_time >> 32)
+            return (
+                tree_oid
+                + struct.pack(">LL", parent1_pos, parent2_pos)
+                + struct.pack(">LL", gen_and_time, commit_time & 0xFFFFFFFF)
+            )
+
+        commit_data = b""
+        for i in range(4):
+            commit_data += commit_data_entry(
+                i, GRAPH_PARENT_MISSING, GRAPH_PARENT_MISSING
+            )
+        # commit4: parents commit0, commit1, commit2 (edges at position 0)
+        commit_data += commit_data_entry(4, 0, GRAPH_EXTRA_EDGES_NEEDED | 0)
+        # commit5: parents commit0, commit2, commit3 (edges at position 2)
+        commit_data += commit_data_entry(5, 0, GRAPH_EXTRA_EDGES_NEEDED | 2)
+
+        extra_edges = (
+            struct.pack(">L", 1)
+            + struct.pack(">L", GRAPH_LAST_EDGE | 2)
+            + struct.pack(">L", 2)
+            + struct.pack(">L", GRAPH_LAST_EDGE | 3)
+        )
+
+        header_size = 8
+        toc_size = 5 * 12  # 4 chunks + terminator
+        chunk1_offset = header_size + toc_size
+        chunk2_offset = chunk1_offset + len(fanout)
+        chunk3_offset = chunk2_offset + len(oid_lookup)
+        chunk4_offset = chunk3_offset + len(commit_data)
+        terminator_offset = chunk4_offset + len(extra_edges)
+
+        toc = (
+            CHUNK_OID_FANOUT
+            + struct.pack(">Q", chunk1_offset)
+            + CHUNK_OID_LOOKUP
+            + struct.pack(">Q", chunk2_offset)
+            + CHUNK_COMMIT_DATA
+            + struct.pack(">Q", chunk3_offset)
+            + CHUNK_EXTRA_EDGE_LIST
+            + struct.pack(">Q", chunk4_offset)
+            + b"\x00\x00\x00\x00"
+            + struct.pack(">Q", terminator_offset)
+        )
+
+        data = header + toc + fanout + oid_lookup + commit_data + extra_edges
+        graph = CommitGraph.from_file(io.BytesIO(data))
+
+        self.assertEqual(len(graph), 6)
+        self.assertEqual(
+            graph.entries[4].parents,
+            [sha_to_hex(oids[0]), sha_to_hex(oids[1]), sha_to_hex(oids[2])],
+        )
+        self.assertEqual(
+            graph.entries[5].parents,
+            [sha_to_hex(oids[0]), sha_to_hex(oids[2]), sha_to_hex(oids[3])],
+        )
 
 
 class CommitGraphFileOperationsTests(unittest.TestCase):

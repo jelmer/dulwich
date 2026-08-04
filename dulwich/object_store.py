@@ -2371,11 +2371,13 @@ class DiskObjectStore(PackBasedObjectStore):
             # Refresh the mtime instead of just checking for existence. A
             # loose object with a stale mtime is a candidate for age-based
             # pruning, so a concurrent "git gc" could remove it before the
-            # caller has created a reference to it. If the utime() fails the
-            # object is missing or cannot be freshened, in which case it is
-            # not safe to skip the write.
+            # caller has created a reference to it.
             os.utime(path, None)
-        except OSError:
+        except FileNotFoundError:
+            pass  # Not there after all, write it out below.
+        except PermissionError:
+            # Owned by another user in a shared repository. The mtime stays
+            # stale, so write the object out to give it a fresh one.
             pass
         else:
             return  # Already there and freshened, no need to write again

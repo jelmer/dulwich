@@ -779,3 +779,48 @@ class GunzipTestCase(HTTPGitApplicationTestCase):
             MinimalistWSGIInputStream2(zstream.read()),
             zlength,
         )
+
+    def test_decompression_bomb_rejected(self) -> None:
+        """A body inflating past the cap gets a 413 and never reaches the app."""
+        cap = 4096
+        called = []
+        statuses = []
+
+        def app(environ, start_response):
+            called.append(True)
+            return []
+
+        def start_response(status, headers):
+            statuses.append(status)
+
+        raw = b"\x00" * (1024 * 1024)
+        zstream, zlength = self._get_zstream(raw)
+        self.assertLess(zlength, cap)
+        environ = {
+            "wsgi.input": zstream,
+            "HTTP_CONTENT_ENCODING": "gzip",
+            "CONTENT_LENGTH": str(zlength),
+        }
+        body = GunzipFilter(app, max_decompressed_size=cap)(environ, start_response)
+        self.assertEqual(["413 Request Entity Too Large"], statuses)
+        self.assertEqual([], called)
+        self.assertNotEqual([], list(body))
+
+    def test_decompression_exactly_at_cap_allowed(self) -> None:
+        """A body whose decompressed size equals the cap passes through."""
+        cap = 4096
+        captured = {}
+
+        def app(environ, start_response):
+            captured["read"] = environ["wsgi.input"].read()
+            return []
+
+        raw = b"\x00" * cap
+        zstream, zlength = self._get_zstream(raw)
+        environ = {
+            "wsgi.input": zstream,
+            "HTTP_CONTENT_ENCODING": "gzip",
+            "CONTENT_LENGTH": str(zlength),
+        }
+        GunzipFilter(app, max_decompressed_size=cap)(environ, None)
+        self.assertEqual(raw, captured["read"])

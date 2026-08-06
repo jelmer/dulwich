@@ -216,6 +216,44 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             ValueError, self.store._get_shafile_path, b"../../../../etc/passwd"
         )
 
+    def test_add_object_freshens_existing_object(self) -> None:
+        # Re-adding an object that is already on disk must refresh its mtime.
+        # Otherwise it stays a candidate for age-based pruning and a
+        # concurrent "git gc" can remove it before the caller has created a
+        # reference to it.
+        b = make_object(Blob, data=b"freshen me")
+        self.store.add_object(b)
+        path = self.store._get_shafile_path(b.id)
+        stale = time.time() - 30 * 24 * 60 * 60
+        os.utime(path, (stale, stale))
+        self.store.add_object(b)
+        self.assertGreater(os.stat(path).st_mtime, stale)
+
+    def test_add_object_writes_when_object_is_missing(self) -> None:
+        # The freshen attempt must not swallow the write when the object
+        # turned out not to be on disk after all.
+        b = make_object(Blob, data=b"write me")
+        self.store.add_object(b)
+        path = self.store._get_shafile_path(b.id)
+        os.unlink(path)
+        self.store.add_object(b)
+        self.assertTrue(os.path.exists(path))
+
+    def test_add_object_writes_when_freshening_fails(self) -> None:
+        # A failing utime() (e.g. EPERM on an object owned by another user in
+        # a shared repository) leaves the mtime stale, so the object has to be
+        # written out rather than skipped.
+        b = make_object(Blob, data=b"rewrite me")
+        self.store.add_object(b)
+        path = self.store._get_shafile_path(b.id)
+        stale = time.time() - 30 * 24 * 60 * 60
+        os.utime(path, (stale, stale))
+        with patch("dulwich.object_store.os.utime", side_effect=PermissionError):
+            self.store.add_object(b)
+        # Rewriting the object gives it a fresh mtime of its own.
+        self.assertGreater(os.stat(path).st_mtime, stale)
+        self.assertEqual(b.data, self.store[b.id].data)
+
     def test_loose_compression_level(self) -> None:
         alternate_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, alternate_dir)

@@ -37,6 +37,7 @@ __all__ = [
     "translate",
 ]
 
+import logging
 import os.path
 import re
 from collections.abc import Iterable, Sequence
@@ -47,6 +48,10 @@ if TYPE_CHECKING:
     from .repo import Repo
 
 from .config import Config, get_xdg_config_home_path
+from .wildmatch import NO_MATCH, MalformedPattern
+from .wildmatch import translate as translate_wildmatch
+
+logger = logging.getLogger(__name__)
 
 
 def _pattern_to_str(pattern: "Pattern | bytes | str") -> str:
@@ -156,89 +161,6 @@ def _pattern_excludes_parent(
     return False
 
 
-def _translate_segment(segment: bytes) -> bytes:
-    """Translate a single path segment to regex, following Git rules exactly."""
-    if segment == b"*":
-        return b"[^/]+"
-
-    res = b""
-    i, n = 0, len(segment)
-    while i < n:
-        c = segment[i : i + 1]
-        i += 1
-        if c == b"*":
-            # Collapse a run of consecutive '*' into a single quantifier.
-            # Within a segment repeated '*' are redundant ([^/]*[^/]* is
-            # equivalent to [^/]*), and emitting one quantifier per star
-            # builds a regex with adjacent unbounded quantifiers that
-            # backtracks catastrophically on non-matching input (ReDoS).
-            while i < n and segment[i : i + 1] == b"*":
-                i += 1
-            res += b"[^/]*"
-        elif c == b"?":
-            res += b"[^/]"
-        elif c == b"\\":
-            if i < n:
-                res += re.escape(segment[i : i + 1])
-                i += 1
-            else:
-                res += re.escape(c)
-        elif c == b"[":
-            j = i
-            if j < n and segment[j : j + 1] == b"!":
-                j += 1
-            if j < n and segment[j : j + 1] == b"]":
-                j += 1
-            while j < n and segment[j : j + 1] != b"]":
-                j += 1
-            if j >= n:
-                res += b"\\["
-            else:
-                stuff = segment[i:j].replace(b"\\", b"\\\\")
-                i = j + 1
-                if stuff.startswith(b"!"):
-                    stuff = b"^" + stuff[1:]
-                elif stuff.startswith(b"^"):
-                    stuff = b"\\" + stuff
-                res += b"[" + stuff + b"]"
-        else:
-            res += re.escape(c)
-    return res
-
-
-def _handle_double_asterisk(segments: Sequence[bytes], i: int) -> tuple[bytes, bool]:
-    """Handle ** segment processing, returns (regex_part, skip_next)."""
-    # Check if ** is at end
-    remaining = segments[i + 1 :]
-    if all(s == b"" for s in remaining):
-        # ** at end - matches everything
-        return b".*", False
-
-    # Check if next segment is also **
-    if i + 1 < len(segments) and segments[i + 1] == b"**":
-        # Consecutive ** segments
-        # Check if this ends with a directory pattern (trailing /)
-        remaining_after_next = segments[i + 2 :]
-        is_dir_pattern = (
-            len(remaining_after_next) == 1 and remaining_after_next[0] == b""
-        )
-
-        if is_dir_pattern:
-            # Pattern like c/**/**/ - requires at least one intermediate directory
-            return b"[^/]+/(?:[^/]+/)*", True
-        else:
-            # Pattern like c/**/**/d - allows zero intermediate directories
-            return b"(?:[^/]+/)*", True
-    else:
-        # ** in middle - handle differently depending on what follows
-        if i == 0:
-            # ** at start - any prefix
-            return b"(?:.*/)??", False
-        else:
-            # ** in middle - match zero or more complete directory segments
-            return b"(?:[^/]+/)*", False
-
-
 def _handle_leading_patterns(pat: bytes, res: bytes) -> tuple[bytes, bytes]:
     """Handle leading patterns like ``/**/``, ``**/``, or ``/``."""
     if pat.startswith(b"/**/"):
@@ -255,13 +177,18 @@ def _handle_leading_patterns(pat: bytes, res: bytes) -> tuple[bytes, bytes]:
 
 
 def translate(pat: bytes) -> bytes:
-    """Translate a gitignore pattern to a regular expression following Git rules exactly."""
+    """Translate a gitignore pattern to a regular expression following Git rules exactly.
+
+    Raises:
+      MalformedPattern: if wildmatch() would refuse the pattern outright;
+        see :func:`dulwich.wildmatch.translate`.
+    """
     res = b"(?ms)"
 
-    # Check for invalid patterns with // - Git treats these as broken patterns
+    # A "//" is well-formed but Git treats it as matching nothing, not as
+    # an error - distinct from a malformed pattern, which raises above.
     if b"//" in pat:
-        # Pattern with // doesn't match anything in Git
-        return b"(?!.*)"  # Negative lookahead - matches nothing
+        return NO_MATCH
 
     # Don't normalize consecutive ** patterns - Git treats them specially
     # c/**/**/ requires at least one intermediate directory
@@ -276,30 +203,8 @@ def translate(pat: bytes) -> bytes:
     if prefix_added:
         res += prefix_added
 
-    # Process the rest of the pattern
-    if pat == b"**":
-        res += b".*"
-    else:
-        segments = pat.split(b"/")
-        i = 0
-        while i < len(segments):
-            segment = segments[i]
-
-            # Add slash separator (except for first segment)
-            if i > 0 and segments[i - 1] != b"**":
-                res += re.escape(b"/")
-
-            if segment == b"**":
-                regex_part, skip_next = _handle_double_asterisk(segments, i)
-                res += regex_part
-                if regex_part == b".*":  # End of pattern
-                    break
-                if skip_next:
-                    i += 1
-            else:
-                res += _translate_segment(segment)
-
-            i += 1
+    # Everything left of the gitignore-specific decoration is plain wildmatch
+    res += translate_wildmatch(pat)
 
     # Add optional trailing slash for files
     if not pat.endswith(b"/"):
@@ -356,6 +261,12 @@ class Pattern:
         Args:
             pattern: The gitignore pattern as bytes.
             ignorecase: Whether to perform case-insensitive matching.
+
+        Raises:
+            MalformedPattern: if wildmatch() would refuse the pattern
+              outright. Loading a whole file of patterns should go through
+              :meth:`IgnoreFilter.append_pattern` instead, which catches
+              this and warns.
         """
         self.pattern = pattern
         self.ignorecase = ignorecase
@@ -475,8 +386,22 @@ class IgnoreFilter:
             self.append_pattern(pattern)
 
     def append_pattern(self, pattern: bytes) -> None:
-        """Add a pattern to the set."""
-        self._patterns.append(Pattern(pattern, self._ignorecase))
+        """Add a pattern to the set.
+
+        A malformed pattern is logged and skipped rather than raised, so one
+        bad line in a gitignore file doesn't stop the rest from loading. To
+        fail loudly instead, construct the ``Pattern`` directly.
+        """
+        try:
+            compiled = Pattern(pattern, self._ignorecase)
+        except MalformedPattern:
+            logger.warning(
+                "Ignoring malformed pattern %r in %s",
+                pattern,
+                self._path or "<patterns>",
+            )
+            return
+        self._patterns.append(compiled)
 
     def find_matching(self, path: bytes | str) -> Iterable[Pattern]:
         """Yield all matching patterns for path.

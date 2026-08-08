@@ -22,10 +22,17 @@
 import io
 import os
 import shutil
+import stat
 import sys
 import tempfile
 
-from dulwich.file import FileLocked, GitFile, _fancy_rename
+from dulwich.file import (
+    PERM_EVERYBODY,
+    PERM_GROUP,
+    FileLocked,
+    GitFile,
+    _fancy_rename,
+)
 
 from . import SkipTest, TestCase
 
@@ -209,3 +216,47 @@ class GitFileTests(TestCase):
 
         f.abort()
         self.assertTrue(f._closed)
+
+    def test_shared_perm_applied_on_close(self) -> None:
+        if sys.platform == "win32":
+            self.skipTest("Windows does not support Unix file permissions")
+        foo = self.path("foo")
+        old = os.umask(0o022)
+        self.addCleanup(os.umask, old)
+        with GitFile(foo, "wb", shared_perm=PERM_GROUP) as f:
+            f.write(b"data")
+        self.assertEqual(0o664, stat.S_IMODE(os.stat(foo).st_mode))
+
+    def test_shared_perm_only_widens(self) -> None:
+        if sys.platform == "win32":
+            self.skipTest("Windows does not support Unix file permissions")
+        foo = self.path("foo")
+        old = os.umask(0o077)
+        self.addCleanup(os.umask, old)
+        # "all" widens a 0o600 file to group write and other read, matching
+        # git init --shared=all under the same umask.
+        with GitFile(foo, "wb", shared_perm=PERM_EVERYBODY) as f:
+            f.write(b"data")
+        self.assertEqual(0o664, stat.S_IMODE(os.stat(foo).st_mode))
+
+    def test_shared_perm_keeps_read_only_files_read_only(self) -> None:
+        if sys.platform == "win32":
+            self.skipTest("Windows does not support Unix file permissions")
+        foo = self.path("foo")
+        old = os.umask(0o022)
+        self.addCleanup(os.umask, old)
+        # Loose objects and packs are written read-only; sharing must only
+        # widen who may read them, never grant write.
+        with GitFile(foo, "wb", mask=0o444, shared_perm=PERM_EVERYBODY) as f:
+            f.write(b"data")
+        self.assertEqual(0o444, stat.S_IMODE(os.stat(foo).st_mode))
+
+    def test_no_shared_perm_leaves_mask(self) -> None:
+        if sys.platform == "win32":
+            self.skipTest("Windows does not support Unix file permissions")
+        foo = self.path("foo")
+        old = os.umask(0o022)
+        self.addCleanup(os.umask, old)
+        with GitFile(foo, "wb") as f:
+            f.write(b"data")
+        self.assertEqual(0o644, stat.S_IMODE(os.stat(foo).st_mode))

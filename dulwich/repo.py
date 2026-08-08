@@ -106,7 +106,13 @@ from .errors import (
     NotTreeError,
     RefFormatError,
 )
-from .file import GitFile
+from .file import (
+    PERM_EVERYBODY,
+    PERM_GROUP,
+    GitFile,
+    SharedPerm,
+    adjust_shared_perm,
+)
 from .hooks import (
     CommitMsgShellHook,
     Hook,
@@ -385,69 +391,49 @@ def _set_filesystem_hidden(path: str) -> None:
     # Could implement other platform specific filesystem hiding here
 
 
-def parse_shared_repository(
-    value: str | bytes | bool,
-) -> tuple[int | None, int | None]:
+def parse_shared_repository(value: str | bytes | bool) -> "SharedPerm | None":
     """Parse core.sharedRepository configuration value.
 
     Args:
       value: Configuration value (string, bytes, or boolean)
 
     Returns:
-      tuple of (file_mask, directory_mask) or (None, None) if not shared
-
-    The masks are permission bits to apply via chmod.
+      SharedPerm to apply, or None to leave permissions to the umask
     """
     if isinstance(value, bytes):
         value = value.decode("utf-8", errors="replace")
 
     # Handle boolean values
     if isinstance(value, bool):
-        if value:
-            # true = group (same as "group")
-            return (0o664, 0o2775)
-        else:
-            # false = umask (use system umask, no adjustment)
-            return (None, None)
+        # true = group (same as "group"), false = umask
+        return PERM_GROUP if value else None
 
     # Handle string values
     value_lower = value.lower()
 
-    if value_lower in ("false", "0", ""):
+    if value_lower in ("false", "0", "", "umask"):
         # Use umask (no adjustment)
-        return (None, None)
+        return None
 
     if value_lower in ("true", "1", "group"):
-        # Group writable (with setgid bit)
-        return (0o664, 0o2775)
+        return PERM_GROUP
 
     if value_lower in ("all", "world", "everybody", "2"):
-        # World readable/writable (with setgid bit)
-        return (0o666, 0o2777)
+        # Others gain read, and execute on directories, but never write.
+        return PERM_EVERYBODY
 
-    if value_lower == "umask":
-        # Explicitly use umask
-        return (None, None)
-
-    # Try to parse as octal
+    # Try to parse as octal. Unlike the named settings, this states the mode
+    # outright rather than loosening what the umask produced.
     if value.startswith("0"):
         try:
             mode = int(value, 8)
-            # For directories, add execute bits where read bits are set
-            # and add setgid bit for shared repositories
-            dir_mode = mode | 0o2000  # Add setgid bit
-            if mode & 0o004:
-                dir_mode |= 0o001
-            if mode & 0o040:
-                dir_mode |= 0o010
-            if mode & 0o400:
-                dir_mode |= 0o100
-            return (mode, dir_mode)
         except ValueError:
             pass
+        else:
+            return SharedPerm(tweak=mode, replace=True)
 
     # Default to umask for unrecognized values
-    return (None, None)
+    return None
 
 
 def _enable_relative_worktrees_extension(repo: "Repo") -> None:
@@ -1655,9 +1641,9 @@ class Repo(BaseRepo):
             # Get shared repository permissions from config
             try:
                 shared_value = config.get(("core",), "sharedRepository")
-                file_mode, dir_mode = parse_shared_repository(shared_value)
+                shared_perm = parse_shared_repository(shared_value)
             except KeyError:
-                file_mode, dir_mode = None, None
+                shared_perm = None
 
             if object_directory is not None:
                 object_dir_path = os.fspath(object_directory)
@@ -1668,8 +1654,7 @@ class Repo(BaseRepo):
             object_store = DiskObjectStore.from_config(
                 object_dir_path,
                 config,
-                file_mode=file_mode,
-                dir_mode=dir_mode,
+                shared_perm=shared_perm,
                 alternates=alternates,
             )
 
@@ -1744,7 +1729,7 @@ class Repo(BaseRepo):
         path = self._reflog_path(ref)
 
         # Get shared repository permissions
-        file_mode, dir_mode = self._get_shared_repository_permissions()
+        shared_perm = self._get_shared_repository_permissions()
 
         # Create directory with appropriate permissions
         parent_dir = os.path.dirname(path)
@@ -1757,8 +1742,7 @@ class Repo(BaseRepo):
         parts.reverse()
         for part in parts:
             os.mkdir(part)
-            if dir_mode is not None:
-                os.chmod(part, dir_mode)
+            adjust_shared_perm(part, shared_perm)
         if committer is None:
             config = self.get_config_stack()
             committer = get_user_identity(config)
@@ -1775,10 +1759,9 @@ class Repo(BaseRepo):
                 + b"\n"
             )
 
-        # Set file permissions (open() respects umask, so we need chmod to set the actual mode)
-        # Always chmod to ensure correct permissions even if file already existed
-        if file_mode is not None:
-            os.chmod(path, file_mode)
+        # Always adjust, so that permissions are right even if the file
+        # already existed.
+        adjust_shared_perm(path, shared_perm)
 
     def _reflog_path(self, ref: bytes) -> str:
         if ref.startswith((b"main-worktree/", b"worktrees/")):
@@ -1922,18 +1905,18 @@ class Repo(BaseRepo):
 
     def _get_shared_repository_permissions(
         self,
-    ) -> tuple[int | None, int | None]:
-        """Get shared repository file and directory permissions from config.
+    ) -> "SharedPerm | None":
+        """Get the shared repository permission setting from config.
 
         Returns:
-            tuple of (file_mask, directory_mask) or (None, None) if not shared
+            SharedPerm to apply, or None if not shared
         """
         try:
             config = self.get_config()
             value = config.get(("core",), "sharedRepository")
             return parse_shared_repository(value)
         except KeyError:
-            return (None, None)
+            return None
 
     def _put_named_file(self, path: str, contents: bytes) -> None:
         """Write a file to the control dir with the given name and contents.
@@ -1945,16 +1928,15 @@ class Repo(BaseRepo):
         path = path.lstrip(os.path.sep)
 
         # Get shared repository permissions
-        file_mode, _ = self._get_shared_repository_permissions()
+        shared_perm = self._get_shared_repository_permissions()
 
         # Create file with appropriate permissions
-        if file_mode is not None:
-            with GitFile(
-                os.path.join(self.controldir(), path), "wb", mask=file_mode
-            ) as f:
+        full_path = os.path.join(self.controldir(), path)
+        if shared_perm is not None:
+            with GitFile(full_path, "wb", shared_perm=shared_perm) as f:
                 f.write(contents)
         else:
-            with GitFile(os.path.join(self.controldir(), path), "wb") as f:
+            with GitFile(full_path, "wb") as f:
                 f.write(contents)
 
     def _del_named_file(self, path: str) -> None:
@@ -2038,13 +2020,13 @@ class Repo(BaseRepo):
             skip_hash = config.get_boolean(b"index", b"skipHash", False)
 
         # Get shared repository permissions for index file
-        file_mode, _ = self._get_shared_repository_permissions()
+        shared_perm = self._get_shared_repository_permissions()
 
         return Index(
             self.index_path(),
             skip_hash=skip_hash,
             version=index_version,
-            file_mode=file_mode,
+            shared_perm=shared_perm,
             path_normalizer=make_path_normalizer(config),
         )
 
@@ -2334,17 +2316,15 @@ class Repo(BaseRepo):
             controldir = os.fsdecode(controldir)
 
         # Determine shared repository permissions early
-        file_mode: int | None = None
-        dir_mode: int | None = None
+        shared_perm: SharedPerm | None = None
         if shared_repository is not None:
-            file_mode, dir_mode = parse_shared_repository(shared_repository)
+            shared_perm = parse_shared_repository(shared_repository)
 
         # Create base directories with appropriate permissions
         for d in BASE_DIRECTORIES:
             dir_path = os.path.join(controldir, *d)
             os.mkdir(dir_path)
-            if dir_mode is not None:
-                os.chmod(dir_path, dir_mode)
+            adjust_shared_perm(dir_path, shared_perm)
 
         # Determine hash algorithm
         from .object_format import get_object_format
@@ -2354,8 +2334,7 @@ class Repo(BaseRepo):
         if object_store is None:
             object_store = DiskObjectStore.init(
                 os.path.join(controldir, OBJECTDIR),
-                file_mode=file_mode,
-                dir_mode=dir_mode,
+                shared_perm=shared_perm,
                 object_format=hash_alg,
             )
         ret = cls(path, bare=bare, object_store=object_store)
@@ -2471,19 +2450,17 @@ class Repo(BaseRepo):
             f.write(b"gitdir: " + os.fsencode(gitdir_ref) + b"\n")
 
         # Get shared repository permissions from main repository
-        _, dir_mode = main_repo._get_shared_repository_permissions()
+        shared_perm = main_repo._get_shared_repository_permissions()
 
         # Create directories with appropriate permissions
         try:
             os.mkdir(main_worktreesdir)
-            if dir_mode is not None:
-                os.chmod(main_worktreesdir, dir_mode)
+            adjust_shared_perm(main_worktreesdir, shared_perm)
         except FileExistsError:
             pass
         try:
             os.mkdir(worktree_controldir)
-            if dir_mode is not None:
-                os.chmod(worktree_controldir, dir_mode)
+            adjust_shared_perm(worktree_controldir, shared_perm)
         except FileExistsError:
             pass
 

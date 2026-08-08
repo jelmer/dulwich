@@ -77,7 +77,7 @@ if TYPE_CHECKING:
     from .object_format import ObjectFormat
 
 from .errors import NotTreeError
-from .file import GitFile, _GitFile
+from .file import GitFile, SharedPerm, _GitFile, adjust_shared_perm
 from .midx import MultiPackIndex, load_midx
 from .objects import (
     DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
@@ -1604,8 +1604,7 @@ class DiskObjectStore(PackBasedObjectStore):
         pack_write_bitmaps: bool = False,
         pack_write_bitmap_hash_cache: bool = True,
         pack_write_bitmap_lookup_table: bool = True,
-        file_mode: int | None = None,
-        dir_mode: int | None = None,
+        shared_perm: "SharedPerm | None" = None,
         object_format: "ObjectFormat | None" = None,
         loose_object_size_limit: int | None = None,
         alternates: "Iterable[str | os.PathLike[str]] | None" = None,
@@ -1629,8 +1628,7 @@ class DiskObjectStore(PackBasedObjectStore):
           pack_write_bitmaps: whether to write bitmap indexes for packs
           pack_write_bitmap_hash_cache: whether to include name-hash cache in bitmaps
           pack_write_bitmap_lookup_table: whether to include lookup table in bitmaps
-          file_mode: File permission mask for shared repository
-          dir_mode: Directory permission mask for shared repository
+          shared_perm: Shared repository permission setting
           object_format: Hash algorithm to use (SHA1 or SHA256)
           loose_object_size_limit: Maximum inflated size of a single loose
             object. Defaults to core.bigFileThreshold's Git default (512 MiB)
@@ -1671,8 +1669,7 @@ class DiskObjectStore(PackBasedObjectStore):
         self.pack_write_bitmaps = pack_write_bitmaps
         self.pack_write_bitmap_hash_cache = pack_write_bitmap_hash_cache
         self.pack_write_bitmap_lookup_table = pack_write_bitmap_lookup_table
-        self.file_mode = file_mode
-        self.dir_mode = dir_mode
+        self.shared_perm = shared_perm
         self.loose_object_size_limit = (
             loose_object_size_limit
             if loose_object_size_limit is not None
@@ -1701,8 +1698,7 @@ class DiskObjectStore(PackBasedObjectStore):
         path: str | os.PathLike[str],
         config: "Config",
         *,
-        file_mode: int | None = None,
-        dir_mode: int | None = None,
+        shared_perm: "SharedPerm | None" = None,
         alternates: "Iterable[str | os.PathLike[str]] | None" = None,
     ) -> "DiskObjectStore":
         """Create a DiskObjectStore from a configuration object.
@@ -1710,8 +1706,7 @@ class DiskObjectStore(PackBasedObjectStore):
         Args:
           path: Path to the object store directory
           config: Configuration object to read settings from
-          file_mode: Optional file permission mask for shared repository
-          dir_mode: Optional directory permission mask for shared repository
+          shared_perm: Optional shared repository permission setting
           alternates: Extra alternate object directory paths to consult,
             appended to those listed in ``objects/info/alternates``.
 
@@ -1854,8 +1849,7 @@ class DiskObjectStore(PackBasedObjectStore):
             pack_write_bitmaps=pack_write_bitmaps,
             pack_write_bitmap_hash_cache=pack_write_bitmap_hash_cache,
             pack_write_bitmap_lookup_table=pack_write_bitmap_lookup_table,
-            file_mode=file_mode,
-            dir_mode=dir_mode,
+            shared_perm=shared_perm,
             object_format=object_format,
             loose_object_size_limit=loose_object_size_limit,
             alternates=alternates,
@@ -1902,13 +1896,11 @@ class DiskObjectStore(PackBasedObjectStore):
         info_dir = os.path.join(self.path, INFODIR)
         try:
             os.mkdir(info_dir)
-            if self.dir_mode is not None:
-                os.chmod(info_dir, self.dir_mode)
+            adjust_shared_perm(info_dir, self.shared_perm)
         except FileExistsError:
             pass
         alternates_path = os.path.join(self.path, INFODIR, "alternates")
-        mask = self.file_mode if self.file_mode is not None else 0o644
-        with GitFile(alternates_path, "wb", mask=mask) as f:
+        with GitFile(alternates_path, "wb", shared_perm=self.shared_perm) as f:
             try:
                 orig_f = open(alternates_path, "rb")
             except FileNotFoundError:
@@ -2177,12 +2169,12 @@ class DiskObjectStore(PackBasedObjectStore):
         os.rename(path, target_pack_path)
 
         # Write the index.
-        mask = self.file_mode if self.file_mode is not None else PACK_MODE
         with GitFile(
             target_index_path,
             "wb",
-            mask=mask,
+            mask=PACK_MODE,
             fsync=self.fsync_object_files,
+            shared_perm=self.shared_perm,
         ) as index_file:
             write_pack_index(
                 index_file, entries, pack_sha, version=self.pack_index_version
@@ -2327,8 +2319,8 @@ class DiskObjectStore(PackBasedObjectStore):
 
         fd, path = tempfile.mkstemp(dir=self.pack_dir, suffix=".pack")
         f = os.fdopen(fd, "w+b")
-        mask = self.file_mode if self.file_mode is not None else PACK_MODE
-        os.chmod(path, mask)
+        os.chmod(path, PACK_MODE)
+        adjust_shared_perm(path, self.shared_perm)
 
         def commit() -> "Pack | None":
             if f.tell() > 0:
@@ -2363,8 +2355,7 @@ class DiskObjectStore(PackBasedObjectStore):
         dir = os.path.dirname(path)
         try:
             os.mkdir(dir)
-            if self.dir_mode is not None:
-                os.chmod(dir, self.dir_mode)
+            adjust_shared_perm(dir, self.shared_perm)
         except FileExistsError:
             pass
         try:
@@ -2381,8 +2372,13 @@ class DiskObjectStore(PackBasedObjectStore):
             pass
         else:
             return  # Already there and freshened, no need to write again
-        mask = self.file_mode if self.file_mode is not None else PACK_MODE
-        with GitFile(path, "wb", mask=mask, fsync=self.fsync_object_files) as f:
+        with GitFile(
+            path,
+            "wb",
+            mask=PACK_MODE,
+            fsync=self.fsync_object_files,
+            shared_perm=self.shared_perm,
+        ) as f:
             f.write(
                 obj.as_legacy_object(compression_level=self.loose_compression_level)
             )
@@ -2392,8 +2388,7 @@ class DiskObjectStore(PackBasedObjectStore):
         cls,
         path: str | os.PathLike[str],
         *,
-        file_mode: int | None = None,
-        dir_mode: int | None = None,
+        shared_perm: "SharedPerm | None" = None,
         object_format: "ObjectFormat | None" = None,
     ) -> "DiskObjectStore":
         """Initialize a new disk object store.
@@ -2402,8 +2397,7 @@ class DiskObjectStore(PackBasedObjectStore):
 
         Args:
           path: Path where the object store should be created
-          file_mode: Optional file permission mask for shared repository
-          dir_mode: Optional directory permission mask for shared repository
+          shared_perm: Optional shared repository permission setting
           object_format: Hash algorithm to use (SHA1 or SHA256)
 
         Returns:
@@ -2411,20 +2405,16 @@ class DiskObjectStore(PackBasedObjectStore):
         """
         try:
             os.mkdir(path)
-            if dir_mode is not None:
-                os.chmod(path, dir_mode)
+            adjust_shared_perm(path, shared_perm)
         except FileExistsError:
             pass
         info_path = os.path.join(path, "info")
         pack_path = os.path.join(path, PACKDIR)
         os.mkdir(info_path)
         os.mkdir(pack_path)
-        if dir_mode is not None:
-            os.chmod(info_path, dir_mode)
-            os.chmod(pack_path, dir_mode)
-        return cls(
-            path, file_mode=file_mode, dir_mode=dir_mode, object_format=object_format
-        )
+        adjust_shared_perm(info_path, shared_perm)
+        adjust_shared_perm(pack_path, shared_perm)
+        return cls(path, shared_perm=shared_perm, object_format=object_format)
 
     def iter_prefix(self, prefix: bytes) -> Iterator[ObjectID]:
         """Iterate over all object SHAs with the given prefix.
@@ -2713,13 +2703,11 @@ class DiskObjectStore(PackBasedObjectStore):
                 # Ensure the info directory exists
                 info_dir = os.path.join(self.path, "info")
                 os.makedirs(info_dir, exist_ok=True)
-                if self.dir_mode is not None:
-                    os.chmod(info_dir, self.dir_mode)
+                adjust_shared_perm(info_dir, self.shared_perm)
 
                 # Write using GitFile for atomic operation
                 graph_path = os.path.join(info_dir, "commit-graph")
-                mask = self.file_mode if self.file_mode is not None else 0o644
-                with GitFile(graph_path, "wb", mask=mask) as f:
+                with GitFile(graph_path, "wb", shared_perm=self.shared_perm) as f:
                     assert isinstance(
                         f, _GitFile
                     )  # GitFile in write mode always returns _GitFile

@@ -2647,7 +2647,7 @@ class Repo(BaseRepo):
         """
         from .attrs import (
             GitAttributes,
-            Pattern,
+            compile_gitattributes_patterns,
             parse_git_attributes,
         )
 
@@ -2685,9 +2685,11 @@ class Repo(BaseRepo):
                     attrs_blob = self[attrs_sha]
                     if isinstance(attrs_blob, Blob):
                         attrs_data = BytesIO(attrs_blob.data)
-                        for pattern_bytes, attrs in parse_git_attributes(attrs_data):
-                            pattern = Pattern(pattern_bytes)
-                            patterns.append((pattern, attrs))
+                        patterns.extend(
+                            compile_gitattributes_patterns(
+                                parse_git_attributes(attrs_data), b".gitattributes"
+                            )
+                        )
             except (KeyError, NotTreeError):
                 pass
 
@@ -2695,17 +2697,21 @@ class Repo(BaseRepo):
         info_attrs_path = os.path.join(self.controldir(), "info", "attributes")
         if os.path.exists(info_attrs_path):
             with open(info_attrs_path, "rb") as f:
-                for pattern_bytes, attrs in parse_git_attributes(f):
-                    pattern = Pattern(pattern_bytes)
-                    patterns.append((pattern, attrs))
+                patterns.extend(
+                    compile_gitattributes_patterns(
+                        parse_git_attributes(f), info_attrs_path
+                    )
+                )
 
         # Read .gitattributes from working directory (if it exists)
         working_attrs_path = os.path.join(self.path, ".gitattributes")
         if os.path.exists(working_attrs_path):
             with open(working_attrs_path, "rb") as f:
-                for pattern_bytes, attrs in parse_git_attributes(f):
-                    pattern = Pattern(pattern_bytes)
-                    patterns.append((pattern, attrs))
+                patterns.extend(
+                    compile_gitattributes_patterns(
+                        parse_git_attributes(f), working_attrs_path
+                    )
+                )
 
         return GitAttributes(patterns)
 

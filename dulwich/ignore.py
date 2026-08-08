@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from .repo import Repo
 
 from .config import Config, get_xdg_config_home_path
-from .wildmatch import NO_MATCH, MalformedPattern
+from .wildmatch import MalformedPattern
 from .wildmatch import translate as translate_wildmatch
 
 logger = logging.getLogger(__name__)
@@ -184,11 +184,6 @@ def translate(pat: bytes) -> bytes:
         see :func:`dulwich.wildmatch.translate`.
     """
     res = b"(?ms)"
-
-    # A "//" is well-formed but Git treats it as matching nothing, not as
-    # an error - distinct from a malformed pattern, which raises above.
-    if b"//" in pat:
-        return NO_MATCH
 
     # Don't normalize consecutive ** patterns - Git treats them specially
     # c/**/**/ requires at least one intermediate directory

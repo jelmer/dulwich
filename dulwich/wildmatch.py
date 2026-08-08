@@ -38,7 +38,6 @@ shared between :mod:`dulwich.ignore` and :mod:`dulwich.attrs`. It is not
 """
 
 __all__ = [
-    "NO_MATCH",
     "MalformedPattern",
     "translate",
     "translate_bracket_expression",
@@ -46,11 +45,6 @@ __all__ = [
 
 import re
 from collections.abc import Sequence
-
-# Regex that never matches. Exported for callers (dulwich.ignore,
-# dulwich.attrs) with their own well-formed-but-vacuous patterns, e.g. one
-# containing a bare "//". Not produced by this module itself.
-NO_MATCH = b"(?!.*)"
 
 _SLASH = 0x2F
 

@@ -124,6 +124,13 @@ class TranslateTests(TestCase):
         self.assertRaises(MalformedPattern, translate, b"/[abc")
         self.assertRaises(MalformedPattern, translate, b"/[[:foo:]]")
 
+    def test_double_slash_matches_nothing(self) -> None:
+        # Git has no special case for "//"; the empty segment becomes a
+        # literal slash that no path can match.
+        for pattern in [b"a//b", b"//foo", b"foo//"]:
+            self.assertFalse(Pattern(pattern, False).match(b"a/b"))
+            self.assertFalse(Pattern(pattern, False).match(b"foo"))
+
     def test_collapses_consecutive_stars(self) -> None:
         # A run of '*' in a segment is redundant and must collapse to a
         # single quantifier so the regex does not contain adjacent

@@ -166,6 +166,7 @@ from .filters import FilterBlobNormalizer, FilterContext, FilterDriver, FilterRe
 from .object_store import iter_tree_contents
 from .objects import Blob, ObjectID
 from .patch import is_binary
+from .wildmatch import MalformedPattern
 
 CRLF = b"\r\n"
 LF = b"\n"
@@ -476,7 +477,11 @@ class BlobNormalizer(FilterBlobNormalizer):
                 pattern_bytes = pattern_str.encode("utf-8")
             else:
                 pattern_bytes = pattern_str
-            pattern = Pattern(pattern_bytes)
+            try:
+                pattern = Pattern(pattern_bytes)
+            except MalformedPattern:
+                logger.warning("Ignoring malformed pattern %r", pattern_bytes)
+                continue
             git_attrs_patterns.append((pattern, attrs))
 
         git_attributes = GitAttributes(git_attrs_patterns)

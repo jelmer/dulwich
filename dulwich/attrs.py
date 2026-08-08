@@ -26,6 +26,7 @@ __all__ = [
     "AttributeValue",
     "GitAttributes",
     "Pattern",
+    "compile_gitattributes_patterns",
     "match_path",
     "parse_git_attributes",
     "parse_gitattributes_file",
@@ -35,7 +36,7 @@ __all__ = [
 import logging
 import os
 import re
-from collections.abc import Generator, Iterator, Mapping, Sequence
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from typing import IO
 
 from .wildmatch import MalformedPattern
@@ -195,6 +196,34 @@ def match_path(
     return attributes
 
 
+def compile_gitattributes_patterns(
+    entries: Iterable[tuple[bytes, Mapping[bytes, AttributeValue]]],
+    source: str | bytes = b"<attributes>",
+) -> list[tuple[Pattern, Mapping[bytes, AttributeValue]]]:
+    """Compile parsed gitattributes entries, skipping malformed patterns.
+
+    Git's wildmatch() treats a malformed pattern as matching nothing rather
+    than as a broken file, so one bad line is logged and dropped instead of
+    aborting the load.
+
+    Args:
+        entries: (pattern, attributes) pairs, as from parse_git_attributes
+        source: Where the entries came from, used in the warning
+
+    Returns:
+        List of (Pattern, attributes) tuples
+    """
+    patterns = []
+    for pattern_bytes, attrs in entries:
+        try:
+            pattern = Pattern(pattern_bytes)
+        except MalformedPattern:
+            logger.warning("Ignoring malformed pattern %r in %r", pattern_bytes, source)
+            continue
+        patterns.append((pattern, attrs))
+    return patterns
+
+
 def parse_gitattributes_file(
     filename: str | bytes,
 ) -> list[tuple[Pattern, Mapping[bytes, AttributeValue]]]:
@@ -209,23 +238,11 @@ def parse_gitattributes_file(
     Returns:
         List of (Pattern, attributes) tuples
     """
-    patterns = []
-
     if isinstance(filename, str):
         filename = filename.encode("utf-8")
 
     with open(filename, "rb") as f:
-        for pattern_bytes, attrs in parse_git_attributes(f):
-            try:
-                pattern = Pattern(pattern_bytes)
-            except MalformedPattern:
-                logger.warning(
-                    "Ignoring malformed pattern %r in %r", pattern_bytes, filename
-                )
-                continue
-            patterns.append((pattern, attrs))
-
-    return patterns
+        return compile_gitattributes_patterns(parse_git_attributes(f), filename)
 
 
 def read_gitattributes(

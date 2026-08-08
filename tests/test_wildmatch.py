@@ -122,6 +122,13 @@ class TranslateTests(TestCase):
         self.assertMatches(b"a\\*c", b"a*c")
         self.assertNotMatches(b"a\\*c", b"abc")
 
+    def test_empty_segment_is_a_literal_slash(self) -> None:
+        # wildmatch() has no special case for "//": each '/' is matched
+        # literally, so "a//b" matches only the text "a//b". Paths reaching
+        # dulwich.ignore are normalized, so nothing there can match it.
+        self.assertMatches(b"a//b", b"a//b")
+        self.assertNotMatches(b"a//b", b"a/b")
+
     def test_malformed_raises(self) -> None:
         self.assertRaises(MalformedPattern, translate, b"a[bc")
         self.assertRaises(MalformedPattern, translate, b"[[:bogus:]]")

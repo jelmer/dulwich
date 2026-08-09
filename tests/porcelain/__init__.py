@@ -3236,6 +3236,36 @@ class FormatPatchTests(PorcelainTestCase):
         )
         self.assertEqual(patches, [])
 
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_format_patch_does_not_follow_symlink_in_outdir(self) -> None:
+        # A symlink pre-planted at the patch's filename must not be followed,
+        # which would write the patch outside outdir.
+        tree1 = Tree()
+        c1 = make_commit(tree=tree1, message=b"Initial commit")
+        self.repo.object_store.add_objects([(tree1, None), (c1, None)])
+
+        blob = Blob.from_string(b"data")
+        tree2 = Tree()
+        tree2.add(b"f.txt", 0o100644, blob.id)
+        c2 = make_commit(tree=tree2, parents=[c1.id], message=b"subject here")
+        self.repo.object_store.add_objects([(blob, None), (tree2, None), (c2, None)])
+        self.repo[b"HEAD"] = c2.id
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outdir = os.path.join(tmpdir, "out")
+            os.mkdir(outdir)
+            target = os.path.join(tmpdir, "escaped")
+            os.symlink(target, os.path.join(outdir, "0001-subject-here.patch"))
+
+            self.assertRaises(
+                OSError,
+                porcelain.format_patch,
+                self.repo.path,
+                committish=c2.id,
+                outdir=outdir,
+            )
+            self.assertFalse(os.path.exists(target))
+
     def test_format_patch_subject_cannot_escape_outdir(self) -> None:
         # A malicious commit subject must not be able to direct the
         # generated patch file outside the requested output directory.

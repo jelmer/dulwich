@@ -972,20 +972,20 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           or graph traversal)
         """
         if prefer_bitmaps:
-            # Check if any packs have bitmaps
-            has_bitmap = False
+            # Check if any packs have bitmaps. ``self.packs`` rescans the pack
+            # directory, so a pack removed by a concurrent repack is dropped
+            # from the cache and its replacement, if any, is probed here too.
             for pack in self.packs:
                 try:
-                    # Try to access bitmap property
                     if pack.bitmap is not None:
-                        has_bitmap = True
-                        break
+                        return BitmapReachability(self)
                 except FileNotFoundError:
                     # Bitmap file doesn't exist for this pack
                     continue
-
-            if has_bitmap:
-                return BitmapReachability(self)
+                except PackFileDisappeared as exc:
+                    # The pack vanished between the scan and the bitmap probe.
+                    self._evict_pack(exc.obj)
+                    continue
 
         # Fall back to graph traversal
         return GraphTraversalReachability(self)

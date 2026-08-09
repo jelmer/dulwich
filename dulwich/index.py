@@ -121,7 +121,7 @@ if TYPE_CHECKING:
     from .object_store import BaseObjectStore
     from .repo import Repo
 
-from .file import GitFile
+from .file import GitFile, SharedPerm
 from .object_store import iter_tree_contents
 from .objects import (
     S_IFGITLINK,
@@ -1128,7 +1128,7 @@ class Index:
         skip_hash: bool = False,
         version: int | None = None,
         *,
-        file_mode: int | None = None,
+        shared_perm: "SharedPerm | None" = None,
         path_normalizer: Callable[[bytes], bytes] | None = None,
     ) -> None:
         """Create an index object associated with the given filename.
@@ -1138,7 +1138,7 @@ class Index:
           read: Whether to initialize the index from the given file, should it exist.
           skip_hash: Whether to skip SHA1 hash when writing (for manyfiles feature)
           version: Index format version to use (None = auto-detect from file or use default)
-          file_mode: Optional file permission mask for shared repository
+          shared_perm: Optional shared repository permission setting
           path_normalizer: Optional function mapping a filesystem path to a
             canonical form (e.g. case-folded, NFC-normalized). When provided,
             lookups (``index[path]``, ``path in index``, ``del index[path]``)
@@ -1149,7 +1149,7 @@ class Index:
         # TODO(jelmer): Store the version returned by read_index
         self._version = version
         self._skip_hash = skip_hash
-        self._file_mode = file_mode
+        self._shared_perm = shared_perm
         self._extensions: list[IndexExtension] = []
         self._path_normalizer = path_normalizer
         self._normalized: dict[bytes, bytes] | None = (
@@ -1193,8 +1193,7 @@ class Index:
 
     def write(self) -> None:
         """Write current contents of index to disk."""
-        mask = self._file_mode if self._file_mode is not None else 0o644
-        f = GitFile(self._filename, "wb", mask=mask)
+        f = GitFile(self._filename, "wb", shared_perm=self._shared_perm)
         try:
             # Filter out extensions with no meaningful data
             meaningful_extensions = []

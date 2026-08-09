@@ -31,6 +31,7 @@ def test_suite() -> unittest.TestSuite:
         "bitmap",
         "bundle",
         "bundle_uri",
+        "check_attr",
         "check_ignore",
         "client",
         "commit_graph",

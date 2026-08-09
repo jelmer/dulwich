@@ -4,6 +4,14 @@
    ``get_reachability_provider``, which only guarded ``FileNotFoundError``.
    (Jelmer Vernooĳ, #2344)
 
+ * SECURITY: Widen modes for ``core.sharedRepository`` as git does rather than
+   chmodding to a precomputed one, which left ``.git/hooks`` and ``.git/refs``
+   world-writable for ``all``. (netliomax25-code, Jelmer Vernooĳ, #2323)
+
+ * ``parse_shared_repository`` now returns a ``SharedPerm``, and
+   ``DiskObjectStore``, ``Index`` and ``GitFile`` take a ``shared_perm``
+   argument in place of ``file_mode``/``dir_mode``. (Jelmer Vernooĳ)
+
  * Fix commit-graph extra edge indexing: the stored value is a position in a
    list of 4-byte entries, not a byte offset, so every octopus merge after
    the first got a wrong parent list. (netliomax25-code)

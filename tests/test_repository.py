@@ -384,6 +384,22 @@ class RepositoryRootTests(TestCase):
         jpg_attrs = attrs.match_path(b"image.jpg")
         self.assertEqual(jpg_attrs, {b"text": False, b"binary": True})
 
+    def test_get_gitattributes_malformed_pattern(self) -> None:
+        # Git treats a malformed pattern as matching nothing rather than as a
+        # broken file, so the bad line is skipped and the rest still applies.
+        r = self.open_repo("a.git")
+        info_dir = os.path.join(r.controldir(), "info")
+        if not os.path.exists(info_dir):
+            os.makedirs(info_dir)
+        with open(os.path.join(info_dir, "attributes"), "wb") as f:
+            f.write(b"*.[ch text=auto\n")
+            f.write(b"*.txt text\n")
+
+        with self.assertLogs("dulwich.attrs", level="WARNING"):
+            attrs = r.get_gitattributes()
+        self.assertEqual(len(attrs), 1)
+        self.assertEqual(attrs.match_path(b"file.txt"), {b"text": True})
+
     def test_contains_missing(self) -> None:
         r = self.open_repo("a.git")
         self.assertNotIn(b"bar", r)

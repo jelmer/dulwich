@@ -26,16 +26,23 @@ __all__ = [
     "AttributeValue",
     "GitAttributes",
     "Pattern",
+    "compile_gitattributes_patterns",
     "match_path",
     "parse_git_attributes",
     "parse_gitattributes_file",
     "read_gitattributes",
 ]
 
+import logging
 import os
 import re
-from collections.abc import Generator, Iterator, Mapping, Sequence
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from typing import IO
+
+from .wildmatch import MalformedPattern
+from .wildmatch import translate as translate_wildmatch
+
+logger = logging.getLogger(__name__)
 
 AttributeValue = bytes | bool | None
 
@@ -106,10 +113,12 @@ def _translate_pattern(pattern: bytes) -> bytes:
 
     Similar to gitignore patterns, but simpler as gitattributes doesn't support
     all the same features (e.g., no directory-only patterns with trailing /).
+
+    Raises:
+      MalformedPattern: if wildmatch() would refuse the pattern outright;
+        see :func:`dulwich.wildmatch.translate`.
     """
     res = b""
-    i = 0
-    n = len(pattern)
 
     # If pattern doesn't contain /, it can match at any level
     if b"/" not in pattern:
@@ -117,58 +126,8 @@ def _translate_pattern(pattern: bytes) -> bytes:
     elif pattern.startswith(b"/"):
         # Leading / means root of repository
         pattern = pattern[1:]
-        n = len(pattern)
 
-    while i < n:
-        c = pattern[i : i + 1]
-        i += 1
-
-        if c == b"*":
-            # Consume the whole run of '*' so consecutive stars collapse to
-            # a single wildcard. Emitting one quantifier per star produces
-            # adjacent unbounded quantifiers (e.g. '.*.*.*') that backtrack
-            # catastrophically on non-matching input (ReDoS); collapsing is
-            # also semantically correct since repeated '*' are redundant.
-            double = i < n and pattern[i : i + 1] == b"*"
-            while i < n and pattern[i : i + 1] == b"*":
-                i += 1
-            if double:
-                # Double asterisk - matches across directory separators
-                if i < n and pattern[i : i + 1] == b"/":
-                    # **/ - match zero or more directories
-                    res += b"(?:.*/)??"
-                    i += 1
-                else:
-                    # ** at end or in the middle
-                    res += b".*"
-            else:
-                # Single * - match any character except /
-                res += b"[^/]*"
-        elif c == b"?":
-            res += b"[^/]"
-        elif c == b"[":
-            # Character class
-            j = i
-            if j < n and pattern[j : j + 1] == b"!":
-                j += 1
-            if j < n and pattern[j : j + 1] == b"]":
-                j += 1
-            while j < n and pattern[j : j + 1] != b"]":
-                j += 1
-            if j >= n:
-                res += b"\\["
-            else:
-                stuff = pattern[i:j].replace(b"\\", b"\\\\")
-                i = j + 1
-                if stuff.startswith(b"!"):
-                    stuff = b"^" + stuff[1:]
-                elif stuff.startswith(b"^"):
-                    stuff = b"\\" + stuff
-                res += b"[" + stuff + b"]"
-        else:
-            res += re.escape(c)
-
-    return res
+    return res + translate_wildmatch(pattern)
 
 
 class Pattern:
@@ -237,10 +196,41 @@ def match_path(
     return attributes
 
 
+def compile_gitattributes_patterns(
+    entries: Iterable[tuple[bytes, Mapping[bytes, AttributeValue]]],
+    source: str | bytes = b"<attributes>",
+) -> list[tuple[Pattern, Mapping[bytes, AttributeValue]]]:
+    """Compile parsed gitattributes entries, skipping malformed patterns.
+
+    Git's wildmatch() treats a malformed pattern as matching nothing rather
+    than as a broken file, so one bad line is logged and dropped instead of
+    aborting the load.
+
+    Args:
+        entries: (pattern, attributes) pairs, as from parse_git_attributes
+        source: Where the entries came from, used in the warning
+
+    Returns:
+        List of (Pattern, attributes) tuples
+    """
+    patterns = []
+    for pattern_bytes, attrs in entries:
+        try:
+            pattern = Pattern(pattern_bytes)
+        except MalformedPattern:
+            logger.warning("Ignoring malformed pattern %r in %r", pattern_bytes, source)
+            continue
+        patterns.append((pattern, attrs))
+    return patterns
+
+
 def parse_gitattributes_file(
     filename: str | bytes,
 ) -> list[tuple[Pattern, Mapping[bytes, AttributeValue]]]:
     """Parse a gitattributes file and return compiled patterns.
+
+    A malformed pattern is logged and skipped rather than raised, so one bad
+    line doesn't stop the rest of the file from loading.
 
     Args:
         filename: Path to the .gitattributes file
@@ -248,17 +238,11 @@ def parse_gitattributes_file(
     Returns:
         List of (Pattern, attributes) tuples
     """
-    patterns = []
-
     if isinstance(filename, str):
         filename = filename.encode("utf-8")
 
     with open(filename, "rb") as f:
-        for pattern_bytes, attrs in parse_git_attributes(f):
-            pattern = Pattern(pattern_bytes)
-            patterns.append((pattern, attrs))
-
-    return patterns
+        return compile_gitattributes_patterns(parse_git_attributes(f), filename)
 
 
 def read_gitattributes(

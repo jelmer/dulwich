@@ -259,6 +259,17 @@ class BlobNormalizerTests(TestCase):
         self.config = ConfigDict()
         self.gitattributes = {}
 
+    def test_malformed_pattern_skipped(self) -> None:
+        """A malformed pattern is skipped rather than aborting normalizer setup."""
+        gitattributes = {"*.[ch": {b"text": True}, "*.txt": {b"text": True}}
+        with self.assertLogs("dulwich.line_ending", level="WARNING"):
+            normalizer = BlobNormalizer(self.config, gitattributes, autocrlf=b"true")
+
+        blob = Blob()
+        blob.data = b"line1\r\nline2\r\n"
+        result = normalizer.checkin_normalize(blob, b"test.txt")
+        self.assertEqual(result.data, b"line1\nline2\n")
+
     def test_autocrlf_true_checkin(self) -> None:
         """Test checkin with autocrlf=true."""
         normalizer = BlobNormalizer(self.config, self.gitattributes, autocrlf=b"true")

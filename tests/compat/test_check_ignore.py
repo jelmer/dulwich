@@ -687,6 +687,98 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
         ]
         self._assert_ignore_match(paths)
 
+    def test_bracket_expression_grammar(self) -> None:
+        """Test the whole bracket expression grammar against git.
+
+        git matches these with wildmatch(), which unlike fnmatch takes '^' as a
+        negation character, understands [:name:] classes, lets a backslash
+        escape a member, never matches '/' and gives up entirely on a malformed
+        class.
+        """
+        paths = [
+            "a",
+            "b",
+            "c",
+            "d",
+            "Q",
+            "z",
+            "0",
+            "9",
+            "_",
+            "^",
+            "!",
+            "]",
+            "[",
+            "ab",
+            "0a",
+            "a-c",
+            "abc",
+            "sub/a",
+            "sub/b",
+            "sub/0",
+        ]
+        for path in paths:
+            self._create_file(path)
+
+        # Patterns git's wildmatch() refuses outright, so nothing is ignored.
+        malformed = {"[abc", "[", "[]", "[!]", "[^]", "[[:foo:]]", "foo["}
+        patterns = [
+            "[abc]",
+            "[a-c]",
+            "[!a-c]",
+            "[^a-c]",
+            "[!0-9]",
+            "[^0-9]",
+            "[^^]",
+            "[[:digit:]]",
+            "[[:alpha:]]",
+            "[[:punct:]]",
+            "[[:xdigit:]]",
+            "[![:digit:]]",
+            "[^[:digit:]]",
+            "[[:digit:]abc]",
+            "[a[:digit:]]",
+            "[]]",
+            "[]a]",
+            "[!]]",
+            "[^]]",
+            "[\\]]",
+            "[\\[]",
+            "[x\\]y]",
+            "a[a\\-c]c",
+            "[a-]",
+            "[-a]",
+            "[a-c-]",
+            "[z-a]",
+            "[/-9]",
+            "[a/c]",
+            "[!/]",
+            "[^/]",
+            "*[^a]",
+            "?[^a]",
+            "[[:digit:]]*",
+            "*[[:digit:]]",
+            "sub/[^a]",
+            "sub/[[:digit:]]",
+            "**/[^a]",
+            "**/[[:digit:]]",
+            *sorted(malformed),
+        ]
+        for pattern in patterns:
+            self._write_gitignore(pattern + "\n")
+            git_ignored = self._git_check_ignore(paths)
+            # An erroring git would look like "nothing is ignored", so check
+            # that it really answered before comparing.
+            if pattern in malformed:
+                self.assertEqual(set(), git_ignored, f"pattern: {pattern}")
+            else:
+                self.assertNotEqual(set(), git_ignored, f"pattern: {pattern}")
+            self.assertEqual(
+                git_ignored,
+                self._dulwich_check_ignore(paths),
+                f"pattern: {pattern}",
+            )
+
     def test_mixed_single_double_asterisk_patterns(self) -> None:
         """Test patterns that mix single (*) and double (**) asterisks."""
         self._write_gitignore(

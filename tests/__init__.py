@@ -267,6 +267,7 @@ def self_test_suite() -> unittest.TestSuite:
         "walk",
         "web",
         "whitespace",
+        "wildmatch",
         "worktree",
     ]
     module_names = ["tests.test_" + name for name in names]

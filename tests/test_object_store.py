@@ -41,6 +41,7 @@ from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import (
     DEFAULT_TEMPFILE_GRACE_PERIOD,
     DiskObjectStore,
+    GraphTraversalReachability,
     MemoryObjectStore,
     ObjectStoreGraphWalker,
     OverlayObjectStore,
@@ -1377,6 +1378,34 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         store.write_midx()
         midx_path = os.path.join(store.pack_dir, "multi-pack-index")
         self.assertTrue(os.path.exists(midx_path))
+
+    def test_get_reachability_provider_handles_disappeared_pack(self) -> None:
+        """The bitmap probe must not raise when a cached pack file vanishes.
+
+        Regression for https://github.com/jelmer/dulwich/issues/2344: the
+        probe guarded only ``FileNotFoundError``, but ``Pack.bitmap`` reaches
+        ``Pack.index``, which raises ``PackFileDisappeared``. The pack here
+        has no bitmap at all, so the bug is not limited to repositories that
+        use bitmaps.
+        """
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+
+        b1 = make_object(Blob, data=b"reachability-after-repack")
+        f, commit, _abort = store.add_pack()
+        write_pack_objects(f.write, [(b1, None)], object_format=DEFAULT_OBJECT_FORMAT)
+        doomed = commit()
+        self.assertIsNotNone(doomed)
+
+        assert doomed is not None
+        doomed.close()
+        os.remove(doomed._idx_path)
+        os.remove(doomed._data_path)
+
+        # Should not raise; the vanished pack is skipped and the store falls
+        # back to graph traversal.
+        provider = store.get_reachability_provider()
+        self.assertIsInstance(provider, GraphTraversalReachability)
 
     def test_contains_packed_hex_sha_with_midx(self) -> None:
         """contains_packed must accept hex SHAs even when a MIDX is loaded.

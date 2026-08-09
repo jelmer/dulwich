@@ -1,5 +1,10 @@
 1.2.13	UNRELEASED
 
+ * SECURITY: Don't follow symlinks when writing patch files in
+   ``porcelain.format_patch``. A symlink pre-planted at a patch's filename in
+   the output directory was followed, writing the patch outside that directory.
+   (Jelmer Vernooĳ; Reported by wzc)
+
  * Catch ``PackFileDisappeared`` in the bitmap probe in
    ``get_reachability_provider``, which only guarded ``FileNotFoundError``.
    (Jelmer Vernooĳ, #2344)

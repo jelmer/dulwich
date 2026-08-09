@@ -293,6 +293,7 @@ __all__ = [
 ]
 
 import datetime
+import errno
 import fnmatch
 import logging
 import os
@@ -8803,7 +8804,19 @@ def format_patch(
                 summary = get_summary(commit)
                 filename = os.path.join(outdir, f"{i:04d}-{summary}.patch")
 
-                with open(filename, "wb") as f:
+                # Refuse to follow a symlink at the target name: patch output
+                # directories are not necessarily private, so following one
+                # would write outside the directory the caller asked for.
+                flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                if hasattr(os, "O_NOFOLLOW"):
+                    flags |= os.O_NOFOLLOW
+                elif os.path.islink(filename):
+                    # Windows has no O_NOFOLLOW; this check races, but creating
+                    # symlinks there requires privileges that make the attack
+                    # far less reachable.
+                    raise OSError(errno.ELOOP, os.strerror(errno.ELOOP), filename)
+
+                with os.fdopen(os.open(filename, flags, 0o666), "wb") as f:
                     write_commit_patch(
                         f,
                         commit,

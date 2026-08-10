@@ -22,12 +22,15 @@
 
 """Tests for Dulwich packs."""
 
+import gc
 import os
+import platform
 import shutil
 import sys
 import tempfile
 import tracemalloc
 import types
+import weakref
 import zlib
 from hashlib import sha1
 from io import BytesIO
@@ -717,6 +720,20 @@ class TestPackData(PackTests):
 
 
 class TestPack(PackTests):
+    def test_no_reference_cycle(self) -> None:
+        # A Pack must be freeable by reference counting alone. If it is part
+        # of a reference cycle, __del__ (and with it the file close) waits
+        # for a cycle-collector pass, and a pack released from the object
+        # store cache keeps its files open past close() — which breaks
+        # directory removal on Windows.
+        pack = self.get_pack(pack1_sha)
+        self.assertEqual(3, len(pack))
+        pack.close()
+        ref = weakref.ref(pack)
+        del pack
+        if platform.python_implementation() == "CPython":
+            self.assertIsNone(ref())
+
     def test_len(self) -> None:
         with self.get_pack(pack1_sha) as p:
             self.assertEqual(3, len(p))
@@ -737,6 +754,29 @@ class TestPack(PackTests):
         with self.get_pack(pack1_sha) as p:
             expected = {p[s] for s in [commit_sha, tree_sha, a_sha]}
             self.assertEqual(expected, set(list(p.iterobjects())))
+
+    def test_iterators_keep_released_pack_alive(self) -> None:
+        iterator_factories = {
+            "iter": iter,
+            "iterobjects": lambda pack: pack.iterobjects(),
+            "iterobjects_subset": lambda pack: pack.iterobjects_subset([commit_sha]),
+            "entries": lambda pack: pack.entries(),
+            "sorted_entries": lambda pack: pack.sorted_entries(),
+        }
+
+        for name, factory in iterator_factories.items():
+            with self.subTest(name=name):
+                pack = self.get_pack(pack1_sha)
+                iterator = factory(pack)
+                pack._release_from_cache()
+                pack_ref = weakref.ref(pack)
+                del pack
+                gc.collect()
+
+                self.assertIsNotNone(pack_ref())
+                self.assertTrue(list(iterator))
+                gc.collect()
+                self.assertIsNone(pack_ref())
 
     def test_pack_tuples(self) -> None:
         with self.get_pack(pack1_sha) as p:

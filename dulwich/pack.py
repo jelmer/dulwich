@@ -4127,8 +4127,13 @@ class Pack:
         self._data = None
         self._idx = None
         self._bitmap = None
-        self._idx_path = self._basename + ".idx"
-        self._data_path = self._basename + ".pack"
+        self._released_from_cache = False
+        # The loaders below must capture the paths as locals rather than read
+        # them off self, so that the closures don't make the Pack part of a
+        # reference cycle; a cycle would delay __del__ (and with it the file
+        # close) until a garbage collector pass.
+        idx_path = self._idx_path = self._basename + ".idx"
+        data_path = self._data_path = self._basename + ".pack"
         self._bitmap_path = self._basename + ".bitmap"
         self.delta_window_size = delta_window_size
         self.window_memory = window_memory
@@ -4137,9 +4142,9 @@ class Pack:
         self.threads = threads
         self.big_file_threshold = big_file_threshold
         self.delta_base_cache_limit = delta_base_cache_limit
-        self._idx_load = lambda: load_pack_index(self._idx_path, object_format)
+        self._idx_load = lambda: load_pack_index(idx_path, object_format)
         self._data_load = lambda: PackData(
-            self._data_path,
+            data_path,
             delta_window_size=delta_window_size,
             window_memory=window_memory,
             delta_cache_size=delta_cache_size,
@@ -4315,14 +4320,27 @@ class Pack:
             self._idx.close()
             self._idx = None
 
+    def _release_from_cache(self) -> None:
+        """Release cache ownership without invalidating other users.
+
+        The pack's resources are closed by ``__del__`` once the last reference
+        is gone. Since this is an intentional ownership transfer, finalization
+        should not report the pack as leaked.
+        """
+        self._released_from_cache = True
+
     def __del__(self) -> None:
         """Ensure pack file is closed when Pack is garbage collected."""
         if self._data is not None or self._idx is not None:
             import warnings
 
-            warnings.warn(
-                f"unclosed Pack {self!r}", ResourceWarning, stacklevel=2, source=self
-            )
+            if not self._released_from_cache:
+                warnings.warn(
+                    f"unclosed Pack {self!r}",
+                    ResourceWarning,
+                    stacklevel=2,
+                    source=self,
+                )
             try:
                 self.close()
             except Exception:
@@ -4358,7 +4376,7 @@ class Pack:
 
     def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over all the sha1s of the objects in this pack."""
-        return iter(self.index)
+        yield from self.index
 
     def check_length_and_checksum(self) -> None:
         """Sanity check the length and checksum of the pack index and data."""
@@ -4418,24 +4436,22 @@ class Pack:
 
     def iterobjects(self) -> Iterator[ShaFile]:
         """Iterate over the objects in this pack."""
-        return iter(
-            PackInflater.for_pack_data(self.data, resolve_ext_ref=self.resolve_ext_ref)
+        yield from PackInflater.for_pack_data(
+            self.data, resolve_ext_ref=self.resolve_ext_ref
         )
 
     def iterobjects_subset(
         self, shas: Iterable[ObjectID], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
         """Iterate over a subset of objects in this pack."""
-        return (
-            uo
-            for uo in PackInflater.for_pack_subset(
-                self,
-                shas,
-                allow_missing=allow_missing,
-                resolve_ext_ref=self.resolve_ext_ref,
-            )
-            if uo.id in shas
-        )
+        for uo in PackInflater.for_pack_subset(
+            self,
+            shas,
+            allow_missing=allow_missing,
+            resolve_ext_ref=self.resolve_ext_ref,
+        ):
+            if uo.id in shas:
+                yield uo
 
     def iter_unpacked_subset(
         self,
@@ -4622,7 +4638,7 @@ class Pack:
             object count.
         Returns: iterator of tuples with (sha, offset, crc32)
         """
-        return self.data.iterentries(
+        yield from self.data.iterentries(
             progress=progress, resolve_ext_ref=self.resolve_ext_ref
         )
 
@@ -4636,10 +4652,8 @@ class Pack:
             object count
         Returns: Iterator of tuples with (sha, offset, crc32)
         """
-        return iter(
-            self.data.sorted_entries(
-                progress=progress, resolve_ext_ref=self.resolve_ext_ref
-            )
+        yield from self.data.sorted_entries(
+            progress=progress, resolve_ext_ref=self.resolve_ext_ref
         )
 
     def get_unpacked_object(

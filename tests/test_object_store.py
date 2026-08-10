@@ -1085,6 +1085,55 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         # accessible because _update_pack_cache will re-open it if needed
         self.assertEqual((Blob.type_num, b"data for pack two"), store.get_raw(b2.id))
 
+    def test_packed_git_limit_does_not_close_pack_in_use(self) -> None:
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+
+        b1 = make_object(Blob, data=b"first object in pack one")
+        b2 = make_object(Blob, data=b"second object in pack one")
+        f, commit, abort = store.add_pack()
+        try:
+            write_pack_objects(
+                f.write,
+                [(b1, None), (b2, None)],
+                object_format=DEFAULT_OBJECT_FORMAT,
+            )
+        except BaseException:
+            abort()
+            raise
+        pack_one = commit()
+        self.assertIsNotNone(pack_one)
+
+        b3 = make_object(Blob, data=b"object in pack two")
+        f, commit, abort = store.add_pack()
+        try:
+            write_pack_objects(
+                f.write, [(b3, None)], object_format=DEFAULT_OBJECT_FORMAT
+            )
+        except BaseException:
+            abort()
+            raise
+        pack_two = commit()
+        self.assertIsNotNone(pack_two)
+
+        assert pack_one is not None
+        assert pack_two is not None
+        # Load both packs, then make pack one the least recently used.
+        pack_one.data
+        pack_two.data
+        store.get_raw(b3.id)
+        store.get_raw(b1.id)
+        store.packed_git_limit = store._total_pack_mmap_size() - 1
+
+        unpacked = pack_one.iter_unpacked()
+        next(unpacked)
+        store.get_raw(b3.id)
+
+        self.assertNotIn(pack_one, store._pack_cache.values())
+        self.assertIsNotNone(pack_one._data)
+        self.assertEqual(1, len(list(unpacked)))
+        pack_one.close()
+
     def test_packed_git_limit_no_limit(self) -> None:
         store = DiskObjectStore(self.store_dir)
         self.addCleanup(store.close)

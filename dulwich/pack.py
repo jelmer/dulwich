@@ -4376,7 +4376,7 @@ class Pack:
 
     def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over all the sha1s of the objects in this pack."""
-        return iter(self.index)
+        yield from self.index
 
     def check_length_and_checksum(self) -> None:
         """Sanity check the length and checksum of the pack index and data."""
@@ -4436,24 +4436,22 @@ class Pack:
 
     def iterobjects(self) -> Iterator[ShaFile]:
         """Iterate over the objects in this pack."""
-        return iter(
-            PackInflater.for_pack_data(self.data, resolve_ext_ref=self.resolve_ext_ref)
+        yield from PackInflater.for_pack_data(
+            self.data, resolve_ext_ref=self.resolve_ext_ref
         )
 
     def iterobjects_subset(
         self, shas: Iterable[ObjectID], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
         """Iterate over a subset of objects in this pack."""
-        return (
-            uo
-            for uo in PackInflater.for_pack_subset(
-                self,
-                shas,
-                allow_missing=allow_missing,
-                resolve_ext_ref=self.resolve_ext_ref,
-            )
-            if uo.id in shas
-        )
+        for uo in PackInflater.for_pack_subset(
+            self,
+            shas,
+            allow_missing=allow_missing,
+            resolve_ext_ref=self.resolve_ext_ref,
+        ):
+            if uo.id in shas:
+                yield uo
 
     def iter_unpacked_subset(
         self,
@@ -4640,7 +4638,7 @@ class Pack:
             object count.
         Returns: iterator of tuples with (sha, offset, crc32)
         """
-        return self.data.iterentries(
+        yield from self.data.iterentries(
             progress=progress, resolve_ext_ref=self.resolve_ext_ref
         )
 
@@ -4654,10 +4652,8 @@ class Pack:
             object count
         Returns: Iterator of tuples with (sha, offset, crc32)
         """
-        return iter(
-            self.data.sorted_entries(
-                progress=progress, resolve_ext_ref=self.resolve_ext_ref
-            )
+        yield from self.data.sorted_entries(
+            progress=progress, resolve_ext_ref=self.resolve_ext_ref
         )
 
     def get_unpacked_object(

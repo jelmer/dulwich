@@ -4128,8 +4128,12 @@ class Pack:
         self._idx = None
         self._bitmap = None
         self._released_from_cache = False
-        self._idx_path = self._basename + ".idx"
-        self._data_path = self._basename + ".pack"
+        # The loaders below must capture the paths as locals rather than read
+        # them off self, so that the closures don't make the Pack part of a
+        # reference cycle; a cycle would delay __del__ (and with it the file
+        # close) until a garbage collector pass.
+        idx_path = self._idx_path = self._basename + ".idx"
+        data_path = self._data_path = self._basename + ".pack"
         self._bitmap_path = self._basename + ".bitmap"
         self.delta_window_size = delta_window_size
         self.window_memory = window_memory
@@ -4138,9 +4142,9 @@ class Pack:
         self.threads = threads
         self.big_file_threshold = big_file_threshold
         self.delta_base_cache_limit = delta_base_cache_limit
-        self._idx_load = lambda: load_pack_index(self._idx_path, object_format)
+        self._idx_load = lambda: load_pack_index(idx_path, object_format)
         self._data_load = lambda: PackData(
-            self._data_path,
+            data_path,
             delta_window_size=delta_window_size,
             window_memory=window_memory,
             delta_cache_size=delta_cache_size,

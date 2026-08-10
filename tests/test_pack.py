@@ -23,11 +23,13 @@
 """Tests for Dulwich packs."""
 
 import os
+import platform
 import shutil
 import sys
 import tempfile
 import tracemalloc
 import types
+import weakref
 import zlib
 from hashlib import sha1
 from io import BytesIO
@@ -717,6 +719,20 @@ class TestPackData(PackTests):
 
 
 class TestPack(PackTests):
+    def test_no_reference_cycle(self) -> None:
+        # A Pack must be freeable by reference counting alone. If it is part
+        # of a reference cycle, __del__ (and with it the file close) waits
+        # for a cycle-collector pass, and a pack released from the object
+        # store cache keeps its files open past close() — which breaks
+        # directory removal on Windows.
+        pack = self.get_pack(pack1_sha)
+        self.assertEqual(3, len(pack))
+        pack.close()
+        ref = weakref.ref(pack)
+        del pack
+        if platform.python_implementation() == "CPython":
+            self.assertIsNone(ref())
+
     def test_len(self) -> None:
         with self.get_pack(pack1_sha) as p:
             self.assertEqual(3, len(p))

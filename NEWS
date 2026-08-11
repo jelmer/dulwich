@@ -1,5 +1,14 @@
 1.2.13	UNRELEASED
 
+ * SECURITY: Deduplicate the commit walk in ``find_shallow`` and ``get_depth``
+   (``dulwich.object_store``). Both re-expanded a commit once per path that
+   reached it, so a small merge-heavy history walked in exponential time. A
+   ``deepen`` request on ``git-upload-pack`` reaches ``find_shallow`` before any
+   authentication, so a pushed ~100-commit repository could pin a server CPU for
+   hours per shallow clone. The traversal now skips already-visited
+   ``(sha, depth)`` states, which leaves the result unchanged.
+   (netliomax25-code)
+
  * SECURITY: Don't follow symlinks when writing messages in
    ``porcelain.format_patch``, ``mbox.split_mbox`` and ``mbox.split_maildir``.
    A symlink pre-planted at an output filename was followed, writing the

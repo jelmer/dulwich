@@ -1249,6 +1249,56 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
         ]
         self._assert_ignore_match(paths)
 
+    def test_trailing_double_asterisk_slash(self) -> None:
+        """Test that "foo/**/" only covers the directories below foo.
+
+        "foo/" itself is left out: git answers it inconsistently. "git status
+        --ignored" leaves the directory untracked, while "git check-ignore
+        foo/" calls it ignored, because the pattern is matched against the
+        trailing slash of the argument and "**" happily matches nothing.
+        """
+        self._write_gitignore("foo/**/\n")
+        self._create_file("foo/keep.txt")
+        self._create_file("foo/bar/bla.c")
+        self._create_dir("foo/bar/bla")
+
+        paths = [
+            "foo/keep.txt",
+            "foo/bar/",
+            "foo/bar/bla.c",
+            "foo/bar/bla/",
+        ]
+        self._assert_ignore_match(paths)
+
+    def test_trailing_double_asterisk_slash_at_root(self) -> None:
+        """Test a bare "**/", which covers every directory below the root."""
+        self._write_gitignore("**/\n")
+        self._create_file("keep.txt")
+        self._create_file("foo/bla.c")
+        self._create_dir("foo/bar")
+
+        paths = ["keep.txt", "foo/", "foo/bla.c", "foo/bar/"]
+        self._assert_ignore_match(paths)
+
+    def test_trailing_double_asterisk_slash_nested(self) -> None:
+        """Test "foo/**/" against a deeper tree with its own subdirectories."""
+        self._write_gitignore("foo/**/\n")
+        self._create_file("foo/a.txt")
+        self._create_file("foo/bar/b.txt")
+        self._create_file("foo/bar/bla/c.txt")
+        self._create_file("keep/foo/d.txt")
+
+        paths = [
+            "foo/a.txt",
+            "foo/bar/",
+            "foo/bar/b.txt",
+            "foo/bar/bla/",
+            "foo/bar/bla/c.txt",
+            "keep/foo/",
+            "keep/foo/d.txt",
+        ]
+        self._assert_ignore_match(paths)
+
     def _git_check_ignore_quoted(self, paths: Sequence[str]) -> set[str]:
         """Run git check-ignore with default quoting and return set of ignored paths."""
         try:

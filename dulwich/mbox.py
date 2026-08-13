@@ -39,6 +39,8 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, TextIO
 
+from .file import open_nofollow
+
 if TYPE_CHECKING:
     from .patch import MailinfoResult
 
@@ -100,7 +102,7 @@ def split_mbox(
             output_file_path = output_path / output_filename
 
             # Write the message to the output file
-            with open(output_file_path, "wb") as f:
+            with open_nofollow(output_file_path) as f:
                 message_bytes = bytes(message)
 
                 # Handle mboxrd format - reverse the escaping
@@ -189,7 +191,7 @@ def split_maildir(
             output_file_path = output_path / output_filename
 
             # Write the message to the output file
-            with open(output_file_path, "wb") as f:
+            with open_nofollow(output_file_path) as f:
                 message_bytes = bytes(message)
 
                 # Handle CR/LF if needed

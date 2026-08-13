@@ -23,8 +23,10 @@
 
 import mailbox
 import os
+import sys
 import tempfile
 from io import BytesIO
+from unittest import skipIf
 
 from dulwich.mbox import mailinfo, split_maildir, split_mbox
 
@@ -247,6 +249,30 @@ From the beginning...
 """
                 self.assertEqual(content, expected)
 
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_split_mbox_does_not_follow_symlink_in_output_dir(self) -> None:
+        # A symlink pre-planted at an output filename must not be followed,
+        # which would write the message outside output_dir.
+        mbox_content = b"""\
+From test@example.com Mon Jan 01 00:00:00 2025
+From: Test <test@example.com>
+Subject: Test
+
+Body.
+"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mbox_path = os.path.join(tmpdir, "test.mbox")
+            with open(mbox_path, "wb") as f:
+                f.write(mbox_content)
+
+            output_dir = os.path.join(tmpdir, "output")
+            os.makedirs(output_dir)
+            target = os.path.join(tmpdir, "escaped")
+            os.symlink(target, os.path.join(output_dir, "0001"))
+
+            self.assertRaises(OSError, split_mbox, mbox_path, output_dir)
+            self.assertFalse(os.path.exists(target))
+
 
 class SplitMaildirTests(TestCase):
     """Tests for split_maildir function."""
@@ -316,6 +342,27 @@ class SplitMaildirTests(TestCase):
 
             self.assertEqual(len(output_files), 1)
             self.assertEqual(output_files[0], os.path.join(output_dir, "01"))
+
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_split_maildir_does_not_follow_symlink_in_output_dir(self) -> None:
+        # A symlink pre-planted at an output filename must not be followed,
+        # which would write the message outside output_dir.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            maildir_path = os.path.join(tmpdir, "maildir")
+            md = mailbox.Maildir(maildir_path)
+
+            msg = mailbox.MaildirMessage()
+            msg.set_payload(b"Test message")
+            msg["From"] = "test@example.com"
+            md.add(msg)
+
+            output_dir = os.path.join(tmpdir, "output")
+            os.makedirs(output_dir)
+            target = os.path.join(tmpdir, "escaped")
+            os.symlink(target, os.path.join(output_dir, "0001"))
+
+            self.assertRaises(OSError, split_maildir, maildir_path, output_dir)
+            self.assertFalse(os.path.exists(target))
 
 
 class MailinfoTests(TestCase):

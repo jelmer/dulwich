@@ -30,8 +30,10 @@ __all__ = [
     "adjust_shared_perm",
     "calc_shared_perm",
     "ensure_dir_exists",
+    "open_nofollow",
 ]
 
+import errno
 import os
 import stat
 import sys
@@ -133,6 +135,37 @@ def ensure_dir_exists(
         os.makedirs(dirname)
     except FileExistsError:
         pass
+
+
+def open_nofollow(
+    path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+    mode: int = 0o666,
+) -> IO[bytes]:
+    """Open a path for writing, refusing to follow a symlink at the final name.
+
+    For output written into a directory the caller named but does not
+    necessarily control, following a symlink pre-planted at the target name
+    would write outside that directory.
+
+    Args:
+      path: File to create or truncate
+      mode: Permission bits for a newly created file, before the umask
+
+    Returns:
+      A binary file object open for writing
+
+    Raises:
+      OSError: If the path is a symlink, with errno ELOOP
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    elif os.path.islink(path):
+        # Windows has no O_NOFOLLOW; this check races, but creating symlinks
+        # there requires privileges that make the attack far less reachable.
+        raise OSError(errno.ELOOP, os.strerror(errno.ELOOP), os.fspath(path))
+
+    return os.fdopen(os.open(path, flags, mode), "wb")
 
 
 def _fancy_rename(oldname: str | bytes, newname: str | bytes) -> None:

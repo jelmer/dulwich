@@ -30,6 +30,7 @@ from pathlib import Path
 # Files that are allowed to not have the standard preamble
 PREAMBLE_EXCEPTIONS = [
     "dulwich/diffstat.py",  # MIT licensed file
+    "tests/test_diffstat.py",  # MIT licensed, like the module it tests
 ]
 
 # Files that are allowed to use os.environ (beyond cli.py and porcelain/)
@@ -207,10 +208,12 @@ class SourceCodeComplianceTests(unittest.TestCase):
 
         return True, ""
 
-    def test_all_files_have_preamble(self):
-        """Test that all dulwich Python files have the standard preamble."""
-        python_files = self._get_dulwich_python_files()
-        self.assertGreater(len(python_files), 0, "No Python files found in dulwich/")
+    def _check_preambles(self, directory_name):
+        """Assert every Python file in a directory has the standard preamble."""
+        python_files = _get_python_files(directory_name)
+        self.assertGreater(
+            len(python_files), 0, f"No Python files found in {directory_name}/"
+        )
 
         files_without_preamble = []
 
@@ -222,6 +225,10 @@ class SourceCodeComplianceTests(unittest.TestCase):
             if rel_path_str in PREAMBLE_EXCEPTIONS:
                 continue
 
+            # Empty files (e.g. package markers) carry no copyrightable content
+            if file_path.stat().st_size == 0:
+                continue
+
             has_preamble, error_msg = self._has_standard_preamble(file_path)
             if not has_preamble:
                 files_without_preamble.append(f"{rel_path_str}: {error_msg}")
@@ -231,6 +238,14 @@ class SourceCodeComplianceTests(unittest.TestCase):
                 "The following files are missing the standard preamble:\n"
                 + "\n".join(f"  - {f}" for f in files_without_preamble)
             )
+
+    def test_all_files_have_preamble(self):
+        """Test that all dulwich Python files have the standard preamble."""
+        self._check_preambles("dulwich")
+
+    def test_all_test_files_have_preamble(self):
+        """Test that all test Python files have the standard preamble."""
+        self._check_preambles("tests")
 
     def test_os_environ_usage_restricted(self):
         """Test that os.environ is only used in allowed files."""

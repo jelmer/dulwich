@@ -559,23 +559,44 @@ class TestPackData(PackTests):
             # Verify it's a valid SHA1 hash (20 bytes)
             self.assertIsInstance(checksum, bytes)
 
-    def test_get_stored_checksum_uses_open_file_size(self) -> None:
+    def test_calculate_checksum_rejects_missing_checksum(self) -> None:
+        path = os.path.join(self.tempdir, "truncated.pack")
+        with open(path, "wb") as f:
+            write_pack_header(f.write, 0)
+
+        with PackData(path, object_format=DEFAULT_OBJECT_FORMAT) as p:
+            self.assertRaises(AssertionError, p.calculate_checksum)
+
+    def test_path_checksums_use_open_file_size(self) -> None:
         contents = self.get_pack_bytes(pack1_sha)
         path = os.path.join(self.tempdir, "pack.pack")
         replacement = os.path.join(self.tempdir, "replacement.pack")
         with open(path, "wb") as f:
             f.write(contents)
 
-        with PackData(path, object_format=DEFAULT_OBJECT_FORMAT) as p:
+        wrong_size = len(contents) + 100
+        with PackData(path, object_format=DEFAULT_OBJECT_FORMAT, size=wrong_size) as p:
             if not p._use_pread:
                 self.skipTest("os.pread is unavailable")
-            self.assertEqual(len(contents), p._size)
+            self.assertSucceeds(p.check)
             with open(replacement, "wb") as f:
                 f.write(b"replacement")
             os.replace(replacement, path)
             self.assertEqual(
                 contents[-DEFAULT_OBJECT_FORMAT.oid_length :], p.get_stored_checksum()
             )
+
+    def test_calculate_checksum_rejects_truncation(self) -> None:
+        contents = self.get_pack_bytes(pack1_sha)
+        path = os.path.join(self.tempdir, "pack.pack")
+        with open(path, "wb") as f:
+            f.write(contents)
+
+        with PackData(path, object_format=DEFAULT_OBJECT_FORMAT) as p:
+            if not p._use_pread:
+                self.skipTest("os.pread is unavailable")
+            os.truncate(path, len(contents) // 2)
+            self.assertRaises(AssertionError, p.calculate_checksum)
 
     # Removed test_check_pack_data_size as it was accessing private attributes
 
@@ -874,6 +895,65 @@ class TestPackData(PackTests):
     def test_concurrent_reads_no_fileno(self) -> None:
         with self.get_memory_pack_data(pack1_sha) as p:
             self._do_test_concurrent_reads(p)
+
+    def test_calculate_checksum_releases_fallback_lock_between_reads(self) -> None:
+        f = BytesIO()
+        write_pack_header(f.write, 0)
+        f.write(b"x" * (1 << 16))
+        f.write(b"\0" * DEFAULT_OBJECT_FORMAT.oid_length)
+        f.seek(0)
+
+        first_chunk_hashed = threading.Event()
+        resume_checksum = threading.Event()
+        other_read_done = threading.Event()
+        failures = []
+        real_hash = sha1()
+        hash_obj = mock.Mock(wraps=real_hash)
+
+        def pause_after_first_update(data: bytes) -> None:
+            real_hash.update(data)
+            if not first_chunk_hashed.is_set():
+                first_chunk_hashed.set()
+                if not resume_checksum.wait(5):
+                    raise RuntimeError("timed out waiting to resume checksum")
+
+        hash_obj.update.side_effect = pause_after_first_update
+
+        with PackData.from_file(f, DEFAULT_OBJECT_FORMAT) as p:
+
+            def calculate_checksum() -> None:
+                try:
+                    p.calculate_checksum()
+                except Exception as e:
+                    failures.append(e)
+
+            def read_checksum() -> None:
+                try:
+                    p.get_stored_checksum()
+                except Exception as e:
+                    failures.append(e)
+                finally:
+                    other_read_done.set()
+
+            checksum_thread = threading.Thread(target=calculate_checksum, daemon=True)
+            reader_thread = threading.Thread(target=read_checksum, daemon=True)
+            with mock.patch.object(p.object_format, "hash_func", return_value=hash_obj):
+                checksum_thread.start()
+                self.assertTrue(first_chunk_hashed.wait(5))
+                reader_thread.start()
+                try:
+                    self.assertTrue(
+                        other_read_done.wait(1),
+                        "fallback read blocked while checksum data was hashed",
+                    )
+                finally:
+                    resume_checksum.set()
+                    checksum_thread.join(5)
+                    reader_thread.join(5)
+
+            self.assertFalse(checksum_thread.is_alive())
+            self.assertFalse(reader_thread.is_alive())
+            self.assertEqual([], failures)
 
     def test_iterentries(self) -> None:
         with self.get_pack_data(pack1_sha) as p:

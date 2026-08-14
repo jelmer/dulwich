@@ -100,7 +100,7 @@ __all__ = [
 
 import binascii
 from collections import defaultdict, deque
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from io import BytesIO, UnsupportedOperation
 
 try:
@@ -1997,14 +1997,15 @@ class PackData:
         self._use_pread = file is None and hasattr(os, "pread")
         if file is None:
             self._file = GitFile(self._filename, "rb")
-            if self._use_pread and self._size is None:
+            if self._use_pread:
+                # Checksum offsets are derived from the size, so measure the
+                # opened descriptor rather than trusting a passed size.
                 self._size = os.fstat(self._file.fileno()).st_size
         else:
             self._file = file
         # The condition's lock protects the shared file position during
-        # fallback reads and whole-file checksum calculations. The condition
-        # itself allows close() to wait for active pread calls before closing
-        # the descriptor.
+        # fallback reads. The condition itself allows close() to wait for
+        # active pread calls before closing the descriptor.
         self._read_condition = threading.Condition(threading.Lock())
         self._active_preads = 0
         self._closing = False
@@ -2141,6 +2142,15 @@ class PackData:
             raise AssertionError(errmsg)
         return self._size
 
+    @contextmanager
+    def _locked_file(self) -> Iterator[IO[bytes]]:
+        """Yield the file with the lock protecting its position held."""
+        with self._read_condition:
+            file = self._file
+            if file is None:
+                raise ValueError("read from closed PackData")
+            yield file
+
     def _cursor(self, offset: int) -> _PreadCursor | _SeekCursor:
         """Create a read cursor at offset with its own file position."""
         file = self._file
@@ -2159,18 +2169,29 @@ class PackData:
 
         Returns: Binary digest (size depends on hash algorithm)
         """
-        # Calculating the checksum changes the shared file position. Keep the
-        # lock for the full calculation so concurrent callers and fallback
-        # cursors cannot change the position partway through it.
-        with self._read_condition:
-            file = self._file
-            if file is None:
-                raise ValueError("read from closed PackData")
-            return compute_file_sha(
-                file,
-                hash_func=self.object_format.hash_func,
-                end_ofs=-self.object_format.oid_length,
-            ).digest()
+        if self._use_pread:
+            size = self._get_size()
+        else:
+            # A supplied file object may not expose its size separately, so
+            # measure it relative to the end of the file.
+            with self._locked_file() as file:
+                file.seek(0, SEEK_END)
+                size = file.tell()
+        # A cursor lets other readers continue while the checksum is calculated.
+        sha = self.object_format.hash_func()
+        remaining = size - self.object_format.oid_length
+        if remaining < 0:
+            raise AssertionError("file too short to contain pack checksum")
+        cursor = self._cursor(0)
+        while remaining > 0:
+            data = cursor.read(min(remaining, 1 << 16))
+            if not data:
+                raise AssertionError(
+                    f"EOF in {self._filename} with {remaining} bytes left to hash"
+                )
+            sha.update(data)
+            remaining -= len(data)
+        return sha.digest()
 
     def iter_unpacked(self, *, include_comp: bool = False) -> Iterator[UnpackedObject]:
         """Iterate over unpacked objects in the pack."""
@@ -2342,10 +2363,7 @@ class PackData:
         if not self._use_pread:
             # A supplied file object may not expose its size separately, so
             # locate the checksum relative to the end of the file.
-            with self._read_condition:
-                file = self._file
-                if file is None:
-                    raise ValueError("read from closed PackData")
+            with self._locked_file() as file:
                 file.seek(-checksum_size, SEEK_END)
                 return file.read(checksum_size)
         # PackData records the descriptor's size when it opens the file and

@@ -1,5 +1,9 @@
 1.2.13	UNRELEASED
 
+ * Read packs via ``os.pread`` where available instead of seek+read on a
+   shared file position, so concurrent readers of the same ``PackData`` no
+   longer corrupt each other's reads. (Bojan Zivanovic, #2350)
+
  * SECURITY: Don't follow symlinks when writing messages in
    ``porcelain.format_patch``, ``mbox.split_mbox`` and ``mbox.split_maildir``.
    A symlink pre-planted at an output filename was followed, writing the

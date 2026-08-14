@@ -112,12 +112,13 @@ import logging
 import os
 import struct
 import sys
+import threading
 import warnings
 import zlib
 from collections.abc import Callable, Iterable, Iterator, Sequence, Set
 from hashlib import sha1, sha256
 from itertools import chain
-from os import SEEK_CUR, SEEK_END
+from os import SEEK_END
 from struct import unpack_from
 from types import TracebackType
 from typing import (
@@ -1810,6 +1811,124 @@ def compute_file_sha(
     return sha
 
 
+class _PreadCursor:
+    """Provide a stateful reader using the stateless ``os.pread`` function.
+
+    Each cursor maintains its own offset. This allows concurrent readers of
+    the same pack file to operate without sharing a file position, taking the
+    shared lock only briefly to register each read.
+
+    A cursor registers with its PackData before reading from the descriptor
+    and unregisters when the read is complete. PackData.close() waits for these
+    reads to finish before closing the descriptor. Once it is closed, further
+    reads raise an error rather than risk using a descriptor number that the OS
+    has reassigned to another file.
+    """
+
+    # ``unpack_object`` reads variable-length headers one byte at a time.
+    # Reading a block in advance avoids a separate system call for each byte.
+    _READAHEAD = 512
+
+    def __init__(self, pack_data: "PackData", offset: int) -> None:
+        self._pack_data = pack_data
+        self.offset = offset
+        self._buf = b""
+        self._buf_start = 0
+
+    def read(self, size: int) -> bytes:
+        """Read up to size bytes and advance the cursor.
+
+        Fewer bytes are returned only when the end of the file is reached.
+        """
+        if size < 0:
+            raise ValueError("size must be non-negative")
+        pack_data = self._pack_data
+        if pack_data._file is None:
+            raise ValueError("read from closed PackData")
+        # Decompression may read past an object and then rewind the cursor, so
+        # reuse the buffer whenever it still covers the requested range.
+        buffer_offset = self.offset - self._buf_start
+        if 0 <= buffer_offset and buffer_offset + size <= len(self._buf):
+            self.offset += size
+            return self._buf[buffer_offset : buffer_offset + size]
+        with pack_data._read_condition:
+            file = pack_data._file
+            if file is None:
+                raise ValueError("read from closed PackData")
+            fd = file.fileno()
+            # Register the read before releasing the condition lock. This lets
+            # close() wait until the descriptor is no longer in use.
+            pack_data._active_preads += 1
+        try:
+            # Read enough to satisfy the request and fill at least one
+            # readahead block. If pread returns early, continue until the
+            # request is complete or the end of the file is reached.
+            chunks: list[bytes] = []
+            have = 0
+            while have < size:
+                chunk = os.pread(  # type: ignore[attr-defined,unused-ignore]
+                    fd, max(size - have, self._READAHEAD), self.offset + have
+                )
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                have += len(chunk)
+        finally:
+            with pack_data._read_condition:
+                pack_data._active_preads -= 1
+                if not pack_data._active_preads:
+                    pack_data._read_condition.notify_all()
+        buf = b"".join(chunks)
+        self._buf = buf
+        self._buf_start = self.offset
+        self.offset += min(size, len(buf))
+        return buf[:size]
+
+
+class _SeekCursor:
+    """Provide a fallback cursor using seek and read on a shared file object.
+
+    This is used when ``os.pread`` is unavailable, as on Windows, or when the
+    file has no usable descriptor, such as ``BytesIO``. Seeking again before
+    every read prevents concurrent cursors from disturbing one another's
+    positions, while the lock keeps each seek-and-read operation atomic.
+    Each read also fills a small readahead window, avoiding another lock and
+    seek for the following header bytes.
+    """
+
+    _READAHEAD = _PreadCursor._READAHEAD
+
+    def __init__(self, file: IO[bytes], lock: threading.Condition, offset: int) -> None:
+        self._file = file
+        self._lock = lock
+        self.offset = offset
+        self._buf = b""
+        self._buf_start = 0
+
+    def read(self, size: int) -> bytes:
+        """Read up to size bytes and advance the cursor.
+
+        Fewer bytes are returned only when the end of the file is reached.
+        """
+        if size < 0:
+            raise ValueError("size must be non-negative")
+        if self._file.closed:
+            raise ValueError("read from closed PackData")
+        # Decompression may read past an object and then rewind the cursor, so
+        # reuse the buffer whenever it still covers the requested range.
+        buffer_offset = self.offset - self._buf_start
+        if 0 <= buffer_offset and buffer_offset + size <= len(self._buf):
+            self.offset += size
+            return self._buf[buffer_offset : buffer_offset + size]
+        with self._lock:
+            self._file.seek(self.offset)
+            buf = self._file.read(max(size, self._READAHEAD))
+        self._buf = buf
+        self._buf_start = self.offset
+        self.offset += min(size, len(buf))
+        return buf[:size]
+
+
 class PackData:
     """The data contained in a packfile.
 
@@ -1854,11 +1973,11 @@ class PackData:
     ) -> None:
         """Create a PackData object representing the pack in the given filename.
 
-        The file must exist and stay readable until the object is disposed of.
-        It must also stay the same size. It will be mapped whenever needed.
-
-        Currently there is a restriction on the size of the pack as the python
-        mmap implementation is flawed.
+        The file must exist and remain readable until PackData is closed, and
+        its size must not change. When PackData opens the file and ``os.pread``
+        is available, readers can access it without changing a shared file
+        position. Supplied file objects instead use seek and read operations
+        protected by a lock.
         """
         self._filename = filename
         self.object_format = object_format
@@ -1871,12 +1990,25 @@ class PackData:
         self.threads = threads
         self.big_file_threshold = big_file_threshold
         self.delta_base_cache_limit = delta_base_cache_limit
-        self._file: IO[bytes]
+        self._file: IO[bytes] | None
 
+        # Use ``pread`` only for files opened here. Supplied file objects use
+        # the fallback to preserve their buffering and other read behavior.
+        self._use_pread = file is None and hasattr(os, "pread")
         if file is None:
             self._file = GitFile(self._filename, "rb")
+            if self._use_pread and self._size is None:
+                self._size = os.fstat(self._file.fileno()).st_size
         else:
             self._file = file
+        # The condition's lock protects the shared file position during
+        # fallback reads and whole-file checksum calculations. The condition
+        # itself allows close() to wait for active pread calls before closing
+        # the descriptor.
+        self._read_condition = threading.Condition(threading.Lock())
+        self._active_preads = 0
+        self._closing = False
+
         (_version, self._num_objects) = read_pack_header(self._file.read)
 
         # Use delta_base_cache_limit, then delta_cache_size, then default
@@ -1942,10 +2074,27 @@ class PackData:
         return cls(filename=path, object_format=object_format)
 
     def close(self) -> None:
-        """Close the underlying pack file."""
-        if self._file is not None:
-            self._file.close()
-            self._file = None  # type: ignore
+        """Close the underlying pack file after any active reads finish.
+
+        Cursors used after the file is closed raise an error.
+        """
+        with self._read_condition:
+            if self._file is None:
+                while self._closing:
+                    self._read_condition.wait()
+                return
+            # Claim the file before waiting so concurrent close calls cannot
+            # attempt to close it again.
+            file = self._file
+            self._file = None
+            self._closing = True
+            try:
+                while self._active_preads:
+                    self._read_condition.wait()
+                file.close()
+            finally:
+                self._closing = False
+                self._read_condition.notify_all()
 
     def __del__(self) -> None:
         """Ensure pack file is closed when PackData is garbage collected."""
@@ -1992,6 +2141,15 @@ class PackData:
             raise AssertionError(errmsg)
         return self._size
 
+    def _cursor(self, offset: int) -> _PreadCursor | _SeekCursor:
+        """Create a read cursor at offset with its own file position."""
+        file = self._file
+        if file is None:
+            raise ValueError("read from closed PackData")
+        if self._use_pread:
+            return _PreadCursor(self, offset)
+        return _SeekCursor(file, self._read_condition, offset)
+
     def __len__(self) -> int:
         """Returns the number of objects in this pack."""
         return self._num_objects
@@ -2001,23 +2159,29 @@ class PackData:
 
         Returns: Binary digest (size depends on hash algorithm)
         """
-        return compute_file_sha(
-            self._file,
-            hash_func=self.object_format.hash_func,
-            end_ofs=-self.object_format.oid_length,
-        ).digest()
+        # Calculating the checksum changes the shared file position. Keep the
+        # lock for the full calculation so concurrent callers and fallback
+        # cursors cannot change the position partway through it.
+        with self._read_condition:
+            file = self._file
+            if file is None:
+                raise ValueError("read from closed PackData")
+            return compute_file_sha(
+                file,
+                hash_func=self.object_format.hash_func,
+                end_ofs=-self.object_format.oid_length,
+            ).digest()
 
     def iter_unpacked(self, *, include_comp: bool = False) -> Iterator[UnpackedObject]:
         """Iterate over unpacked objects in the pack."""
-        self._file.seek(self._header_size)
-
         if self._num_objects is None:
             return
 
+        cursor = self._cursor(self._header_size)
         for _ in range(self._num_objects):
-            offset = self._file.tell()
+            offset = cursor.offset
             unpacked, unused = unpack_object(
-                self._file.read,
+                cursor.read,
                 self.object_format.hash_func,
                 compute_crc32=False,
                 include_comp=include_comp,
@@ -2025,7 +2189,7 @@ class PackData:
             unpacked.offset = offset
             yield unpacked
             # Back up over unused data.
-            self._file.seek(-len(unused), SEEK_CUR)
+            cursor.offset -= len(unused)
 
     def iterentries(
         self,
@@ -2175,8 +2339,18 @@ class PackData:
     def get_stored_checksum(self) -> bytes:
         """Return the expected checksum stored in this pack."""
         checksum_size = self.object_format.oid_length
-        self._file.seek(-checksum_size, SEEK_END)
-        return self._file.read(checksum_size)
+        if not self._use_pread:
+            # A supplied file object may not expose its size separately, so
+            # locate the checksum relative to the end of the file.
+            with self._read_condition:
+                file = self._file
+                if file is None:
+                    raise ValueError("read from closed PackData")
+                file.seek(-checksum_size, SEEK_END)
+                return file.read(checksum_size)
+        # PackData records the descriptor's size when it opens the file and
+        # requires that size to remain unchanged while the file is open.
+        return self._cursor(self._get_size() - checksum_size).read(checksum_size)
 
     def check(self) -> None:
         """Check the consistency of this pack."""
@@ -2190,9 +2364,10 @@ class PackData:
     ) -> UnpackedObject:
         """Given offset in the packfile return a UnpackedObject."""
         assert offset >= self._header_size
-        self._file.seek(offset)
         unpacked, _ = unpack_object(
-            self._file.read, self.object_format.hash_func, include_comp=include_comp
+            self._cursor(offset).read,
+            self.object_format.hash_func,
+            include_comp=include_comp,
         )
         unpacked.offset = offset
         return unpacked
@@ -2257,7 +2432,15 @@ class DeltaChainIterator(Generic[T]):
                 that materialise objects (e.g. PackInflater) when iterating
                 packs in a non-default hash algorithm such as SHA-256.
         """
-        self._file = file_obj
+        self._reader_at: Callable[[int], Callable[[int], bytes]] | None = None
+        if file_obj is not None:
+
+            def reader_at(offset: int) -> Callable[[int], bytes]:
+                # The buffered file may still be written, as in add_thin_pack.
+                file_obj.seek(offset)
+                return file_obj.read
+
+            self._reader_at = reader_at
         self.hash_func = hash_func
         self._object_format = object_format
         self._resolve_ext_ref = resolve_ext_ref
@@ -2374,7 +2557,7 @@ class DeltaChainIterator(Generic[T]):
         Args:
           pack_data: PackData object to use
         """
-        self._file = pack_data._file
+        self._reader_at = lambda offset: pack_data._cursor(offset).read
 
     def _walk_all_chains(self) -> Iterator[T]:
         for offset, type_num in self._full_ofs:
@@ -2419,10 +2602,10 @@ class DeltaChainIterator(Generic[T]):
         obj_type_num: int,
         base_chunks: bytes | list[bytes] | None,
     ) -> UnpackedObject:
-        assert self._file is not None
-        self._file.seek(offset)
+        assert self._reader_at is not None
+        read = self._reader_at(offset)
         unpacked, _ = unpack_object(
-            self._file.read,
+            read,
             self.hash_func,
             read_some=None,
             compute_crc32=self._compute_crc32,

@@ -26,12 +26,15 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 import tracemalloc
 import types
 import zlib
+from functools import partial
 from hashlib import sha1
 from io import BytesIO
 from typing import NoReturn
+from unittest import mock
 
 from dulwich.errors import ApplyDeltaError, ChecksumMismatch
 from dulwich.file import GitFile
@@ -112,11 +115,26 @@ class PackTests(TestCase):
         self.addCleanup(idx.close)
         return idx
 
+    def get_pack_path(self, sha):
+        """Returns the path of the pack file in the datadir with the given sha."""
+        return os.path.join(self.datadir, "pack-{}.pack".format(sha.decode("ascii")))
+
+    def get_pack_bytes(self, sha):
+        """Return the contents of the pack file with the given SHA."""
+        with open(self.get_pack_path(sha), "rb") as f:
+            return f.read()
+
     def get_pack_data(self, sha):
         """Returns a PackData object from the datadir with the given sha."""
         return PackData(
-            os.path.join(self.datadir, "pack-{}.pack".format(sha.decode("ascii"))),
+            self.get_pack_path(sha),
             object_format=DEFAULT_OBJECT_FORMAT,
+        )
+
+    def get_memory_pack_data(self, sha):
+        """Return a PackData backed by BytesIO rather than a file descriptor."""
+        return PackData.from_file(
+            BytesIO(self.get_pack_bytes(sha)), DEFAULT_OBJECT_FORMAT
         )
 
     def get_pack(self, sha):
@@ -515,13 +533,14 @@ class TestPackData(PackTests):
         self.get_pack_data(pack1_sha).close()
 
     def test_from_file(self) -> None:
-        path = os.path.join(
-            self.datadir, "pack-{}.pack".format(pack1_sha.decode("ascii"))
-        )
+        path = self.get_pack_path(pack1_sha)
         with open(path, "rb") as f:
             pack_data = PackData.from_file(
                 f, DEFAULT_OBJECT_FORMAT, os.path.getsize(path)
             )
+            # Files supplied by the caller use the fallback reader rather than
+            # ``pread``.
+            self.assertFalse(pack_data._use_pread)
             pack_data.close()
 
     def test_pack_len(self) -> None:
@@ -539,6 +558,24 @@ class TestPackData(PackTests):
             self.assertEqual(20, len(checksum))
             # Verify it's a valid SHA1 hash (20 bytes)
             self.assertIsInstance(checksum, bytes)
+
+    def test_get_stored_checksum_uses_open_file_size(self) -> None:
+        contents = self.get_pack_bytes(pack1_sha)
+        path = os.path.join(self.tempdir, "pack.pack")
+        replacement = os.path.join(self.tempdir, "replacement.pack")
+        with open(path, "wb") as f:
+            f.write(contents)
+
+        with PackData(path, object_format=DEFAULT_OBJECT_FORMAT) as p:
+            if not p._use_pread:
+                self.skipTest("os.pread is unavailable")
+            self.assertEqual(len(contents), p._size)
+            with open(replacement, "wb") as f:
+                f.write(b"replacement")
+            os.replace(replacement, path)
+            self.assertEqual(
+                contents[-DEFAULT_OBJECT_FORMAT.oid_length :], p.get_stored_checksum()
+            )
 
     # Removed test_check_pack_data_size as it was accessing private attributes
 
@@ -586,6 +623,257 @@ class TestPackData(PackTests):
                 ],
                 actual,
             )
+
+    def test_from_file_spooled_stays_in_memory(self) -> None:
+        """Ensure checking for pread support keeps a spooled file in memory."""
+        contents = self.get_pack_bytes(pack1_sha)
+        with tempfile.SpooledTemporaryFile(max_size=len(contents) + 1024) as sf:
+            sf.write(contents)
+            sf.seek(0)
+            with PackData.from_file(sf, DEFAULT_OBJECT_FORMAT) as p:
+                self.assertEqual(3, len(list(p.iter_unpacked())))
+                self.assertFalse(sf._rolled)
+
+    def _do_test_iter_unpacked_interleaved(self, p) -> None:
+        expected = list(p.iter_unpacked())
+        actual = []
+        for unpacked in p.iter_unpacked():
+            actual.append(unpacked)
+            # Reading another object between yields should not affect the
+            # iterator's position.
+            p.get_unpacked_object_at(178)
+            p.get_stored_checksum()
+        self.assertEqual(expected, actual)
+
+        it1 = p.iter_unpacked()
+        it2 = p.iter_unpacked()
+        actual1 = [next(it1)]
+        # Likewise, completing a second iteration should not affect the first.
+        actual2 = list(it2)
+        actual1.extend(it1)
+        self.assertEqual(expected, actual1)
+        self.assertEqual(expected, actual2)
+
+    def test_iter_unpacked_interleaved(self) -> None:
+        with self.get_pack_data(pack1_sha) as p:
+            self._do_test_iter_unpacked_interleaved(p)
+
+    def test_iter_unpacked_interleaved_no_fileno(self) -> None:
+        with self.get_memory_pack_data(pack1_sha) as p:
+            self._do_test_iter_unpacked_interleaved(p)
+
+    def _do_test_stale_cursor_after_close(self, p) -> None:
+        it = p.iter_unpacked()
+        next(it)
+        p.close()
+        # The OS may have reassigned the descriptor number to another file. In
+        # that case, the cursor should report that PackData is closed rather
+        # than read from the new file.
+        self.assertRaises(ValueError, next, it)
+
+    def test_stale_cursor_after_close(self) -> None:
+        """An iterator used after close() should report that the file is closed."""
+        self._do_test_stale_cursor_after_close(self.get_pack_data(pack1_sha))
+
+    def test_buffered_cursor_after_close(self) -> None:
+        """A closed PackData should not serve data buffered by a cursor."""
+        p = self.get_pack_data(pack1_sha)
+        cursor = p._cursor(0)
+        if not p._use_pread:
+            p.close()
+            self.skipTest("os.pread is unavailable")
+        cursor.read(1)
+        p.close()
+        self.assertRaises(ValueError, cursor.read, 1)
+        self.assertRaises(ValueError, p._cursor, 0)
+
+    def test_buffered_cursor_after_close_no_fileno(self) -> None:
+        """Ensure the fallback cursor rejects buffered reads after close()."""
+        p = self.get_memory_pack_data(pack1_sha)
+        cursor = p._cursor(0)
+        cursor.read(1)
+        p.close()
+        self.assertRaises(ValueError, cursor.read, 1)
+        self.assertRaises(ValueError, p._cursor, 0)
+
+    def _do_test_cursor_rejects_negative_size(self, p) -> None:
+        cursor = p._cursor(0)
+        cursor.read(1)
+        offset = cursor.offset
+        self.assertRaises(ValueError, cursor.read, -1)
+        self.assertEqual(offset, cursor.offset)
+
+    def test_cursor_rejects_negative_size(self) -> None:
+        with self.get_pack_data(pack1_sha) as p:
+            self._do_test_cursor_rejects_negative_size(p)
+
+    def test_cursor_rejects_negative_size_no_fileno(self) -> None:
+        with self.get_memory_pack_data(pack1_sha) as p:
+            self._do_test_cursor_rejects_negative_size(p)
+
+    def test_pread_cursor_handles_short_reads_and_eof(self) -> None:
+        p = self.get_pack_data(pack1_sha)
+        if not p._use_pread:
+            p.close()
+            self.skipTest("os.pread is unavailable")
+        contents = self.get_pack_bytes(pack1_sha)
+        calls = []
+
+        def short_pread(fd, size, offset):
+            calls.append((size, offset))
+            return contents[offset : offset + min(size, 3)]
+
+        try:
+            with mock.patch("dulwich.pack.os.pread", side_effect=short_pread):
+                cursor = p._cursor(0)
+                self.assertEqual(contents[:10], cursor.read(10))
+                self.assertEqual(10, cursor.offset)
+
+                cursor = p._cursor(len(contents) - 2)
+                self.assertEqual(contents[-2:], cursor.read(10))
+                self.assertEqual(len(contents), cursor.offset)
+        finally:
+            p.close()
+        self.assertGreater(len(calls), 2)
+
+    def test_pread_cursor_reuses_large_read_after_rewind(self) -> None:
+        p = self.get_pack_data(pack1_sha)
+        if not p._use_pread:
+            p.close()
+            self.skipTest("os.pread is unavailable")
+        contents = bytes(range(256)) * 4
+        calls = []
+
+        def recording_pread(fd, size, offset):
+            calls.append((size, offset))
+            return contents[offset : offset + size]
+
+        try:
+            with mock.patch("dulwich.pack.os.pread", side_effect=recording_pread):
+                cursor = p._cursor(0)
+                self.assertEqual(contents[:600], cursor.read(600))
+                self.assertEqual(1, len(calls))
+                cursor.offset -= 100
+                self.assertEqual(contents[500:501], cursor.read(1))
+                self.assertEqual(1, len(calls))
+        finally:
+            p.close()
+
+    def test_stale_cursor_after_close_no_fileno(self) -> None:
+        self._do_test_stale_cursor_after_close(self.get_memory_pack_data(pack1_sha))
+
+    def test_close_waits_for_active_pread(self) -> None:
+        """Ensure close() waits for a pread before releasing the descriptor."""
+        p = self.get_pack_data(pack1_sha)
+        if not p._use_pread:
+            p.close()
+            self.skipTest("os.pread is unavailable")
+        cursor = p._cursor(0)
+        entered_pread = threading.Event()
+        resume_pread = threading.Event()
+        close_done_events = [threading.Event(), threading.Event()]
+        results = []
+        failures = []
+        original_pread = os.pread
+
+        def delayed_pread(fd, size, offset):
+            entered_pread.set()
+            if not resume_pread.wait(5):
+                raise RuntimeError("timed out waiting to resume pread")
+            return original_pread(fd, size, offset)
+
+        def read() -> None:
+            try:
+                results.append(cursor.read(4))
+            except Exception as e:
+                failures.append(e)
+
+        def close(done: threading.Event) -> None:
+            try:
+                p.close()
+            except Exception as e:
+                failures.append(e)
+            finally:
+                done.set()
+
+        reader = threading.Thread(target=read, daemon=True)
+        closers = [
+            threading.Thread(target=close, args=(done,), daemon=True)
+            for done in close_done_events
+        ]
+        with mock.patch("dulwich.pack.os.pread", side_effect=delayed_pread):
+            reader.start()
+            self.assertTrue(entered_pread.wait(5))
+            for closer in closers:
+                closer.start()
+            try:
+                # Both close calls should wait until the delayed pread is
+                # allowed to finish.
+                for done in close_done_events:
+                    self.assertFalse(done.wait(0.1))
+            finally:
+                resume_pread.set()
+                reader.join(5)
+                for closer in closers:
+                    closer.join(5)
+
+        self.assertFalse(reader.is_alive())
+        self.assertFalse(any(closer.is_alive() for closer in closers))
+        self.assertTrue(all(done.is_set() for done in close_done_events))
+        self.assertEqual([b"PACK"], results)
+        self.assertEqual([], failures)
+
+    def assertStableUnderConcurrency(self, jobs, iterations=100) -> None:
+        """Run (func, expected result) jobs in parallel threads.
+
+        Each call is expected to return its corresponding result without
+        raising an exception.
+        """
+        failures = []
+
+        def hammer(func, expected) -> None:
+            try:
+                for _ in range(iterations):
+                    result = func()
+                    if result != expected:
+                        failures.append(result)
+                        return
+            except Exception as e:
+                failures.append(e)
+
+        threads = [
+            threading.Thread(target=hammer, args=job, daemon=True) for job in jobs
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(5)
+        self.assertFalse(any(t.is_alive() for t in threads))
+        self.assertEqual([], failures)
+
+    def _do_test_concurrent_reads(self, p) -> None:
+        expected_checksum = p.calculate_checksum()
+        offsets = [12, 138, 178]
+        self.assertStableUnderConcurrency(
+            [(p.calculate_checksum, expected_checksum)] * 2
+            + [
+                (
+                    partial(p.get_unpacked_object_at, offset),
+                    p.get_unpacked_object_at(offset),
+                )
+                for offset in offsets * 2
+            ],
+            iterations=200,
+        )
+
+    def test_concurrent_reads(self) -> None:
+        """Verify concurrent reads from one PackData remain independent."""
+        with self.get_pack_data(pack1_sha) as p:
+            self._do_test_concurrent_reads(p)
+
+    def test_concurrent_reads_no_fileno(self) -> None:
+        with self.get_memory_pack_data(pack1_sha) as p:
+            self._do_test_concurrent_reads(p)
 
     def test_iterentries(self) -> None:
         with self.get_pack_data(pack1_sha) as p:
@@ -1658,6 +1946,21 @@ class DeltaChainIteratorTests(TestCase):
         return TestPackIterator.for_pack_subset(
             pack, subset, resolve_ext_ref=resolve_ext_ref
         )
+
+    def test_set_pack_data_replaces_file_source(self) -> None:
+        f = BytesIO()
+        entries = build_pack(f, [(Blob.type_num, b"blob")])
+        data = PackData("test.pack", file=f, object_format=DEFAULT_OBJECT_FORMAT)
+        self.addCleanup(data.close)
+        file_obj = mock.Mock()
+        pack_iter = TestPackIterator(file_obj, DEFAULT_OBJECT_FORMAT.hash_func)
+
+        pack_iter.set_pack_data(data)
+        for unpacked in data.iter_unpacked(include_comp=False):
+            pack_iter.record(unpacked)
+
+        self.assertEntriesMatch([0], entries, pack_iter)
+        file_obj.seek.assert_not_called()
 
     def assertEntriesMatch(self, expected_indexes, entries, pack_iter) -> None:
         expected = [entries[i] for i in expected_indexes]

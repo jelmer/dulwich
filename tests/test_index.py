@@ -755,6 +755,26 @@ class BuildIndexTests(TestCase):
             self.assertTrue(os.path.exists(colon_path))
             self.assertFileContents(colon_path, b"foo\n")
 
+    @skipIf(os.name == "nt", "Reserved device names are invalid on Windows")
+    def test_posix_reserved_device_name_checked_out(self) -> None:
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            blob = Blob.from_string(b"foo\n")
+            tree = Tree()
+            tree[b"aux"] = (stat.S_IFREG | 0o644, blob.id)
+            repo.object_store.add_objects([(o, None) for o in [blob, tree]])
+
+            build_index_from_tree(
+                repo.path,
+                repo.index_path(),
+                repo.object_store,
+                tree.id,
+                validate_path_element=get_path_element_validator(repo.get_config()),
+            )
+
+            self.assertFileContents(os.path.join(repo.path, "aux"), b"foo\n")
+
     @skipIf(not can_symlink(), "Requires symlink support")
     def test_regular_file_replaces_symlink(self) -> None:
         # A symlink left in the work tree by an earlier checkout must be

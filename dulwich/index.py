@@ -2157,11 +2157,11 @@ def validate_path_element_hfs(element: bytes) -> bool:
 def get_path_element_validator(config: "Config") -> Callable[[bytes], bool]:
     """Get the path-element validator to use when checking out a tree.
 
-    ``core.protectNTFS`` defaults to true on every platform (matching Git's
-    ``PROTECT_NTFS_DEFAULT=1``) because a repository authored on POSIX can
-    still be cloned on Windows later; ``core.protectHFS`` defaults to true on
-    macOS. Both protections are independent and apply together, so on macOS
-    (where both default on) a path element must satisfy the NTFS and HFS+
+    ``core.protectNTFS`` defaults to true on Windows (matching Git's
+    ``PROTECT_NTFS_DEFAULT=1`` there) because Windows cannot safely materialize
+    reserved device names; ``core.protectHFS`` defaults to true on macOS. Both
+    protections are independent and apply together, so on macOS a path element
+    must satisfy the HFS+
     checks. With both disabled this falls back to the default validator, which
     only refuses ``.git``, ``.`` and ``..``.
 
@@ -2173,7 +2173,7 @@ def get_path_element_validator(config: "Config") -> Callable[[bytes], bool]:
         filesystem protections.
     """
     validators: list[Callable[[bytes], bool]] = []
-    if config.get_boolean(b"core", b"protectNTFS", True):
+    if config.get_boolean(b"core", b"protectNTFS", os.name == "nt"):
         validators.append(validate_path_element_ntfs)
     if config.get_boolean(b"core", b"protectHFS", sys.platform == "darwin"):
         validators.append(validate_path_element_hfs)

@@ -973,6 +973,50 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         depth_disabled = get_depth(self.store, c4.id)
         self.assertEqual(3, depth_disabled)
 
+    def test_find_shallow_merge_heavy_history(self) -> None:
+        # A "diamond" history: m_i has parents [a_i, b_i] and a_i/b_i both have
+        # parent m_{i+1}, so ~3*levels commits expose 2**levels distinct paths.
+        # Without state deduplication find_shallow/get_depth re-expand every
+        # path and hang here; the result is unchanged, only the walk is bounded.
+        ts = int(time.time())
+        seq = [0]
+
+        def commit(parents):
+            seq[0] += 1
+            c = make_object(
+                Commit,
+                message=b"c%d" % seq[0],
+                tree=b"1" * 40,
+                parents=parents,
+                author=b"Test <test@example.com>",
+                committer=b"Test <test@example.com>",
+                commit_time=ts,
+                commit_timezone=0,
+                author_time=ts,
+                author_timezone=0,
+            )
+            self.store.add_object(c)
+            return c.id
+
+        levels = 24
+        head = tail = commit([])
+        for _ in range(levels):
+            a = commit([head])
+            b = commit([head])
+            head = commit([a, b])
+
+        all_ids = set(self.store)
+        # Depth larger than the longest path: every commit is not_shallow.
+        shallow, not_shallow = find_shallow(self.store, [head], 10**9)
+        self.assertEqual(set(), shallow)
+        self.assertEqual(all_ids, not_shallow)
+        # Longest path head -> a/b -> m ... -> tail is 2*levels + 1 commits.
+        self.assertEqual(2 * levels + 1, get_depth(self.store, head))
+        # Boundary depth still marks the commit reached exactly at the boundary.
+        shallow, not_shallow = find_shallow(self.store, [tail], 1)
+        self.assertEqual({tail}, shallow)
+        self.assertEqual(set(), not_shallow)
+
     def test_fsync_object_files_disabled_by_default(self) -> None:
         """Test that fsync is disabled by default for object files."""
         config = ConfigDict()

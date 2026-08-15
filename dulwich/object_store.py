@@ -61,6 +61,7 @@ import stat
 import sys
 import time
 import warnings
+from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Set
 from contextlib import closing, suppress
 from io import BytesIO
@@ -336,8 +337,17 @@ def find_shallow(
 
     not_shallow = set()
     shallow = set()
+    # A commit reachable along N distinct paths was popped and re-expanded N
+    # times, so a merge-heavy history walked in exponential time. Deduplicate
+    # on the (sha, depth) state: re-processing a state adds to the same set and
+    # pushes the same parents, so skipping repeats leaves the result unchanged.
+    seen: set[tuple[ObjectID, int]] = set()
     while todo:
-        sha, cur_depth = todo.pop()
+        state = todo.pop()
+        if state in seen:
+            continue
+        seen.add(state)
+        sha, cur_depth = state
         if cur_depth < depth:
             not_shallow.add(sha)
             new_depth = cur_depth + 1
@@ -368,11 +378,20 @@ def get_depth(
     if head not in store:
         return 0
     current_depth = 1
-    queue = [(head, current_depth)]
+    queue = deque([(head, current_depth)])
     commit_graph = store.get_commit_graph()
 
+    # Without deduplication a commit reachable along several paths is expanded
+    # once per path, so a merge-heavy history is walked in exponential time.
+    # Track the (sha, depth) states already queued; re-visiting one only
+    # recomputes the same max and re-queues the same parents. deque.popleft()
+    # keeps the O(1) breadth-first order that list.pop(0) made O(n).
+    seen: set[tuple[ObjectID, int]] = set()
     while queue and (max_depth is None or current_depth < max_depth):
-        e, depth = queue.pop(0)
+        e, depth = queue.popleft()
+        if (e, depth) in seen:
+            continue
+        seen.add((e, depth))
         current_depth = max(current_depth, depth)
 
         # Try to use commit graph for parent lookup if available

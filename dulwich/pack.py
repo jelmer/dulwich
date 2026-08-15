@@ -1828,12 +1828,18 @@ class _PreadCursor:
     # ``unpack_object`` reads variable-length headers one byte at a time.
     # Reading a block in advance avoids a separate system call for each byte.
     _READAHEAD = 512
+    # Start small because most cursors only read one object. If a cursor keeps
+    # missing its buffer, grow the window so sequential scans need fewer reads.
+    _MAX_READAHEAD = 256 * 1024
+
+    __slots__ = ("_buf", "_buf_start", "_pack_data", "_readahead", "offset")
 
     def __init__(self, pack_data: "PackData", offset: int) -> None:
         self._pack_data = pack_data
         self.offset = offset
         self._buf = b""
         self._buf_start = 0
+        self._readahead = self._READAHEAD
 
     def read(self, size: int) -> bytes:
         """Read up to size bytes and advance the cursor.
@@ -1860,14 +1866,15 @@ class _PreadCursor:
             # close() wait until the descriptor is no longer in use.
             pack_data._active_preads += 1
         try:
-            # Read enough to satisfy the request and fill at least one
-            # readahead block. If pread returns early, continue until the
-            # request is complete or the end of the file is reached.
+            # Fetch some extra data for the next call. If pread returns a short
+            # result, keep going until this request is satisfied or we hit EOF.
+            want = size + self._readahead
+            self._readahead = min(self._readahead * 2, self._MAX_READAHEAD)
             chunks: list[bytes] = []
             have = 0
             while have < size:
                 chunk = os.pread(  # type: ignore[attr-defined,unused-ignore]
-                    fd, max(size - have, self._READAHEAD), self.offset + have
+                    fd, want - have, self.offset + have
                 )
                 if not chunk:
                     break
@@ -1897,6 +1904,9 @@ class _SeekCursor:
     """
 
     _READAHEAD = _PreadCursor._READAHEAD
+    _MAX_READAHEAD = _PreadCursor._MAX_READAHEAD
+
+    __slots__ = ("_buf", "_buf_start", "_file", "_lock", "_readahead", "offset")
 
     def __init__(self, file: IO[bytes], lock: threading.Condition, offset: int) -> None:
         self._file = file
@@ -1904,6 +1914,7 @@ class _SeekCursor:
         self.offset = offset
         self._buf = b""
         self._buf_start = 0
+        self._readahead = self._READAHEAD
 
     def read(self, size: int) -> bytes:
         """Read up to size bytes and advance the cursor.
@@ -1922,7 +1933,8 @@ class _SeekCursor:
             return self._buf[buffer_offset : buffer_offset + size]
         with self._lock:
             self._file.seek(self.offset)
-            buf = self._file.read(max(size, self._READAHEAD))
+            buf = self._file.read(size + self._readahead)
+        self._readahead = min(self._readahead * 2, self._MAX_READAHEAD)
         self._buf = buf
         self._buf_start = self.offset
         self.offset += min(size, len(buf))

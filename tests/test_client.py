@@ -41,6 +41,7 @@ import dulwich
 from dulwich import client, errors
 from dulwich.bundle import create_bundle_from_repo, write_bundle
 from dulwich.client import (
+    MAX_IN_VAIN,
     AuthCallbackPoolManager,
     BundleClient,
     FetchPackResult,
@@ -126,6 +127,28 @@ class DummyPopen:
 
     def wait(self, *args, **kwards) -> bool:
         return False
+
+
+class CountingGraphWalker:
+    """Graph walker yielding a bounded stream of synthetic shas."""
+
+    def __init__(self, limit=None) -> None:
+        self.count = 0
+        self.limit = limit
+        self.acked: list[bytes] = []
+
+    @staticmethod
+    def sha(count):
+        return f"{count:040x}".encode("ascii")
+
+    def __next__(self):
+        self.count += 1
+        if self.limit is not None and self.count > self.limit:
+            return None
+        return self.sha(self.count)
+
+    def ack(self, sha):
+        self.acked.append(sha)
 
 
 # TODO(durin42): add unit-level tests of GitClient
@@ -353,6 +376,63 @@ class GitClientTests(TestCase):
         output = self.rout.getvalue()
         self.assertIn(b"deepen-since 2023-01-01T00:00:00Z\n", output)
         self.assertIn(b"deepen-not refs/heads/excluded\n", output)
+
+    def test_handle_upload_pack_head_stateless_bounds_haves(self) -> None:
+        # Stateless transports cannot receive ACKs while building the request.
+        proto = Protocol(self.rin.read, self.rout.write)
+        _handle_upload_pack_head(
+            proto=proto,
+            capabilities=[b"multi_ack"],
+            graph_walker=CountingGraphWalker(),
+            wants=[b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"],
+            can_read=None,
+            depth=None,
+            protocol_version=0,
+        )
+
+        output = self.rout.getvalue()
+        self.assertEqual(MAX_IN_VAIN, output.count(b"have "))
+        self.assertTrue(output.endswith(b"0009done\n"))
+
+    def test_handle_upload_pack_head_no_ack_sends_all_haves(self) -> None:
+        # A readable connection waits for the first ACK before applying the limit.
+        num_haves = MAX_IN_VAIN + 44
+        proto = Protocol(self.rin.read, self.rout.write)
+        _handle_upload_pack_head(
+            proto=proto,
+            capabilities=[b"multi_ack"],
+            graph_walker=CountingGraphWalker(limit=num_haves),
+            wants=[b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"],
+            can_read=lambda: False,
+            depth=None,
+            protocol_version=0,
+        )
+
+        output = self.rout.getvalue()
+        self.assertEqual(num_haves, output.count(b"have "))
+
+    def test_handle_upload_pack_head_gives_up_after_ack(self) -> None:
+        # Stop after MAX_IN_VAIN more haves without an ACK.
+        first_sha = CountingGraphWalker.sha(1)
+        self.rin.write(pkt_line(b"ACK " + first_sha + b" continue\n"))
+        self.rin.seek(0)
+
+        reads = iter([True])
+        proto = Protocol(self.rin.read, self.rout.write)
+        graph_walker = CountingGraphWalker()
+        _handle_upload_pack_head(
+            proto=proto,
+            capabilities=[b"multi_ack"],
+            graph_walker=graph_walker,
+            wants=[b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"],
+            can_read=lambda: next(reads, False),
+            depth=None,
+            protocol_version=0,
+        )
+
+        self.assertEqual([first_sha], graph_walker.acked)
+        output = self.rout.getvalue()
+        self.assertEqual(1 + MAX_IN_VAIN, output.count(b"have "))
 
     def test_send_pack_no_sideband64k_with_update_ref_error(self) -> None:
         # No side-bank-64k reported by server shouldn't try to parse

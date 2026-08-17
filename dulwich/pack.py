@@ -660,10 +660,14 @@ def _load_file_contents(
       size: Expected size, or None to determine from file
     Returns: Tuple of (contents, size)
     """
-    try:
-        fd = f.fileno()
-    except (UnsupportedOperation, AttributeError):
+    # Avoid rolling a SpooledTemporaryFile to disk just to get a descriptor.
+    if getattr(f, "_rolled", True) is False:
         fd = None
+    else:
+        try:
+            fd = f.fileno()
+        except (UnsupportedOperation, AttributeError):
+            fd = None
     # Attempt to use mmap if possible
     if fd is not None:
         if size is None:
@@ -679,6 +683,18 @@ def _load_file_contents(
     contents_bytes = f.read()
     size = len(contents_bytes)
     return contents_bytes, size
+
+
+def _close_file_contents(contents: "bytes | mmap.mmap | None") -> None:
+    """Close contents returned by _load_file_contents, if closeable.
+
+    Callers must close the mapping before the file it maps: on Windows the
+    mapping holds a lock on the file, so the handle cannot be released while
+    it is alive.
+    """
+    close_fn = getattr(contents, "close", None)
+    if close_fn is not None:
+        close_fn()
 
 
 def load_pack_index_file(
@@ -980,11 +996,7 @@ class FilePackIndex(PackIndex):
 
     def close(self) -> None:
         """Close the underlying file and any mmap."""
-        # Close the mmap before the file: on Windows the mapping holds a lock
-        # on the file, so the handle cannot be released while it is alive.
-        close_fn = getattr(self._contents, "close", None)
-        if close_fn is not None:
-            close_fn()
+        _close_file_contents(self._contents)
         self._file.close()
 
     def __del__(self) -> None:
@@ -1775,7 +1787,7 @@ def obj_sha(
 
 
 def compute_file_sha(
-    f: IO[bytes],
+    f: "IO[bytes] | _ContentsReader",
     hash_func: Callable[[], "HashObject"],
     start_ofs: int = 0,
     end_ofs: int = 0,
@@ -1810,6 +1822,44 @@ def compute_file_sha(
     return sha
 
 
+class _ContentsReader:
+    """Stateful read interface over an in-memory pack buffer.
+
+    Every reader tracks its own position, so any number of them can read
+    from the same buffer concurrently. Calling the reader reads from it, so
+    it can be passed directly wherever a read callable is expected.
+    """
+
+    __slots__ = ("_contents", "pos")
+
+    def __init__(self, contents: "bytes | mmap.mmap", offset: int) -> None:
+        self._contents = contents
+        self.pos = offset
+
+    def read(self, size: int = -1) -> bytes:
+        """Read up to size bytes from the current position, or all if -1."""
+        end = None if size < 0 else self.pos + size
+        chunk = self._contents[self.pos : end]
+        self.pos += len(chunk)
+        return chunk
+
+    __call__ = read
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        """Move the read position, following the io.IOBase convention."""
+        if whence == SEEK_END:
+            self.pos = len(self._contents) + offset
+        elif whence == SEEK_CUR:
+            self.pos += offset
+        else:
+            self.pos = offset
+        return self.pos
+
+    def tell(self) -> int:
+        """Return the current read position."""
+        return self.pos
+
+
 class PackData:
     """The data contained in a packfile.
 
@@ -1828,9 +1878,8 @@ class PackData:
     For the complete objects the data is stored as zlib deflated data.
     The size in the header is the uncompressed object size, so to uncompress
     you need to just keep feeding data to zlib until you get an object back,
-    or it errors on bad data. This is done here by just giving the complete
-    buffer from the start of the deflated object on. This is bad, but until I
-    get mmap sorted out it will have to do.
+    or it errors on bad data. This is done here by reading from the mapped
+    pack contents starting at the deflated object.
 
     Currently there are no integrity checks done. Also no attempt is made to
     try and detect the delta case, or a request for an object at the wrong
@@ -1855,14 +1904,15 @@ class PackData:
         """Create a PackData object representing the pack in the given filename.
 
         The file must exist and stay readable until the object is disposed of.
-        It must also stay the same size. It will be mapped whenever needed.
+        It must also stay the same size. It is mapped into memory on open, so
+        reads never contend on a shared file position.
 
-        Currently there is a restriction on the size of the pack as the python
-        mmap implementation is flawed.
+        The size argument is accepted for backward compatibility and ignored:
+        checksum offsets are derived from the size, so it is measured when the
+        pack is mapped rather than trusted from the caller.
         """
         self._filename = filename
         self.object_format = object_format
-        self._size = size
         self._header_size = 12
         self.delta_window_size = delta_window_size
         self.window_memory = window_memory
@@ -1872,20 +1922,34 @@ class PackData:
         self.big_file_threshold = big_file_threshold
         self.delta_base_cache_limit = delta_base_cache_limit
         self._file: IO[bytes]
+        self._contents: bytes | mmap.mmap | None = None
 
         if file is None:
             self._file = GitFile(self._filename, "rb")
         else:
             self._file = file
-        (_version, self._num_objects) = read_pack_header(self._file.read)
+        try:
+            # Keep one copy of the pack so each reader can track its own position.
+            self._contents, self._size = _load_file_contents(self._file)
+            minimum_size = self._header_size + self.object_format.oid_length
+            if self._size < minimum_size:
+                raise AssertionError(
+                    f"{self._filename} is too small for a packfile ({self._size} < {minimum_size})"
+                )
+            (_version, self._num_objects) = read_pack_header(self._reader())
 
-        # Use delta_base_cache_limit, then delta_cache_size, then default
-        cache_size = (
-            delta_base_cache_limit or delta_cache_size or DEFAULT_DELTA_BASE_CACHE_LIMIT
-        )
-        self._offset_cache = LRUSizeCache[int, tuple[int, OldUnpackedObject]](
-            cache_size, compute_size=_compute_object_size
-        )
+            # Use delta_base_cache_limit, then delta_cache_size, then default
+            cache_size = (
+                delta_base_cache_limit
+                or delta_cache_size
+                or DEFAULT_DELTA_BASE_CACHE_LIMIT
+            )
+            self._offset_cache = LRUSizeCache[int, tuple[int, OldUnpackedObject]](
+                cache_size, compute_size=_compute_object_size
+            )
+        except BaseException:
+            self.close()
+            raise
 
     @property
     def filename(self) -> str:
@@ -1917,7 +1981,7 @@ class PackData:
         Args:
           file: Open file object
           object_format: Object format
-          size: Optional file size
+          size: Ignored; the pack is measured when it is mapped
 
         Returns:
           PackData instance
@@ -1941,8 +2005,18 @@ class PackData:
         """
         return cls(filename=path, object_format=object_format)
 
+    def _reader(self, offset: int = 0) -> _ContentsReader:
+        """Return a reader over the pack contents positioned at offset."""
+        contents = self._contents
+        if contents is None:
+            raise ValueError(f"read from closed PackData: {self._filename}")
+        return _ContentsReader(contents, offset)
+
     def close(self) -> None:
         """Close the underlying pack file."""
+        contents = self._contents
+        self._contents = None
+        _close_file_contents(contents)
         if self._file is not None:
             self._file.close()
             self._file = None  # type: ignore
@@ -1984,12 +2058,6 @@ class PackData:
         return False
 
     def _get_size(self) -> int:
-        if self._size is not None:
-            return self._size
-        self._size = os.path.getsize(self._filename)
-        if self._size < self._header_size:
-            errmsg = f"{self._filename} is too small for a packfile ({self._size} < {self._header_size})"
-            raise AssertionError(errmsg)
         return self._size
 
     def __len__(self) -> int:
@@ -2002,22 +2070,21 @@ class PackData:
         Returns: Binary digest (size depends on hash algorithm)
         """
         return compute_file_sha(
-            self._file,
+            self._reader(),
             hash_func=self.object_format.hash_func,
             end_ofs=-self.object_format.oid_length,
         ).digest()
 
     def iter_unpacked(self, *, include_comp: bool = False) -> Iterator[UnpackedObject]:
         """Iterate over unpacked objects in the pack."""
-        self._file.seek(self._header_size)
-
         if self._num_objects is None:
             return
 
+        reader = self._reader(self._header_size)
         for _ in range(self._num_objects):
-            offset = self._file.tell()
+            offset = reader.pos
             unpacked, unused = unpack_object(
-                self._file.read,
+                reader,
                 self.object_format.hash_func,
                 compute_crc32=False,
                 include_comp=include_comp,
@@ -2025,7 +2092,7 @@ class PackData:
             unpacked.offset = offset
             yield unpacked
             # Back up over unused data.
-            self._file.seek(-len(unused), SEEK_CUR)
+            reader.pos -= len(unused)
 
     def iterentries(
         self,
@@ -2175,8 +2242,7 @@ class PackData:
     def get_stored_checksum(self) -> bytes:
         """Return the expected checksum stored in this pack."""
         checksum_size = self.object_format.oid_length
-        self._file.seek(-checksum_size, SEEK_END)
-        return self._file.read(checksum_size)
+        return self._reader(self._size - checksum_size).read(checksum_size)
 
     def check(self) -> None:
         """Check the consistency of this pack."""
@@ -2190,9 +2256,10 @@ class PackData:
     ) -> UnpackedObject:
         """Given offset in the packfile return a UnpackedObject."""
         assert offset >= self._header_size
-        self._file.seek(offset)
         unpacked, _ = unpack_object(
-            self._file.read, self.object_format.hash_func, include_comp=include_comp
+            self._reader(offset),
+            self.object_format.hash_func,
+            include_comp=include_comp,
         )
         unpacked.offset = offset
         return unpacked
@@ -2257,7 +2324,15 @@ class DeltaChainIterator(Generic[T]):
                 that materialise objects (e.g. PackInflater) when iterating
                 packs in a non-default hash algorithm such as SHA-256.
         """
-        self._file = file_obj
+        self._reader_at: Callable[[int], Callable[[int], bytes]] | None = None
+        if file_obj is not None:
+
+            def reader_at(offset: int) -> Callable[[int], bytes]:
+                # add_thin_pack may still be writing to this file, so read it directly.
+                file_obj.seek(offset)
+                return file_obj.read
+
+            self._reader_at = reader_at
         self.hash_func = hash_func
         self._object_format = object_format
         self._resolve_ext_ref = resolve_ext_ref
@@ -2374,7 +2449,7 @@ class DeltaChainIterator(Generic[T]):
         Args:
           pack_data: PackData object to use
         """
-        self._file = pack_data._file
+        self._reader_at = pack_data._reader
 
     def _walk_all_chains(self) -> Iterator[T]:
         for offset, type_num in self._full_ofs:
@@ -2419,10 +2494,9 @@ class DeltaChainIterator(Generic[T]):
         obj_type_num: int,
         base_chunks: bytes | list[bytes] | None,
     ) -> UnpackedObject:
-        assert self._file is not None
-        self._file.seek(offset)
+        assert self._reader_at is not None
         unpacked, _ = unpack_object(
-            self._file.read,
+            self._reader_at(offset),
             self.hash_func,
             read_some=None,
             compute_crc32=self._compute_crc32,

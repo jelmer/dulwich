@@ -43,6 +43,7 @@ __all__ = [
     "COMMON_CAPABILITIES",
     "DEFAULT_GIT_CREDENTIALS_PATHS",
     "DEFAULT_REF_PREFIX",
+    "MAX_IN_VAIN",
     "RECEIVE_CAPABILITIES",
     "UPLOAD_CAPABILITIES",
     "AbstractHttpGitClient",
@@ -256,6 +257,10 @@ from .repo import BaseRepo, Repo
 # specified, so explicitly request all refs to match
 # behaviour with v1 when no ref-prefix is specified.
 DEFAULT_REF_PREFIX = [b"HEAD", b"refs/"]
+
+# Stop negotiation after this many "have" lines without an ACK. This matches
+# MAX_IN_VAIN in C Git's fetch-pack.c.
+MAX_IN_VAIN = 256
 
 
 logger = logging.getLogger(__name__)
@@ -968,14 +973,19 @@ def _handle_upload_pack_head(
         proto.write_pkt_line(None)
 
     have = next(graph_walker)
+    in_vain = 0
+    got_ack = False
     while have:
         proto.write_pkt_line(COMMAND_HAVE + b" " + have + b"\n")
+        in_vain += 1
         if can_read is not None and can_read():
             pkt = proto.read_pkt_line()
             assert pkt is not None
             parts = pkt.rstrip(b"\n").split(b" ")
             if parts[0] == b"ACK":
                 graph_walker.ack(ObjectID(parts[1]))
+                in_vain = 0
+                got_ack = True
                 if parts[2] in (b"continue", b"common"):
                     pass
                 elif parts[2] == b"ready":
@@ -984,6 +994,11 @@ def _handle_upload_pack_head(
                     raise AssertionError(
                         f"{parts[2]!r} not in ('continue', 'ready', 'common)"
                     )
+        # Once the server has ACKed something, stop if negotiation makes no
+        # progress for MAX_IN_VAIN haves. Stateless transports cannot read
+        # ACKs while building the request, so apply the limit from the start.
+        if in_vain >= MAX_IN_VAIN and (got_ack or can_read is None):
+            break
         have = next(graph_walker)
     proto.write_pkt_line(COMMAND_DONE + b"\n")
     if protocol_version == 2:

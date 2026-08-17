@@ -532,6 +532,18 @@ class TestPackData(PackTests):
         with self.get_pack_data(pack1_sha) as p:
             self.assertSucceeds(p.check)
 
+    def test_check_rejects_missing_checksum(self) -> None:
+        pack_file = BytesIO()
+        write_pack_header(pack_file.write, 0)
+        pack_file.seek(0)
+        with self.assertRaisesRegex(
+            AssertionError, "truncated.pack is too small for a packfile"
+        ):
+            PackData(
+                "truncated.pack", file=pack_file, object_format=DEFAULT_OBJECT_FORMAT
+            )
+        self.assertTrue(pack_file.closed)
+
     def test_get_stored_checksum(self) -> None:
         """Test getting the stored checksum of the pack data."""
         with self.get_pack_data(pack1_sha) as p:

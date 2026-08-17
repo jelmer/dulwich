@@ -55,6 +55,7 @@ __all__ = [
     "parse_graftpoints",
     "parse_shared_repository",
     "read_gitfile",
+    "sanitize_user_identity",
     "serialize_graftpoints",
 ]
 
@@ -312,6 +313,44 @@ def check_user_identity(identity: bytes) -> None:
         raise InvalidUserIdentity(identity.decode("utf-8", "replace"))
     if b"\0" in identity or b"\n" in identity:
         raise InvalidUserIdentity(identity.decode("utf-8", "replace"))
+
+
+_IDENTITY_CRUD = bytes(range(33)) + b",:;<>\"\\'"
+
+
+def _strip_identity_crud(value: bytes) -> bytes:
+    r"""Strip characters using git's ``strbuf_addstr_without_crud`` rules.
+
+    Leading and trailing "crud" (bytes <= 32 as well as ``,:;<>"\'``) is
+    stripped, and the delimiter characters ``\n``, ``<`` and ``>`` are
+    dropped from the rest of the value.
+    """
+    # Git does not handle embedded NUL bytes here, but check_user_identity
+    # rejects them.
+    return value.strip(_IDENTITY_CRUD).translate(None, b"\0\n<>")
+
+
+def sanitize_user_identity(name: bytes, email: bytes) -> bytes:
+    r"""Build a user identity with a sanitized name and email.
+
+    Matches git's ``fmt_ident`` behavior: the name and the email are each
+    stripped of leading and trailing "crud" (bytes <= 32 as well as
+    ``,:;<>"\'``), and the delimiter characters ``\n``, ``<`` and ``>``
+    are dropped from the middle.
+
+    Unlike ``check_user_identity``, this function never rejects its input. It
+    is intended for identities outside the caller's control, such as those
+    used by an importer to build commits. The result always passes
+    ``check_user_identity``.
+
+    Args:
+      name: User name bytestring
+      email: Email bytestring
+
+    Returns:
+      Identity bytestring of the format ``name <email>``
+    """
+    return _strip_identity_crud(name) + b" <" + _strip_identity_crud(email) + b">"
 
 
 def parse_graftpoints(

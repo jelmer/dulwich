@@ -683,56 +683,49 @@ class TestPackData(PackTests):
         with self.get_memory_pack_data(pack1_sha) as p:
             self._do_test_iter_unpacked_interleaved(p)
 
-    def _do_test_stale_cursor_after_close(self, p) -> None:
+    def _do_test_stale_iterator_after_close(self, p) -> None:
         it = p.iter_unpacked()
         next(it)
         p.close()
         # The OS may have reassigned the descriptor number to another file. In
-        # that case, the cursor should report that PackData is closed rather
+        # that case, the read should report that PackData is closed rather
         # than read from the new file.
         self.assertRaises(ValueError, next, it)
 
-    def test_stale_cursor_after_close(self) -> None:
+    def test_stale_iterator_after_close(self) -> None:
         """An iterator used after close() should report that the file is closed."""
-        self._do_test_stale_cursor_after_close(self.get_pack_data(pack1_sha))
+        self._do_test_stale_iterator_after_close(self.get_pack_data(pack1_sha))
 
-    def test_buffered_cursor_after_close(self) -> None:
-        """A closed PackData should not serve data buffered by a cursor."""
-        p = self.get_pack_data(pack1_sha)
-        cursor = p._cursor(0)
-        if not p._use_pread:
-            p.close()
-            self.skipTest("os.pread is unavailable")
-        cursor.read(1)
+    def _do_test_reader_after_close(self, p) -> None:
+        read = p._reader(0)
+        read(1)
         p.close()
-        self.assertRaises(ValueError, cursor.read, 1)
-        self.assertRaises(ValueError, p._cursor, 0)
+        self.assertRaises(ValueError, read, 1)
+        self.assertRaises(ValueError, p._reader, 0)
 
-    def test_buffered_cursor_after_close_no_fileno(self) -> None:
-        """Ensure the fallback cursor rejects buffered reads after close()."""
-        p = self.get_memory_pack_data(pack1_sha)
-        cursor = p._cursor(0)
-        cursor.read(1)
-        p.close()
-        self.assertRaises(ValueError, cursor.read, 1)
-        self.assertRaises(ValueError, p._cursor, 0)
+    def test_reader_after_close(self) -> None:
+        """A closed PackData should reject further reads."""
+        self._do_test_reader_after_close(self.get_pack_data(pack1_sha))
 
-    def _do_test_cursor_rejects_negative_size(self, p) -> None:
-        cursor = p._cursor(0)
-        cursor.read(1)
-        offset = cursor.offset
-        self.assertRaises(ValueError, cursor.read, -1)
-        self.assertEqual(offset, cursor.offset)
+    def test_reader_after_close_no_fileno(self) -> None:
+        self._do_test_reader_after_close(self.get_memory_pack_data(pack1_sha))
 
-    def test_cursor_rejects_negative_size(self) -> None:
+    def _do_test_reader_rejects_negative_size(self, p) -> None:
+        read = p._reader(0)
+        read(1)
+        self.assertRaises(ValueError, read, -1)
+        # The failed read should not have moved the position.
+        self.assertEqual(b"ACK", read(3))
+
+    def test_reader_rejects_negative_size(self) -> None:
         with self.get_pack_data(pack1_sha) as p:
-            self._do_test_cursor_rejects_negative_size(p)
+            self._do_test_reader_rejects_negative_size(p)
 
-    def test_cursor_rejects_negative_size_no_fileno(self) -> None:
+    def test_reader_rejects_negative_size_no_fileno(self) -> None:
         with self.get_memory_pack_data(pack1_sha) as p:
-            self._do_test_cursor_rejects_negative_size(p)
+            self._do_test_reader_rejects_negative_size(p)
 
-    def test_pread_cursor_handles_short_reads_and_eof(self) -> None:
+    def test_pread_handles_short_reads_and_eof(self) -> None:
         p = self.get_pack_data(pack1_sha)
         if not p._use_pread:
             p.close()
@@ -746,42 +739,19 @@ class TestPackData(PackTests):
 
         try:
             with mock.patch("dulwich.pack.os.pread", side_effect=short_pread):
-                cursor = p._cursor(0)
-                self.assertEqual(contents[:10], cursor.read(10))
-                self.assertEqual(10, cursor.offset)
+                read = p._reader(0)
+                self.assertEqual(contents[:10], read(10))
+                self.assertEqual(contents[10:12], read(2))
 
-                cursor = p._cursor(len(contents) - 2)
-                self.assertEqual(contents[-2:], cursor.read(10))
-                self.assertEqual(len(contents), cursor.offset)
+                read = p._reader(len(contents) - 2)
+                self.assertEqual(contents[-2:], read(10))
+                self.assertEqual(b"", read(1))
         finally:
             p.close()
         self.assertGreater(len(calls), 2)
 
-    def test_pread_cursor_reuses_large_read_after_rewind(self) -> None:
-        p = self.get_pack_data(pack1_sha)
-        if not p._use_pread:
-            p.close()
-            self.skipTest("os.pread is unavailable")
-        contents = bytes(range(256)) * 4
-        calls = []
-
-        def recording_pread(fd, size, offset):
-            calls.append((size, offset))
-            return contents[offset : offset + size]
-
-        try:
-            with mock.patch("dulwich.pack.os.pread", side_effect=recording_pread):
-                cursor = p._cursor(0)
-                self.assertEqual(contents[:600], cursor.read(600))
-                self.assertEqual(1, len(calls))
-                cursor.offset -= 100
-                self.assertEqual(contents[500:501], cursor.read(1))
-                self.assertEqual(1, len(calls))
-        finally:
-            p.close()
-
-    def test_stale_cursor_after_close_no_fileno(self) -> None:
-        self._do_test_stale_cursor_after_close(self.get_memory_pack_data(pack1_sha))
+    def test_stale_iterator_after_close_no_fileno(self) -> None:
+        self._do_test_stale_iterator_after_close(self.get_memory_pack_data(pack1_sha))
 
     def test_close_waits_for_active_pread(self) -> None:
         """Ensure close() waits for a pread before releasing the descriptor."""
@@ -789,7 +759,7 @@ class TestPackData(PackTests):
         if not p._use_pread:
             p.close()
             self.skipTest("os.pread is unavailable")
-        cursor = p._cursor(0)
+        read_at_start = p._reader(0)
         entered_pread = threading.Event()
         resume_pread = threading.Event()
         close_done_events = [threading.Event(), threading.Event()]
@@ -805,7 +775,7 @@ class TestPackData(PackTests):
 
         def read() -> None:
             try:
-                results.append(cursor.read(4))
+                results.append(read_at_start(4))
             except Exception as e:
                 failures.append(e)
 

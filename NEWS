@@ -1,5 +1,9 @@
 1.2.13	UNRELEASED
 
+ * Make concurrent ``PackData`` reads thread-safe by mmap-ing pack contents
+   and giving each operation an independent cursor instead of sharing the
+   file position. (Bojan Zivanovic)
+
  * SECURITY: Don't follow symlinks when writing messages in
    ``porcelain.format_patch``, ``mbox.split_mbox`` and ``mbox.split_maildir``.
    A symlink pre-planted at an output filename was followed, writing the

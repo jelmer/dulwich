@@ -117,7 +117,7 @@ import zlib
 from collections.abc import Callable, Iterable, Iterator, Sequence, Set
 from hashlib import sha1, sha256
 from itertools import chain
-from os import SEEK_CUR, SEEK_END
+from os import SEEK_END
 from struct import unpack_from
 from types import TracebackType
 from typing import (
@@ -386,6 +386,32 @@ def take_msb_bytes(
     return ret, crc32
 
 
+def take_msb_bytes_at(
+    contents: "bytes | mmap.mmap", offset: int, crc32: int | None = None
+) -> tuple[list[int], int, int | None]:
+    """Read bytes marked with most significant bit from a buffer at an offset.
+
+    Args:
+      contents: Buffer to read from
+      offset: Offset in contents to start reading at
+      crc32: Optional CRC32 checksum to update
+
+    Returns:
+      Tuple of (list of bytes read, offset just past them, updated CRC32 or None)
+    """
+    ret: list[int] = []
+    pos = offset
+    while len(ret) == 0 or ret[-1] & 0x80:
+        b = contents[pos : pos + 1]
+        if not b:
+            raise AssertionError(f"unexpected end of pack data at {pos}")
+        pos += 1
+        if crc32 is not None:
+            crc32 = binascii.crc32(b, crc32)
+        ret.append(ord(b))
+    return ret, pos, crc32
+
+
 class PackFileDisappeared(Exception):
     """Raised when a pack file unexpectedly disappears.
 
@@ -613,6 +639,77 @@ def read_zlib_chunks(
     if include_comp:
         unpacked.comp_chunks = comp_chunks
     return unused
+
+
+def read_zlib_chunks_at(
+    contents: "bytes | mmap.mmap",
+    offset: int,
+    unpacked: UnpackedObject,
+    include_comp: bool = False,
+    buffer_size: int = _ZLIB_BUFSIZE,
+) -> int:
+    """Read zlib data from a buffer at a given offset.
+
+    Like :func:`read_zlib_chunks`, but indexes the buffer directly instead of
+    consuming a read callable, so concurrent readers do not share a position.
+
+    Args:
+      contents: Buffer holding the compressed data.
+      offset: Offset in contents at which the zlib stream starts.
+      unpacked: An UnpackedObject to write result data to; see
+        :func:`read_zlib_chunks` for the attributes set on it.
+      include_comp: If True, include compressed data in the result.
+      buffer_size: Number of bytes to decompress at a time.
+    Returns: Offset in contents just past the end of the zlib stream.
+
+    Raises:
+      zlib.error: if a decompression error occurred.
+    """
+    if unpacked.decomp_len is None or unpacked.decomp_len <= -1:
+        raise ValueError("non-negative zlib data stream size expected")
+    decomp_obj = zlib.decompressobj()
+
+    comp_chunks = []
+    decomp_chunks = unpacked.decomp_chunks
+    decomp_len = 0
+    crc32 = unpacked.crc32
+    max_decomp = unpacked.decomp_len
+    pos = offset
+
+    while True:
+        add = contents[pos : pos + buffer_size]
+        if not add:
+            raise zlib.error("EOF before end of zlib stream")
+        pos += len(add)
+        comp_chunks.append(add)
+        # +1 so overrun surfaces as unconsumed_tail rather than being truncated.
+        remaining = max_decomp - decomp_len + 1
+        decomp = decomp_obj.decompress(add, remaining)
+        if decomp_obj.unconsumed_tail:
+            raise zlib.error("decompressed data exceeds expected size")
+        decomp_len += len(decomp)
+        decomp_chunks.append(decomp)
+        unused = decomp_obj.unused_data
+        if unused:
+            left = len(unused)
+            pos -= left
+            if crc32 is not None:
+                crc32 = binascii.crc32(add[:-left], crc32)
+            if include_comp:
+                comp_chunks[-1] = add[:-left]
+            break
+        elif crc32 is not None:
+            crc32 = binascii.crc32(add, crc32)
+    if crc32 is not None:
+        crc32 &= 0xFFFFFFFF
+
+    if decomp_len != unpacked.decomp_len:
+        raise zlib.error("decompressed data does not match expected size")
+
+    unpacked.crc32 = crc32
+    if include_comp:
+        unpacked.comp_chunks = comp_chunks
+    return pos
 
 
 def iter_sha1(iter: Iterable[bytes]) -> bytes:
@@ -1435,6 +1532,28 @@ def read_pack_header(read: Callable[[int], bytes]) -> tuple[int, int]:
     return (version, num_objects)
 
 
+def read_pack_header_at(
+    contents: "bytes | mmap.mmap", offset: int = 0
+) -> tuple[int, int]:
+    """Read the header of a pack file from a buffer.
+
+    Args:
+      contents: Buffer holding the pack
+      offset: Offset in contents at which the header starts
+    Returns: Tuple of (pack version, number of objects).
+    """
+    header = contents[offset : offset + 12]
+    if not header:
+        raise AssertionError("file too short to contain pack")
+    if header[:4] != b"PACK":
+        raise AssertionError(f"Invalid pack header {bytes(header)!r}")
+    (version,) = unpack_from(b">L", header, 4)
+    if version not in (2, 3):
+        raise AssertionError(f"Version was {version}")
+    (num_objects,) = unpack_from(b">L", header, 8)
+    return (version, num_objects)
+
+
 def chunks_length(chunks: bytes | Iterable[bytes]) -> int:
     """Get the total length of a sequence of chunks.
 
@@ -1536,6 +1655,85 @@ def unpack_object(
         include_comp=include_comp,
     )
     return unpacked, unused
+
+
+def unpack_object_at(
+    contents: "bytes | mmap.mmap",
+    offset: int,
+    hash_func: Callable[[], "HashObject"],
+    compute_crc32: bool = False,
+    include_comp: bool = False,
+    zlib_bufsize: int = _ZLIB_BUFSIZE,
+) -> tuple[UnpackedObject, int]:
+    """Unpack a Git object from a buffer at a given offset.
+
+    Like :func:`unpack_object`, but indexes the buffer directly rather than
+    consuming a read callable, so any number of readers can work on the same
+    buffer concurrently.
+
+    Args:
+      contents: Buffer holding the pack.
+      offset: Offset in contents at which the object starts.
+      hash_func: Hash function to use for computing object IDs.
+      compute_crc32: If True, compute the CRC32 of the compressed data.
+      include_comp: If True, include compressed data in the result.
+      zlib_bufsize: An optional buffer size for zlib operations.
+    Returns: A tuple of (unpacked, end), where end is the offset just past
+        the object and unpacked is an UnpackedObject with its ``offset`` set;
+        see :func:`unpack_object` for the other attributes.
+    """
+    crc32: int | None = 0 if compute_crc32 else None
+
+    raw, pos, crc32 = take_msb_bytes_at(contents, offset, crc32=crc32)
+    type_num = (raw[0] >> 4) & 0x07
+    size = raw[0] & 0x0F
+    for i, byte in enumerate(raw[1:]):
+        size += (byte & 0x7F) << ((i * 7) + 4)
+
+    delta_base: int | bytes | None
+    if type_num == OFS_DELTA:
+        raw, pos, crc32 = take_msb_bytes_at(contents, pos, crc32=crc32)
+        if raw[-1] & 0x80:
+            raise AssertionError
+        delta_base_offset = raw[0] & 0x7F
+        for byte in raw[1:]:
+            delta_base_offset += 1
+            delta_base_offset <<= 7
+            delta_base_offset += byte & 0x7F
+        if delta_base_offset == 0:
+            # A zero offset makes the delta reference itself, which would
+            # loop forever in resolve_object. git's C client rejects this
+            # with "delta offset == 0 is invalid".
+            raise ApplyDeltaError("OFS_DELTA has delta_base_offset of 0")
+        delta_base = delta_base_offset
+    elif type_num == REF_DELTA:
+        hash_size = len(hash_func().digest())
+        delta_base_obj = bytes(contents[pos : pos + hash_size])
+        if len(delta_base_obj) != hash_size:
+            raise AssertionError(f"unexpected end of pack data at {pos}")
+        pos += hash_size
+        if crc32 is not None:
+            crc32 = binascii.crc32(delta_base_obj, crc32)
+        delta_base = delta_base_obj
+    else:
+        delta_base = None
+
+    unpacked = UnpackedObject(
+        type_num,
+        delta_base=delta_base,
+        decomp_len=size,
+        crc32=crc32,
+        hash_func=hash_func,
+    )
+    unpacked.offset = offset
+    end = read_zlib_chunks_at(
+        contents,
+        pos,
+        unpacked,
+        buffer_size=zlib_bufsize,
+        include_comp=include_comp,
+    )
+    return unpacked, end
 
 
 def _compute_object_size(value: tuple[int, Any]) -> int:
@@ -1787,7 +1985,7 @@ def obj_sha(
 
 
 def compute_file_sha(
-    f: "IO[bytes] | _ContentsReader",
+    f: IO[bytes],
     hash_func: Callable[[], "HashObject"],
     start_ofs: int = 0,
     end_ofs: int = 0,
@@ -1822,42 +2020,38 @@ def compute_file_sha(
     return sha
 
 
-class _ContentsReader:
-    """Stateful read interface over an in-memory pack buffer.
+def compute_buffer_sha(
+    contents: "bytes | mmap.mmap",
+    hash_func: Callable[[], "HashObject"],
+    start_ofs: int = 0,
+    end_ofs: int = 0,
+    buffer_size: int = 1 << 16,
+) -> "HashObject":
+    """Hash a portion of a buffer into a new SHA.
 
-    Every reader tracks its own position, so any number of them can read
-    from the same buffer concurrently. Calling the reader reads from it, so
-    it can be passed directly wherever a read callable is expected.
+    Args:
+      contents: Buffer to hash.
+      hash_func: A callable that returns a new HashObject.
+      start_ofs: The offset in the buffer to start hashing at.
+      end_ofs: The offset to end hashing at, relative to the end of the
+        buffer.
+      buffer_size: Number of bytes to hash at a time.
+    Returns: A new SHA object updated with data read from the buffer.
     """
-
-    __slots__ = ("_contents", "pos")
-
-    def __init__(self, contents: "bytes | mmap.mmap", offset: int) -> None:
-        self._contents = contents
-        self.pos = offset
-
-    def read(self, size: int = -1) -> bytes:
-        """Read up to size bytes from the current position, or all if -1."""
-        end = None if size < 0 else self.pos + size
-        chunk = self._contents[self.pos : end]
-        self.pos += len(chunk)
-        return chunk
-
-    __call__ = read
-
-    def seek(self, offset: int, whence: int = 0) -> int:
-        """Move the read position, following the io.IOBase convention."""
-        if whence == SEEK_END:
-            self.pos = len(self._contents) + offset
-        elif whence == SEEK_CUR:
-            self.pos += offset
-        else:
-            self.pos = offset
-        return self.pos
-
-    def tell(self) -> int:
-        """Return the current read position."""
-        return self.pos
+    sha = hash_func()
+    length = len(contents)
+    if start_ofs < 0:
+        raise AssertionError(f"start_ofs cannot be negative: {start_ofs}")
+    if (end_ofs < 0 and length + end_ofs < start_ofs) or end_ofs > length:
+        raise AssertionError(
+            f"Attempt to read beyond buffer length. start_ofs: {start_ofs}, end_ofs: {end_ofs}, buffer length: {length}"
+        )
+    pos = start_ofs
+    end = length + end_ofs
+    while pos < end:
+        sha.update(contents[pos : min(pos + buffer_size, end)])
+        pos += buffer_size
+    return sha
 
 
 class PackData:
@@ -1905,7 +2099,7 @@ class PackData:
 
         The file must exist and stay readable until the object is disposed of.
         It must also stay the same size. It is mapped into memory on open, so
-        reads never contend on a shared file position.
+        reads index the mapping directly rather than sharing a file position.
 
         The size argument is accepted for backward compatibility and ignored:
         checksum offsets are derived from the size, so it is measured when the
@@ -1929,14 +2123,15 @@ class PackData:
         else:
             self._file = file
         try:
-            # Keep one copy of the pack so each reader can track its own position.
+            # Map the pack once; every read indexes this buffer at an explicit
+            # offset, so concurrent reads never contend on a file position.
             self._contents, self._size = _load_file_contents(self._file)
             minimum_size = self._header_size + self.object_format.oid_length
             if self._size < minimum_size:
                 raise AssertionError(
                     f"{self._filename} is too small for a packfile ({self._size} < {minimum_size})"
                 )
-            (_version, self._num_objects) = read_pack_header(self._reader())
+            (_version, self._num_objects) = read_pack_header_at(self._contents)
 
             # Use delta_base_cache_limit, then delta_cache_size, then default
             cache_size = (
@@ -2005,12 +2200,12 @@ class PackData:
         """
         return cls(filename=path, object_format=object_format)
 
-    def _reader(self, offset: int = 0) -> _ContentsReader:
-        """Return a reader over the pack contents positioned at offset."""
+    def _buffer(self) -> "bytes | mmap.mmap":
+        """Return the mapped pack contents."""
         contents = self._contents
         if contents is None:
             raise ValueError(f"read from closed PackData: {self._filename}")
-        return _ContentsReader(contents, offset)
+        return contents
 
     def close(self) -> None:
         """Close the underlying pack file."""
@@ -2069,8 +2264,8 @@ class PackData:
 
         Returns: Binary digest (size depends on hash algorithm)
         """
-        return compute_file_sha(
-            self._reader(),
+        return compute_buffer_sha(
+            self._buffer(),
             hash_func=self.object_format.hash_func,
             end_ofs=-self.object_format.oid_length,
         ).digest()
@@ -2080,19 +2275,17 @@ class PackData:
         if self._num_objects is None:
             return
 
-        reader = self._reader(self._header_size)
+        contents = self._buffer()
+        offset = self._header_size
         for _ in range(self._num_objects):
-            offset = reader.pos
-            unpacked, unused = unpack_object(
-                reader,
+            unpacked, offset = unpack_object_at(
+                contents,
+                offset,
                 self.object_format.hash_func,
                 compute_crc32=False,
                 include_comp=include_comp,
             )
-            unpacked.offset = offset
             yield unpacked
-            # Back up over unused data.
-            reader.pos -= len(unused)
 
     def iterentries(
         self,
@@ -2242,7 +2435,7 @@ class PackData:
     def get_stored_checksum(self) -> bytes:
         """Return the expected checksum stored in this pack."""
         checksum_size = self.object_format.oid_length
-        return self._reader(self._size - checksum_size).read(checksum_size)
+        return bytes(self._buffer()[self._size - checksum_size :])
 
     def check(self) -> None:
         """Check the consistency of this pack."""
@@ -2256,12 +2449,12 @@ class PackData:
     ) -> UnpackedObject:
         """Given offset in the packfile return a UnpackedObject."""
         assert offset >= self._header_size
-        unpacked, _ = unpack_object(
-            self._reader(offset),
+        unpacked, _ = unpack_object_at(
+            self._buffer(),
+            offset,
             self.object_format.hash_func,
             include_comp=include_comp,
         )
-        unpacked.offset = offset
         return unpacked
 
     def get_object_at(self, offset: int) -> tuple[int, OldUnpackedObject]:
@@ -2324,15 +2517,8 @@ class DeltaChainIterator(Generic[T]):
                 that materialise objects (e.g. PackInflater) when iterating
                 packs in a non-default hash algorithm such as SHA-256.
         """
-        self._reader_at: Callable[[int], Callable[[int], bytes]] | None = None
-        if file_obj is not None:
-
-            def reader_at(offset: int) -> Callable[[int], bytes]:
-                # add_thin_pack may still be writing to this file, so read it directly.
-                file_obj.seek(offset)
-                return file_obj.read
-
-            self._reader_at = reader_at
+        self._file = file_obj
+        self._contents: bytes | mmap.mmap | None = None
         self.hash_func = hash_func
         self._object_format = object_format
         self._resolve_ext_ref = resolve_ext_ref
@@ -2449,7 +2635,8 @@ class DeltaChainIterator(Generic[T]):
         Args:
           pack_data: PackData object to use
         """
-        self._reader_at = pack_data._reader
+        self._file = None
+        self._contents = pack_data._buffer()
 
     def _walk_all_chains(self) -> Iterator[T]:
         for offset, type_num in self._full_ofs:
@@ -2494,15 +2681,27 @@ class DeltaChainIterator(Generic[T]):
         obj_type_num: int,
         base_chunks: bytes | list[bytes] | None,
     ) -> UnpackedObject:
-        assert self._reader_at is not None
-        unpacked, _ = unpack_object(
-            self._reader_at(offset),
-            self.hash_func,
-            read_some=None,
-            compute_crc32=self._compute_crc32,
-            include_comp=self._include_comp,
-        )
-        unpacked.offset = offset
+        if self._contents is not None:
+            unpacked, _ = unpack_object_at(
+                self._contents,
+                offset,
+                self.hash_func,
+                compute_crc32=self._compute_crc32,
+                include_comp=self._include_comp,
+            )
+        else:
+            # add_thin_pack may still be writing to this file, so it cannot be
+            # mapped up front; read through the file position instead.
+            assert self._file is not None
+            self._file.seek(offset)
+            unpacked, _ = unpack_object(
+                self._file.read,
+                self.hash_func,
+                read_some=None,
+                compute_crc32=self._compute_crc32,
+                include_comp=self._include_comp,
+            )
+            unpacked.offset = offset
         if base_chunks is None:
             assert unpacked.pack_type_num == obj_type_num
         else:

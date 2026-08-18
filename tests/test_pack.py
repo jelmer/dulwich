@@ -26,6 +26,7 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 import tracemalloc
 import types
 import zlib
@@ -543,6 +544,34 @@ class TestPackData(PackTests):
                 "truncated.pack", file=pack_file, object_format=DEFAULT_OBJECT_FORMAT
             )
         self.assertTrue(pack_file.closed)
+
+    def test_concurrent_reads(self) -> None:
+        """Reads from several threads must not interfere with each other."""
+        with self.get_pack_data(pack1_sha) as p:
+            offsets = [unpacked.offset for unpacked in p.iter_unpacked()]
+            expected = {o: p.get_unpacked_object_at(o).sha() for o in offsets}
+            results: list[bool] = []
+            errors: list[BaseException] = []
+
+            def read_repeatedly() -> None:
+                try:
+                    for _ in range(50):
+                        for offset in offsets:
+                            results.append(
+                                p.get_unpacked_object_at(offset).sha()
+                                == expected[offset]
+                            )
+                except BaseException as e:
+                    errors.append(e)
+
+            threads = [threading.Thread(target=read_repeatedly) for _ in range(8)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            self.assertEqual([], errors)
+            self.assertEqual(8 * 50 * len(offsets), len(results))
+            self.assertEqual([], [r for r in results if not r])
 
     def test_get_stored_checksum(self) -> None:
         """Test getting the stored checksum of the pack data."""

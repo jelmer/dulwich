@@ -9,6 +9,10 @@
    callers who cannot reject invalid input via ``check_user_identity``.
    (Bojan Zivanovic, #2342)
 
+ * Make concurrent ``PackData`` reads thread-safe by mmap-ing pack contents
+   and giving each operation an independent cursor instead of sharing the
+   file position. (Bojan Zivanovic)
+
  * Deduplicate the commit walk in ``find_shallow`` and ``get_depth``
    (``dulwich.object_store``). Both re-expanded a commit once per path that
    reached it, so a merge-heavy history walked in exponential time.

@@ -10,8 +10,11 @@
    (Bojan Zivanovic, #2342)
 
  * Make concurrent ``PackData`` reads thread-safe by mmap-ing pack contents
-   and giving each operation an independent cursor instead of sharing the
-   file position. (Bojan Zivanovic)
+   and indexing the mapping at explicit offsets instead of sharing the file
+   position. New ``unpack_object_at``, ``read_pack_header_at``,
+   ``read_zlib_chunks_at``, ``take_msb_bytes_at`` and ``compute_buffer_sha``
+   read from a buffer; the existing read-callable variants remain for streams.
+   (Bojan Zivanovic, Jelmer Vernooĳ)
 
  * Deduplicate the commit walk in ``find_shallow`` and ``get_depth``
    (``dulwich.object_store``). Both re-expanded a commit once per path that

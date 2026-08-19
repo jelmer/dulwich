@@ -1,5 +1,10 @@
 1.2.13	UNRELEASED
 
+ * Add ``repo.sanitize_user_identity``, which builds an identity from a
+   name and an email sanitized the way git's ``fmt_ident`` does, for
+   callers who cannot reject invalid input via ``check_user_identity``.
+   (Bojan Zivanovic, #2342)
+
  * Deduplicate the commit walk in ``find_shallow`` and ``get_depth``
    (``dulwich.object_store``). Both re-expanded a commit once per path that
    reached it, so a merge-heavy history walked in exponential time.

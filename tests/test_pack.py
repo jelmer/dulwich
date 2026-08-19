@@ -62,6 +62,7 @@ from dulwich.pack import (
     load_pack_index,
     read_zlib_chunks,
     unpack_object,
+    unpack_object_at,
     write_pack,
     write_pack_header,
     write_pack_index,
@@ -1128,6 +1129,20 @@ class WritePackTests(TestCase):
             ApplyDeltaError,
             unpack_object,
             f.read,
+            DEFAULT_OBJECT_FORMAT.hash_func,
+        )
+
+    def test_unpack_object_at_rejects_zero_ofs_delta(self) -> None:
+        # Same guard as test_unpack_object_rejects_zero_ofs_delta, on the
+        # offset-based path.
+        header = bytes([(OFS_DELTA << 4) | 0])
+        ofs_bytes = bytes([0x00])
+        body = zlib.compress(b"")
+        self.assertRaises(
+            ApplyDeltaError,
+            unpack_object_at,
+            header + ofs_bytes + body,
+            0,
             DEFAULT_OBJECT_FORMAT.hash_func,
         )
 

@@ -1526,26 +1526,6 @@ class PackIndex3(FilePackIndex):
         return result
 
 
-def read_pack_header(read: Callable[[int], bytes]) -> tuple[int, int]:
-    """Read the header of a pack file.
-
-    Args:
-      read: Read function
-    Returns: Tuple of (pack version, number of objects). If no data is
-        available to read, returns (None, None).
-    """
-    header = read(12)
-    if not header:
-        raise AssertionError("file too short to contain pack")
-    if header[:4] != b"PACK":
-        raise AssertionError(f"Invalid pack header {header!r}")
-    (version,) = unpack_from(b">L", header, 4)
-    if version not in (2, 3):
-        raise AssertionError(f"Version was {version}")
-    (num_objects,) = unpack_from(b">L", header, 8)
-    return (version, num_objects)
-
-
 def read_pack_header_at(
     contents: "bytes | mmap.mmap", offset: int = 0
 ) -> tuple[int, int]:
@@ -1568,6 +1548,16 @@ def read_pack_header_at(
     return (version, num_objects)
 
 
+def read_pack_header(read: Callable[[int], bytes]) -> tuple[int, int]:
+    """Read the header of a pack file.
+
+    Args:
+      read: Read function
+    Returns: Tuple of (pack version, number of objects).
+    """
+    return read_pack_header_at(read(12))
+
+
 def chunks_length(chunks: bytes | Iterable[bytes]) -> int:
     """Get the total length of a sequence of chunks.
 
@@ -1579,6 +1569,32 @@ def chunks_length(chunks: bytes | Iterable[bytes]) -> int:
         return len(chunks)
     else:
         return sum(map(len, chunks))
+
+
+def _decode_object_header(raw: list[int]) -> tuple[int, int]:
+    """Decode an object type and size from a pack object header."""
+    type_num = (raw[0] >> 4) & 0x07
+    size = raw[0] & 0x0F
+    for i, byte in enumerate(raw[1:]):
+        size += (byte & 0x7F) << ((i * 7) + 4)
+    return type_num, size
+
+
+def _decode_delta_base_offset(raw: list[int]) -> int:
+    """Decode an OFS_DELTA base offset from its variable-length encoding."""
+    if raw[-1] & 0x80:
+        raise AssertionError
+    delta_base_offset = raw[0] & 0x7F
+    for byte in raw[1:]:
+        delta_base_offset += 1
+        delta_base_offset <<= 7
+        delta_base_offset += byte & 0x7F
+    if delta_base_offset == 0:
+        # A zero offset makes the delta reference itself, which would
+        # loop forever in resolve_object. git's C client rejects this
+        # with "delta offset == 0 is invalid".
+        raise ApplyDeltaError("OFS_DELTA has delta_base_offset of 0")
+    return delta_base_offset
 
 
 def unpack_object(
@@ -1621,29 +1637,14 @@ def unpack_object(
         crc32 = None
 
     raw, crc32 = take_msb_bytes(read_all, crc32=crc32)
-    type_num = (raw[0] >> 4) & 0x07
-    size = raw[0] & 0x0F
-    for i, byte in enumerate(raw[1:]):
-        size += (byte & 0x7F) << ((i * 7) + 4)
+    type_num, size = _decode_object_header(raw)
 
     delta_base: int | bytes | None
     raw_base = len(raw)
     if type_num == OFS_DELTA:
         raw, crc32 = take_msb_bytes(read_all, crc32=crc32)
         raw_base += len(raw)
-        if raw[-1] & 0x80:
-            raise AssertionError
-        delta_base_offset = raw[0] & 0x7F
-        for byte in raw[1:]:
-            delta_base_offset += 1
-            delta_base_offset <<= 7
-            delta_base_offset += byte & 0x7F
-        if delta_base_offset == 0:
-            # A zero offset makes the delta reference itself, which would
-            # loop forever in resolve_object. git's C client rejects this
-            # with "delta offset == 0 is invalid".
-            raise ApplyDeltaError("OFS_DELTA has delta_base_offset of 0")
-        delta_base = delta_base_offset
+        delta_base = _decode_delta_base_offset(raw)
     elif type_num == REF_DELTA:
         # Determine hash size from hash_func
         hash_size = len(hash_func().digest())
@@ -1699,27 +1700,12 @@ def unpack_object_at(
     crc32: int | None = 0 if compute_crc32 else None
 
     raw, pos, crc32 = take_msb_bytes_at(contents, offset, crc32=crc32)
-    type_num = (raw[0] >> 4) & 0x07
-    size = raw[0] & 0x0F
-    for i, byte in enumerate(raw[1:]):
-        size += (byte & 0x7F) << ((i * 7) + 4)
+    type_num, size = _decode_object_header(raw)
 
     delta_base: int | bytes | None
     if type_num == OFS_DELTA:
         raw, pos, crc32 = take_msb_bytes_at(contents, pos, crc32=crc32)
-        if raw[-1] & 0x80:
-            raise AssertionError
-        delta_base_offset = raw[0] & 0x7F
-        for byte in raw[1:]:
-            delta_base_offset += 1
-            delta_base_offset <<= 7
-            delta_base_offset += byte & 0x7F
-        if delta_base_offset == 0:
-            # A zero offset makes the delta reference itself, which would
-            # loop forever in resolve_object. git's C client rejects this
-            # with "delta offset == 0 is invalid".
-            raise ApplyDeltaError("OFS_DELTA has delta_base_offset of 0")
-        delta_base = delta_base_offset
+        delta_base = _decode_delta_base_offset(raw)
     elif type_num == REF_DELTA:
         hash_size = len(hash_func().digest())
         delta_base_obj = bytes(contents[pos : pos + hash_size])

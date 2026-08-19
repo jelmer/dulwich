@@ -573,6 +573,14 @@ class TestPackData(PackTests):
             self.assertEqual(8 * 50 * len(offsets), len(results))
             self.assertEqual([], [r for r in results if not r])
 
+    def test_rejects_wrong_size(self) -> None:
+        """A caller-supplied size that disagrees with the file is an error."""
+        with open(
+            os.path.join(self.datadir, f"pack-{pack1_sha.decode()}.pack"), "rb"
+        ) as f:
+            with self.assertRaisesRegex(AssertionError, "but caller said 42"):
+                PackData.from_file(f, DEFAULT_OBJECT_FORMAT, 42)
+
     def test_get_stored_checksum(self) -> None:
         """Test getting the stored checksum of the pack data."""
         with self.get_pack_data(pack1_sha) as p:
@@ -1981,8 +1989,8 @@ class DeltaChainIteratorTests(TestCase):
             ],
             store=self.store,
         )
-        fsize = f.tell()
-        f.seek(0)
+        # build_pack rewinds f, so measure the buffer rather than tell().
+        fsize = len(f.getvalue())
         packdata = PackData.from_file(f, DEFAULT_OBJECT_FORMAT, fsize)
         td = tempfile.mkdtemp()
         idx_path = os.path.join(td, "test.idx")

@@ -2058,7 +2058,8 @@ def _is_ntfs_dotgit(name: bytes) -> bool:
 # Reserved Windows device names. Opening any of these on Windows
 # resolves to a device rather than a file, regardless of any
 # extension or trailing dots/spaces (``NUL``, ``NUL.txt``,
-# ``aux.foo.bar`` all hit the device).
+# ``aux.foo.bar`` all hit the device). They are ordinary filenames
+# everywhere else, so this is only enforced when running on Windows.
 RESERVED_WINDOWS_DEVICE_NAMES = frozenset(
     [b"con", b"prn", b"aux", b"nul"]
     + [b"com%d" % i for i in range(1, 10)]
@@ -2105,7 +2106,10 @@ def validate_path_element_ntfs(element: bytes) -> bool:
     normalized = _normalize_path_element_ntfs(element)
     if normalized in INVALID_DOTNAMES:
         return False
-    if _is_reserved_windows_device_name(normalized):
+    # Like the backslash check above, a reserved device name is only a
+    # hazard on Windows; C git confines this to is_valid_win32_path in
+    # compat/mingw.c, and accepts e.g. ``aux`` on POSIX (issue #2351).
+    if os.name == "nt" and _is_reserved_windows_device_name(normalized):
         return False
     return True
 

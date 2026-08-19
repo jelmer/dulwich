@@ -27,6 +27,11 @@
    message outside the output
    directory. (Jelmer Vernooĳ; Reported by wzc)
 
+ * Only reject reserved Windows device names (``aux``, ``nul``, ``con``, ...)
+   when actually running on Windows. C git confines this check to its Windows
+   compat layer, so repositories carrying such paths could not be cloned
+   elsewhere. (Jelmer Vernooĳ, #2351)
+
  * Catch ``PackFileDisappeared`` in the bitmap probe in
    ``get_reachability_provider``, which only guarded ``FileNotFoundError``.
    (Jelmer Vernooĳ, #2344)

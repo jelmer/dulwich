@@ -62,6 +62,7 @@ from dulwich.index import (
     _fs_to_tree_path,
     _has_directory_changed,
     _has_dos_drive_prefix,
+    _is_reserved_windows_device_name,
     _tree_to_fs_path,
     build_index_from_tree,
     cleanup_mode,
@@ -754,6 +755,34 @@ class BuildIndexTests(TestCase):
             colon_path = os.path.join(repo.path, "with:colon.txt")
             self.assertTrue(os.path.exists(colon_path))
             self.assertFileContents(colon_path, b"foo\n")
+
+    @skipIf(os.name == "nt", "'aux' is a device name on Windows")
+    def test_reserved_device_name_checked_out_off_windows(self) -> None:
+        # ``aux`` is a reserved device only on Windows; on POSIX it is an
+        # ordinary filename that C git checks out happily, so rejecting it
+        # made whole repositories unclonable. See issue #2351.
+
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            blob = Blob.from_string(b"#!/bin/sh\n")
+            tree = Tree()
+            tree[b"aux"] = (stat.S_IFREG | 0o644, blob.id)
+            repo.object_store.add_objects([(o, None) for o in [blob, tree]])
+
+            build_index_from_tree(
+                repo.path,
+                repo.index_path(),
+                repo.object_store,
+                tree.id,
+                validate_path_element=validate_path_element_ntfs,
+            )
+
+            index = repo.open_index()
+            self.assertEqual(list(index), [b"aux"])
+            aux_path = os.path.join(repo.path, "aux")
+            self.assertTrue(os.path.exists(aux_path))
+            self.assertFileContents(aux_path, b"#!/bin/sh\n")
 
     @skipIf(not can_symlink(), "Requires symlink support")
     def test_regular_file_replaces_symlink(self) -> None:
@@ -1741,11 +1770,13 @@ class TestValidatePathElement(TestCase):
         self.assertTrue(validate_path_element_ntfs(b"foo:bar"))
         self.assertTrue(validate_path_element_ntfs(b"with:colon.txt"))
 
-    def test_ntfs_rejects_reserved_device_names(self) -> None:
+    def test_reserved_device_names_only_rejected_on_windows(self) -> None:
         # CON, PRN, AUX, NUL and COM1..9 / LPT1..9 are reserved
         # devices on Windows. Opening them resolves to the device
         # rather than a disk file, with or without an extension and
-        # regardless of case.
+        # regardless of case. Elsewhere they are ordinary filenames
+        # and must be checked out (issue #2351).
+        expected = os.name != "nt"
         for name in (
             b"NUL",
             b"nul",
@@ -1758,26 +1789,49 @@ class TestValidatePathElement(TestCase):
             b"LPT1",
             b"LPT9",
         ):
-            self.assertFalse(
+            self.assertEqual(
+                expected,
                 validate_path_element_ntfs(name),
-                f"{name!r} should be rejected on NTFS",
+                f"{name!r} should be rejected only on Windows",
             )
 
-    def test_ntfs_rejects_reserved_device_names_with_extension(self) -> None:
+    def test_reserved_device_names_with_extension(self) -> None:
         # Extensions do not make a reserved name safe on Windows:
         # ``NUL.txt`` still opens the NUL device.
-        self.assertFalse(validate_path_element_ntfs(b"NUL.txt"))
-        self.assertFalse(validate_path_element_ntfs(b"aux.foo"))
-        self.assertFalse(validate_path_element_ntfs(b"COM1.bar"))
-        # Multiple extensions still match the stem.
-        self.assertFalse(validate_path_element_ntfs(b"nul.tar.gz"))
-        # Trailing dots/spaces are stripped by NTFS before resolution.
-        self.assertFalse(validate_path_element_ntfs(b"NUL."))
-        self.assertFalse(validate_path_element_ntfs(b"NUL "))
-        self.assertFalse(validate_path_element_ntfs(b"NUL ..."))
-        # A trailing space on the stem itself is also stripped, so
-        # ``NUL .txt`` still resolves to the NUL device.
-        self.assertFalse(validate_path_element_ntfs(b"NUL .txt"))
+        expected = os.name != "nt"
+        for name in (
+            b"NUL.txt",
+            b"aux.foo",
+            b"COM1.bar",
+            # Multiple extensions still match the stem.
+            b"nul.tar.gz",
+            # Trailing dots/spaces are stripped by NTFS before resolution.
+            b"NUL.",
+            b"NUL ",
+            b"NUL ...",
+            # A trailing space on the stem itself is also stripped, so
+            # ``NUL .txt`` still resolves to the NUL device.
+            b"NUL .txt",
+        ):
+            self.assertEqual(
+                expected,
+                validate_path_element_ntfs(name),
+                f"{name!r} should be rejected only on Windows",
+            )
+
+    def test_reserved_device_name_stem_matching(self) -> None:
+        # The stem match itself is platform-independent; only its
+        # enforcement in the validator is gated on Windows.
+        for name in (b"nul", b"nul.txt", b"nul ", b"aux.foo.bar", b"com1"):
+            self.assertTrue(
+                _is_reserved_windows_device_name(name),
+                f"{name!r} should match a reserved device name",
+            )
+        for name in (b"null", b"myaux", b"com0", b"com10", b"lpt0"):
+            self.assertFalse(
+                _is_reserved_windows_device_name(name),
+                f"{name!r} should not match a reserved device name",
+            )
 
     def test_ntfs_accepts_names_that_only_resemble_devices(self) -> None:
         # Only the exact reserved names are devices; longer names

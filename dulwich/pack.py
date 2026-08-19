@@ -68,6 +68,7 @@ __all__ = [
     "apply_delta",
     "bisect_find_sha",
     "chunks_length",
+    "compute_buffer_sha",
     "compute_file_sha",
     "deltas_from_sorted_objects",
     "deltify_pack_objects",
@@ -84,10 +85,14 @@ __all__ = [
     "pack_object_header",
     "pack_objects_to_data",
     "read_pack_header",
+    "read_pack_header_at",
     "read_zlib_chunks",
+    "read_zlib_chunks_at",
     "sort_objects_for_delta",
     "take_msb_bytes",
+    "take_msb_bytes_at",
     "unpack_object",
+    "unpack_object_at",
     "verify_and_read",
     "write_pack",
     "write_pack_data",
@@ -2110,9 +2115,10 @@ class PackData:
         It must also stay the same size. It is mapped into memory on open, so
         reads index the mapping directly rather than sharing a file position.
 
-        The size argument is accepted for backward compatibility and ignored:
-        checksum offsets are derived from the size, so it is measured when the
-        pack is mapped rather than trusted from the caller.
+        The size argument is not trusted for checksum offsets, which are
+        derived from the mapped length instead. When given it is checked
+        against that length, so a caller passing a stale size gets an error
+        rather than silently wrong offsets.
         """
         self._filename = filename
         self.object_format = object_format
@@ -2135,6 +2141,10 @@ class PackData:
             # Map the pack once; every read indexes this buffer at an explicit
             # offset, so concurrent reads never contend on a file position.
             self._contents, self._size = _load_file_contents(self._file)
+            if size is not None and size != self._size:
+                raise AssertionError(
+                    f"{self._filename} is {self._size} bytes, but caller said {size}"
+                )
             minimum_size = self._header_size + self.object_format.oid_length
             if self._size < minimum_size:
                 raise AssertionError(
@@ -2185,7 +2195,7 @@ class PackData:
         Args:
           file: Open file object
           object_format: Object format
-          size: Ignored; the pack is measured when it is mapped
+          size: Optional expected file size, checked against the mapped length
 
         Returns:
           PackData instance
@@ -2260,9 +2270,6 @@ class PackData:
         if isinstance(other, PackData):
             return self.get_stored_checksum() == other.get_stored_checksum()
         return False
-
-    def _get_size(self) -> int:
-        return self._size
 
     def __len__(self) -> int:
         """Returns the number of objects in this pack."""
@@ -4583,7 +4590,7 @@ class Pack:
         """
         total = 0
         if self._data is not None:
-            total += self._data._get_size()
+            total += self._data._size
         if self._idx is not None and isinstance(self._idx, FilePackIndex):
             total += self._idx._size
         return total

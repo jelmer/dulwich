@@ -653,13 +653,22 @@ def read_zlib_chunks_at(
     Like :func:`read_zlib_chunks`, but indexes the buffer directly instead of
     consuming a read callable, so concurrent readers do not share a position.
 
+    The buffer is fed to zlib in ``buffer_size`` slices rather than in one
+    piece. That bounds ``unused_data``, which zlib materialises as a copy of
+    everything it was handed past the end of the stream: passing the whole
+    mapping would copy the entire remainder of the pack for every object read.
+
+    Slices are taken as memoryviews, so the compressed data is decompressed
+    straight out of the mapping. With ``include_comp`` the chunks are kept on
+    ``unpacked`` and outlive the mapping, so those are copied.
+
     Args:
       contents: Buffer holding the compressed data.
       offset: Offset in contents at which the zlib stream starts.
       unpacked: An UnpackedObject to write result data to; see
         :func:`read_zlib_chunks` for the attributes set on it.
       include_comp: If True, include compressed data in the result.
-      buffer_size: Number of bytes to decompress at a time.
+      buffer_size: Number of bytes to feed to zlib at a time.
     Returns: Offset in contents just past the end of the zlib stream.
 
     Raises:
@@ -676,30 +685,30 @@ def read_zlib_chunks_at(
     max_decomp = unpacked.decomp_len
     pos = offset
 
-    while True:
-        add = contents[pos : pos + buffer_size]
-        if not add:
-            raise zlib.error("EOF before end of zlib stream")
-        pos += len(add)
-        comp_chunks.append(add)
-        # +1 so overrun surfaces as unconsumed_tail rather than being truncated.
-        remaining = max_decomp - decomp_len + 1
-        decomp = decomp_obj.decompress(add, remaining)
-        if decomp_obj.unconsumed_tail:
-            raise zlib.error("decompressed data exceeds expected size")
-        decomp_len += len(decomp)
-        decomp_chunks.append(decomp)
-        unused = decomp_obj.unused_data
-        if unused:
-            left = len(unused)
-            pos -= left
+    with memoryview(contents) as view:
+        while True:
+            add = view[pos : pos + buffer_size]
+            if not add:
+                raise zlib.error("EOF before end of zlib stream")
+            pos += len(add)
+            # +1 so overrun surfaces as unconsumed_tail rather than being truncated.
+            remaining = max_decomp - decomp_len + 1
+            decomp = decomp_obj.decompress(add, remaining)
+            if decomp_obj.unconsumed_tail:
+                raise zlib.error("decompressed data exceeds expected size")
+            decomp_len += len(decomp)
+            decomp_chunks.append(decomp)
+            unused = decomp_obj.unused_data
+            if unused:
+                left = len(unused)
+                pos -= left
+                add = add[:-left]
             if crc32 is not None:
-                crc32 = binascii.crc32(add[:-left], crc32)
+                crc32 = binascii.crc32(add, crc32)
             if include_comp:
-                comp_chunks[-1] = add[:-left]
-            break
-        elif crc32 is not None:
-            crc32 = binascii.crc32(add, crc32)
+                comp_chunks.append(bytes(add))
+            if unused:
+                break
     if crc32 is not None:
         crc32 &= 0xFFFFFFFF
 

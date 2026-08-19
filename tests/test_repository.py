@@ -51,6 +51,7 @@ from dulwich.repo import (
     UnsupportedVersion,
     check_user_identity,
     parse_shared_repository,
+    sanitize_user_identity,
 )
 from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
@@ -2011,6 +2012,38 @@ class CheckUserIdentityTests(TestCase):
         self.assertRaises(
             InvalidUserIdentity, check_user_identity, b"Contains\nnewline byte <>"
         )
+
+
+class SanitizeUserIdentityTests(TestCase):
+    def test_clean(self) -> None:
+        self.assertEqual(
+            b"Me <me@example.com>", sanitize_user_identity(b"Me", b"me@example.com")
+        )
+
+    def test_strips_leading_and_trailing_crud(self) -> None:
+        self.assertEqual(
+            b"Full Name <me@example.com>",
+            sanitize_user_identity(b" ,:;<Full Name>'\"\\ ", b"<me@example.com>"),
+        )
+        self.assertEqual(
+            b"Me <me@example.com>",
+            sanitize_user_identity(b"\x01\x1fMe\t\n", b"\x00me@example.com\x20"),
+        )
+
+    def test_drops_delimiters_from_middle(self) -> None:
+        self.assertEqual(
+            b"FullName <mee@xample.com>",
+            sanitize_user_identity(b"Full<>\nName", b"me\ne@<x>\0ample.com"),
+        )
+
+    def test_keeps_inner_crud(self) -> None:
+        self.assertEqual(
+            b"Name, Full: yes <m,e@example.com>",
+            sanitize_user_identity(b"Name, Full: yes", b"m,e@example.com"),
+        )
+
+    def test_empty(self) -> None:
+        self.assertEqual(b" <>", sanitize_user_identity(b"<>", b" ,;"))
 
 
 class RepoConfigIncludeIfTests(TestCase):

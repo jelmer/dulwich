@@ -105,6 +105,7 @@ from .pack import (
     PackedObjectContainer,
     PackFileDisappeared,
     PackHint,
+    PackIndexEntry,
     PackIndexer,
     PackInflater,
     PackStreamCopier,
@@ -2113,12 +2114,35 @@ class DiskObjectStore(PackBasedObjectStore):
         suffix = suffix_bytes.decode("ascii")
         return os.path.join(self.pack_dir, "pack-" + suffix)
 
+    def _index_pack(
+        self,
+        indexer: PackIndexer,
+        num_objects: int,
+        progress: Callable[..., None] | None = None,
+    ) -> tuple[list[PackIndexEntry], set[RawObjectID]]:
+        """Drain an indexer into index entries and the external refs it needs.
+
+        Args:
+          indexer: A PackIndexer over the pack being completed.
+          num_objects: Number of objects in the pack, for progress reporting.
+          progress: Optional progress reporting function.
+
+        Returns: Tuple of (index entries, external refs). ext_refs() is only
+            populated once the indexer has been drained.
+        """
+        entries = []
+        for i, entry in enumerate(indexer):
+            if progress is not None:
+                progress(f"generating index: {i}/{num_objects}\r".encode("ascii"))
+            entries.append(entry)
+        return entries, set(indexer.ext_refs())
+
     def _complete_pack(
         self,
         f: BinaryIO,
         path: str,
-        num_objects: int,
-        indexer: PackIndexer,
+        entries: list[PackIndexEntry],
+        ext_refs: set[RawObjectID],
         progress: Callable[..., None] | None = None,
         refs: dict[Ref, ObjectID] | None = None,
     ) -> Pack:
@@ -2127,23 +2151,23 @@ class DiskObjectStore(PackBasedObjectStore):
         Note: The file should be on the same file system as the
             packs directory.
 
+        This takes ownership of ``f``: it appends any missing base objects,
+        closes the file and renames it into place. Callers must have finished
+        reading the pack (see :meth:`_index_pack`) before calling this; on
+        Windows a mapping left over the file blocks both the write and the
+        rename.
+
         Args:
           f: Open file object for the pack.
           path: Path to the pack file.
-          num_objects: Number of objects in the pack.
-          indexer: A PackIndexer for indexing the pack.
+          entries: Index entries for the objects already in the pack.
+          ext_refs: Objects the pack deltas against that it does not contain.
           progress: Optional progress reporting function.
           refs: Optional dictionary of refs for bitmap generation.
         """
-        entries = []
-        for i, entry in enumerate(indexer):
-            if progress is not None:
-                progress(f"generating index: {i}/{num_objects}\r".encode("ascii"))
-            entries.append(entry)
-
         pack_sha, extra_entries = extend_pack(
             f,
-            set(indexer.ext_refs()),
+            ext_refs,
             get_raw=self.get_raw,
             compression_level=self.pack_compression_level,
             progress=progress,
@@ -2323,7 +2347,10 @@ class DiskObjectStore(PackBasedObjectStore):
                 delta_iter=indexer,  # type: ignore[arg-type]
             )
             copier.verify(progress=progress)
-            return self._complete_pack(f, path, len(copier), indexer, progress=progress)
+            entries, ext_refs = self._index_pack(
+                indexer, len(copier), progress=progress
+            )
+            return self._complete_pack(f, path, entries, ext_refs, progress=progress)
 
     def add_pack(
         self,
@@ -2345,12 +2372,16 @@ class DiskObjectStore(PackBasedObjectStore):
             if f.tell() > 0:
                 f.seek(0)
 
+                # Scope the mapping to indexing: _complete_pack writes to and
+                # renames this same file, which a live mapping blocks on
+                # Windows. PackData.close() leaves f open for it to finish.
                 with PackData(path, file=f, object_format=self.object_format) as pd:
                     indexer = PackIndexer.for_pack_data(
                         pd,
                         resolve_ext_ref=self.get_raw,
                     )
-                    return self._complete_pack(f, path, len(pd), indexer)  # type: ignore[arg-type]
+                    entries, ext_refs = self._index_pack(indexer, len(pd))  # type: ignore[arg-type]
+                return self._complete_pack(f, path, entries, ext_refs)
             else:
                 f.close()
                 os.remove(path)

@@ -2025,9 +2025,13 @@ def compute_buffer_sha(
     hash_func: Callable[[], "HashObject"],
     start_ofs: int = 0,
     end_ofs: int = 0,
-    buffer_size: int = 1 << 16,
 ) -> "HashObject":
     """Hash a portion of a buffer into a new SHA.
+
+    The region is hashed in one pass through a memoryview, so a mapped pack
+    is never copied. The view is released before returning rather than left
+    to the garbage collector, since ``mmap.close()`` raises BufferError while
+    an export is alive.
 
     Args:
       contents: Buffer to hash.
@@ -2035,7 +2039,6 @@ def compute_buffer_sha(
       start_ofs: The offset in the buffer to start hashing at.
       end_ofs: The offset to end hashing at, relative to the end of the
         buffer.
-      buffer_size: Number of bytes to hash at a time.
     Returns: A new SHA object updated with data read from the buffer.
     """
     sha = hash_func()
@@ -2046,11 +2049,8 @@ def compute_buffer_sha(
         raise AssertionError(
             f"Attempt to read beyond buffer length. start_ofs: {start_ofs}, end_ofs: {end_ofs}, buffer length: {length}"
         )
-    pos = start_ofs
-    end = length + end_ofs
-    while pos < end:
-        sha.update(contents[pos : min(pos + buffer_size, end)])
-        pos += buffer_size
+    with memoryview(contents) as view:
+        sha.update(view[start_ofs : length + end_ofs])
     return sha
 
 

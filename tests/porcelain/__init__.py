@@ -6031,14 +6031,18 @@ class SubmoduleTests(PorcelainTestCase):
                 porcelain.Error, _check_submodule_path, bad, validate_path_element_ntfs
             )
 
-        # A path that is only unsafe on NTFS (a reserved device name) is
-        # refused under the default protectNTFS validator but, like git with
-        # core.protectNTFS=false, accepted by the default validator so an
-        # existing POSIX repository can still be updated.
-        self.assertRaises(
-            porcelain.Error, _check_submodule_path, b"aux", validate_path_element_ntfs
-        )
-        _check_submodule_path(b"aux", validate_path_element_default)
+        # A path that is only unsafe on NTFS is refused under the protectNTFS
+        # validator but, like git with core.protectNTFS=false, accepted by the
+        # default validator so an existing POSIX repository can still be
+        # updated.
+        for ntfs_only in (b".git.", b"git~1"):
+            self.assertRaises(
+                porcelain.Error,
+                _check_submodule_path,
+                ntfs_only,
+                validate_path_element_ntfs,
+            )
+            _check_submodule_path(ntfs_only, validate_path_element_default)
 
         # Ordinary nested paths pass under either validator.
         _check_submodule_path(b"libs/foo", validate_path_element_ntfs)

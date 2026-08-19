@@ -1,5 +1,9 @@
 1.2.13	UNRELEASED
 
+ * Bound fetch negotiation the way C Git's ``MAX_IN_VAIN`` does: give up
+   after 256 unacknowledged "have" lines instead of draining the whole
+   graph walker into stateless (HTTP) requests. (Bojan Zivanovic, #2343)
+
  * Add ``repo.sanitize_user_identity``, which builds an identity from a
    name and an email sanitized the way git's ``fmt_ident`` does, for
    callers who cannot reject invalid input via ``check_user_identity``.

@@ -21,6 +21,7 @@
 
 """Tests for the object store interface."""
 
+import mmap
 import os
 import shutil
 import stat
@@ -31,6 +32,7 @@ from contextlib import closing
 from io import BytesIO
 from unittest.mock import patch
 
+import dulwich.pack
 from dulwich.config import ConfigDict
 from dulwich.errors import ChecksumMismatch, NotTreeError, ObjectFormatException
 from dulwich.file import GitFile
@@ -464,6 +466,49 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             raise
         else:
             commit()
+
+    def test_add_pack_unmaps_before_rename(self) -> None:
+        """The pack must not still be mapped when it is renamed into place.
+
+        commit() maps the temporary pack to index it, then hands the same
+        file to _complete_pack to append bases to and rename. Windows
+        refuses both while a mapping is alive.
+        """
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+
+        mappings = []
+        real_load = dulwich.pack._load_file_contents
+
+        def tracking_load(f, size=None):
+            contents, size = real_load(f, size)
+            mappings.append(contents)
+            return contents, size
+
+        open_at_rename = []
+        real_rename = os.rename
+
+        def checking_rename(src, dst):
+            open_at_rename.extend(
+                m for m in mappings if isinstance(m, mmap.mmap) and not m.closed
+            )
+            return real_rename(src, dst)
+
+        f, commit, abort = o.add_pack()
+        try:
+            b = make_object(Blob, data=b"more yummy data")
+            write_pack_objects(
+                f.write, [(b, None)], object_format=DEFAULT_OBJECT_FORMAT
+            )
+        except BaseException:
+            abort()
+            raise
+        with (
+            patch.object(dulwich.pack, "_load_file_contents", tracking_load),
+            patch("dulwich.object_store.os.rename", checking_rename),
+        ):
+            commit()
+        self.assertEqual([], open_at_rename)
 
     def test_add_thin_pack(self) -> None:
         o = DiskObjectStore(self.store_dir)

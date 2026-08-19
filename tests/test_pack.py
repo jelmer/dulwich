@@ -544,7 +544,8 @@ class TestPackData(PackTests):
             PackData(
                 "truncated.pack", file=pack_file, object_format=DEFAULT_OBJECT_FORMAT
             )
-        self.assertTrue(pack_file.closed)
+        # The file was handed to us, so it stays the caller's to close.
+        self.assertFalse(pack_file.closed)
 
     def test_concurrent_reads(self) -> None:
         """Reads from several threads must not interfere with each other."""

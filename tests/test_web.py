@@ -711,6 +711,42 @@ class HTTPGitApplicationTestCase(TestCase):
             self._route_handler("GET", f"/objects/pack/pack-{sha}.pack"),
         )
 
+    def test_route_rejects_trailing_newline(self) -> None:
+        """A trailing newline must not match a service route.
+
+        Python's "$" also matches just before a final newline, so
+        "/git-receive-pack\n" would otherwise reach the write handler while a
+        front-end proxy gating writes by request path does not recognise it.
+        git-http-backend returns 404 for this spelling.
+        """
+        self.assertIs(
+            handle_service_request, self._route_handler("POST", "/git-receive-pack")
+        )
+        self.assertIsNone(self._route_handler("POST", "/git-receive-pack\n"))
+        self.assertIsNone(self._route_handler("POST", "/git-upload-pack\n"))
+        self.assertIsNone(self._route_handler("GET", "/info/refs\n"))
+        self.assertIsNone(self._route_handler("GET", "/HEAD\n"))
+
+    def test_route_rejects_doubled_slash(self) -> None:
+        """A doubled slash must not resolve to the same repository.
+
+        url_prefix() strips slashes, so "/repo//git-receive-pack" would
+        otherwise reach the same repository as the canonical spelling.
+        """
+        app = HTTPGitApplication("backend")
+        status = []
+
+        def start_response(code, headers, exc=None):
+            status.append(code)
+            return lambda data: None
+
+        environ = {
+            "PATH_INFO": "//git-receive-pack",
+            "REQUEST_METHOD": "POST",
+        }
+        list(app(environ, start_response))
+        self.assertEqual(["404 Not Found"], status)
+
     def test_route_rejects_pack_path_traversal(self) -> None:
         # A name with a path separator must not match the pack routes.
         self.assertIsNone(self._route_handler("GET", "/objects/pack/../../config.pack"))

@@ -724,14 +724,14 @@ class HTTPGitApplication:
             Callable[[HTTPGitRequest, Backend, re.Match[str]], Iterator[bytes]],
         ]
     ] = {
-        ("GET", re.compile("/HEAD$")): get_text_file,
-        ("GET", re.compile("/info/refs$")): get_info_refs,
-        ("GET", re.compile("/objects/info/alternates$")): get_text_file,
-        ("GET", re.compile("/objects/info/http-alternates$")): get_text_file,
-        ("GET", re.compile("/objects/info/packs$")): get_info_packs,
+        ("GET", re.compile("/HEAD\\Z")): get_text_file,
+        ("GET", re.compile("/info/refs\\Z")): get_info_refs,
+        ("GET", re.compile("/objects/info/alternates\\Z")): get_text_file,
+        ("GET", re.compile("/objects/info/http-alternates\\Z")): get_text_file,
+        ("GET", re.compile("/objects/info/packs\\Z")): get_info_packs,
         (
             "GET",
-            re.compile("/objects/([0-9a-f]{2})/([0-9a-f]{38})$"),
+            re.compile("/objects/([0-9a-f]{2})/([0-9a-f]{38})\\Z"),
         ): get_loose_object,
         # Match any "<prefix>-<hash>" pack basename, not just "pack-". ``git
         # maintenance`` writes "loose-<hash>" packs, which get_info_packs
@@ -740,14 +740,14 @@ class HTTPGitApplication:
         # (get_named_file joins it under the control dir unsanitised).
         (
             "GET",
-            re.compile("/objects/pack/\\w+-([0-9a-f]{40}|[0-9a-f]{64})\\.pack$"),
+            re.compile("/objects/pack/\\w+-([0-9a-f]{40}|[0-9a-f]{64})\\.pack\\Z"),
         ): get_pack_file,
         (
             "GET",
-            re.compile("/objects/pack/\\w+-([0-9a-f]{40}|[0-9a-f]{64})\\.idx$"),
+            re.compile("/objects/pack/\\w+-([0-9a-f]{40}|[0-9a-f]{64})\\.idx\\Z"),
         ): get_idx_file,
-        ("POST", re.compile("/git-upload-pack$")): handle_service_request,
-        ("POST", re.compile("/git-receive-pack$")): handle_service_request,
+        ("POST", re.compile("/git-upload-pack\\Z")): handle_service_request,
+        ("POST", re.compile("/git-receive-pack\\Z")): handle_service_request,
     }
 
     def __init__(
@@ -793,6 +793,13 @@ class HTTPGitApplication:
                 continue
             mat = spath.search(path)
             if mat:
+                # url_prefix() collapses slashes, so "/repo//git-receive-pack"
+                # would otherwise resolve to the same repository as the
+                # canonical spelling. Reject the redundant form rather than
+                # normalise it, so only one path reaches a given repository.
+                if mat.string[: mat.start()].endswith("/"):
+                    mat = None
+                    continue
                 handler = self.services[smethod, spath]
                 break
 

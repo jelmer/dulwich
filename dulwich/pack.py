@@ -2121,8 +2121,12 @@ class PackData:
 
         if file is None:
             self._file = GitFile(self._filename, "rb")
+            self._close_file = True
         else:
+            # A caller-supplied file stays the caller's to close; it may well
+            # keep writing to it after we are done reading.
             self._file = file
+            self._close_file = False
         try:
             # Map the pack once; every read indexes this buffer at an explicit
             # offset, so concurrent reads never contend on a file position.
@@ -2213,12 +2217,17 @@ class PackData:
         return contents
 
     def close(self) -> None:
-        """Close the underlying pack file."""
+        """Release the mapping, and the pack file if we opened it.
+
+        Callers must drop the mapping before writing to or renaming the pack:
+        on Windows a live mapping locks the file.
+        """
         contents = self._contents
         self._contents = None
         _close_file_contents(contents)
         if self._file is not None:
-            self._file.close()
+            if self._close_file:
+                self._file.close()
             self._file = None  # type: ignore
 
     def __del__(self) -> None:

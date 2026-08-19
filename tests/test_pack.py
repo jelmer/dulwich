@@ -26,6 +26,7 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 import tracemalloc
 import types
 import zlib
@@ -61,6 +62,7 @@ from dulwich.pack import (
     load_pack_index,
     read_zlib_chunks,
     unpack_object,
+    unpack_object_at,
     write_pack,
     write_pack_header,
     write_pack_index,
@@ -531,6 +533,55 @@ class TestPackData(PackTests):
     def test_index_check(self) -> None:
         with self.get_pack_data(pack1_sha) as p:
             self.assertSucceeds(p.check)
+
+    def test_check_rejects_missing_checksum(self) -> None:
+        pack_file = BytesIO()
+        write_pack_header(pack_file.write, 0)
+        pack_file.seek(0)
+        with self.assertRaisesRegex(
+            AssertionError, "truncated.pack is too small for a packfile"
+        ):
+            PackData(
+                "truncated.pack", file=pack_file, object_format=DEFAULT_OBJECT_FORMAT
+            )
+        # The file was handed to us, so it stays the caller's to close.
+        self.assertFalse(pack_file.closed)
+
+    def test_concurrent_reads(self) -> None:
+        """Reads from several threads must not interfere with each other."""
+        with self.get_pack_data(pack1_sha) as p:
+            offsets = [unpacked.offset for unpacked in p.iter_unpacked()]
+            expected = {o: p.get_unpacked_object_at(o).sha() for o in offsets}
+            results: list[bool] = []
+            errors: list[BaseException] = []
+
+            def read_repeatedly() -> None:
+                try:
+                    for _ in range(50):
+                        for offset in offsets:
+                            results.append(
+                                p.get_unpacked_object_at(offset).sha()
+                                == expected[offset]
+                            )
+                except BaseException as e:
+                    errors.append(e)
+
+            threads = [threading.Thread(target=read_repeatedly) for _ in range(8)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            self.assertEqual([], errors)
+            self.assertEqual(8 * 50 * len(offsets), len(results))
+            self.assertEqual([], [r for r in results if not r])
+
+    def test_rejects_wrong_size(self) -> None:
+        """A caller-supplied size that disagrees with the file is an error."""
+        with open(
+            os.path.join(self.datadir, f"pack-{pack1_sha.decode()}.pack"), "rb"
+        ) as f:
+            with self.assertRaisesRegex(AssertionError, "but caller said 42"):
+                PackData.from_file(f, DEFAULT_OBJECT_FORMAT, 42)
 
     def test_get_stored_checksum(self) -> None:
         """Test getting the stored checksum of the pack data."""
@@ -1079,6 +1130,20 @@ class WritePackTests(TestCase):
             ApplyDeltaError,
             unpack_object,
             f.read,
+            DEFAULT_OBJECT_FORMAT.hash_func,
+        )
+
+    def test_unpack_object_at_rejects_zero_ofs_delta(self) -> None:
+        # Same guard as test_unpack_object_rejects_zero_ofs_delta, on the
+        # offset-based path.
+        header = bytes([(OFS_DELTA << 4) | 0])
+        ofs_bytes = bytes([0x00])
+        body = zlib.compress(b"")
+        self.assertRaises(
+            ApplyDeltaError,
+            unpack_object_at,
+            header + ofs_bytes + body,
+            0,
             DEFAULT_OBJECT_FORMAT.hash_func,
         )
 
@@ -1940,8 +2005,8 @@ class DeltaChainIteratorTests(TestCase):
             ],
             store=self.store,
         )
-        fsize = f.tell()
-        f.seek(0)
+        # build_pack rewinds f, so measure the buffer rather than tell().
+        fsize = len(f.getvalue())
         packdata = PackData.from_file(f, DEFAULT_OBJECT_FORMAT, fsize)
         td = tempfile.mkdtemp()
         idx_path = os.path.join(td, "test.idx")

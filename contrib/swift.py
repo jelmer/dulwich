@@ -67,17 +67,16 @@ if TYPE_CHECKING:
 from geventhttpclient import HTTPClient
 
 from dulwich.file import _GitFile
-from dulwich.lru_cache import LRUSizeCache
 from dulwich.object_store import INFODIR, PACKDIR, PackBasedObjectStore
 from dulwich.objects import S_ISGITLINK, Blob, Commit, ObjectID, Tag, Tree
 from dulwich.pack import (
     ObjectContainer,
+    OldUnpackedObject,
     Pack,
     PackData,
     PackIndex,
     PackIndexer,
     PackStreamCopier,
-    _compute_object_size,
     compute_file_sha,
     iter_sha1,
     load_pack_index_file,
@@ -696,15 +695,10 @@ class SwiftPackData(PackData):
         self.pack_length = int(headers["content-length"])
         pack_reader = SwiftPackReader(self.scon, str(self._filename), self.pack_length)
         (_version, self._num_objects) = read_pack_header(pack_reader.read)
-        self._offset_cache = LRUSizeCache(
-            1024 * 1024 * self.scon.cache_length,
-            compute_size=_compute_object_size,
-        )
+        self._init_offset_cache(1024 * 1024 * self.scon.cache_length)
         self.pack = None
 
-    def get_object_at(
-        self, offset: int
-    ) -> tuple[int, tuple[bytes | int, list[bytes]] | list[bytes]]:
+    def get_object_at(self, offset: int) -> tuple[int, OldUnpackedObject]:
         """Get the object at a specific offset in the pack.
 
         Args:
@@ -713,8 +707,10 @@ class SwiftPackData(PackData):
         Returns:
           Tuple of (pack_type_num, object_data)
         """
-        if offset in self._offset_cache:
-            return self._offset_cache[offset]
+        try:
+            return self._get_cached_object_at(offset)
+        except KeyError:
+            pass
         assert offset >= self._header_size
         pack_reader = SwiftPackReader(self.scon, str(self._filename), self.pack_length)
         pack_reader.seek(offset)

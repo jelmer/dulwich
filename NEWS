@@ -1,5 +1,9 @@
 1.2.13	UNRELEASED
 
+ * Make concurrent ``Pack.get_raw`` calls thread-safe by synchronizing
+   ``PackData``'s resolved-object offset cache.
+   (Bojan Zivanovic)
+
  * Bound fetch negotiation the way C Git's ``MAX_IN_VAIN`` does: give up
    after 256 unacknowledged "have" lines instead of draining the whole
    graph walker into stateless (HTTP) requests. (Bojan Zivanovic, #2343)

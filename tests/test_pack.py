@@ -812,6 +812,50 @@ class TestPack(PackTests):
             self.assertEqual(obj.type_name, b"commit")
             self.assertEqual(obj.sha().hexdigest().encode("ascii"), commit_sha)
 
+    def test_get_raw_concurrent(self) -> None:
+        """Concurrent delta reads must not corrupt the offset cache."""
+        f = BytesIO()
+        specs = [(Blob.type_num, b"blob-0")]
+        specs.extend((OFS_DELTA, (0, f"blob-{i}".encode())) for i in range(1, 32))
+        entries = build_pack(f, specs)
+        data = PackData("test.pack", file=f, object_format=DEFAULT_OBJECT_FORMAT)
+        index = MemoryPackIndex.for_pack(data)
+        pack = Pack.from_objects(data, index)
+        self.addCleanup(pack.close)
+
+        expected = {entry[3]: (Blob.type_num, entry[2]) for entry in entries}
+        for sha, result in expected.items():
+            self.assertEqual(result, pack.get_raw(sha))
+
+        errors: list[BaseException] = []
+
+        def read_repeatedly(start: int) -> None:
+            try:
+                for i in range(2000):
+                    entry = entries[1 + (start + i) % (len(entries) - 1)]
+                    self.assertEqual(expected[entry[3]], pack.get_raw(entry[3]))
+            except BaseException as exc:
+                errors.append(exc)
+
+        old_switch_interval = sys.getswitchinterval()
+        sys.setswitchinterval(1e-6)
+        try:
+            threads = [
+                threading.Thread(target=read_repeatedly, args=(i * 3,))
+                for i in range(8)
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        finally:
+            sys.setswitchinterval(old_switch_interval)
+
+        self.assertEqual([], errors)
+        self.assertEqual(
+            len(data._offset_cache), len(list(data._offset_cache._walk_lru()))
+        )
+
     def test_copy(self) -> None:
         with self.get_pack(pack1_sha) as origpack:
             self.assertSucceeds(origpack.index.check)

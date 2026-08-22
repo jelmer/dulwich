@@ -361,6 +361,7 @@ from ..diff_tree import (
 from ..errors import SendPackError
 from ..file import open_nofollow
 from ..graph import can_fast_forward
+from ..hooks import get_hook
 from ..ignore import IgnoreFilterManager
 from ..index import (
     ConflictedIndexEntry,
@@ -10117,6 +10118,28 @@ def am_quit(repo: RepoPath | None = None) -> None:
 
     with open_repo_closing(repo) as r:
         am_quit_impl(r)
+
+
+def hook_run(
+    repo: RepoPath,
+    hook_name: str,
+    args: Sequence[str],
+) -> bytes | tuple[bytes, bytes] | None:
+    """Manually run a git hook.
+
+    Args:
+        repo: Path to the repository
+        hook_name: Name of the hook to run, e.g. "pre-commit" or "update"
+        args: Positional arguments to pass to the hook
+
+    Returns:
+        Whatever the underlying hook returns; varies by hook type
+    """
+    with open_repo_closing(repo) as r:
+        controldir = r.controldir()
+        cwd = r.path
+        hook = get_hook(hook_name, cwd, controldir)
+        return cast(bytes | tuple[bytes, bytes] | None, hook.execute(*args))
 
 
 def __getattr__(name: str) -> object:

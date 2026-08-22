@@ -395,7 +395,6 @@ def get_hook(
     Raises:
         HookError: If hook_name does not match a known hook
     """
-
     hook_class = HOOK_CLASSES.get(hook_name)
     if not hook_class:
         raise HookError(
@@ -406,4 +405,4 @@ def get_hook(
     if hook_class is PreCommitShellHook:
         return hook_class(cwd=cwd, controldir=controldir)
 
-    return hook_class(controldir)
+    return hook_class(controldir)  # type: ignore[call-arg]

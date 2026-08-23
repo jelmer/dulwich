@@ -2477,8 +2477,13 @@ class PackData:
 
     def _get_cached_object_at(self, offset: int) -> tuple[int, OldUnpackedObject]:
         """Return the cached object at offset, or raise KeyError."""
-        with self._offset_cache_lock:
+        # Hot path: acquire/release directly rather than using the context
+        # manager, which measurably speeds up cache hits on get_object_at.
+        self._offset_cache_lock.acquire()
+        try:
             return self._offset_cache[offset]
+        finally:
+            self._offset_cache_lock.release()
 
     def _cache_object_at(
         self, offset: int, type_num: int, chunks: OldUnpackedObject

@@ -4,6 +4,10 @@
    ``PackData``'s resolved-object offset cache.
    (Bojan Zivanovic)
 
+ * Speed up cached `PackData.get_object_at` lookups by acquiring the
+   offset-cache lock directly instead of through a `with` statement.
+   (Bojan Zivanovic)
+
  * Bound fetch negotiation the way C Git's ``MAX_IN_VAIN`` does: give up
    after 256 unacknowledged "have" lines instead of draining the whole
    graph walker into stateless (HTTP) requests. (Bojan Zivanovic, #2343)

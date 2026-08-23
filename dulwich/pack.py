@@ -117,6 +117,7 @@ import logging
 import os
 import struct
 import sys
+import threading
 import warnings
 import zlib
 from collections.abc import Callable, Iterable, Iterator, Sequence, Set
@@ -2148,12 +2149,18 @@ class PackData:
                 or delta_cache_size
                 or DEFAULT_DELTA_BASE_CACHE_LIMIT
             )
-            self._offset_cache = LRUSizeCache[int, tuple[int, OldUnpackedObject]](
-                cache_size, compute_size=_compute_object_size
-            )
+            self._init_offset_cache(cache_size)
         except BaseException:
             self.close()
             raise
+
+    def _init_offset_cache(self, max_size: int) -> None:
+        """Initialize the resolved object cache."""
+        self._offset_cache = LRUSizeCache[int, tuple[int, OldUnpackedObject]](
+            max_size, compute_size=_compute_object_size
+        )
+        # Cache hits update the LRU linked list, so reads need locking too.
+        self._offset_cache_lock = threading.Lock()
 
     @property
     def filename(self) -> str:
@@ -2468,6 +2475,18 @@ class PackData:
         )
         return unpacked
 
+    def _get_cached_object_at(self, offset: int) -> tuple[int, OldUnpackedObject]:
+        """Return the cached object at offset, or raise KeyError."""
+        with self._offset_cache_lock:
+            return self._offset_cache[offset]
+
+    def _cache_object_at(
+        self, offset: int, type_num: int, chunks: OldUnpackedObject
+    ) -> None:
+        """Cache a resolved object at offset."""
+        with self._offset_cache_lock:
+            self._offset_cache[offset] = (type_num, chunks)
+
     def get_object_at(self, offset: int) -> tuple[int, OldUnpackedObject]:
         """Given an offset in to the packfile return the object that is there.
 
@@ -2476,7 +2495,7 @@ class PackData:
         function.
         """
         try:
-            return self._offset_cache[offset]
+            return self._get_cached_object_at(offset)
         except KeyError:
             pass
         unpacked = self.get_unpacked_object_at(offset, include_comp=False)
@@ -4893,7 +4912,7 @@ class Pack:
             chunks = apply_delta(chunks_bytes, delta)
 
             if prev_offset is not None:
-                self.data._offset_cache[prev_offset] = base_type, chunks
+                self.data._cache_object_at(prev_offset, base_type, chunks)
         return base_type, chunks
 
     def entries(

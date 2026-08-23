@@ -29,7 +29,10 @@ from io import BytesIO, StringIO
 from time import time
 from unittest import skipIf
 
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.objects import Blob, Commit, Tag, Tree, parse_timezone
+from dulwich.pack import OFS_DELTA, MemoryPackIndex, Pack
+from dulwich.tests.utils import build_pack
 from tests import TestCase
 from tests.test_object_store import ObjectStoreTests
 
@@ -229,6 +232,36 @@ class FakeSwiftConnector:
         if name not in self.store:
             return None
         return {"content-length": len(self.store[name])}
+
+
+@skipIf(missing_libs, skipmsg)
+class TestSwiftPackData(TestCase):
+    def test_resolve_delta_uses_offset_cache(self) -> None:
+        pack_file = BytesIO()
+        entries = build_pack(
+            pack_file,
+            [
+                (Blob.type_num, b"blob"),
+                (OFS_DELTA, (0, b"blob1")),
+            ],
+        )
+        pack_bytes = pack_file.getvalue()
+        connector = FakeSwiftConnector(
+            "fakerepo", None, {"fakerepo/pack.pack": pack_bytes}
+        )
+        data = swift.SwiftPackData(
+            connector, "pack.pack", object_format=DEFAULT_OBJECT_FORMAT
+        )
+        index = MemoryPackIndex(
+            [(entry[3], entry[0], entry[4]) for entry in entries],
+            object_format=DEFAULT_OBJECT_FORMAT,
+            pack_checksum=pack_bytes[-DEFAULT_OBJECT_FORMAT.oid_length :],
+        )
+        pack = Pack.from_objects(data, index)
+        self.addCleanup(pack.close)
+
+        self.assertEqual((Blob.type_num, b"blob1"), pack.get_raw(entries[1][3]))
+        self.assertEqual((Blob.type_num, b"blob1"), pack.get_raw(entries[1][3]))
 
 
 @skipIf(missing_libs, skipmsg)

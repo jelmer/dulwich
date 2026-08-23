@@ -36,6 +36,9 @@ class HookPorcelainTestCase(TestCase):
 
     def setUp(self) -> None:
         super().setUp()
+        if os.name != "posix":
+            self.skipTest("shell hook tests requires POSIX shell")
+        self.assertTrue(os.path.exists("/bin/sh"))
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(self._cleanup_test_dir)
         self.repo = Repo.init(self.test_dir)

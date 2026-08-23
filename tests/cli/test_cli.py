@@ -2717,6 +2717,12 @@ class RemoteCommandTest(DulwichCliTestCase):
 class HookCommandTest(DulwichCliTestCase):
     """Tests for hook run command."""
 
+    def setUp(self):
+        super().setUp()
+        if os.name != "posix":
+            self.skipTest("shell hook tests requires POSIX shell")
+        self.assertTrue(os.path.exists("/bin/sh"))
+
     def test_hook_run_unrecognized(self):
         with self.assertLogs("dulwich.cli", level="ERROR") as cm:
             result, _stdout, _stderr = self._run_cli("hook", "run", "not-a-real-hook")

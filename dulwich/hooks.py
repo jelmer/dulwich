@@ -393,13 +393,21 @@ def get_hook(
         A constructed hook instance ready to be executed
 
     Raises:
-        HookError: If hook_name does not match a known hook
+        HookError: If hook_name does not match a known hook, or refers to
+            a hook not supported by manual execution (e.g. pre-receive,
+            post-receive)
     """
     hook_class = HOOK_CLASSES.get(hook_name)
     if not hook_class:
         raise HookError(
             f"unrecognized hook {hook_name!r}, expected one of: "
             f"{', '.join(sorted(HOOK_CLASSES))}"
+        )
+
+    if hook_class is PreReceiveShellHook or hook_class is PostReceiveShellHook:
+        raise HookError(
+            f"{hook_name!r} is not supported by 'hook run'; it expects a batch "
+            "of ref updates rather than individual arguments"
         )
 
     if hook_class is PreCommitShellHook:

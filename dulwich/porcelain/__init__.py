@@ -10139,7 +10139,8 @@ def hook_run(
         controldir = r.controldir()
         cwd = r.path
         hook = get_hook(hook_name, cwd, controldir)
-        return cast(bytes | tuple[bytes, bytes] | None, hook.execute(*args))
+        encoded_args = [a.encode() for a in args]
+        return cast(bytes | tuple[bytes, bytes] | None, hook.execute(*encoded_args))
 
 
 def __getattr__(name: str) -> object:

@@ -1,5 +1,12 @@
 1.2.13	UNRELEASED
 
+ * Add ``dulwich hook run <name>`` CLI command and
+   ``porcelain.hook_run()`` for manually executing git hooks
+   (pre-commit, post-commit, commit-msg, update) for testing and
+   debugging. ``pre-receive``/``post-receive`` are not yet supported,
+   since they operate on a batch of ref updates rather than
+   individual arguments. (Muhammad, #1842)
+
  * Bound fetch negotiation the way C Git's ``MAX_IN_VAIN`` does: give up
    after 256 unacknowledged "have" lines instead of draining the whole
    graph walker into stateless (HTTP) requests. (Bojan Zivanovic, #2343)

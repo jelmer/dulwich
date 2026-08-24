@@ -40,6 +40,11 @@
    compat layer, so repositories carrying such paths could not be cloned
    elsewhere. (Jelmer Vernooĳ, #2351)
 
+ * Fix ``ignore`` and ``attrs`` matching for patterns ending in ``**/``. The
+   trailing slash was dropped when translating the pattern, so ``foo/**/`` also
+   matched ``foo/`` itself and every file directly inside it. Git only ignores
+   the directories below ``foo``. (adarshsm)
+
  * Catch ``PackFileDisappeared`` in the bitmap probe in
    ``get_reachability_provider``, which only guarded ``FileNotFoundError``.
    (Jelmer Vernooĳ, #2344)

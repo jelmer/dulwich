@@ -54,6 +54,8 @@ POSITIVE_MATCH_TESTS = [
     (b"foo.c", b"foo.c"),
     (b"foo.c", b"foo.[ch]"),
     (b"foo/bar/bla.c", b"foo/**"),
+    (b"foo/bar/", b"foo/**/"),
+    (b"foo/bar/bla/", b"foo/**/"),
     (b"foo/bar/bla/blie.c", b"foo/**/blie.c"),
     (b"foo/bar/bla.c", b"**/bla.c"),
     (b"bla.c", b"**/bla.c"),
@@ -78,6 +80,8 @@ NEGATIVE_MATCH_TESTS = [
     (b"foo.c", b"foo.[^ch]"),
     (b"foo.x", b"foo.[[:digit:]]"),
     (b"a/b", b"a[!x]b"),
+    (b"foo/bla.c", b"foo/**/"),
+    (b"foo/", b"foo/**/"),
 ]
 
 
@@ -90,6 +94,7 @@ TRANSLATE_TESTS = [
     (b"foo.[ch]", b"(?ms)(.*/)?foo\\.[ch]/?\\Z"),
     (b"bar/", b"(?ms)(.*/)?bar\\/\\Z"),
     (b"foo/**", b"(?ms)foo/.*/?\\Z"),
+    (b"foo/**/", b"(?ms)foo/.*/\\Z"),
     (b"foo/**/blie.c", b"(?ms)foo/(?:[^/]+/)*blie\\.c/?\\Z"),
     (b"**/bla.c", b"(?ms)(.*/)?bla\\.c/?\\Z"),
     (b"foo/**/bar", b"(?ms)foo/(?:[^/]+/)*bar/?\\Z"),
@@ -502,6 +507,20 @@ class IgnoreFilterManagerTests(TestCase):
         self.assertFalse(m.is_ignored("dir3"))
         self.assertTrue(m.is_ignored("dir3/"))
         self.assertTrue(m.is_ignored("dir3/bla"))
+
+    def test_trailing_double_asterisk_slash_is_directory_only(self) -> None:
+        # "foo/**/" is a directory pattern: Git ignores the directories below
+        # foo, but not a file sitting directly in foo.
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b"foo/**/\n")
+        os.makedirs(os.path.join(repo.path, "foo", "sub"))
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertFalse(m.is_ignored("foo/keep.txt"))
+        self.assertTrue(m.is_ignored("foo/sub/"))
+        self.assertTrue(m.is_ignored("foo/sub/bla.txt"))
 
     def test_nested_gitignores(self) -> None:
         tmp_dir = tempfile.mkdtemp()

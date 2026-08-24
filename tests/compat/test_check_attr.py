@@ -143,6 +143,45 @@ class CheckAttrCompatTestCase(CompatTestCase):
             self._create_file(path)
         self._assert_attr_match("text", paths)
 
+    def test_trailing_double_asterisk_slash(self) -> None:
+        # ``foo/**/`` in .gitattributes goes through the same wildmatch
+        # translation as .gitignore, so the trailing slash must be preserved:
+        # only directories under foo get the attribute.
+        self._write_gitattributes("foo/**/ text\n")
+        paths = ["foo/f.txt", "foo/sub/", "foo/sub/g.txt"]
+        for path in paths:
+            if not path.endswith("/"):
+                self._create_file(path)
+        os.makedirs(os.path.join(self.test_dir, "foo", "sub"), exist_ok=True)
+        self._assert_attr_match("text", paths)
+
+    def test_trailing_double_asterisk_slash_at_root(self) -> None:
+        # A bare ``**/`` gives the attribute to every directory below root.
+        self._write_gitattributes("**/ text\n")
+        self._create_file("keep.txt")
+        self._create_file("foo/bla.c")
+        os.makedirs(os.path.join(self.test_dir, "foo", "bar"), exist_ok=True)
+        paths = ["keep.txt", "foo/", "foo/bla.c", "foo/bar/"]
+        self._assert_attr_match("text", paths)
+
+    def test_trailing_double_asterisk_slash_nested(self) -> None:
+        # ``foo/**/`` against a deeper tree with its own subdirectories.
+        self._write_gitattributes("foo/**/ text\n")
+        self._create_file("foo/a.txt")
+        self._create_file("foo/bar/b.txt")
+        self._create_file("foo/bar/bla/c.txt")
+        self._create_file("keep/foo/d.txt")
+        paths = [
+            "foo/a.txt",
+            "foo/bar/",
+            "foo/bar/b.txt",
+            "foo/bar/bla/",
+            "foo/bar/bla/c.txt",
+            "keep/foo/",
+            "keep/foo/d.txt",
+        ]
+        self._assert_attr_match("text", paths)
+
     def test_wildcards_do_not_cross_slash(self) -> None:
         self._write_gitattributes("a*c text\na?c text\n")
         paths = ["abc", "ac", "a/c", "abbc", "axc"]

@@ -109,6 +109,14 @@ class TranslateTests(TestCase):
         self.assertMatches(b"a/**/d", b"a/d")
         self.assertMatches(b"**/d", b"a/b/d")
 
+    def test_trailing_double_asterisk_slash_requires_subdir(self) -> None:
+        # 'a/**/' is directory-only: the trailing '/' must be preserved so
+        # 'a/f' (a file directly under 'a') does not match.
+        self.assertMatches(b"a/**/", b"a/b/")
+        self.assertMatches(b"a/**/", b"a/b/c/")
+        self.assertNotMatches(b"a/**/", b"a/")
+        self.assertNotMatches(b"a/**/", b"a/f")
+
     def test_bracket(self) -> None:
         self.assertMatches(b"a/[[:digit:]]", b"a/5")
         self.assertNotMatches(b"a/[[:digit:]]", b"a/x")

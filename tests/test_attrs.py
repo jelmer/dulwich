@@ -317,6 +317,15 @@ class PatternTests(TestCase):
         self.assertFalse(pattern.match(b"foo.txt"))
         self.assertFalse(pattern.match(b"other/foo.txt"))
 
+    def test_trailing_double_asterisk_slash(self):
+        """Trailing ``**/`` requires at least one subdirectory."""
+        pattern = Pattern(b"foo/**/")
+        self.assertTrue(pattern.match(b"foo/sub/"))
+        self.assertTrue(pattern.match(b"foo/a/b/"))
+        self.assertFalse(pattern.match(b"foo/"))
+        self.assertFalse(pattern.match(b"foo/f.txt"))
+        self.assertFalse(pattern.match(b"foo/sub/g.txt"))
+
     def test_leading_slash(self):
         """Test pattern with leading slash."""
         pattern = Pattern(b"/README.txt")

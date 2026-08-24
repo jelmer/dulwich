@@ -1,5 +1,14 @@
 1.2.13	2026-08-24
 
+ * Collapse a run of consecutive ``**`` segments when translating a
+   wildmatch pattern (``dulwich.wildmatch``). Git treats a run of
+   directory-spanning ``**`` as a single ``**``, but each segment emitted
+   its own ``(?:[^/]+/)*``, so a short ``.gitignore``/``.gitattributes``
+   pattern such as ``a/**/**/**/z`` from an untrusted repository built a
+   regex with adjacent unbounded quantifiers that backtracked
+   catastrophically on non-matching paths during status/checkout.
+   (netliomax25-code)
+
  * Make concurrent ``Pack.get_raw`` calls thread-safe by synchronizing
    ``PackData``'s resolved-object offset cache.
    (Bojan Zivanovic)

@@ -237,8 +237,13 @@ def _split_segments(pat: bytes) -> list[bytes]:
     return segments
 
 
-def _translate_double_asterisk(segments: Sequence[bytes], i: int) -> tuple[bytes, bool]:
-    """Handle ** segment processing, returns (regex_part, skip_next)."""
+def _translate_double_asterisk(segments: Sequence[bytes], i: int) -> bytes:
+    """Handle ** segment processing, returns the regex part.
+
+    A run of consecutive ``**`` segments is collapsed to one by
+    :func:`_translate` before this is called, so each ``**`` is handled on
+    its own here.
+    """
     # Check if ** is at end
     remaining = segments[i + 1 :]
     if all(s == b"" for s in remaining):
@@ -247,40 +252,41 @@ def _translate_double_asterisk(segments: Sequence[bytes], i: int) -> tuple[bytes
             # least one directory and end in a slash. Without this, "abc/**/"
             # also matches "abc/" itself and every file directly inside it,
             # while Git only ignores the directories below "abc".
-            return b".*/", False
+            return b".*/"
         # ** at end - matches everything
-        return b".*", False
+        return b".*"
 
-    # Check if next segment is also **
-    if i + 1 < len(segments) and segments[i + 1] == b"**":
-        # Consecutive ** segments
-        # Check if this ends with a directory pattern (trailing /)
-        remaining_after_next = segments[i + 2 :]
-        is_dir_pattern = (
-            len(remaining_after_next) == 1 and remaining_after_next[0] == b""
-        )
+    # ** in middle - handle differently depending on what follows
+    if i == 0:
+        # ** at start - any prefix
+        return b"(?:.*/)??"
+    # ** in middle - match zero or more complete directory segments
+    return b"(?:[^/]+/)*"
 
-        if is_dir_pattern:
-            # Pattern like c/**/**/ - requires at least one intermediate directory
-            return b"[^/]+/(?:[^/]+/)*", True
-        else:
-            # Pattern like c/**/**/d - allows zero intermediate directories
-            return b"(?:[^/]+/)*", True
-    else:
-        # ** in middle - handle differently depending on what follows
-        if i == 0:
-            # ** at start - any prefix
-            return b"(?:.*/)??", False
-        else:
-            # ** in middle - match zero or more complete directory segments
-            return b"(?:[^/]+/)*", False
+
+def _collapse_double_asterisks(segments: list[bytes]) -> list[bytes]:
+    """Collapse a run of consecutive ``**`` segments into a single one.
+
+    In Git a run of directory-spanning ``**`` segments is equivalent to a
+    single ``**``. Emitting one quantifier per segment builds a regex with
+    adjacent unbounded quantifiers (e.g. ``(?:[^/]+/)*(?:[^/]+/)*``) that
+    backtracks catastrophically on non-matching input (ReDoS), so a pattern
+    such as ``a/**/**/**/z`` from an untrusted ``.gitignore`` or
+    ``.gitattributes`` must be normalized before translation.
+    """
+    collapsed: list[bytes] = []
+    for segment in segments:
+        if segment == b"**" and collapsed and collapsed[-1] == b"**":
+            continue
+        collapsed.append(segment)
+    return collapsed
 
 
 def _translate(pat: bytes) -> bytes:
     if pat == b"**":
         return b".*"
     res = b""
-    segments = _split_segments(pat)
+    segments = _collapse_double_asterisks(_split_segments(pat))
     i = 0
     while i < len(segments):
         segment = segments[i]
@@ -290,12 +296,10 @@ def _translate(pat: bytes) -> bytes:
             res += re.escape(b"/")
 
         if segment == b"**":
-            regex_part, skip_next = _translate_double_asterisk(segments, i)
+            regex_part = _translate_double_asterisk(segments, i)
             res += regex_part
             if regex_part == b".*":  # End of pattern
                 break
-            if skip_next:
-                i += 1
         else:
             res += _translate_segment(segment)
 

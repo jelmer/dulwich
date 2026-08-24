@@ -242,6 +242,12 @@ def _translate_double_asterisk(segments: Sequence[bytes], i: int) -> tuple[bytes
     # Check if ** is at end
     remaining = segments[i + 1 :]
     if all(s == b"" for s in remaining):
+        if remaining:
+            # Trailing "**/" is a directory pattern, so it has to consume at
+            # least one directory and end in a slash. Without this, "abc/**/"
+            # also matches "abc/" itself and every file directly inside it,
+            # while Git only ignores the directories below "abc".
+            return b".*/", False
         # ** at end - matches everything
         return b".*", False
 

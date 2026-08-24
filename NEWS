@@ -1,4 +1,4 @@
-1.2.13	UNRELEASED
+1.2.13	2026-08-24
 
  * Make concurrent ``Pack.get_raw`` calls thread-safe by synchronizing
    ``PackData``'s resolved-object offset cache.

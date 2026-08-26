@@ -839,7 +839,7 @@ class ConfigDictTests(TestCase):
 
         self.assertEqual([(b"foo", b"bla")], list(cd.items((b"core",))))
 
-    def test_items_nonexistant(self) -> None:
+    def test_items_nonexistent(self) -> None:
         cd = ConfigDict()
         cd.set((b"core2",), b"foo", b"bloe")
 

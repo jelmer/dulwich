@@ -117,6 +117,22 @@ class TranslateTests(TestCase):
         self.assertNotMatches(b"a/**/", b"a/")
         self.assertNotMatches(b"a/**/", b"a/f")
 
+    def test_consecutive_double_asterisks_collapse(self) -> None:
+        # A run of '**' segments is equivalent to a single '**' in Git, so it
+        # must translate to a single quantifier rather than one per segment.
+        self.assertEqual(translate(b"a/**/z"), translate(b"a/**/**/**/z"))
+        self.assertEqual(translate(b"**/z"), translate(b"**/**/z"))
+        self.assertEqual(translate(b"a/**/"), translate(b"a/**/**/"))
+        self.assertMatches(b"a/**/**/z", b"a/z")
+        self.assertMatches(b"a/**/**/z", b"a/b/c/z")
+
+    def test_consecutive_double_asterisks_no_redos(self) -> None:
+        # Adjacent unbounded quantifiers from a run of '**' segments used to
+        # backtrack exponentially on a long non-matching path; the collapsed
+        # form must return promptly.
+        regex = re.compile(rb"^" + translate(b"a/" + b"**/" * 25 + b"z") + rb"$")
+        self.assertIsNone(regex.match(b"a/" + b"x/" * 40 + b"y"))
+
     def test_bracket(self) -> None:
         self.assertMatches(b"a/[[:digit:]]", b"a/5")
         self.assertNotMatches(b"a/[[:digit:]]", b"a/x")

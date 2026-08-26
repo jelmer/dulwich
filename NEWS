@@ -1,5 +1,9 @@
 1.2.13	2026-08-24
 
+ * Collapse consecutive `**` segments in wildmatch translation, matching
+   git's behavior and avoiding catastrophic regex backtracking on patterns
+   like `a/**/**/**/z` from untrusted repositories. (netliomax25-code)
+
  * Make concurrent ``Pack.get_raw`` calls thread-safe by synchronizing
    ``PackData``'s resolved-object offset cache.
    (Bojan Zivanovic)

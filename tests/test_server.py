@@ -1217,7 +1217,7 @@ class FileSystemBackendTests(TestCase):
         else:
             self.backend = FileSystemBackend()
 
-    def test_nonexistant(self) -> None:
+    def test_nonexistent(self) -> None:
         self.assertRaises(
             NotGitRepository,
             self.backend.open_repository,
@@ -1257,7 +1257,7 @@ class FileSystemBackendTests(TestCase):
 class DictBackendTests(TestCase):
     """Tests for DictBackend."""
 
-    def test_nonexistant(self) -> None:
+    def test_nonexistent(self) -> None:
         repo = MemoryRepo.init_bare([], {})
         backend = DictBackend({b"/": repo})
         self.assertRaises(

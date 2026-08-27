@@ -549,18 +549,21 @@ class UploadPackSHA1InWantTestCase(TestCase):
         backend = DictBackend({b"/": self._repo})
         return TestUploadPackHandler(backend, [b"/", b"host=lolcats"], TestProto())
 
+    def _allowed(self, handler: UploadPackHandler, sha: bytes) -> bool:
+        return sha in handler.allowed_wants({sha})
+
     def test_disallowed_by_default(self) -> None:
         handler = self._handler()
         for sha in (ONE, TWO, THREE, FIVE, SIX):
-            self.assertFalse(handler.is_want_allowed(sha))
+            self.assertFalse(self._allowed(handler, sha))
 
     def test_allow_tip(self) -> None:
         handler = self._handler(b"allowTipSHA1InWant")
         # Tip of a ref that was never advertised to this client.
-        self.assertTrue(handler.is_want_allowed(FIVE))
+        self.assertTrue(self._allowed(handler, FIVE))
         # Reachable, but not the tip of any ref.
-        self.assertFalse(handler.is_want_allowed(TWO))
-        self.assertFalse(handler.is_want_allowed(SIX))
+        self.assertFalse(self._allowed(handler, TWO))
+        self.assertFalse(self._allowed(handler, SIX))
 
     def test_annotated_tag_policy(self) -> None:
         target = self._repo.object_store[SIX]
@@ -571,28 +574,28 @@ class UploadPackSHA1InWantTestCase(TestCase):
         self._repo.refs[b"refs/tags/hidden"] = outer_tag.id
 
         handler = self._handler(b"allowTipSHA1InWant")
-        self.assertTrue(handler.is_want_allowed(outer_tag.id))
-        self.assertFalse(handler.is_want_allowed(tag.id))
-        self.assertFalse(handler.is_want_allowed(SIX))
+        self.assertTrue(self._allowed(handler, outer_tag.id))
+        self.assertFalse(self._allowed(handler, tag.id))
+        self.assertFalse(self._allowed(handler, SIX))
 
         reachable_handler = self._handler(b"allowReachableSHA1InWant")
-        self.assertTrue(reachable_handler.is_want_allowed(outer_tag.id))
-        self.assertTrue(reachable_handler.is_want_allowed(tag.id))
-        self.assertTrue(reachable_handler.is_want_allowed(SIX))
+        self.assertTrue(self._allowed(reachable_handler, outer_tag.id))
+        self.assertTrue(self._allowed(reachable_handler, tag.id))
+        self.assertTrue(self._allowed(reachable_handler, SIX))
 
     def test_allow_reachable(self) -> None:
         handler = self._handler(b"allowReachableSHA1InWant")
-        self.assertTrue(handler.is_want_allowed(FIVE))
+        self.assertTrue(self._allowed(handler, FIVE))
         for sha in (ONE, TWO, THREE):
-            self.assertTrue(handler.is_want_allowed(sha))
+            self.assertTrue(self._allowed(handler, sha))
         # Present, but not reachable from any ref.
-        self.assertFalse(handler.is_want_allowed(SIX))
+        self.assertFalse(self._allowed(handler, SIX))
 
     def test_allow_any(self) -> None:
         handler = self._handler(b"allowAnySHA1InWant")
-        self.assertTrue(handler.is_want_allowed(SIX))
+        self.assertTrue(self._allowed(handler, SIX))
         # Objects that are not in the store at all are still refused.
-        self.assertFalse(handler.is_want_allowed(b"f" * 40))
+        self.assertFalse(self._allowed(handler, b"f" * 40))
 
     def test_no_unadvertised_wants_does_not_enumerate_refs(self) -> None:
         # Every want being advertised is the common case, and an enabled
@@ -637,19 +640,13 @@ class UploadPackSHA1InWantTestCase(TestCase):
             def get_refs(self):
                 return self.refs.as_dict()
 
-            def get_peeled(self, ref):
-                return self.refs.get_peeled(ref)
-
-            def find_missing_objects(self, *args, **kwargs):
-                return self.object_store.find_missing_objects(*args, **kwargs)
-
         backend = DictBackend({b"/": ConfiglessRepo(self._repo)})
         handler = TestUploadPackHandler(backend, [b"/", b"host=lolcats"], TestProto())
 
         caps = handler.capabilities()
         self.assertNotIn(CAPABILITY_ALLOW_TIP_SHA1_IN_WANT, caps)
         self.assertNotIn(CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT, caps)
-        self.assertFalse(handler.is_want_allowed(FIVE))
+        self.assertFalse(self._allowed(handler, FIVE))
 
     def test_determine_wants_accepts_unadvertised(self) -> None:
         handler = self._handler(b"allowAnySHA1InWant")

@@ -555,7 +555,7 @@ class ParentsProvider:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass
 class SHA1InWantPolicy:
     """Which unadvertised objects a client may request from upload-pack.
 
@@ -567,6 +567,12 @@ class SHA1InWantPolicy:
     allow_any: bool = False
     allow_reachable: bool = False
     allow_tip: bool = False
+
+    def __post_init__(self) -> None:
+        # As in git, allowing any object implies the two narrower options.
+        if self.allow_any:
+            self.allow_reachable = True
+            self.allow_tip = True
 
 
 class BaseRepo:
@@ -1181,23 +1187,21 @@ class BaseRepo:
     def get_sha1_in_want_policy(self) -> SHA1InWantPolicy:
         """Read the uploadpack.allow*SHA1InWant settings for this repository.
 
-        Returns: The configured policy. ``allowAnySHA1InWant`` implies the
-            other two options, as in git. All three default to false.
+        Returns: The configured policy. All three options default to false.
         """
         config = self.get_config_stack()
 
         def get(name: bytes) -> bool:
             try:
-                return bool(config.get_boolean((b"uploadpack",), name, False))
+                return config.get_boolean((b"uploadpack",), name, False)
             except ValueError:
                 logger.warning("Ignoring invalid uploadpack.%s value", name.decode())
                 return False
 
-        allow_any = get(b"allowAnySHA1InWant")
         return SHA1InWantPolicy(
-            allow_any=allow_any,
-            allow_reachable=allow_any or get(b"allowReachableSHA1InWant"),
-            allow_tip=allow_any or get(b"allowTipSHA1InWant"),
+            allow_any=get(b"allowAnySHA1InWant"),
+            allow_reachable=get(b"allowReachableSHA1InWant"),
+            allow_tip=get(b"allowTipSHA1InWant"),
         )
 
     def get_shallow(self) -> set[ObjectID]:

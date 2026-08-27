@@ -47,6 +47,7 @@ from dulwich.protocol import (
 from dulwich.repo import MemoryRepo, Repo
 from dulwich.server import (
     Backend,
+    BackendRepo,
     DictBackend,
     FileSystemBackend,
     MultiAckDetailedGraphWalkerImpl,
@@ -617,11 +618,21 @@ class UploadPackSHA1InWantTestCase(TestCase):
         self.assertIn(CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT, caps)
 
     def test_configless_backend_defaults_to_disabled(self) -> None:
-        class ConfiglessRepo:
+        class ConfiglessRepo(BackendRepo):
             def __init__(self, repo):
-                self.object_store = repo.object_store
-                self.refs = repo.refs
-                self.object_format = repo.object_format
+                self._repo = repo
+
+            @property
+            def object_store(self):
+                return self._repo.object_store
+
+            @property
+            def refs(self):
+                return self._repo.refs
+
+            @property
+            def object_format(self):
+                return self._repo.object_format
 
             def get_refs(self):
                 return self.refs.as_dict()

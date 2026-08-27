@@ -76,7 +76,6 @@ import zlib
 from collections import deque
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Set as AbstractSet
-from dataclasses import dataclass
 from functools import partial
 from typing import IO, TYPE_CHECKING
 from typing import Protocol as TypingProtocol
@@ -167,7 +166,7 @@ from .protocol import (
     write_info_refs,
 )
 from .refs import Ref, RefsContainer
-from .repo import BaseRepo, Repo
+from .repo import Repo, SHA1InWantPolicy
 
 logger = log_utils.getLogger(__name__)
 
@@ -232,6 +231,14 @@ class BackendRepo(TypingProtocol):
             but it should attempt to peel the tag if possible.
         """
         return None
+
+    def get_sha1_in_want_policy(self) -> SHA1InWantPolicy:
+        """Return the policy for serving objects that were not advertised.
+
+        Returns: The policy to apply. The default refuses all unadvertised
+            wants, matching git's defaults.
+        """
+        return SHA1InWantPolicy()
 
     def find_missing_objects(
         self,
@@ -463,15 +470,6 @@ class PackHandler(Handler):
         self._done_received = True
 
 
-@dataclass(frozen=True)
-class _SHA1InWantPolicy:
-    """Configured policy for unadvertised object requests."""
-
-    allow_any: bool = False
-    allow_reachable: bool = False
-    allow_tip: bool = False
-
-
 class UploadPackHandler(PackHandler):
     """Protocol handler for uploading a pack to the client."""
 
@@ -502,7 +500,7 @@ class UploadPackHandler(PackHandler):
         self._processing_have_lines = False
         # Filter specification for partial clone support
         self.filter_spec: FilterSpec | None = None
-        self._sha1_in_want_policy: _SHA1InWantPolicy | None = None
+        self._sha1_in_want_policy: SHA1InWantPolicy | None = None
         self._sha1_in_want_ref_tips: set[ObjectID] | None = None
 
     def capabilities(self) -> list[bytes]:
@@ -531,36 +529,9 @@ class UploadPackHandler(PackHandler):
             caps.append(CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT)
         return caps
 
-    def _get_sha1_in_want_policy(self) -> _SHA1InWantPolicy:
-        """Read the uploadpack.allow*SHA1InWant settings for this repository.
-
-        Returns: The configured policy. ``allowAnySHA1InWant`` implies the
-            other two options, as in git.
-        """
+    def _get_sha1_in_want_policy(self) -> SHA1InWantPolicy:
         if self._sha1_in_want_policy is None:
-            if not isinstance(self.repo, BaseRepo):
-                # BackendRepo intentionally does not require configuration
-                # access. Preserve compatibility with custom backends by
-                # leaving all opt-in policies disabled when it is unavailable.
-                self._sha1_in_want_policy = _SHA1InWantPolicy()
-                return self._sha1_in_want_policy
-            config = self.repo.get_config_stack()
-
-            def get(name: bytes) -> bool:
-                try:
-                    return bool(config.get_boolean((b"uploadpack",), name, False))
-                except ValueError:
-                    logger.warning(
-                        "Ignoring invalid uploadpack.%s value", name.decode()
-                    )
-                    return False
-
-            allow_any = get(b"allowAnySHA1InWant")
-            self._sha1_in_want_policy = _SHA1InWantPolicy(
-                allow_any=allow_any,
-                allow_reachable=allow_any or get(b"allowReachableSHA1InWant"),
-                allow_tip=allow_any or get(b"allowTipSHA1InWant"),
-            )
+            self._sha1_in_want_policy = self.repo.get_sha1_in_want_policy()
         return self._sha1_in_want_policy
 
     def is_want_allowed(self, sha: ObjectID) -> bool:

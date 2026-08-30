@@ -43,6 +43,7 @@ from dulwich.pack import (
     OFS_DELTA,
     REF_DELTA,
     DeltaChainIterator,
+    DeltaCycle,
     MemoryPackIndex,
     Pack,
     PackData,
@@ -1010,10 +1011,8 @@ class TestThinPack(PackTests):
 
 class ResolveObjectDeltaCycleTests(TestCase):
     def test_get_raw_rejects_ref_delta_cycle(self) -> None:
-        # Two REF_DELTA objects that name each other form a delta cycle. Without
-        # cycle detection resolve_object walks the chain forever while
-        # delta_stack grows without bound. git rejects such packs; dulwich
-        # should raise UnresolvedDeltas instead of hanging.
+        # Two REF_DELTA objects that name each other form a delta cycle;
+        # resolve_object should raise DeltaCycle instead of looping forever.
         sha_a = b"\xaa" * 20
         sha_b = b"\xbb" * 20
         delta = list(create_delta(b"x", b"x"))
@@ -1042,7 +1041,7 @@ class ResolveObjectDeltaCycleTests(TestCase):
         )
         pack = Pack.from_objects(data, index)
         self.addCleanup(pack.close)
-        self.assertRaises(UnresolvedDeltas, pack.get_raw, sha_a)
+        self.assertRaises(DeltaCycle, pack.get_raw, sha_a)
 
 
 class WritePackTests(TestCase):

@@ -195,6 +195,10 @@
    attacker-chosen SHAs. Newlines are now collapsed to spaces, matching git's
    ``copy_reflog_msg``. (netliomax25-code, #2300)
 
+ * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with
+   REF_DELTA objects that name each other sent ``get_raw`` into an
+   unbounded loop. Such chains now raise ``DeltaCycle``.
+
 1.2.10	2026-07-07
 
  * Fix regression in 1.2.9 where loose objects whose content inflates to

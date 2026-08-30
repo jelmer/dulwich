@@ -44,6 +44,7 @@ from dulwich.pack import (
     OFS_DELTA,
     REF_DELTA,
     DeltaChainIterator,
+    DeltaCycle,
     MemoryPackIndex,
     Pack,
     PackData,
@@ -1129,6 +1130,41 @@ class TestThinPack(PackTests):
                 ),
                 sorted(o.id for o in p.iterobjects()),
             )
+
+
+class ResolveObjectDeltaCycleTests(TestCase):
+    def test_get_raw_rejects_ref_delta_cycle(self) -> None:
+        # Two REF_DELTA objects that name each other form a delta cycle;
+        # resolve_object should raise DeltaCycle instead of looping forever.
+        sha_a = b"\xaa" * 20
+        sha_b = b"\xbb" * 20
+        delta = list(create_delta(b"x", b"x"))
+
+        buf = BytesIO()
+        write_pack_header(buf.write, 2)
+        offset_a = buf.tell()
+        write_pack_object(
+            buf.write, REF_DELTA, (sha_b, delta), object_format=DEFAULT_OBJECT_FORMAT
+        )
+        offset_b = buf.tell()
+        write_pack_object(
+            buf.write, REF_DELTA, (sha_a, delta), object_format=DEFAULT_OBJECT_FORMAT
+        )
+        body = buf.getvalue()
+        raw = body + sha1(body).digest()
+
+        data = PackData(
+            "test.pack", file=BytesIO(raw), object_format=DEFAULT_OBJECT_FORMAT
+        )
+        self.addCleanup(data.close)
+        index = MemoryPackIndex(
+            [(sha_a, offset_a, 0), (sha_b, offset_b, 0)],
+            DEFAULT_OBJECT_FORMAT,
+            pack_checksum=raw[-20:],
+        )
+        pack = Pack.from_objects(data, index)
+        self.addCleanup(pack.close)
+        self.assertRaises(DeltaCycle, pack.get_raw, sha_a)
 
 
 class WritePackTests(TestCase):

@@ -598,6 +598,10 @@ class RepositoryRootTests(TestCase):
                 b"+refs/heads/*:refs/remotes/origin/*",
                 c.get((b"remote", b"origin"), b"fetch"),
             )
+            self.assertEqual(b"origin", c.get((b"branch", b"master"), b"remote"))
+            self.assertEqual(
+                b"refs/heads/master", c.get((b"branch", b"master"), b"merge")
+            )
 
     def test_clone_no_head(self) -> None:
         temp_dir = self.mkdtemp()
@@ -730,6 +734,31 @@ class RepositoryRootTests(TestCase):
                 t.refs[b"refs/remotes/origin/HEAD"],
                 b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
             )
+            c = t.get_config()
+            self.assertEqual(b"origin", c.get((b"branch", b"mybranch"), b"remote"))
+            self.assertEqual(
+                b"refs/heads/mybranch", c.get((b"branch", b"mybranch"), b"merge")
+            )
+
+    def test_clone_custom_origin_name(self) -> None:
+        r = self.open_repo("a.git")
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        with r.clone(tmp_dir, mkdir=False, origin=b"upstream") as t:
+            c = t.get_config()
+            self.assertEqual(b"upstream", c.get((b"branch", b"master"), b"remote"))
+            self.assertEqual(
+                b"refs/heads/master", c.get((b"branch", b"master"), b"merge")
+            )
+
+    def test_clone_bare_no_tracking(self) -> None:
+        r = self.open_repo("a.git")
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        with r.clone(tmp_dir, mkdir=False, bare=True) as t:
+            c = t.get_config()
+            self.assertRaises(KeyError, c.get, (b"branch", b"master"), b"remote")
+            self.assertRaises(KeyError, c.get, (b"branch", b"master"), b"merge")
 
     def test_clone_tag(self) -> None:
         r = self.open_repo("a.git")
@@ -745,6 +774,9 @@ class RepositoryRootTests(TestCase):
                 t.refs[b"refs/remotes/origin/HEAD"],
                 b"a90fa2d900a17e99b433217e988c4eb4a2e9a097",
             )
+            # A detached HEAD has no branch to track, as with git clone
+            c = t.get_config()
+            self.assertRaises(KeyError, c.get, (b"branch", b"mytag"), b"remote")
 
     def test_clone_invalid_branch(self) -> None:
         r = self.open_repo("a.git")

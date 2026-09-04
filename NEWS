@@ -1,3 +1,7 @@
+ * Set ``branch.<name>.remote`` and ``branch.<name>.merge`` for the branch
+   checked out by a clone, so that a subsequent ``git pull`` with no arguments
+   has tracking information. (Jelmer Vernooĳ, #2376)
+
 1.2.14	2026-08-28
 
  * Collapse consecutive `**` segments in wildmatch translation, matching

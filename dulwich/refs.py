@@ -76,6 +76,7 @@ else:
     from typing_extensions import Self
 
 if TYPE_CHECKING:
+    from .config import ConfigFile
     from .file import _GitFile
 
 from .errors import PackedRefsException, RefFormatError
@@ -1791,6 +1792,26 @@ def _set_head(
         except KeyError:
             head = None
     return head
+
+
+def _set_branch_tracking(config: "ConfigFile", head_ref: bytes, remote: bytes) -> None:
+    """Point the branch a clone checked out at its counterpart on the remote.
+
+    This is what lets a subsequent "git pull" with no arguments know what to
+    merge. Like git clone, nothing is written when HEAD ended up detached at a
+    tag rather than on a branch.
+
+    Args:
+      config: Config of the freshly cloned repository
+      head_ref: Local ref HEAD was pointed at, e.g. refs/heads/master
+      remote: Name of the remote the clone came from
+    """
+    if not head_ref.startswith(LOCAL_BRANCH_PREFIX):
+        return
+    branch = extract_branch_name(Ref(head_ref))
+    config.set((b"branch", branch), b"remote", remote)
+    config.set((b"branch", branch), b"merge", head_ref)
+    config.write_to_path()
 
 
 def _import_remote_refs(

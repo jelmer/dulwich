@@ -1408,6 +1408,54 @@ class CloneTests(PorcelainTestCase):
             b"+refs/heads/*:refs/remotes/origin/*",
             c.get((b"remote", b"origin"), b"fetch"),
         )
+        self.assertEqual(b"origin", c.get((b"branch", b"master"), b"remote"))
+        self.assertEqual(b"refs/heads/master", c.get((b"branch", b"master"), b"merge"))
+
+    def test_branch_tracking(self) -> None:
+        """A cloned branch tracks its remote counterpart, so "git pull" works."""
+        f1_1 = make_object(Blob, data=b"f1")
+        (c1,) = build_commit_graph(self.repo.object_store, [[1]], {1: [(b"f1", f1_1)]})
+        self.repo.refs[b"refs/heads/master"] = c1.id
+        self.repo.refs[b"refs/heads/other"] = c1.id
+        self.repo.refs[b"refs/tags/v1"] = c1.id
+
+        for kwargs, expected in [
+            ({}, (b"master", b"origin", b"refs/heads/master")),
+            ({"branch": b"other"}, (b"other", b"origin", b"refs/heads/other")),
+            ({"origin": "upstream"}, (b"master", b"upstream", b"refs/heads/master")),
+        ]:
+            target_path = tempfile.mkdtemp()
+            self.addCleanup(shutil.rmtree, target_path)
+            branch, remote, merge = expected
+            with porcelain.clone(
+                self.repo.path,
+                target_path,
+                checkout=False,
+                errstream=BytesIO(),
+                **kwargs,
+            ) as r:
+                c = r.get_config()
+                self.assertEqual(remote, c.get((b"branch", branch), b"remote"))
+                self.assertEqual(merge, c.get((b"branch", branch), b"merge"))
+
+    def test_no_branch_tracking_for_tag(self) -> None:
+        """Cloning a tag leaves HEAD detached, so there is nothing to track."""
+        f1_1 = make_object(Blob, data=b"f1")
+        (c1,) = build_commit_graph(self.repo.object_store, [[1]], {1: [(b"f1", f1_1)]})
+        self.repo.refs[b"refs/heads/master"] = c1.id
+        self.repo.refs[b"refs/tags/v1"] = c1.id
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        with porcelain.clone(
+            self.repo.path,
+            target_path,
+            checkout=False,
+            branch=b"v1",
+            errstream=BytesIO(),
+        ) as r:
+            c = r.get_config()
+            self.assertRaises(KeyError, c.get, (b"branch", b"v1"), b"remote")
+            self.assertRaises(KeyError, c.get, (b"branch", b"master"), b"remote")
 
     def test_simple_local_with_checkout(self) -> None:
         f1_1 = make_object(Blob, data=b"f1")

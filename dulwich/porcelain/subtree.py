@@ -87,7 +87,7 @@ def _create_subtree_commit(
 
 
 def subtree_add(
-    repo: RepoPath,
+    repo: RepoPath | None,
     prefix: bytes | str,
     repository: str | None = None,
     ref: bytes | str | None = None,
@@ -221,7 +221,7 @@ def subtree_add(
 
 
 def subtree_merge(
-    repo: RepoPath,
+    repo: RepoPath | None,
     prefix: bytes | str,
     commit: bytes | str | Commit | Tag,
     squash: bool = False,
@@ -375,7 +375,7 @@ def subtree_merge(
 
 
 def subtree_split(
-    repo: RepoPath,
+    repo: RepoPath | None,
     prefix: bytes | str,
     branch: bytes | str | None = None,
     rejoin: bool = False,
@@ -522,7 +522,7 @@ def subtree_split(
 
 
 def subtree_pull(
-    repo: RepoPath,
+    repo: RepoPath | None,
     prefix: bytes | str,
     repository: str,
     ref: bytes | str,
@@ -580,7 +580,7 @@ def subtree_pull(
 
 
 def subtree_push(
-    repo: RepoPath,
+    repo: RepoPath | None,
     prefix: bytes | str,
     repository: str,
     ref: bytes | str,

@@ -49,7 +49,7 @@ def _make_tag_ref(name: str | bytes) -> Ref:
 
 
 def verify_tag(
-    repo: "RepoPath",
+    repo: "RepoPath | None",
     tagname: str | bytes,
     keyids: list[str] | None = None,
 ) -> None:
@@ -100,7 +100,7 @@ def verify_tag(
 
 
 def tag_create(
-    repo: "RepoPath",
+    repo: "RepoPath | None",
     tag: str | bytes,
     author: str | bytes | None = None,
     message: str | bytes | None = None,

@@ -2714,6 +2714,45 @@ class RemoteCommandTest(DulwichCliTestCase):
         )
 
 
+class HookCommandTest(DulwichCliTestCase):
+    """Tests for hook run command."""
+
+    def setUp(self):
+        super().setUp()
+        if os.name != "posix":
+            self.skipTest("shell hook tests requires POSIX shell")
+        self.assertTrue(os.path.exists("/bin/sh"))
+
+    def test_hook_run_unrecognized(self):
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, _stdout, _stderr = self._run_cli("hook", "run", "not-a-real-hook")
+            log_output = "\n".join(cm.output)
+            self.assertEqual(result, 1)
+            self.assertIn("unrecognized hook", log_output)
+
+    def test_hook_run_post_receive_rejected(self):
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, _stdout, _stderr = self._run_cli("hook", "run", "post-receive")
+            self.assertEqual(result, 1)
+            log_output = "\n".join(cm.output)
+            self.assertIn("not supported", log_output)
+
+    def test_hook_run_update(self):
+        test_file = os.path.join(self.repo_path, ".git", "hooks", "update")
+        with open(test_file, "w") as f:
+            f.write(
+                '#!/bin/sh\necho "stdout: $1 $2 $3"\necho "stderr output" >&2\nexit 0\n'
+            )
+        os.chmod(test_file, 0o755)
+
+        result, stdout_text, stderr_text = self._run_cli(
+            "hook", "run", "update", "refs/heads/main", "abc123", "def456"
+        )
+        self.assertIsNone(result)
+        self.assertIn("stdout: refs/heads/main abc123 def456", stdout_text)
+        self.assertIn("stderr output", stderr_text)
+
+
 class CheckIgnoreCommandTest(DulwichCliTestCase):
     """Tests for check-ignore command."""
 

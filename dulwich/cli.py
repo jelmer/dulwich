@@ -85,6 +85,7 @@ from .errors import (
     ApplyDeltaError,
     FileFormatException,
     GitProtocolError,
+    HookError,
     NotGitRepository,
 )
 from .index import Index, InvalidPathError
@@ -7714,6 +7715,43 @@ class cmd_am(Command):
                 sys.stdout.write(sha.decode("ascii") + "\n")
 
 
+class cmd_hook_run(Command):
+    """Run hooks manually."""
+
+    def run(self, args: Sequence[str]) -> int | None:
+        """Run a hook manually.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("hook_name", help="Name of the hook to run")
+        parser.add_argument("args", nargs="*", help="Arguments to pass to the hook")
+        parsed_args = parser.parse_args(args)
+        try:
+            output = porcelain.hook_run(".", parsed_args.hook_name, parsed_args.args)
+        except HookError as e:
+            logger.error(f"error: {e}")
+            return 1
+
+        if output is not None:
+            if isinstance(output, bytes):
+                sys.stdout.buffer.write(output)
+            elif isinstance(output, tuple):
+                sys.stdout.buffer.write(output[0])
+                sys.stderr.buffer.write(output[1])
+
+        return None
+
+
+class cmd_hook(SuperCommand):
+    """Manage git hooks."""
+
+    subcommands: ClassVar[dict[str, type[Command]]] = {
+        "run": cmd_hook_run,
+    }
+
+
 commands = {
     "add": cmd_add,
     "am": cmd_am,
@@ -7754,6 +7792,7 @@ commands = {
     "grep": cmd_grep,
     "hash-object": cmd_hash_object,
     "help": cmd_help,
+    "hook": cmd_hook,
     "init": cmd_init,
     "interpret-trailers": cmd_interpret_trailers,
     "lfs": cmd_lfs,

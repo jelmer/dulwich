@@ -27,7 +27,12 @@ import sys
 import tempfile
 
 from dulwich import errors
-from dulwich.hooks import CommitMsgShellHook, PostCommitShellHook, PreCommitShellHook
+from dulwich.hooks import (
+    CommitMsgShellHook,
+    PostCommitShellHook,
+    PreCommitShellHook,
+    get_hook,
+)
 
 from . import TestCase
 
@@ -184,3 +189,31 @@ if [ "$(pwd)" = '"""
 
         hook.execute()
         self.assertFalse(os.path.exists(path))
+
+    def test_get_hook_pre_commit(self) -> None:
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.mkdir(os.path.join(repo_dir, "hooks"))
+        self.addCleanup(shutil.rmtree, repo_dir)
+        hook = get_hook("pre-commit", repo_dir, repo_dir)
+        self.assertIsInstance(hook, PreCommitShellHook)
+
+    def test_get_hook_post_commit(self) -> None:
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.mkdir(os.path.join(repo_dir, "hooks"))
+        self.addCleanup(shutil.rmtree, repo_dir)
+        hook = get_hook("post-commit", repo_dir, repo_dir)
+        self.assertIsInstance(hook, PostCommitShellHook)
+
+    def test_get_hook_unrecognized(self) -> None:
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.mkdir(os.path.join(repo_dir, "hooks"))
+        self.addCleanup(shutil.rmtree, repo_dir)
+        self.assertRaises(
+            errors.HookError, get_hook, "not_a_real_hook", repo_dir, repo_dir
+        )
+
+    def test_get_hook_rejects_receive_hooks(self) -> None:
+        repo_dir = os.path.join(tempfile.mkdtemp())
+        os.mkdir(os.path.join(repo_dir, "hooks"))
+        self.addCleanup(shutil.rmtree, repo_dir)
+        self.assertRaises(errors.HookError, get_hook, "pre-receive", repo_dir, repo_dir)

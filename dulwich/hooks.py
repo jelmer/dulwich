@@ -364,3 +364,53 @@ class UpdateShellHook(ShellHook):
             return (out_data, err_data)
         except OSError as err:
             raise HookError(repr(err)) from err
+
+
+HOOK_CLASSES: dict[str, type[ShellHook]] = {
+    "pre-commit": PreCommitShellHook,
+    "commit-msg": CommitMsgShellHook,
+    "post-commit": PostCommitShellHook,
+    "pre-receive": PreReceiveShellHook,
+    "post-receive": PostReceiveShellHook,
+    "update": UpdateShellHook,
+}
+
+
+def get_hook(
+    hook_name: str,
+    cwd: str,
+    controldir: str,
+) -> ShellHook:
+    """Look up and construct a hook by name.
+
+    Args:
+        hook_name: Name of the hook, e.g. "pre-commit" or "post-receive"
+        cwd: Working directory to use for hooks that execute in the
+            working tree
+        controldir: Path to the git control directory (.git)
+
+    Returns:
+        A constructed hook instance ready to be executed
+
+    Raises:
+        HookError: If hook_name does not match a known hook, or refers to
+            a hook not supported by manual execution (e.g. pre-receive,
+            post-receive)
+    """
+    hook_class = HOOK_CLASSES.get(hook_name)
+    if not hook_class:
+        raise HookError(
+            f"unrecognized hook {hook_name!r}, expected one of: "
+            f"{', '.join(sorted(HOOK_CLASSES))}"
+        )
+
+    if hook_class is PreReceiveShellHook or hook_class is PostReceiveShellHook:
+        raise HookError(
+            f"{hook_name!r} is not supported by 'hook run'; it expects a batch "
+            "of ref updates rather than individual arguments"
+        )
+
+    if hook_class is PreCommitShellHook:
+        return hook_class(cwd=cwd, controldir=controldir)
+
+    return hook_class(controldir)  # type: ignore[call-arg]

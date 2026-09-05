@@ -1,6 +1,14 @@
+1.2.15	UNRELEASED
+
  * Set ``branch.<name>.remote`` and ``branch.<name>.merge`` for the branch
    checked out by a clone, so that a subsequent ``git pull`` with no arguments
    has tracking information. (Jelmer Vernooĳ, #2376)
+
+ * Keep relative paths relative in ``SSHGitClient.get_url``, emitting git's
+   ``ssh://host/~/path`` form. Cloning from an scp-style URL like
+   ``user@host:git/repo.git`` previously stored
+   ``ssh://user@host/git/repo.git`` as the remote URL, which points at a
+   different repository. (Jelmer Vernooĳ, #2375)
 
 1.2.14	2026-08-28
 

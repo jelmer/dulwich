@@ -2358,6 +2358,7 @@ class cmd_commit(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("--message", "-m", help="Commit message")
+        parser.add_argument("--author", help="Override commit author (Name <email>)")
         parser.add_argument(
             "-a",
             "--all",
@@ -2400,7 +2401,13 @@ class cmd_commit(Command):
 
         try:
             porcelain.commit(
-                ".", message=message, all=parsed_args.all, amend=parsed_args.amend
+                ".",
+                message=message,
+                author=parsed_args.author.encode("utf-8")
+                if parsed_args.author is not None
+                else None,
+                all=parsed_args.all,
+                amend=parsed_args.amend,
             )
         except CommitMessageError as e:
             logger.exception(e)

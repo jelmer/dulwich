@@ -1194,6 +1194,26 @@ class SSHGitClientTests(TestCase):
         url = c.get_url(path)
         self.assertEqual("ssh://user@git.samba.org:2222/tmp/repo.git", url)
 
+    def test_get_url_relative_path(self) -> None:
+        # Relative paths, as used in scp-style URLs, are home directory
+        # relative and must not be turned into absolute paths.
+        c = SSHGitClient("git.samba.org", username="user")
+
+        self.assertEqual(
+            "ssh://user@git.samba.org/~/git/repo.git", c.get_url("git/repo.git")
+        )
+
+    def test_get_url_tilde_path(self) -> None:
+        c = SSHGitClient("git.samba.org", username="user")
+
+        self.assertEqual(
+            "ssh://user@git.samba.org/~/git/repo.git", c.get_url("~/git/repo.git")
+        )
+        self.assertEqual(
+            "ssh://user@git.samba.org/~other/git/repo.git",
+            c.get_url("~other/git/repo.git"),
+        )
+
     def test_default_command(self) -> None:
         self.assertEqual(b"git-upload-pack", self.client._get_cmd_path(b"upload-pack"))
 

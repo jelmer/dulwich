@@ -3973,6 +3973,14 @@ class SSHGitClient(TraditionalGitClient):
         if self.username is not None:
             netloc = urlquote(self.username, "@/:") + "@" + netloc
 
+        if not path.startswith("/"):
+            # Paths in ssh:// URLs are absolute, but scp-style URLs take a
+            # path relative to the home directory. Use git's /~/ form so the
+            # URL still refers to the same repository.
+            if not path.startswith("~"):
+                path = "~/" + path
+            path = "/" + path
+
         return urlunsplit(("ssh", netloc, path, "", ""))
 
     @classmethod

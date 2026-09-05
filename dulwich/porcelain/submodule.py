@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 
 def submodule_add(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     url: str,
     path: str | os.PathLike[str] | None = None,
     name: str | None = None,
@@ -70,7 +70,7 @@ def submodule_add(
         config.write_to_path()
 
 
-def submodule_init(repo: str | os.PathLike[str] | Repo) -> None:
+def submodule_init(repo: str | os.PathLike[str] | Repo | None = None) -> None:
     """Initialize submodules.
 
     Args:
@@ -110,7 +110,7 @@ def _check_submodule_path(path: bytes, validator: Callable[[bytes], bool]) -> No
         raise Error(f"refusing submodule with unsafe path: {path!r}")
 
 
-def submodule_list(repo: "RepoPath") -> Iterator[tuple[str, str]]:
+def submodule_list(repo: "RepoPath | None" = None) -> Iterator[tuple[str, str]]:
     """List submodules.
 
     Args:

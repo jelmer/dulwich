@@ -1,5 +1,8 @@
 1.2.15	UNRELEASED
 
+ * Add ``dulwich commit --author="Name <email>"`` to override the author
+   of a new or amended commit. (kudala-bharani, #1845)
+
  * Set ``branch.<name>.remote`` and ``branch.<name>.merge`` for the branch
    checked out by a clone, so that a subsequent ``git pull`` with no arguments
    has tracking information. (Jelmer Vernooĳ, #2376)

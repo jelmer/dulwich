@@ -289,6 +289,52 @@ class CommitCommandTest(DulwichCliTestCase):
         # Check that HEAD points to a commit
         self.assertIsNotNone(self.repo.head())
 
+    def test_commit_author(self):
+        """Explicit authors, including Unicode names, do not change the committer."""
+        self.overrideEnv("GIT_COMMITTER_NAME", "Test Committer")
+        self.overrideEnv("GIT_COMMITTER_EMAIL", "committer@example.com")
+        for author in (
+            "Other Author <author@example.com>",
+            "Zoë Example <zoe@example.com>",
+        ):
+            with self.subTest(author=author):
+                result, _stdout, _stderr = self._run_cli(
+                    "commit", "-m", "Authored commit", "--author", author
+                )
+                self.assertIsNone(result)
+                commit = self.repo[self.repo.head()]
+                self.assertEqual(commit.author, author.encode("utf-8"))
+                self.assertEqual(
+                    commit.committer, b"Test Committer <committer@example.com>"
+                )
+
+    def test_commit_amend_author(self):
+        """Amend preserves the original author unless explicitly overridden."""
+        self.overrideEnv("GIT_COMMITTER_NAME", "Test Committer")
+        self.overrideEnv("GIT_COMMITTER_EMAIL", "committer@example.com")
+        original_author = b"Original Author <original@example.com>"
+        for author in (None, "Other Author <other@example.com>"):
+            with self.subTest(author=author):
+                original_id = porcelain.commit(
+                    self.repo, message=b"Original commit", author=original_author
+                )
+                original = self.repo[original_id]
+                args = ["commit", "--amend", "-m", "Amended commit"]
+                if author is not None:
+                    args.extend(["--author", author])
+                result, _stdout, _stderr = self._run_cli(*args)
+                self.assertIsNone(result)
+                commit = self.repo[self.repo.head()]
+                expected_author = (
+                    original_author if author is None else author.encode("utf-8")
+                )
+                self.assertEqual(commit.author, expected_author)
+                self.assertEqual(
+                    commit.committer, b"Test Committer <committer@example.com>"
+                )
+                self.assertEqual(commit.parents, original.parents)
+                self.assertEqual(commit.message, b"Amended commit")
+
     def test_commit_all_flag(self):
         # Create initial commit
         test_file = os.path.join(self.repo_path, "test.txt")

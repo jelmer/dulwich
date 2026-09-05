@@ -40,7 +40,7 @@ def _make_notes_ref(name: bytes) -> bytes:
 
 
 def notes_add(
-    repo: "RepoPath",
+    repo: "RepoPath | None",
     object_sha: bytes,
     note: bytes,
     ref: bytes = b"commits",
@@ -89,7 +89,7 @@ def notes_add(
 
 
 def notes_remove(
-    repo: "RepoPath",
+    repo: "RepoPath | None",
     object_sha: bytes,
     ref: bytes = b"commits",
     author: bytes | None = None,
@@ -133,7 +133,7 @@ def notes_remove(
 
 
 def notes_show(
-    repo: "RepoPath", object_sha: bytes, ref: bytes = b"commits"
+    repo: "RepoPath | None", object_sha: bytes, ref: bytes = b"commits"
 ) -> bytes | None:
     """Show the note for an object.
 
@@ -162,7 +162,7 @@ def notes_show(
 
 
 def notes_list(
-    repo: "RepoPath", ref: bytes = b"commits"
+    repo: "RepoPath | None", ref: bytes = b"commits"
 ) -> list[tuple[ObjectID, bytes]]:
     """List all notes in a notes ref.
 

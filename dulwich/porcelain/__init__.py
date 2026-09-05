@@ -1257,7 +1257,7 @@ def symbolic_ref(repo: RepoPath, ref_name: str | bytes, force: bool = False) -> 
         repo_obj.refs.set_symbolic_ref(HEADREF, ref_path)
 
 
-def pack_refs(repo: RepoPath, all: bool = False) -> None:
+def pack_refs(repo: RepoPath | None = None, all: bool = False) -> None:
     """Pack loose references into packed-refs file."""
     with open_repo_closing(repo) as repo_obj:
         repo_obj.refs.pack_refs(all=all)
@@ -1585,7 +1585,7 @@ def commit(
 
 
 def commit_tree(
-    repo: RepoPath,
+    repo: RepoPath | None,
     tree: ObjectID,
     message: str | bytes | None = None,
     author: bytes | None = None,
@@ -2242,7 +2242,7 @@ rm = remove
 
 
 def mv(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     source: str | bytes | os.PathLike[str],
     destination: str | bytes | os.PathLike[str],
     force: bool = False,
@@ -2887,7 +2887,7 @@ def show(
 
 
 def diff_tree(
-    repo: RepoPath,
+    repo: RepoPath | None,
     old_tree: str | bytes | Tree,
     new_tree: str | bytes | Tree,
     outstream: BinaryIO = default_bytes_out_stream,
@@ -3042,7 +3042,7 @@ def diff(
 
 
 def rev_list(
-    repo: RepoPath,
+    repo: RepoPath | None,
     commits: Sequence[str | bytes],
     outstream: BinaryIO = default_bytes_out_stream,
 ) -> None:
@@ -3068,7 +3068,7 @@ def _canonical_part(url: str) -> str:
 
 
 def verify_commit(
-    repo: RepoPath,
+    repo: RepoPath | None = None,
     committish: str | bytes = "HEAD",
     keyids: list[str] | None = None,
 ) -> None:
@@ -3109,7 +3109,7 @@ def verify_commit(
         vendor.verify(payload, signature)
 
 
-def replace_list(repo: RepoPath) -> list[tuple[ObjectID, ObjectID]]:
+def replace_list(repo: RepoPath | None = None) -> list[tuple[ObjectID, ObjectID]]:
     """List all replacement refs.
 
     Args:
@@ -3129,7 +3129,7 @@ def replace_list(repo: RepoPath) -> list[tuple[ObjectID, ObjectID]]:
         return replacements
 
 
-def replace_delete(repo: RepoPath, object_sha: ObjectID | str) -> None:
+def replace_delete(repo: RepoPath | None, object_sha: ObjectID | str) -> None:
     """Delete a replacement ref.
 
     Args:
@@ -3152,7 +3152,7 @@ def replace_delete(repo: RepoPath, object_sha: ObjectID | str) -> None:
 
 
 def replace_create(
-    repo: RepoPath,
+    repo: RepoPath | None,
     object_sha: str | ObjectID,
     replacement_sha: str | ObjectID,
 ) -> None:
@@ -3181,7 +3181,7 @@ def replace_create(
 
 
 def reset(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     mode: str,
     treeish: str | bytes | Commit | Tree | Tag = "HEAD",
     env: Mapping[str, str] | None = None,
@@ -3460,7 +3460,7 @@ def _select_push_refs(
 
 
 def push(
-    repo: RepoPath,
+    repo: RepoPath | None = None,
     remote_location: str | bytes | None = None,
     refspecs: str | bytes | Sequence[str | bytes] | None = None,
     outstream: BinaryIO = default_bytes_out_stream,
@@ -3703,7 +3703,7 @@ def push(
 
 
 def pull(
-    repo: RepoPath,
+    repo: RepoPath | None = None,
     remote_location: str | bytes | None = None,
     refspecs: str | bytes | Sequence[str | bytes] | None = None,
     outstream: BinaryIO = default_bytes_out_stream,
@@ -4530,7 +4530,9 @@ def _make_replace_ref(name: str | bytes | ObjectID) -> Ref:
     return local_replace_name(name)
 
 
-def branch_delete(repo: RepoPath, name: str | bytes | Sequence[str | bytes]) -> None:
+def branch_delete(
+    repo: RepoPath | None, name: str | bytes | Sequence[str | bytes]
+) -> None:
     """Delete a branch.
 
     Args:
@@ -4548,7 +4550,7 @@ def branch_delete(repo: RepoPath, name: str | bytes | Sequence[str | bytes]) -> 
 
 
 def branch_create(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     name: str | bytes,
     objectish: str | bytes | None = None,
     force: bool = False,
@@ -4677,7 +4679,7 @@ def filter_branches_by_pattern(branches: Iterable[bytes], pattern: str) -> list[
     ]
 
 
-def branch_list(repo: RepoPath) -> list[Ref]:
+def branch_list(repo: RepoPath | None = None) -> list[Ref]:
     """List all branches.
 
     Args:
@@ -4734,7 +4736,7 @@ def branch_list(repo: RepoPath) -> list[Ref]:
         return branches
 
 
-def branch_remotes_list(repo: RepoPath) -> list[bytes]:
+def branch_remotes_list(repo: RepoPath | None = None) -> list[bytes]:
     """List the short names of all remote branches.
 
     Args:
@@ -4790,7 +4792,7 @@ def branch_remotes_list(repo: RepoPath) -> list[bytes]:
         return branches
 
 
-def _get_branch_merge_status(repo: RepoPath) -> Iterator[tuple[bytes, bool]]:
+def _get_branch_merge_status(repo: RepoPath | None) -> Iterator[tuple[bytes, bool]]:
     """Get merge status for all branches relative to current HEAD.
 
     Args:
@@ -4811,7 +4813,7 @@ def _get_branch_merge_status(repo: RepoPath) -> Iterator[tuple[bytes, bool]]:
             yield branch_ref, is_merged
 
 
-def merged_branches(repo: RepoPath) -> Iterator[bytes]:
+def merged_branches(repo: RepoPath | None = None) -> Iterator[bytes]:
     """List branches that have been merged into the current branch.
 
     Args:
@@ -4825,7 +4827,7 @@ def merged_branches(repo: RepoPath) -> Iterator[bytes]:
             yield branch_name
 
 
-def no_merged_branches(repo: RepoPath) -> Iterator[bytes]:
+def no_merged_branches(repo: RepoPath | None = None) -> Iterator[bytes]:
     """List branches that have been merged into the current branch.
 
     Args:
@@ -4839,7 +4841,7 @@ def no_merged_branches(repo: RepoPath) -> Iterator[bytes]:
             yield branch_name
 
 
-def branches_containing(repo: RepoPath, commit: str) -> Iterator[bytes]:
+def branches_containing(repo: RepoPath | None, commit: str) -> Iterator[bytes]:
     """List branches that contain the specified commit.
 
     Args:
@@ -5551,7 +5553,7 @@ def ls_remote(
     )
 
 
-def repack(repo: RepoPath, write_bitmaps: bool = False) -> None:
+def repack(repo: RepoPath | None = None, write_bitmaps: bool = False) -> None:
     """Repack loose files in a repository.
 
     Currently this only packs loose objects.
@@ -5652,7 +5654,7 @@ def ls_tree(
 
 
 def remote_add(
-    repo: RepoPath,
+    repo: RepoPath | None,
     name: bytes | str,
     url: bytes | str,
 ) -> None:
@@ -5730,7 +5732,7 @@ def _quote_path(path: str) -> str:
 
 
 def check_ignore(
-    repo: RepoPath,
+    repo: RepoPath | None,
     paths: Sequence[str | bytes | os.PathLike[str]],
     no_index: bool = False,
     quote_path: bool = True,
@@ -5986,7 +5988,7 @@ def update_head(
 
 
 def checkout(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None = None,
     target: str | bytes | Commit | Tag | None = None,
     force: bool = False,
     new_branch: bytes | str | None = None,
@@ -6159,7 +6161,7 @@ def checkout(
 
 
 def restore(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     paths: list[bytes | str],
     source: str | bytes | Commit | Tag | None = None,
     staged: bool = False,
@@ -6297,7 +6299,7 @@ def restore(
 
 
 def switch(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     target: str | bytes | Commit | Tag,
     create: str | bytes | None = None,
     force: bool = False,
@@ -6496,7 +6498,7 @@ def sparse_checkout(
             raise CheckoutError(*exc.args) from exc
 
 
-def cone_mode_init(repo: str | os.PathLike[str] | Repo) -> None:
+def cone_mode_init(repo: str | os.PathLike[str] | Repo | None = None) -> None:
     """Initialize a repository to use sparse checkout in 'cone' mode.
 
     Sets ``core.sparseCheckout`` and ``core.sparseCheckoutCone`` in the config.
@@ -6520,7 +6522,7 @@ def cone_mode_init(repo: str | os.PathLike[str] | Repo) -> None:
 
 
 def cone_mode_set(
-    repo: str | os.PathLike[str] | Repo, dirs: Sequence[str], force: bool = False
+    repo: str | os.PathLike[str] | Repo | None, dirs: Sequence[str], force: bool = False
 ) -> None:
     """Overwrite the existing 'cone-mode' sparse patterns with a new set of directories.
 
@@ -6545,7 +6547,7 @@ def cone_mode_set(
 
 
 def cone_mode_add(
-    repo: str | os.PathLike[str] | Repo, dirs: Sequence[str], force: bool = False
+    repo: str | os.PathLike[str] | Repo | None, dirs: Sequence[str], force: bool = False
 ) -> None:
     """Add new directories to the existing 'cone-mode' sparse-checkout patterns.
 
@@ -6576,7 +6578,7 @@ def cone_mode_add(
         sparse_checkout(repo_obj, patterns=new_patterns, force=force, cone=True)
 
 
-def cone_mode_list(repo: str | os.PathLike[str] | Repo) -> list[str]:
+def cone_mode_list(repo: str | os.PathLike[str] | Repo | None = None) -> list[str]:
     """List current sparse-checkout patterns.
 
     Args:
@@ -6589,7 +6591,9 @@ def cone_mode_list(repo: str | os.PathLike[str] | Repo) -> list[str]:
         return repo_obj.get_worktree().get_sparse_checkout_patterns()
 
 
-def cone_mode_disable(repo: str | os.PathLike[str] | Repo, force: bool = False) -> None:
+def cone_mode_disable(
+    repo: str | os.PathLike[str] | Repo | None = None, force: bool = False
+) -> None:
     """Disable sparse checkout and restore all files.
 
     This function:
@@ -6642,7 +6646,9 @@ def cone_mode_disable(repo: str | os.PathLike[str] | Repo, force: bool = False) 
         )
 
 
-def cat_file_type(repo: str | os.PathLike[str] | Repo, objectish: str | bytes) -> bytes:
+def cat_file_type(
+    repo: str | os.PathLike[str] | Repo | None, objectish: str | bytes
+) -> bytes:
     """Get the type of a Git object.
 
     Args:
@@ -6659,7 +6665,9 @@ def cat_file_type(repo: str | os.PathLike[str] | Repo, objectish: str | bytes) -
         return obj.type_name
 
 
-def cat_file_size(repo: str | os.PathLike[str] | Repo, objectish: str | bytes) -> int:
+def cat_file_size(
+    repo: str | os.PathLike[str] | Repo | None, objectish: str | bytes
+) -> int:
     """Get the size of a Git object.
 
     Args:
@@ -6677,7 +6685,7 @@ def cat_file_size(repo: str | os.PathLike[str] | Repo, objectish: str | bytes) -
 
 
 def cat_file_content(
-    repo: str | os.PathLike[str] | Repo, objectish: str | bytes
+    repo: str | os.PathLike[str] | Repo | None, objectish: str | bytes
 ) -> bytes:
     """Get the raw content of a Git object.
 
@@ -6750,7 +6758,7 @@ def hash_object(
     return blob.id
 
 
-def rev_parse(repo: str | os.PathLike[str] | Repo, rev: str | bytes) -> bytes:
+def rev_parse(repo: str | os.PathLike[str] | Repo | None, rev: str | bytes) -> bytes:
     """Parse a revision string and return the object SHA.
 
     Args:
@@ -6768,7 +6776,7 @@ def rev_parse(repo: str | os.PathLike[str] | Repo, rev: str | bytes) -> bytes:
 
 
 def update_ref(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     ref: str | bytes,
     new_value: str | bytes | None,
     old_value: str | bytes | None = None,
@@ -6829,7 +6837,7 @@ def update_ref(
                 )
 
 
-def mktag(repo: str | os.PathLike[str] | Repo, tag_data: bytes) -> bytes:
+def mktag(repo: str | os.PathLike[str] | Repo | None, tag_data: bytes) -> bytes:
     """Create a tag object from raw tag data.
 
     Args:
@@ -6878,7 +6886,7 @@ def show_index(
             return [(offset, sha, crc32) for sha, offset, crc32 in idx.iterentries()]
 
 
-def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:
+def check_mailmap(repo: RepoPath | None, contact: str | bytes) -> bytes:
     """Check canonical name and email of contact.
 
     Args:
@@ -6909,7 +6917,7 @@ def check_mailmap(repo: RepoPath, contact: str | bytes) -> bytes:
             return name + b" <" + email + b">"
 
 
-def fsck(repo: RepoPath) -> Iterator[tuple[bytes, Exception]]:
+def fsck(repo: RepoPath | None = None) -> Iterator[tuple[bytes, Exception]]:
     """Check a repository.
 
     This function is shallow-aware and will not report errors for missing
@@ -6947,7 +6955,7 @@ def stash_list(
         return enumerate([(entry.old_sha, entry.new_sha) for entry in entries])
 
 
-def stash_push(repo: str | os.PathLike[str] | Repo) -> None:
+def stash_push(repo: str | os.PathLike[str] | Repo | None = None) -> None:
     """Push a new stash onto the stack."""
     with open_repo_closing(repo) as r:
         from ..stash import Stash
@@ -6956,7 +6964,7 @@ def stash_push(repo: str | os.PathLike[str] | Repo) -> None:
         stash.push(config=r.get_config_stack())
 
 
-def stash_pop(repo: str | os.PathLike[str] | Repo) -> None:
+def stash_pop(repo: str | os.PathLike[str] | Repo | None = None) -> None:
     """Pop a stash from the stack."""
     with open_repo_closing(repo) as r:
         from ..stash import Stash
@@ -6974,7 +6982,7 @@ def stash_drop(repo: str | os.PathLike[str] | Repo, index: int) -> None:
         stash.drop(index)
 
 
-def ls_files(repo: RepoPath) -> list[bytes]:
+def ls_files(repo: RepoPath | None = None) -> list[bytes]:
     """List all files in an index."""
     with open_repo_closing(repo) as r:
         return sorted(r.open_index(config=r.get_config_stack()))
@@ -7019,7 +7027,9 @@ def find_unique_abbrev(
     return hex_id
 
 
-def describe(repo: str | os.PathLike[str] | Repo, abbrev: int | None = None) -> str:
+def describe(
+    repo: str | os.PathLike[str] | Repo | None = None, abbrev: int | None = None
+) -> str:
     """Describe the repository version.
 
     The commit hash is prefixed with a literal "g" (for "git"), matching
@@ -7137,7 +7147,7 @@ def get_object_by_path(
         return obj
 
 
-def write_tree(repo: RepoPath) -> bytes:
+def write_tree(repo: RepoPath | None = None) -> bytes:
     """Write a tree object from the index.
 
     Args:
@@ -7422,7 +7432,7 @@ def _do_octopus_merge(
 
 
 def merge(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     committish: str | bytes | Commit | Tag | Sequence[str | bytes | Commit | Tag],
     no_commit: bool = False,
     no_ff: bool = False,
@@ -7537,7 +7547,7 @@ def unpack_objects(
 
 
 def merge_tree(
-    repo: RepoPath,
+    repo: RepoPath | None,
     base_tree: str | bytes | Tree | Commit | Tag | None,
     our_tree: str | bytes | Tree | Commit | Tag,
     their_tree: str | bytes | Tree | Commit | Tag,
@@ -7582,7 +7592,7 @@ def merge_tree(
 
 
 def cherry(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None = None,
     upstream: str | bytes | None = None,
     head: str | bytes | None = None,
     limit: str | bytes | None = None,
@@ -7834,7 +7844,7 @@ def range_diff(
 
 
 def cherry_pick(  # noqa: D417
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     committish: str | bytes | Commit | Tag | None,
     no_commit: bool = False,
     continue_: bool = False,
@@ -8011,7 +8021,7 @@ def cherry_pick(  # noqa: D417
 
 
 def revert(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     commits: str | bytes | Commit | Tag | Sequence[str | bytes | Commit | Tag],
     no_commit: bool = False,
     message: str | bytes | None = None,
@@ -8174,7 +8184,7 @@ def revert(
 
 
 def gc(
-    repo: RepoPath,
+    repo: RepoPath | None = None,
     auto: bool = False,
     aggressive: bool = False,
     prune: bool = True,
@@ -8214,7 +8224,7 @@ def gc(
 
 
 def prune(
-    repo: RepoPath,
+    repo: RepoPath | None = None,
     grace_period: int | None = None,
     dry_run: bool = False,
     progress: Callable[[str], None] | None = None,
@@ -8239,7 +8249,7 @@ def prune(
 
 
 def maintenance_run(
-    repo: RepoPath,
+    repo: RepoPath | None = None,
     tasks: list[str] | None = None,
     auto: bool = False,
     progress: Callable[[str], None] | None = None,
@@ -8262,7 +8272,7 @@ def maintenance_run(
         return run_maintenance(r, tasks=tasks, auto=auto, progress=progress)
 
 
-def maintenance_register(repo: RepoPath) -> None:
+def maintenance_register(repo: RepoPath | None = None) -> None:
     """Register a repository for background maintenance.
 
     This adds the repository to the global maintenance.repo config and sets
@@ -8277,7 +8287,7 @@ def maintenance_register(repo: RepoPath) -> None:
         register_repository(r)
 
 
-def maintenance_unregister(repo: RepoPath, force: bool = False) -> None:
+def maintenance_unregister(repo: RepoPath | None = None, force: bool = False) -> None:
     """Unregister a repository from background maintenance.
 
     This removes the repository from the global maintenance.repo config.
@@ -8363,7 +8373,7 @@ def count_objects(
         )
 
 
-def is_interactive_rebase(repo: Repo | str) -> bool:
+def is_interactive_rebase(repo: Repo | str | None = None) -> bool:
     """Check if an interactive rebase is in progress.
 
     Args:
@@ -8383,7 +8393,7 @@ def is_interactive_rebase(repo: Repo | str) -> bool:
 
 
 def rebase(
-    repo: Repo | str,
+    repo: Repo | str | None,
     upstream: bytes | str,
     onto: bytes | str | None = None,
     branch: bytes | str | None = None,
@@ -8851,7 +8861,7 @@ def _request_pull_ref(r: "Repo", local: bytes) -> bytes:
 
 
 def request_pull(
-    repo: RepoPath,
+    repo: RepoPath | None,
     base: str | bytes,
     url: str,
     end: str | bytes | None = None,
@@ -9260,7 +9270,7 @@ def bisect_log(repo: str | os.PathLike[str] | Repo | None = None) -> str:
 
 
 def bisect_replay(
-    repo: str | os.PathLike[str] | Repo,
+    repo: str | os.PathLike[str] | Repo | None,
     log_file: str | os.PathLike[str] | BinaryIO,
 ) -> None:
     """Replay a bisect log.

@@ -1067,7 +1067,7 @@ class VerifyCommitCommandTest(DulwichCliTestCase):
         # Mock the porcelain.verify_commit function since we don't have GPG setup
         with patch("dulwich.cli.porcelain.verify_commit") as mock_verify:
             _result, stdout, _stderr = self._run_cli("verify-commit", "HEAD")
-            mock_verify.assert_called_once_with(".", "HEAD")
+            mock_verify.assert_called_once_with(None, "HEAD")
             self.assertIn("Good signature", stdout)
 
     def test_verify_commit_multiple(self):
@@ -1102,7 +1102,7 @@ class VerifyCommitCommandTest(DulwichCliTestCase):
         with patch("dulwich.cli.porcelain.verify_commit") as mock_verify:
             # Test that verify-commit without arguments defaults to HEAD
             _result, stdout, _stderr = self._run_cli("verify-commit")
-            mock_verify.assert_called_once_with(".", "HEAD")
+            mock_verify.assert_called_once_with(None, "HEAD")
             self.assertIn("Good signature", stdout)
 
 
@@ -1123,7 +1123,7 @@ class VerifyTagCommandTest(DulwichCliTestCase):
         # Mock the porcelain.verify_tag function since we don't have GPG setup
         with patch("dulwich.cli.porcelain.verify_tag") as mock_verify:
             _result, stdout, _stderr = self._run_cli("verify-tag", "v1.0")
-            mock_verify.assert_called_once_with(".", "v1.0")
+            mock_verify.assert_called_once_with(None, "v1.0")
             self.assertIn("Good signature", stdout)
 
     def test_verify_tag_multiple(self):
@@ -2398,7 +2398,7 @@ class PushCommandTest(DulwichCliTestCase):
     def test_push_force(self, mock_push):
         _result, _stdout, _stderr = self._run_cli("push", "-f", "origin")
         mock_push.assert_called_with(
-            ".",
+            None,
             "origin",
             None,
             force=True,
@@ -2420,7 +2420,7 @@ class PushCommandTest(DulwichCliTestCase):
             "push", "-o", "topic=my-feature", "origin"
         )
         mock_push.assert_called_with(
-            ".",
+            None,
             "origin",
             None,
             force=False,
@@ -2447,7 +2447,7 @@ class PushCommandTest(DulwichCliTestCase):
             "origin",
         )
         mock_push.assert_called_with(
-            ".",
+            None,
             "origin",
             None,
             force=False,
@@ -2467,7 +2467,7 @@ class PushCommandTest(DulwichCliTestCase):
     def test_push_all(self, mock_push):
         _result, _stdout, _stderr = self._run_cli("push", "--all", "origin")
         mock_push.assert_called_with(
-            ".",
+            None,
             "origin",
             None,
             force=False,
@@ -2487,7 +2487,7 @@ class PushCommandTest(DulwichCliTestCase):
     def test_push_tags(self, mock_push):
         _result, _stdout, _stderr = self._run_cli("push", "--tags", "origin")
         mock_push.assert_called_with(
-            ".",
+            None,
             "origin",
             None,
             force=False,
@@ -2509,7 +2509,7 @@ class PushCommandTest(DulwichCliTestCase):
             "push", "--delete", "origin", "refs/heads/foo"
         )
         mock_push.assert_called_with(
-            ".",
+            None,
             "origin",
             ["refs/heads/foo"],
             force=False,
@@ -2529,7 +2529,7 @@ class PushCommandTest(DulwichCliTestCase):
     def test_push_dry_run(self, mock_push):
         _result, _stdout, _stderr = self._run_cli("push", "--dry-run", "origin")
         mock_push.assert_called_with(
-            ".",
+            None,
             "origin",
             None,
             force=False,
@@ -2549,7 +2549,7 @@ class PushCommandTest(DulwichCliTestCase):
     def test_push_set_upstream(self, mock_push):
         _result, _stdout, _stderr = self._run_cli("push", "-u", "origin", "main")
         mock_push.assert_called_with(
-            ".",
+            None,
             "origin",
             ["main"],
             force=False,
@@ -2569,7 +2569,7 @@ class PushCommandTest(DulwichCliTestCase):
     def test_push_mirror(self, mock_push):
         _result, _stdout, _stderr = self._run_cli("push", "--mirror", "origin")
         mock_push.assert_called_with(
-            ".",
+            None,
             "origin",
             None,
             force=False,
@@ -5232,6 +5232,52 @@ class DiagnoseCommandTest(DulwichCliTestCase):
 
             # Check that at least core dependencies are listed
             self.assertIn("urllib3:", log_output)
+
+
+class RepoDiscoveryTest(DulwichCliTestCase):
+    """Tests that commands locate the repository like git does."""
+
+    def _run_cli_in(self, cwd, *args, env=None):
+        """Run a CLI command from an arbitrary directory."""
+        old_cwd = os.getcwd()
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        old_environ = dict(os.environ)
+        try:
+            if env is not None:
+                os.environ.update(env)
+            sys.stdout = io.StringIO()
+            sys.stderr = io.StringIO()
+            os.chdir(cwd)
+            return cli.main(list(args)), sys.stdout.getvalue()
+        finally:
+            os.chdir(old_cwd)
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+            os.environ.clear()
+            os.environ.update(old_environ)
+
+    def setUp(self):
+        super().setUp()
+        path = os.path.join(self.repo_path, "a.txt")
+        with open(path, "w") as f:
+            f.write("contents")
+        self._run_cli("add", "a.txt")
+        self._run_cli("commit", "--message=Initial commit")
+
+    def test_discovery_from_subdirectory(self):
+        subdir = os.path.join(self.repo_path, "sub", "dir")
+        os.makedirs(subdir)
+        _result, stdout = self._run_cli_in(subdir, "log")
+        self.assertIn("Initial commit", stdout)
+
+    def test_git_dir_environment_variable(self):
+        outside = os.path.join(self.test_dir, "outside")
+        os.mkdir(outside)
+        _result, stdout = self._run_cli_in(
+            outside, "log", env={"GIT_DIR": os.path.join(self.repo_path, ".git")}
+        )
+        self.assertIn("Initial commit", stdout)
 
 
 if __name__ == "__main__":

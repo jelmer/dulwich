@@ -2102,6 +2102,16 @@ def add(
     return (relpaths, ignored)
 
 
+def _resolve_path(path: str | bytes | os.PathLike[str]) -> str:
+    """Normalize a path into a form that can be compared for identity.
+
+    Comparing path strings is not enough: the same directory can be
+    spelled in several ways, such as an 8.3 short name and its expanded
+    form on Windows.
+    """
+    return os.path.normcase(os.path.realpath(os.fsdecode(path)))
+
+
 def _is_subdir(
     subdir: str | os.PathLike[str], parentdir: str | os.PathLike[str]
 ) -> bool:
@@ -4038,16 +4048,23 @@ def _walk_working_dir_paths(
     """
     # Convert paths to strings for os.walk compatibility
 
+    # Resolved once so that each directory holding a .git can be compared
+    # against it by identity: dirpath and basepath may spell the same
+    # directory differently, for example an 8.3 short name on Windows
+    # versus its expanded form.
+    basepath_resolved = _resolve_path(basepath)
+
     for dirpath, dirnames, filenames in os.walk(frompath):  # type: ignore[type-var]
-        # Skip .git and below.
+        # Skip .git and below, unless this is the repo we are reporting
+        # against, whose own files are still of interest.
         if ".git" in dirnames:
             dirnames.remove(".git")
-            if dirpath != basepath:
+            if _resolve_path(dirpath) != basepath_resolved:  # type: ignore[arg-type]
                 continue
 
         if ".git" in filenames:
             filenames.remove(".git")
-            if dirpath != basepath:
+            if _resolve_path(dirpath) != basepath_resolved:  # type: ignore[arg-type]
                 continue
 
         if precompose_unicode and isinstance(dirpath, str):

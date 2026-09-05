@@ -1369,6 +1369,23 @@ class CleanTests(PorcelainTestCase):
             }
         )
 
+    def test_from_root_spelled_differently(self) -> None:
+        # target_dir and repo.path can name the same directory with
+        # different strings, e.g. an 8.3 short name and its expanded form
+        # on Windows.
+        self.put_files(
+            tracked={"tracked_file", ".gitignore"},
+            ignored={"ignored_file"},
+            untracked={"untracked_file"},
+            empty_dirs=set(),
+        )
+
+        porcelain.clean(
+            repo=self.repo.path, target_dir=os.path.join(self.repo.path, ".")
+        )
+
+        self.assert_wd({"tracked_file", ".gitignore", "ignored_file"})
+
 
 class CloneTests(PorcelainTestCase):
     def test_simple_local(self) -> None:

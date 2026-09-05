@@ -1075,7 +1075,12 @@ def path_to_tree_path(
     if isinstance(path, bytes):
         path = os.fsdecode(path)
     path = Path(path)
-    resolved_path = path.resolve()
+    if path.is_symlink():
+        # A symlink is named in the index by its own path, so resolve only its
+        # parent; resolving the link would yield the path of its target.
+        resolved_path = path.parent.resolve() / path.name
+    else:
+        resolved_path = path.resolve()
 
     # Resolve and abspath seems to behave differently regarding symlinks,
     # as we are doing abspath on the file path, we need to do the same on
@@ -1088,16 +1093,7 @@ def path_to_tree_path(
         repopath = os.fsdecode(repopath)
     repopath = Path(repopath).resolve()
 
-    try:
-        relpath = resolved_path.relative_to(repopath)
-    except ValueError:
-        # If path is a symlink that points to a file outside the repo, we
-        # want the relpath for the link itself, not the resolved target
-        if path.is_symlink():
-            parent = path.parent.resolve()
-            relpath = (parent / path.name).relative_to(repopath)
-        else:
-            raise
+    relpath = resolved_path.relative_to(repopath)
     if sys.platform == "win32":
         return str(relpath).replace(os.path.sep, "/").encode(tree_encoding)
     else:

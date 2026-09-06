@@ -2044,6 +2044,11 @@ class cmd_clone(Command):
             action="store_true",
             help="Initialize and clone submodules",
         )
+        parser.add_argument(
+            "--no-tags",
+            action="store_true",
+            help="Do not clone any tags, and configure the remote not to fetch them",
+        )
         parser.add_argument("source", help="Repository to clone from")
         parser.add_argument("target", nargs="?", help="Directory to clone into")
         parsed_args = parser.parse_args(args)
@@ -2059,6 +2064,7 @@ class cmd_clone(Command):
                 filter_spec=parsed_args.filter_spec,
                 protocol_version=parsed_args.protocol,
                 recurse_submodules=parsed_args.recurse_submodules,
+                no_tags=parsed_args.no_tags,
             )
         except GitProtocolError as e:
             logger.exception(e)

@@ -241,6 +241,7 @@ from .protocol import (
 )
 from .refs import (
     HEADREF,
+    LOCAL_BRANCH_PREFIX,
     SYMREF,
     Ref,
     _import_remote_refs,
@@ -1450,6 +1451,7 @@ class GitClient:
         filter_spec: bytes | None = None,
         protocol_version: int | None = None,
         bundle_uri: str | None = None,
+        no_tags: bool = False,
     ) -> Repo:
         """Clone a repository.
 
@@ -1470,10 +1472,17 @@ class GitClient:
             This can be a URL to a bundle file or a bundle list.
             Using a bundle URI can speed up the clone by downloading
             pre-computed pack data.
+          no_tags: Do not fetch tags, and record
+            ``remote.<origin>.tagOpt = --no-tags`` in the new repository.
 
         Returns:
           The newly created Repo object
         """
+        if no_tags and ref_prefix is None:
+            # ls-refs' ref-prefix has no negative form, so narrow to HEAD
+            # and branches rather than subtracting refs/tags/.
+            ref_prefix = [HEADREF, LOCAL_BRANCH_PREFIX]
+
         if mkdir:
             os.mkdir(target_path)
 
@@ -1509,6 +1518,14 @@ class GitClient:
                     b"fetch",
                     b"+refs/heads/*:refs/remotes/" + origin.encode("utf-8") + b"/*",
                 )
+                if no_tags:
+                    # git records this too: without it the next bare fetch
+                    # pulls the tags straight back in.
+                    target_config.set(
+                        (b"remote", origin.encode("utf-8")),
+                        b"tagOpt",
+                        b"--no-tags",
+                    )
                 target_config.write_to_path()
 
             # Apply bundle URI if provided (bootstrap before fetch)
@@ -3267,6 +3284,7 @@ class LocalGitClient(GitClient):
         filter_spec: bytes | None = None,
         protocol_version: int | None = None,
         bundle_uri: str | None = None,
+        no_tags: bool = False,
     ) -> Repo:
         """Clone a local repository.
 
@@ -3280,6 +3298,11 @@ class LocalGitClient(GitClient):
         # Detect the object format from the source repository
         with self._open_repo(path) as source_repo:
             object_format_name = source_repo.object_format.name
+
+        if no_tags and ref_prefix is None:
+            # ls-refs' ref-prefix has no negative form, so narrow to HEAD
+            # and branches rather than subtracting refs/tags/.
+            ref_prefix = [HEADREF, LOCAL_BRANCH_PREFIX]
 
         if mkdir:
             os.mkdir(target_path)
@@ -3309,6 +3332,14 @@ class LocalGitClient(GitClient):
                     b"fetch",
                     b"+refs/heads/*:refs/remotes/" + origin.encode("utf-8") + b"/*",
                 )
+                if no_tags:
+                    # git records this too: without it the next bare fetch
+                    # pulls the tags straight back in.
+                    target_config.set(
+                        (b"remote", origin.encode("utf-8")),
+                        b"tagOpt",
+                        b"--no-tags",
+                    )
                 target_config.write_to_path()
 
             ref_message = b"clone: from " + encoded_path

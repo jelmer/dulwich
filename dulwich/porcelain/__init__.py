@@ -1834,6 +1834,7 @@ def clone(
     filter_spec: str | None = None,
     protocol_version: int | None = None,
     recurse_submodules: bool = False,
+    no_tags: bool = False,
     ssh_command: str | None = None,
     env: Mapping[str, str] | None = None,
     **kwargs: str | bytes | Sequence[str | bytes],
@@ -1859,6 +1860,9 @@ def clone(
         requested in ``env``, and otherwise to the highest mutually supported
         protocol version.
       recurse_submodules: Whether to initialize and clone submodules
+      no_tags: Do not clone any tags, and record the choice as
+        ``remote.<origin>.tagOpt = --no-tags`` so a later fetch does not
+        pull them in either
       ssh_command: Optional custom SSH command. Defaults to the command
         configured in ``env``.
       env: Environment to read Git variables from (defaults to os.environ)
@@ -1937,6 +1941,7 @@ def clone(
         depth=depth,
         filter_spec=filter_spec_bytes,
         protocol_version=protocol_version,
+        no_tags=no_tags,
     )
 
     # Initialize and update submodules if requested

@@ -5,6 +5,11 @@
    applied before ``determine_wants`` sees the refs, so objects reachable
    only from an excluded ref are no longer copied. (Dipak Chaudhari)
 
+ * Add ``dulwich clone --no-tags``, which clones only ``HEAD`` and the
+   branches and records ``remote.<origin>.tagOpt = --no-tags`` so a later
+   bare ``fetch`` does not pull the tags in either.
+   (Dipak Chaudhari, #1846)
+
  * Reject reftable ``tables.list`` entries that contain a path separator or
    are absolute, so a hostile repository cannot make a ref lookup open a file
    outside the reftable directory. (netliomax25-code)

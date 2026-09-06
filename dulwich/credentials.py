@@ -27,12 +27,23 @@ https://git-scm.com/book/en/v2/Git-Tools-Credential-Storage
 """
 
 __all__ = [
+    "CredentialHelper",
+    "CredentialNotFound",
+    "InvalidCredentialDescription",
+    "fill_credential",
+    "format_credential_description",
+    "helpers_for_url",
     "match_partial_url",
     "match_urls",
+    "parse_credential_description",
+    "url_for_credential",
     "urlmatch_credential_sections",
 ]
 
-from collections.abc import Iterator
+import os
+import shutil
+import subprocess
+from collections.abc import Iterable, Iterator, Mapping
 from urllib.parse import ParseResult, urlparse
 
 from .config import Config, SectionLike
@@ -110,3 +121,277 @@ def urlmatch_credential_sections(
 
         if is_match:
             yield config_section
+
+
+class InvalidCredentialDescription(Exception):
+    """A credential description could not be parsed."""
+
+
+class CredentialNotFound(Exception):
+    """No helper could supply the requested credential."""
+
+
+# gitcredentials(7): "url" is expanded into its components rather than being a
+# field of its own, and the components it sets are overridden by any explicit
+# key that follows it.
+_URL_KEY = "url"
+
+# Attributes a helper may return. Anything else is dropped rather than passed
+# on, so a helper cannot inject an attribute that changes where a later helper
+# (or the caller) sends the credential.
+CREDENTIAL_ATTRIBUTES = (
+    "protocol",
+    "host",
+    "path",
+    "username",
+    "password",
+    "password_expiry_utc",
+    "oauth_refresh_token",
+)
+
+
+def parse_credential_description(lines: Iterable[str]) -> dict[str, str]:
+    """Parse the git credential description format.
+
+    A sequence of ``key=value`` lines terminated by a blank line or by the end
+    of input. A ``url`` key is expanded into its components, and, per
+    gitcredentials(7), an explicit key that follows overrides what the URL set.
+
+    Args:
+      lines: Lines of the description, with or without trailing newlines.
+
+    Returns:
+      The parsed attributes.
+
+    Raises:
+      InvalidCredentialDescription: If a line has no ``=``.
+    """
+    credential: dict[str, str] = {}
+    for raw in lines:
+        line = raw.rstrip("\n")
+        if not line:
+            break
+        key, sep, value = line.partition("=")
+        if not sep:
+            raise InvalidCredentialDescription(
+                f"credential description line has no '=': {line!r}"
+            )
+        if key == _URL_KEY:
+            credential.update(_split_url(value))
+        else:
+            credential[key] = value
+    return credential
+
+
+def _split_url(url: str) -> dict[str, str]:
+    """Expand a ``url=`` line into the components it implies."""
+    parsed = urlparse(url)
+    components: dict[str, str] = {}
+    if parsed.scheme:
+        components["protocol"] = parsed.scheme
+    if parsed.hostname:
+        host = parsed.hostname
+        if parsed.port is not None:
+            host = f"{host}:{parsed.port}"
+        components["host"] = host
+    if parsed.path and parsed.path != "/":
+        components["path"] = parsed.path.lstrip("/")
+    if parsed.username:
+        components["username"] = parsed.username
+    if parsed.password:
+        components["password"] = parsed.password
+    return components
+
+
+def format_credential_description(credential: Mapping[str, str]) -> str:
+    """Render attributes in the git credential description format.
+
+    Args:
+      credential: The attributes to render.
+
+    Returns:
+      The description, terminated by a blank line.
+
+    Raises:
+      ValueError: If a value contains a newline or a NUL. Git rejects these
+        because the format is line-oriented: a newline in a value would be
+        read back as a separate attribute, which is how a hostile value in one
+        field becomes an injected password in another.
+    """
+    lines = []
+    for key, value in credential.items():
+        if "\n" in value or "\x00" in value:
+            raise ValueError(f"credential value for {key!r} contains a newline or NUL")
+        lines.append(f"{key}={value}")
+    return "".join(line + "\n" for line in lines) + "\n"
+
+
+class CredentialHelper:
+    """An external git credential helper.
+
+    Args:
+      command: The value of a ``credential.helper`` config entry.
+    """
+
+    def __init__(self, command: str) -> None:
+        """Set up a helper from its configured command."""
+        self.command = command
+
+    def __repr__(self) -> str:
+        """Return a representation naming the configured command."""
+        return f"{type(self).__name__}({self.command!r})"
+
+    def __eq__(self, other: object) -> bool:
+        """Two helpers are equal when they name the same command."""
+        return isinstance(other, CredentialHelper) and other.command == self.command
+
+    def __hash__(self) -> int:
+        """Hash consistently with __eq__."""
+        return hash(self.command)
+
+    def _argv(self, operation: str) -> tuple[list[str], bool]:
+        """Build the command line for an operation.
+
+        Returns:
+          The argv, and whether it must run through a shell.
+        """
+        command = self.command
+        # gitcredentials(7): a leading "!" means the rest is a shell command.
+        if command.startswith("!"):
+            return [f"{command[1:]} {operation}"], True
+        # An absolute path, or anything carrying a path separator, is used
+        # as-is; a bare word names git-credential-<word>. Testing for a
+        # separator rather than only os.path.isabs is what makes "./helper"
+        # work.
+        if os.path.isabs(command) or os.sep in command or "/" in command:
+            return [command, operation], False
+        return [f"git-credential-{command}", operation], False
+
+    def is_available(self) -> bool:
+        """Whether the helper program can be found.
+
+        A configured-but-missing helper is ordinary -- a keychain helper in a
+        dotfiles repository shared across machines -- and git skips it rather
+        than failing, so callers can use this to do the same.
+        """
+        argv, shell = self._argv("get")
+        if shell:
+            return True
+        return shutil.which(argv[0]) is not None
+
+    def _run(self, operation: str, credential: Mapping[str, str]) -> str | None:
+        argv, shell = self._argv(operation)
+        try:
+            process = subprocess.run(
+                argv[0] if shell else argv,
+                shell=shell,
+                input=format_credential_description(credential),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            return None
+        if process.returncode != 0:
+            return None
+        return process.stdout
+
+    def get(self, credential: Mapping[str, str]) -> dict[str, str] | None:
+        """Ask the helper to supply missing attributes.
+
+        Returns:
+          The attributes the helper supplied, or None if it declined or could
+          not be run.
+        """
+        output = self._run("get", credential)
+        if output is None:
+            return None
+        try:
+            supplied = parse_credential_description(output.splitlines())
+        except InvalidCredentialDescription:
+            return None
+        return {k: v for k, v in supplied.items() if k in CREDENTIAL_ATTRIBUTES}
+
+    def store(self, credential: Mapping[str, str]) -> None:
+        """Tell the helper that the credential worked."""
+        self._run("store", credential)
+
+    def erase(self, credential: Mapping[str, str]) -> None:
+        """Tell the helper that the credential did not work."""
+        self._run("erase", credential)
+
+
+def helpers_for_url(config: Config, url: str | None) -> list[CredentialHelper]:
+    """Return the credential helpers configured for a URL, in order.
+
+    Both ``[credential] helper`` and ``[credential "<url>"] helper`` are
+    consulted, most general first, matching git's precedence.
+
+    An empty ``helper`` value resets the list. Git documents this as the way to
+    discard helpers configured in a more general scope; without it a repository
+    could not opt out of a system-wide helper.
+    """
+    helpers: list[CredentialHelper] = []
+    for section in urlmatch_credential_sections(config, url):
+        for value in config.get_multivar(section, "helper"):
+            command = value.decode("utf-8", errors="replace")
+            if not command:
+                helpers.clear()
+            else:
+                helpers.append(CredentialHelper(command))
+    return helpers
+
+
+def fill_credential(config: Config, credential: Mapping[str, str]) -> dict[str, str]:
+    """Complete a credential, consulting config and then the helpers.
+
+    Args:
+      config: Configuration to read ``credential.*`` from.
+      credential: The attributes known so far.
+
+    Returns:
+      The completed attributes.
+
+    Raises:
+      CredentialNotFound: If no username and password could be obtained.
+    """
+    filled = dict(credential)
+    url = url_for_credential(filled)
+
+    # A configured username seeds the request, but a configured password is
+    # deliberately not read: git has no `credential.password`, and inventing
+    # one here would put a plaintext password in a config file on a path
+    # nothing else in dulwich reads.
+    if "username" not in filled:
+        for section in urlmatch_credential_sections(config, url):
+            try:
+                username = config.get(section, "username")
+            except KeyError:
+                continue
+            filled["username"] = username.decode("utf-8", errors="replace")
+
+    for helper in helpers_for_url(config, url):
+        supplied = helper.get(filled)
+        if supplied:
+            filled.update(supplied)
+        if "username" in filled and "password" in filled:
+            break
+
+    if "username" not in filled or "password" not in filled:
+        raise CredentialNotFound(
+            "no credential helper supplied a username and password"
+        )
+    return filled
+
+
+def url_for_credential(credential: Mapping[str, str]) -> str | None:
+    """Rebuild the URL that a set of attributes describes."""
+    protocol = credential.get("protocol")
+    host = credential.get("host")
+    if not protocol or not host:
+        return None
+    url = f"{protocol}://{host}"
+    path = credential.get("path")
+    if path:
+        url = f"{url}/{path}"
+    return url

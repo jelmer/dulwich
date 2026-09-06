@@ -59,7 +59,7 @@ from the root of the repository, and then opening
 Layering
 ~~~~~~~~
 
-Dulwich is layered into three layers:
+Dulwich has three layers:
 
 * The command-line interface (CLI), which provides the user-facing commands and options
 * The porcelain, which provides a high-level API that is designed to be easy to use and understand,
@@ -202,6 +202,20 @@ Please either send pull requests to the maintainer (jelmer@jelmer.uk) or create
 new pull requests on GitHub.
 
 See also Jelmer's [advice on getting your PRs merged](https://jelmer.uk/pages/pr-advice.html).
+
+AI slop
+-------
+AI slop is a major waste of maintainer time nowadays - it's very easy for
+contributors to create PRs with LLM tools with very little effort, and to then
+just have the LLM interact with the maintainers' code reviews.
+
+This adds no value - if I wanted to use a LLM I could just do so myself
+without a MITM, and give it review comments directly.
+
+So if you submit a PR of dubious quality that was obviously LLM-generated,
+expect it to be closed. This goes doubly for if you submit a burst of such
+PRs. This notably includes overly verbose and complex code, comments and
+descriptions.
 
 Licensing
 ---------

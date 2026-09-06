@@ -11,3 +11,6 @@
 
 Please report security issues by e-mail to jelmer@jelmer.uk, ideally PGP
 encrypted to the key at <https://jelmer.uk/D729A457.asc>
+
+Also - and this goes doubly for anybody using AI to generate
+vulnerability reports - keep reports brief and to the point.

@@ -148,7 +148,7 @@ Other
 * ✗ ``git web--browse`` - Launch web browser to view HTML documentation
 * ✗ ``git difftool`` - Show changes using external diff tool
 * ✓ ``git range-diff`` - Compare two commit ranges
-* ✗ ``git bugreport`` - Collect information for bug reports
+* ✓ ``git bugreport`` - Collect information for bug reports
 * ✓ ``git diagnose`` - Display diagnostic information about the environment
 * ✗ ``git fsmonitor--daemon`` - Filesystem monitor daemon
 * ✗ ``git scalar`` - Manage large Git repositories

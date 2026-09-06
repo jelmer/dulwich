@@ -1,5 +1,10 @@
 1.2.15	UNRELEASED
 
+ * Add ``dulwich bugreport`` to collect system info, the Dulwich version and
+   a repository's enabled hooks into a text file for filing bug reports,
+   matching the layout and ``-o``/``-s``/``--no-suffix`` options of C Git's
+   ``git bugreport``. (Prashant Koirala, #1836)
+
  * Support ``dulwich commit -C/--reuse-message`` and ``-c/--reedit-message``
    to reuse a commit's message, author and author date, optionally editing
    the message. The committer and new commit ancestry remain independent.

@@ -28,6 +28,7 @@ import glob
 import io
 import logging
 import os
+import platform
 import re
 import shutil
 import sys
@@ -37,6 +38,7 @@ import unittest
 from unittest import skipIf
 from unittest.mock import MagicMock, patch
 
+import dulwich
 from dulwich import cli, porcelain
 from dulwich.cli import (
     AutoFlushBinaryIOWrapper,
@@ -5353,6 +5355,158 @@ class DiagnoseCommandTest(DulwichCliTestCase):
 
             # Check that at least core dependencies are listed
             self.assertIn("urllib3:", log_output)
+
+
+def _parse_bugreport(content):
+    """Split bugreport text into its intro paragraph and named sections.
+
+    Returns a tuple ``(intro_lines, sections)`` where ``intro_lines`` is
+    the text before the first ``[Section Header]`` line and ``sections``
+    is an ordered dict mapping each header to its non-blank content
+    lines, so tests can assert on exact structure instead of doing
+    substring matches against the whole blob.
+    """
+    intro = []
+    sections: dict[str, list[str]] = {}
+    current = None
+    for line in content.splitlines():
+        if line.startswith("[") and line.endswith("]"):
+            current = line[1:-1]
+            sections[current] = []
+        elif current is None:
+            intro.append(line)
+        elif line:
+            sections[current].append(line)
+    return intro, sections
+
+
+class BugreportCommandTest(DulwichCliTestCase):
+    """Tests for bugreport command."""
+
+    def test_bugreport_default_filename(self):
+        """Test that a timestamped report file is created with the expected structure."""
+        result, stdout, _stderr = self._run_cli("bugreport")
+        self.assertEqual(0, result)
+
+        matches = glob.glob(os.path.join(self.repo_path, "git-bugreport-*.txt"))
+        self.assertEqual(1, len(matches))
+        self.assertIn("Created new report at", stdout)
+        self.assertIn(os.path.basename(matches[0]), stdout)
+
+        with open(matches[0]) as f:
+            content = f.read()
+
+        intro, sections = _parse_bugreport(content)
+        self.assertEqual("Thank you for filling out a Git bug report!", intro[0])
+        self.assertEqual(["System Info", "Enabled Hooks"], list(sections.keys()))
+
+        version = ".".join(str(v) for v in dulwich.__version__)
+        self.assertEqual(
+            [
+                f"dulwich version: {version}",
+                f"python version: {sys.version}",
+                f"python executable: {sys.executable}",
+                f"platform: {platform.platform()}",
+                f"$SHELL (typically, interactive shell): {os.environ.get('SHELL', '(not set)')}",
+            ],
+            sections["System Info"],
+        )
+        # No hooks were installed in this repo, so nothing should be listed.
+        self.assertEqual([], sections["Enabled Hooks"])
+
+    def test_bugreport_no_suffix(self):
+        """Test that --no-suffix produces an unadorned filename."""
+        result, _stdout, _stderr = self._run_cli("bugreport", "--no-suffix")
+        self.assertEqual(0, result)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo_path, "git-bugreport.txt"))
+        )
+
+    def test_bugreport_custom_suffix(self):
+        """Test that -s controls the filename suffix."""
+        result, _stdout, _stderr = self._run_cli("bugreport", "-s", "custom")
+        self.assertEqual(0, result)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo_path, "git-bugreport-custom.txt"))
+        )
+
+    def test_bugreport_refuses_to_overwrite(self):
+        """Test that an existing report file is not clobbered."""
+        result, _stdout, _stderr = self._run_cli("bugreport", "--no-suffix")
+        self.assertEqual(0, result)
+
+        with self.assertLogs("dulwich.cli", level="ERROR"):
+            result, _stdout, _stderr = self._run_cli("bugreport", "--no-suffix")
+        self.assertEqual(128, result)
+
+    def test_bugreport_output_directory(self):
+        """Test that -o places the report in the given directory, creating it."""
+        result, _stdout, _stderr = self._run_cli(
+            "bugreport", "-o", "reports", "--no-suffix"
+        )
+        self.assertEqual(0, result)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo_path, "reports", "git-bugreport.txt"))
+        )
+
+    def test_bugreport_lists_enabled_hooks(self):
+        """Test that an executable hook script is listed as enabled."""
+        hooks_dir = os.path.join(self.repo_path, ".git", "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+        hook_path = os.path.join(hooks_dir, "pre-commit")
+        with open(hook_path, "w") as f:
+            f.write("#!/bin/sh\nexit 0\n")
+        os.chmod(hook_path, 0o755)
+
+        result, _stdout, _stderr = self._run_cli("bugreport", "--no-suffix")
+        self.assertEqual(0, result)
+
+        with open(os.path.join(self.repo_path, "git-bugreport.txt")) as f:
+            content = f.read()
+        _intro, sections = _parse_bugreport(content)
+        self.assertEqual(["pre-commit"], sections["Enabled Hooks"])
+
+    def test_bugreport_ignores_non_executable_hook(self):
+        """Test that a hook script without the executable bit is not listed.
+
+        Matches C Git, which ignores non-executable hook files (and warns
+        about them) rather than treating them as enabled.
+        """
+        hooks_dir = os.path.join(self.repo_path, ".git", "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+        hook_path = os.path.join(hooks_dir, "pre-commit")
+        with open(hook_path, "w") as f:
+            f.write("#!/bin/sh\nexit 0\n")
+        os.chmod(hook_path, 0o644)
+
+        result, _stdout, _stderr = self._run_cli("bugreport", "--no-suffix")
+        self.assertEqual(0, result)
+
+        with open(os.path.join(self.repo_path, "git-bugreport.txt")) as f:
+            content = f.read()
+        _intro, sections = _parse_bugreport(content)
+        self.assertEqual([], sections["Enabled Hooks"])
+
+    def test_bugreport_outside_repository(self):
+        """Test the hooks section when run outside of any repository."""
+        old_cwd = os.getcwd()
+        old_stdout = sys.stdout
+        try:
+            os.chdir(self.test_dir)
+            sys.stdout = io.StringIO()
+            result = cli.main(["bugreport", "--no-suffix"])
+        finally:
+            os.chdir(old_cwd)
+            sys.stdout = old_stdout
+        self.assertEqual(0, result)
+
+        with open(os.path.join(self.test_dir, "git-bugreport.txt")) as f:
+            content = f.read()
+        _intro, sections = _parse_bugreport(content)
+        self.assertEqual(
+            ["not run from a git repository - no hooks to show"],
+            sections["Enabled Hooks"],
+        )
 
 
 class RepoDiscoveryTest(DulwichCliTestCase):

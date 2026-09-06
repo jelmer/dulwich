@@ -60,11 +60,13 @@ import contextlib
 import io
 import logging
 import os
+import platform
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+import time
 import types
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
@@ -5073,6 +5075,124 @@ class cmd_describe(Command):
         logger.info(porcelain.describe(None))
 
 
+def _bugreport_hooks_section() -> str:
+    """Build the "[Enabled Hooks]" section of a bug report.
+
+    Returns:
+        The names of hooks enabled in the repository discovered from the
+        current directory, one per line, or an explanatory message if the
+        current directory is not inside a repository.
+    """
+    try:
+        with Repo.discover() as r:
+            enabled = sorted(
+                name
+                for name, hook in r.hooks.items()
+                if os.access(getattr(hook, "filepath", ""), os.X_OK)
+            )
+    except NotGitRepository:
+        return "not run from a git repository - no hooks to show"
+    return "\n".join(enabled)
+
+
+def _bugreport_text() -> str:
+    """Build the contents of a Dulwich bug report.
+
+    Returns:
+        The full text of the bug report, matching the layout of C Git's
+        ``git bugreport`` so it can be filed against either project.
+    """
+    import dulwich
+
+    version = ".".join(str(v) for v in dulwich.__version__)
+    lines = [
+        "Thank you for filling out a Git bug report!",
+        "Please answer the following questions to help us understand your issue.",
+        "",
+        "What did you do before the bug happened? (Steps to reproduce your issue)",
+        "",
+        "What did you expect to happen? (Expected behavior)",
+        "",
+        "What happened instead? (Actual behavior)",
+        "",
+        "What's different between what you expected and what actually happened?",
+        "",
+        "Anything else you want to add:",
+        "",
+        "Please review the rest of the bug report below.",
+        "You can delete any lines you don't wish to share.",
+        "",
+        "",
+        "[System Info]",
+        f"dulwich version: {version}",
+        f"python version: {sys.version}",
+        f"python executable: {sys.executable}",
+        f"platform: {platform.platform()}",
+        f"$SHELL (typically, interactive shell): {os.environ.get('SHELL', '(not set)')}",
+        "",
+        "",
+        "[Enabled Hooks]",
+        _bugreport_hooks_section(),
+    ]
+    return "\n".join(lines) + "\n"
+
+
+class cmd_bugreport(Command):
+    """Collect information for a bug report."""
+
+    def run(self, args: Sequence[str]) -> int:
+        """Execute the bugreport command.
+
+        Args:
+            args: Command line arguments
+
+        Returns:
+            0 on success, 128 if the report file already exists
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "-o",
+            "--output-directory",
+            type=str,
+            default=".",
+            help="Place the resulting bug report file in this directory",
+        )
+        parser.add_argument(
+            "-s",
+            "--suffix",
+            type=str,
+            default="%Y-%m-%d-%H%M",
+            dest="suffix",
+            help="strftime(3) format string used to disambiguate the filename",
+        )
+        parser.add_argument(
+            "--no-suffix",
+            action="store_const",
+            const=None,
+            dest="suffix",
+            help="Do not disambiguate the filename with a suffix",
+        )
+        parsed_args = parser.parse_args(args)
+
+        if parsed_args.suffix is None:
+            filename = "git-bugreport.txt"
+        else:
+            filename = f"git-bugreport-{time.strftime(parsed_args.suffix)}.txt"
+
+        os.makedirs(parsed_args.output_directory, exist_ok=True)
+        path = os.path.join(parsed_args.output_directory, filename)
+
+        try:
+            with open(path, "x", encoding="utf-8") as f:
+                f.write(_bugreport_text())
+        except FileExistsError:
+            logger.error("fatal: unable to create '%s': File exists", path)
+            return 128
+
+        print(f"Created new report at '{path}'.")
+        return 0
+
+
 class cmd_diagnose(Command):
     """Display diagnostic information about the Python environment."""
 
@@ -7778,6 +7898,7 @@ commands = {
     "bisect": cmd_bisect,
     "blame": cmd_blame,
     "branch": cmd_branch,
+    "bugreport": cmd_bugreport,
     "bundle": cmd_bundle,
     "cat-file": cmd_cat_file,
     "check-ignore": cmd_check_ignore,

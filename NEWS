@@ -1,5 +1,9 @@
 1.2.15	UNRELEASED
 
+ * List local branches for bare ``dulwich branch`` and standalone
+   ``dulwich branch --list [pattern]``. Listing empty repositories or patterns
+   with no matches succeeds without changing refs. (be-student, #1847)
+
  * Add ``dulwich commit --author="Name <email>"`` to override the author
    of a new or amended commit. (kudala-bharani, #1845)
 

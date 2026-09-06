@@ -4396,7 +4396,7 @@ class cmd_branch(Command):
         parser.add_argument(
             "--list",
             nargs="?",
-            const=None,
+            const="*",
             help="List branches matching a pattern",
         )
         parsed_args = parser.parse_args(args)
@@ -4412,7 +4412,7 @@ class cmd_branch(Command):
                 for branch in branches:
                     sys.stdout.write(f"{branch.decode()}\n")
 
-        branches: Iterator[bytes] | list[bytes] | None = None
+        branches: Iterator[bytes] | Sequence[bytes] | None = None
 
         try:
             if parsed_args.all:
@@ -4436,13 +4436,17 @@ class cmd_branch(Command):
                         f"error: object name {e.args[0].decode()} not found\n"
                     )
                     return 1
+            elif parsed_args.list is not None or (
+                parsed_args.branch is None and not parsed_args.delete
+            ):
+                branches = porcelain.branch_list(None)
 
         except porcelain.Error as e:
             sys.stderr.write(f"{e}")
             return 1
 
         pattern = parsed_args.list
-        if pattern is not None and branches:
+        if pattern is not None and branches is not None:
             branches = porcelain.filter_branches_by_pattern(branches, pattern)
 
         if branches is not None:

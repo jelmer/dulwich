@@ -335,6 +335,100 @@ class CommitCommandTest(DulwichCliTestCase):
                 self.assertEqual(commit.parents, original.parents)
                 self.assertEqual(commit.message, b"Amended commit")
 
+    def test_commit_reuse_message(self):
+        """Reusing a message preserves authorship, not committer or parents."""
+        self.overrideEnv("GIT_COMMITTER_NAME", "New Committer")
+        self.overrideEnv("GIT_COMMITTER_EMAIL", "new@example.com")
+        for flag in ("-C", "--reuse-message", "-c", "--reedit-message"):
+            with self.subTest(flag=flag):
+                original_id = porcelain.commit(
+                    self.repo,
+                    message="Original café\n",
+                    author=b"Old <old@example.com>",
+                    author_timestamp=1234567890,
+                    author_timezone=19800,
+                    commit_timestamp=1234567890,
+                )
+                with patch(
+                    "dulwich.cli.launch_editor", return_value=b"Edited message\n"
+                ) as editor:
+                    result, _, _ = self._run_cli("commit", flag, original_id.decode())
+                self.assertIsNone(result)
+                commit = self.repo[self.repo.head()]
+                self.assertEqual(commit.author, b"Old <old@example.com>")
+                self.assertEqual(commit.author_time, 1234567890)
+                self.assertEqual(commit.author_timezone, 19800)
+                self.assertEqual(commit.committer, b"New Committer <new@example.com>")
+                self.assertNotEqual(commit.commit_time, 1234567890)
+                self.assertEqual(commit.parents, [original_id])
+                if flag in ("-c", "--reedit-message"):
+                    self.assertEqual(commit.message, b"Edited message\n")
+                    self.assertTrue(
+                        editor.call_args.args[0].startswith("Original café\n".encode())
+                    )
+                else:
+                    self.assertEqual(commit.message, "Original café\n".encode())
+                    editor.assert_not_called()
+
+    def test_commit_reuse_message_amend_author_override(self):
+        """An explicit author overrides reused authorship when amending."""
+        source = porcelain.commit(
+            self.repo, message=b"Source", author_timestamp=1234567890
+        )
+        head = porcelain.commit(self.repo, message=b"Head")
+        result, _, _ = self._run_cli(
+            "commit",
+            "--amend",
+            "-C",
+            source.decode(),
+            "--author",
+            "Other <other@example.com>",
+        )
+        self.assertIsNone(result)
+        commit = self.repo[self.repo.head()]
+        self.assertEqual(commit.message, b"Source")
+        self.assertEqual(commit.author, b"Other <other@example.com>")
+        self.assertEqual(commit.author_time, 1234567890)
+        self.assertEqual(commit.parents, self.repo[head].parents)
+
+    def test_commit_reuse_invalid_arguments(self):
+        """Conflicting message flags leave HEAD unchanged."""
+        head = porcelain.commit(self.repo, message=b"Original")
+        for args in (
+            ("-m", "new", "-C", "HEAD"),
+            ("-C", "HEAD", "-c", "HEAD"),
+        ):
+            with self.subTest(args=args):
+                with self.assertRaises(SystemExit) as error:
+                    self._run_cli("commit", *args)
+                self.assertEqual(error.exception.code, 2)
+                self.assertEqual(self.repo.head(), head)
+
+    def test_commit_reuse_invalid_source(self):
+        """Commit resolution errors propagate without changing HEAD."""
+        head = porcelain.commit(self.repo, message=b"Original")
+        blob = Blob.from_string(b"not a commit")
+        self.repo.object_store.add_object(blob)
+        for flag in ("-C", "--reuse-message", "-c", "--reedit-message"):
+            for source, error_type in (
+                ("missing", KeyError),
+                ("", KeyError),
+                (blob.id.decode(), ValueError),
+            ):
+                with self.subTest(flag=flag, source=source):
+                    with self.assertRaises(error_type):
+                        self._run_cli("commit", flag, source)
+                    self.assertEqual(self.repo.head(), head)
+
+    @patch("dulwich.cli.launch_editor", return_value=b"")
+    def test_commit_reedit_empty_message(self, editor):
+        """Cancelling the reused message editor leaves the existing commit intact."""
+        head = porcelain.commit(self.repo, message=b"Original")
+        result, _, _ = self._run_cli("commit", "-c", "HEAD")
+        self.assertEqual(result, 1)
+        self.assertEqual(self.repo.head(), head)
+        editor.assert_called_once()
+
     def test_commit_all_flag(self):
         # Create initial commit
         test_file = os.path.join(self.repo_path, "test.txt")

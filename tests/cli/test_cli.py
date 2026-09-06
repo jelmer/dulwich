@@ -5403,3 +5403,67 @@ class RepoDiscoveryTest(DulwichCliTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BugreportCommandTest(DulwichCliTestCase):
+    """Tests for `dulwich bugreport`."""
+
+    def _read_only_report(self):
+        reports = glob.glob(os.path.join(self.repo_path, "git-bugreport*.txt"))
+        self.assertEqual(1, len(reports), reports)
+        with open(reports[0], encoding="utf-8") as f:
+            return reports[0], f.read()
+
+    def test_writes_a_timestamped_report(self) -> None:
+        result, stdout, _ = self._run_cli("bugreport")
+        self.assertEqual(0, result)
+        path, report = self._read_only_report()
+        # The default suffix is a strftime format, so assert the shape rather
+        # than a literal name: a test pinning "now" is a test that fails at
+        # midnight.
+        self.assertRegex(
+            os.path.basename(path), r"^git-bugreport-\d{4}-\d{2}-\d{2}-\d{4}\.txt$"
+        )
+        self.assertIn(os.path.basename(path), stdout)
+        self.assertIn("[System Info]", report)
+        self.assertIn("[Enabled Hooks]", report)
+
+    def test_no_suffix_writes_a_fixed_name(self) -> None:
+        result, _, _ = self._run_cli("bugreport", "--no-suffix")
+        self.assertEqual(0, result)
+        path, _ = self._read_only_report()
+        self.assertEqual("git-bugreport.txt", os.path.basename(path))
+
+    def test_does_not_overwrite_an_existing_report(self) -> None:
+        """Two runs inside the same minute must not lose the first report.
+
+        The default suffix has minute resolution, so this is reachable in
+        ordinary use, not just with --no-suffix.
+        """
+        self.assertEqual(0, self._run_cli("bugreport", "--no-suffix")[0])
+        _, original = self._read_only_report()
+
+        result, _, _ = self._run_cli("bugreport", "--no-suffix")
+        self.assertEqual(1, result)
+        _, after = self._read_only_report()
+        self.assertEqual(original, after)
+
+    def test_output_directory(self) -> None:
+        target = os.path.join(self.test_dir, "reports")
+        os.mkdir(target)
+        result, _, _ = self._run_cli("bugreport", "--no-suffix", "-o", target)
+        self.assertEqual(0, result)
+        self.assertTrue(os.path.exists(os.path.join(target, "git-bugreport.txt")))
+        self.assertEqual([], glob.glob(os.path.join(self.repo_path, "*.txt")))
+
+    def test_missing_output_directory_is_an_error_not_a_traceback(self) -> None:
+        result, _, _ = self._run_cli(
+            "bugreport", "--no-suffix", "-o", os.path.join(self.test_dir, "nope")
+        )
+        self.assertEqual(1, result)
+
+    def test_custom_suffix(self) -> None:
+        result, _, _ = self._run_cli("bugreport", "-s", "fixed")
+        self.assertEqual(0, result)
+        path, _ = self._read_only_report()
+        self.assertEqual("git-bugreport-fixed.txt", os.path.basename(path))

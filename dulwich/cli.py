@@ -65,6 +65,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 import types
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
@@ -4395,6 +4396,68 @@ class cmd_check_mailmap(Command):
             logger.info(canonical_identity)
 
 
+class cmd_bugreport(Command):
+    """Collect information for a bug report."""
+
+    def run(self, args: Sequence[str]) -> int | None:
+        """Execute the bugreport command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "-o",
+            "--output-directory",
+            type=str,
+            default=".",
+            help="Write the report to this directory (default: current directory)",
+        )
+        parser.add_argument(
+            "-s",
+            "--suffix",
+            type=str,
+            default="%Y-%m-%d-%H%M",
+            help=(
+                "strftime format for the generated filename's suffix "
+                "(default: %%Y-%%m-%%d-%%H%%M)"
+            ),
+        )
+        parser.add_argument(
+            "--no-suffix",
+            action="store_true",
+            help="Write to git-bugreport.txt with no timestamp suffix",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Reading the environment is the CLI's job, not the porcelain's, so
+        # $SHELL is collected here and passed down explicitly.
+        report = porcelain.bugreport(".", env=os.environ)
+
+        if parsed_args.no_suffix:
+            filename = "git-bugreport.txt"
+        else:
+            suffix = time.strftime(parsed_args.suffix)
+            filename = f"git-bugreport-{suffix}.txt"
+        path = os.path.join(parsed_args.output_directory, filename)
+
+        # "x", not "w": two reports a second apart share a filename under the
+        # default minute-resolution suffix, and silently overwriting the first
+        # one loses the report the user is in the middle of filing.
+        try:
+            with open(path, "x", encoding="utf-8") as f:
+                f.write(report)
+        except FileExistsError:
+            logger.error("error: %s already exists", path)
+            return 1
+        except OSError as e:
+            logger.error("error: could not write %s: %s", path, e)
+            return 1
+
+        print(f"Created new report at '{path}'.")
+        return 0
+
+
 class cmd_branch(Command):
     """List, create, or delete branches."""
 
@@ -7778,6 +7841,7 @@ commands = {
     "bisect": cmd_bisect,
     "blame": cmd_blame,
     "branch": cmd_branch,
+    "bugreport": cmd_bugreport,
     "bundle": cmd_bundle,
     "cat-file": cmd_cat_file,
     "check-ignore": cmd_check_ignore,

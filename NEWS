@@ -1,5 +1,13 @@
 1.2.15	UNRELEASED
 
+ * Add ``dulwich bugreport``, which writes a fill-in template plus the
+   environment facts a maintainer would otherwise have to ask for: the
+   Dulwich and Python versions, the platform, whether the Rust extensions
+   are actually in use, ``$SHELL``, and which githooks(5) hooks are enabled
+   in the repository. Supports ``-o/--output-directory``, ``-s/--suffix``
+   and ``--no-suffix``, and refuses to overwrite an existing report.
+   (Dipak Chaudhari, #1836)
+
  * Reject reftable ``tables.list`` entries that contain a path separator or
    are absolute, so a hostile repository cannot make a ref lookup open a file
    outside the reftable directory. (netliomax25-code)

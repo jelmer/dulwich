@@ -118,6 +118,7 @@ __all__ = [
     "branch_list",
     "branch_remotes_list",
     "branches_containing",
+    "bugreport",
     "cat_file_content",
     "cat_file_size",
     "cat_file_type",
@@ -296,6 +297,7 @@ import datetime
 import fnmatch
 import logging
 import os
+import platform
 import posixpath
 import re
 import stat
@@ -358,7 +360,7 @@ from ..diff_tree import (
     TreeChange,
     tree_changes,
 )
-from ..errors import SendPackError
+from ..errors import NotGitRepository, SendPackError
 from ..file import open_nofollow
 from ..graph import can_fast_forward
 from ..ignore import IgnoreFilterManager
@@ -1400,6 +1402,140 @@ def var(
         return variables[variable]
     else:
         raise KeyError(f"Variable {variable} has no value")
+
+
+# The hook names githooks(5) defines. `git bugreport` lists which of these are
+# present and executable, because a hook firing unexpectedly is a common cause
+# of behaviour a reporter cannot explain.
+BUGREPORT_HOOK_NAMES = (
+    "applypatch-msg",
+    "pre-applypatch",
+    "post-applypatch",
+    "pre-commit",
+    "pre-merge-commit",
+    "prepare-commit-msg",
+    "commit-msg",
+    "post-commit",
+    "pre-rebase",
+    "post-checkout",
+    "post-merge",
+    "pre-push",
+    "pre-receive",
+    "update",
+    "proc-receive",
+    "post-receive",
+    "post-update",
+    "reference-transaction",
+    "push-to-checkout",
+    "pre-auto-gc",
+    "post-rewrite",
+    "sendemail-validate",
+    "fsmonitor-watchman",
+    "p4-changelist",
+    "p4-prepare-changelist",
+    "p4-post-changelist",
+    "p4-pre-submit",
+    "post-index-change",
+)
+
+_BUGREPORT_TEMPLATE = """Thank you for filling out a Dulwich bug report!
+Please answer the following questions to help us understand your issue.
+
+What did you do before the bug happened? (Steps to reproduce your issue)
+
+What did you expect to happen? (Expected behavior)
+
+What happened instead? (Actual behavior)
+
+What's different between what you expected and what actually happened?
+
+Anything else you want to add:
+
+Please review the rest of the bug report below.
+You can delete any lines you don't wish to share.
+"""
+
+
+def bugreport(
+    repo: RepoPath | None = None,
+    env: Mapping[str, str] | None = None,
+) -> str:
+    """Collect the information a Dulwich bug report should carry.
+
+    Mirrors ``git bugreport``: a fill-in template followed by the environment
+    facts a maintainer would otherwise have to ask for one at a time.
+
+    Args:
+      repo: Path to the repository, or None to report system information only.
+        A path that is not a repository is reported as such rather than
+        raising, since a bug report about failing to open a repository is
+        exactly when this command is most useful.
+      env: Environment to read from (defaults to ``os.environ``). Only
+        ``SHELL`` is consulted, and only to record it.
+
+    Returns:
+      The report as a single string, ending in a newline.
+    """
+    if env is None:
+        env = os.environ
+
+    lines = [_BUGREPORT_TEMPLATE, "[System Info]"]
+    from .. import __version__ as dulwich_version
+
+    lines.append(
+        "dulwich version: {}".format(".".join(str(part) for part in dulwich_version))
+    )
+    lines.append(f"python version: {sys.version.splitlines()[0]}")
+    lines.append(f"implementation: {platform.python_implementation()}")
+    lines.append(f"uname: {' '.join(platform.uname())}")
+    # Whether the Rust extensions are in use changes which code actually ran,
+    # so a report that omits it can send a reader to the wrong implementation.
+    lines.append(f"rust extensions: {'yes' if _rust_extensions_loaded() else 'no'}")
+    lines.append(
+        f"$SHELL (typically, interactive shell): {env.get('SHELL', '<unset>')}"
+    )
+
+    lines.append("")
+    lines.append("[Enabled Hooks]")
+    if repo is None:
+        lines.append("<no repository>")
+    else:
+        try:
+            hooks = list(_enabled_hooks(repo))
+        except NotGitRepository:
+            lines.append("<not a git repository>")
+        else:
+            lines.extend(hooks or ["<none>"])
+
+    return "\n".join(lines) + "\n"
+
+
+def _rust_extensions_loaded() -> bool:
+    """Whether the compiled accelerators are the ones actually in use.
+
+    Asks whether ``parse_tree`` is still the pure-Python function rather than
+    whether ``dulwich._objects`` imports: a wheel can ship the extension while
+    the running process fell back to Python, and it is the latter that decides
+    which code a reported traceback came from.
+    """
+    from ..objects import _parse_tree_py, parse_tree
+
+    return parse_tree is not _parse_tree_py
+
+
+def _enabled_hooks(repo: RepoPath) -> Iterator[str]:
+    """Yield the githooks(5) hooks that are present and executable."""
+    with open_repo_closing(repo) as r:
+        hooks_dir = os.path.join(r.controldir(), "hooks")
+        for name in BUGREPORT_HOOK_NAMES:
+            path = os.path.join(hooks_dir, name)
+            # Git treats a non-executable hook as disabled on POSIX. Windows
+            # has no execute bit, so existence is the whole test there and
+            # os.access would answer True for every readable file anyway.
+            if not os.path.isfile(path):
+                continue
+            if sys.platform == "win32" or os.access(path, os.X_OK):
+                yield name
 
 
 def commit(

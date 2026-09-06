@@ -591,6 +591,33 @@ class StatusCommandTest(DulwichCliTestCase):
 class BranchCommandTest(DulwichCliTestCase):
     """Tests for branch command."""
 
+    def test_branch_list_local_defaults(self) -> None:
+        self._run_cli("commit", "--message=Initial")
+        self._run_cli("branch", "feature-one")
+        self._run_cli("branch", "feature-two")
+        refs_before = self.repo.refs.as_dict()
+        local_names = {"master", "feature-one", "feature-two"}
+        cases = [
+            ((), local_names),
+            (("--list",), local_names),
+            (("--list", "feature-*"), {"feature-one", "feature-two"}),
+            (("--list", "missing-*"), set()),
+            (("--column",), local_names),
+        ]
+        for args, expected in cases:
+            with self.subTest(args=args):
+                result, stdout, _stderr = self._run_cli("branch", *args)
+                self.assertEqual(result, 0)
+                self.assertEqual(set(stdout.split()), expected)
+                self.assertEqual(self.repo.refs.as_dict(), refs_before)
+
+    def test_branch_list_empty_repository(self) -> None:
+        for args in [(), ("--list",), ("--list", "missing-*")]:
+            with self.subTest(args=args):
+                result, stdout, _stderr = self._run_cli("branch", *args)
+                self.assertEqual(result, 0)
+                self.assertEqual(stdout, "")
+
     def test_branch_create(self):
         # Create initial commit
         test_file = os.path.join(self.repo_path, "test.txt")

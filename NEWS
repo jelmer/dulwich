@@ -1,5 +1,10 @@
 1.2.15	UNRELEASED
 
+ * Add ``porcelain.credential_fill``/``credential_approve``/
+   ``credential_reject`` and the ``dulwich credential fill|approve|reject``
+   command they back, exposing the credential helper protocol.
+   (Dipak Chaudhari, #1827)
+
  * Implement the git credential description format and the
    ``credential.helper`` protocol in ``dulwich.credentials``, resolving and
    consulting helpers as git does. (Dipak Chaudhari, #1827)

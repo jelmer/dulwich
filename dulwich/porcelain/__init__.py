@@ -139,6 +139,9 @@ __all__ = [
     "cone_mode_list",
     "cone_mode_set",
     "count_objects",
+    "credential_approve",
+    "credential_fill",
+    "credential_reject",
     "daemon",
     "describe",
     "diff",
@@ -348,6 +351,11 @@ from ..client import (
     get_transport_and_path,
 )
 from ..config import Config, StackedConfig, env_config
+from ..credentials import (
+    fill_credential,
+    helpers_for_url,
+    url_for_credential,
+)
 from ..diff_tree import (
     CHANGE_ADD,
     CHANGE_COPY,
@@ -358,7 +366,7 @@ from ..diff_tree import (
     TreeChange,
     tree_changes,
 )
-from ..errors import SendPackError
+from ..errors import NotGitRepository, SendPackError
 from ..file import open_nofollow
 from ..graph import can_fast_forward
 from ..ignore import IgnoreFilterManager
@@ -7038,6 +7046,79 @@ def find_unique_abbrev(
 
     # If we get here, return the full ID
     return hex_id
+
+
+def _credential_config(
+    repo: str | os.PathLike[str] | Repo | None,
+    env: Mapping[str, str] | None = None,
+) -> "StackedConfig":
+    """Build the config stack to read ``credential.*`` from.
+
+    ``git credential`` is routinely run outside a repository -- that is how
+    helpers are driven -- so a missing repository falls back to the user and
+    system stack rather than being an error.
+    """
+    if repo is None:
+        try:
+            discovered = Repo.discover()
+        except NotGitRepository:
+            config = StackedConfig.default()
+            override = env_config(os.environ if env is None else env)
+            if override is not None:
+                config.backends.insert(0, override)
+            return config
+        with discovered as r:
+            return _config_stack(r, env)
+    with open_repo_closing(repo) as r:
+        return _config_stack(r, env)
+
+
+def credential_fill(
+    credential: Mapping[str, str],
+    repo: str | os.PathLike[str] | Repo | None = None,
+    env: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Complete a credential from the config and the configured helpers.
+
+    Args:
+      credential: The attributes known so far, as from
+        :func:`dulwich.credentials.parse_credential_description`.
+      repo: Repository whose config to use; discovered if not given.
+      env: Environment to read ``GIT_CONFIG_*`` from.
+
+    Returns:
+      The completed attributes.
+
+    Raises:
+      CredentialNotFound: If no helper supplied a username and password.
+    """
+    return fill_credential(_credential_config(repo, env), credential)
+
+
+def credential_approve(
+    credential: Mapping[str, str],
+    repo: str | os.PathLike[str] | Repo | None = None,
+    env: Mapping[str, str] | None = None,
+) -> None:
+    """Tell every configured helper that a credential worked.
+
+    Every helper is told, not just the first: more than one store may hold the
+    credential, and a stale copy in the second is the bug being fixed.
+    """
+    config = _credential_config(repo, env)
+    for helper in helpers_for_url(config, url_for_credential(credential)):
+        helper.store(credential)
+
+
+def credential_reject(
+    credential: Mapping[str, str],
+    repo: str | os.PathLike[str] | Repo | None = None,
+    env: Mapping[str, str] | None = None,
+) -> None:
+    """Tell every configured helper that a credential did not work."""
+    config = _credential_config(repo, env)
+    for helper in helpers_for_url(config, url_for_credential(credential)):
+        helper.erase(credential)
 
 
 def describe(

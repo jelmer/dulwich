@@ -220,7 +220,7 @@ Internal Helpers
 * ✓ ``git check-ignore`` - Debug gitignore / exclude files
 * ✓ ``git check-mailmap`` - Show canonical names and email addresses
 * ✓ ``git column`` - Display data in columns
-* ◐ ``git credential`` - Retrieve and store user credentials (basic support)
+* ◐ ``git credential`` - Retrieve and store user credentials (fill/approve/reject; no credential cache daemon)
 * ✗ ``git fmt-merge-msg`` - Produce merge commit message
 * ✓ ``git interpret-trailers`` - Add or parse structured information in commit messages
 * ✓ ``git mailinfo`` - Extract patch and authorship from single email message

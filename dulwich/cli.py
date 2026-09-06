@@ -82,6 +82,12 @@ from dulwich.refs import HEADREF, Ref
 from .bundle import Bundle, create_bundle_from_repo, read_bundle, write_bundle
 from .client import get_transport_and_path
 from .config import Config
+from .credentials import (
+    CredentialNotFound,
+    InvalidCredentialDescription,
+    format_credential_description,
+    parse_credential_description,
+)
 from .errors import (
     ApplyDeltaError,
     FileFormatException,
@@ -5073,6 +5079,49 @@ class cmd_describe(Command):
         logger.info(porcelain.describe(None))
 
 
+class cmd_credential(Command):
+    """Retrieve and store user credentials."""
+
+    def run(self, args: Sequence[str]) -> int | None:
+        """Execute the credential command.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "operation",
+            choices=["fill", "approve", "reject"],
+            help="fill: complete a credential; approve: record that it worked; "
+            "reject: record that it did not",
+        )
+        parsed_args = parser.parse_args(args)
+
+        # Read the description from stdin, as git does. Passing a password as
+        # an argument would put it in the process table, which is the reason
+        # the format exists at all.
+        try:
+            credential = parse_credential_description(sys.stdin)
+        except InvalidCredentialDescription as e:
+            logger.error("error: %s", e)
+            return 1
+
+        if parsed_args.operation == "fill":
+            try:
+                filled = porcelain.credential_fill(credential)
+            except CredentialNotFound as e:
+                logger.error("error: %s", e)
+                return 1
+            sys.stdout.write(format_credential_description(filled))
+            return 0
+
+        if parsed_args.operation == "approve":
+            porcelain.credential_approve(credential)
+        else:
+            porcelain.credential_reject(credential)
+        return 0
+
+
 class cmd_diagnose(Command):
     """Display diagnostic information about the Python environment."""
 
@@ -7792,6 +7841,7 @@ commands = {
     "commit-tree": cmd_commit_tree,
     "config": cmd_config,
     "count-objects": cmd_count_objects,
+    "credential": cmd_credential,
     "describe": cmd_describe,
     "diagnose": cmd_diagnose,
     "daemon": cmd_daemon,

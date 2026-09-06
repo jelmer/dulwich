@@ -45,6 +45,7 @@ from dulwich import porcelain
 from dulwich.am import AmConflict
 from dulwich.client import SendPackResult
 from dulwich.commit_graph import read_commit_graph
+from dulwich.credentials import CredentialNotFound
 from dulwich.diff_tree import tree_changes
 from dulwich.errors import CommitError, WorkingTreeModifiedError
 from dulwich.index import (
@@ -79,6 +80,7 @@ from dulwich.tests.utils import build_commit_graph, make_commit, make_object
 from dulwich.web import make_server, make_wsgi_chain
 
 from .. import DependencyMissing, TestCase
+from ..test_credentials import _HELPER_SOURCE
 
 try:
     import gpg
@@ -1751,6 +1753,90 @@ class CloneTests(PorcelainTestCase):
         )
         self.addCleanup(r.close)
         self.assertEqual(r.path, target_path)
+
+
+class CredentialTests(TestCase):
+    """`porcelain.credential_fill` / `_approve` / `_reject`."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.repo_path = os.path.join(self.test_dir, "repo")
+        os.mkdir(self.repo_path)
+        repo = porcelain.init(self.repo_path)
+        self.addCleanup(repo.close)
+        self.helper_path = os.path.join(self.test_dir, "helper.py")
+        with open(self.helper_path, "w") as f:
+            f.write(_HELPER_SOURCE)
+
+    def _helper_command(self, *answers: str) -> str:
+        return "!" + " ".join([sys.executable, self.helper_path, *answers])
+
+    def _configure_repo_helper(self, *answers: str) -> None:
+        with porcelain.open_repo_closing(self.repo_path) as repo:
+            config = repo.get_config()
+            config.set((b"credential",), b"helper", self._helper_command(*answers))
+            config.write_to_path()
+
+    def _helper_env(self, *answers: str) -> dict[str, str]:
+        return {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "credential.helper",
+            "GIT_CONFIG_VALUE_0": self._helper_command(*answers),
+        }
+
+    def _helper_log(self) -> list[str]:
+        try:
+            with open(self.helper_path + ".log") as f:
+                return f.read().split()
+        except FileNotFoundError:
+            return []
+
+    def test_fill_uses_the_repository_config(self) -> None:
+        self._configure_repo_helper("username=repo-user", "password=hunter2")
+        self.assertEqual(
+            {
+                "protocol": "https",
+                "host": "example.com",
+                "username": "repo-user",
+                "password": "hunter2",
+            },
+            porcelain.credential_fill(
+                {"protocol": "https", "host": "example.com"}, repo=self.repo_path
+            ),
+        )
+
+    def test_fill_outside_a_repository(self) -> None:
+        """`git credential` is routinely run with no repository at all.
+
+        Discovery failing has to fall back to the user/system stack rather
+        than raise, so the helper here comes in through GIT_CONFIG_*.
+        """
+        cwd = os.getcwd()
+        os.chdir(self.test_dir)
+        self.addCleanup(os.chdir, cwd)
+
+        filled = porcelain.credential_fill(
+            {"protocol": "https", "host": "example.com"},
+            env=self._helper_env("username=env-user", "password=p"),
+        )
+        self.assertEqual("env-user", filled["username"])
+
+    def test_fill_without_a_helper_raises(self) -> None:
+        self.assertRaises(
+            CredentialNotFound,
+            porcelain.credential_fill,
+            {"protocol": "https", "host": "example.com"},
+            repo=self.repo_path,
+        )
+
+    def test_approve_and_reject_reach_the_helper(self) -> None:
+        self._configure_repo_helper()
+        credential = {"protocol": "https", "host": "example.com", "username": "bob"}
+        porcelain.credential_approve(credential, repo=self.repo_path)
+        porcelain.credential_reject(credential, repo=self.repo_path)
+        self.assertEqual(["store", "erase"], self._helper_log())
 
 
 class InitTests(TestCase):

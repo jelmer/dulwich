@@ -54,6 +54,7 @@ from dulwich.repo import Repo
 from dulwich.tests.utils import (
     build_commit_graph,
 )
+from tests.test_credentials import _HELPER_SOURCE as HELPER_SOURCE
 
 from .. import TestCase
 
@@ -5403,3 +5404,86 @@ class RepoDiscoveryTest(DulwichCliTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CredentialCommandTest(DulwichCliTestCase):
+    """Tests for `dulwich credential`."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.helper_path = os.path.join(self.test_dir, "helper.py")
+        with open(self.helper_path, "w") as f:
+            f.write(HELPER_SOURCE)
+
+    def _configure_helper(self, *answers: str) -> None:
+        command = "!" + " ".join([sys.executable, self.helper_path, *answers])
+        config = self.repo.get_config()
+        config.set((b"credential",), b"helper", command.encode())
+        config.write_to_path()
+
+    def _run_credential(self, operation, description):
+        old_stdin = sys.stdin
+        sys.stdin = io.StringIO(description)
+        try:
+            return self._run_cli("credential", operation)
+        finally:
+            sys.stdin = old_stdin
+
+    def _helper_log(self) -> list[str]:
+        try:
+            with open(self.helper_path + ".log") as f:
+                return f.read().split()
+        except FileNotFoundError:
+            return []
+
+    def test_fill_writes_the_completed_description(self) -> None:
+        self._configure_helper("username=bob", "password=hunter2")
+        result, stdout, _ = self._run_credential(
+            "fill", "protocol=https\nhost=example.com\n\n"
+        )
+        self.assertEqual(0, result)
+        self.assertEqual(
+            "protocol=https\nhost=example.com\nusername=bob\npassword=hunter2\n\n",
+            stdout,
+        )
+
+    def test_fill_uses_the_repository_config(self) -> None:
+        """A per-repository credential.helper has to be honoured.
+
+        StackedConfig.default() would miss it, so this is the test that keeps
+        the command reading the repository's own stack.
+        """
+        self._configure_helper("username=repo-user", "password=p")
+        _, stdout, _ = self._run_credential(
+            "fill", "protocol=https\nhost=example.com\n\n"
+        )
+        self.assertIn("username=repo-user", stdout)
+
+    def test_fill_without_a_helper_fails(self) -> None:
+        result, stdout, _ = self._run_credential(
+            "fill", "protocol=https\nhost=example.com\n\n"
+        )
+        self.assertEqual(1, result)
+        self.assertEqual("", stdout)
+
+    def test_a_malformed_description_is_an_error_not_a_traceback(self) -> None:
+        result, _, _ = self._run_credential("fill", "not-a-pair\n\n")
+        self.assertEqual(1, result)
+
+    def test_approve_stores_and_reject_erases(self) -> None:
+        self._configure_helper()
+        self.assertEqual(
+            0,
+            self._run_credential(
+                "approve", "protocol=https\nhost=example.com\nusername=bob\n\n"
+            )[0],
+        )
+        self.assertEqual(
+            0,
+            self._run_credential("reject", "protocol=https\nhost=example.com\n\n")[0],
+        )
+        self.assertEqual(["store", "erase"], self._helper_log())
+
+    def test_an_unknown_operation_is_rejected(self) -> None:
+        with self.assertRaises(SystemExit):
+            self._run_credential("frobnicate", "host=example.com\n\n")

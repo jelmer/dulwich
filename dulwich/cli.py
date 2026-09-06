@@ -91,7 +91,7 @@ from .errors import (
 from .index import Index, InvalidPathError
 from .log_utils import _configure_logging_from_trace
 from .objects import Commit, ObjectID, RawObjectID, sha_to_hex, valid_hexsha
-from .objectspec import parse_commit_range
+from .objectspec import parse_commit, parse_commit_range
 from .pack import Pack
 from .patch import DiffAlgorithmNotAvailable
 from .repo import Repo
@@ -2358,7 +2358,20 @@ class cmd_commit(Command):
             args: Command line arguments
         """
         parser = argparse.ArgumentParser()
-        parser.add_argument("--message", "-m", help="Commit message")
+        messages = parser.add_mutually_exclusive_group()
+        messages.add_argument("--message", "-m", help="Commit message")
+        messages.add_argument(
+            "--reuse-message",
+            "-C",
+            metavar="COMMIT",
+            help="Reuse message and authorship from a commit",
+        )
+        messages.add_argument(
+            "--reedit-message",
+            "-c",
+            metavar="COMMIT",
+            help="Reuse authorship and edit a commit's message",
+        )
         parser.add_argument("--author", help="Override commit author (Name <email>)")
         parser.add_argument(
             "-a",
@@ -2374,8 +2387,34 @@ class cmd_commit(Command):
         parsed_args = parser.parse_args(args)
 
         message: bytes | str | Callable[[Repo | None, Commit | None], bytes]
+        reused_commit = None
+        source = (
+            parsed_args.reuse_message
+            if parsed_args.reuse_message is not None
+            else parsed_args.reedit_message
+        )
+        if source is not None:
+            try:
+                with porcelain.open_repo_closing(None) as repo:
+                    reused_commit = parse_commit(repo, source)
+            except (KeyError, ValueError) as e:
+                parser.error(str(e))
 
-        if parsed_args.message:
+        if reused_commit is not None:
+            if parsed_args.reedit_message is not None:
+                initial_message = reused_commit.message
+
+                def get_reused_message(
+                    repo: Repo | None, commit: Commit | None
+                ) -> bytes:
+                    return _get_commit_message_with_template(
+                        initial_message, repo, commit
+                    )
+
+                message = get_reused_message
+            else:
+                message = reused_commit.message
+        elif parsed_args.message:
             message = parsed_args.message
         elif parsed_args.amend:
             # For amend, create a callable that opens editor with original message pre-populated
@@ -2406,7 +2445,16 @@ class cmd_commit(Command):
                 message=message,
                 author=parsed_args.author.encode("utf-8")
                 if parsed_args.author is not None
+                else reused_commit.author
+                if reused_commit is not None
                 else None,
+                author_timestamp=reused_commit.author_time
+                if reused_commit is not None
+                else None,
+                author_timezone=reused_commit.author_timezone
+                if reused_commit is not None
+                else None,
+                encoding=reused_commit.encoding if reused_commit is not None else None,
                 all=parsed_args.all,
                 amend=parsed_args.amend,
             )

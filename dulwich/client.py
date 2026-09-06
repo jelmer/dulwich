@@ -3117,12 +3117,25 @@ class LocalGitClient(GitClient):
 
         """
         with self._open_repo(path) as r:
+            if ref_prefix is not None and determine_wants is None:
+                # Restrict the wants, not just the returned refs, so objects
+                # reachable only from an unwanted ref are never copied.
+                prefixes = ref_prefix
+
+                def determine_wants(
+                    refs: Mapping[Ref, ObjectID], depth: int | None = None
+                ) -> list[ObjectID]:
+                    wanted = filter_ref_prefix(dict(refs), prefixes)
+                    return target.object_store.determine_wants_all(wanted)
+
             refs = r.fetch(
                 target,
                 determine_wants=determine_wants,
                 progress=progress,
                 depth=depth,
             )
+            if ref_prefix is not None:
+                refs = filter_ref_prefix(refs, ref_prefix)
             return FetchPackResult(
                 _to_optional_dict(refs),
                 r.refs.get_symrefs(),

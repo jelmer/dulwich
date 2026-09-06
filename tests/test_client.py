@@ -1391,6 +1391,27 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(tear_down_repo, s)
         self.assertEqual(s.get_refs(), c.fetch(s.path, t).refs)
 
+    def test_fetch_ref_prefix(self) -> None:
+        # ref_prefix is documented as filtered client side when the server
+        # cannot do it; a local fetch has no server at all.
+        c = LocalGitClient()
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        t = Repo.init_bare(target)
+        self.addCleanup(t.close)
+        s = open_repo("a.git")
+        self.addCleanup(tear_down_repo, s)
+
+        result = c.fetch(s.path, t, ref_prefix=[b"refs/heads/"])
+
+        self.assertEqual(
+            {b"refs/heads/master": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"},
+            result.refs,
+        )
+        # The wants are filtered too, so an unrequested ref's objects are not
+        # transferred -- not merely hidden from the result.
+        self.assertNotIn(b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a", t.object_store)
+
     def test_clone(self) -> None:
         c = LocalGitClient()
         s = open_repo("a.git")

@@ -392,11 +392,9 @@ class CommitCommandTest(DulwichCliTestCase):
         self.assertEqual(commit.parents, self.repo[head].parents)
 
     def test_commit_reuse_invalid_arguments(self):
-        """Invalid references and conflicting message flags leave HEAD unchanged."""
+        """Conflicting message flags leave HEAD unchanged."""
         head = porcelain.commit(self.repo, message=b"Original")
         for args in (
-            ("-C", "missing"),
-            ("-C", ""),
             ("-m", "new", "-C", "HEAD"),
             ("-C", "HEAD", "-c", "HEAD"),
         ):
@@ -405,6 +403,22 @@ class CommitCommandTest(DulwichCliTestCase):
                     self._run_cli("commit", *args)
                 self.assertEqual(error.exception.code, 2)
                 self.assertEqual(self.repo.head(), head)
+
+    def test_commit_reuse_invalid_source(self):
+        """Commit resolution errors propagate without changing HEAD."""
+        head = porcelain.commit(self.repo, message=b"Original")
+        blob = Blob.from_string(b"not a commit")
+        self.repo.object_store.add_object(blob)
+        for flag in ("-C", "--reuse-message", "-c", "--reedit-message"):
+            for source, error_type in (
+                ("missing", KeyError),
+                ("", KeyError),
+                (blob.id.decode(), ValueError),
+            ):
+                with self.subTest(flag=flag, source=source):
+                    with self.assertRaises(error_type):
+                        self._run_cli("commit", flag, source)
+                    self.assertEqual(self.repo.head(), head)
 
     @patch("dulwich.cli.launch_editor", return_value=b"")
     def test_commit_reedit_empty_message(self, editor):

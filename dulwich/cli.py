@@ -2394,11 +2394,8 @@ class cmd_commit(Command):
             else parsed_args.reedit_message
         )
         if source is not None:
-            try:
-                with porcelain.open_repo_closing(None) as repo:
-                    reused_commit = parse_commit(repo, source)
-            except (KeyError, ValueError) as e:
-                parser.error(str(e))
+            with porcelain.open_repo_closing(None) as repo:
+                reused_commit = parse_commit(repo, source)
 
         if reused_commit is not None:
             if parsed_args.reedit_message is not None:

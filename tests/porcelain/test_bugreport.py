@@ -116,10 +116,17 @@ class BugreportHookTests(TestCase):
             "<none>", _section(bugreport(self.test_dir, env={}), "Enabled Hooks")
         )
 
-    def test_ignores_an_unrecognised_file(self) -> None:
-        self._write_hook("not-a-hook")
+    def test_lists_a_name_githooks_does_not_define(self) -> None:
+        """A file git will not run is worth reporting, not hiding.
+
+        The report says what is in the hooks directory. Filtering it against a
+        list of the names githooks(5) defines would drop exactly the two cases
+        a bug report needs to surface: a hook that is misspelled and therefore
+        never fires, and one from a git newer than that list.
+        """
+        self._write_hook("pre-comit")
         self.assertEqual(
-            "<none>", _section(bugreport(self.test_dir, env={}), "Enabled Hooks")
+            "pre-comit", _section(bugreport(self.test_dir, env={}), "Enabled Hooks")
         )
 
     @skipIf(sys.platform == "win32", "no execute bit on Windows")
@@ -130,12 +137,12 @@ class BugreportHookTests(TestCase):
             "<none>", _section(bugreport(self.test_dir, env={}), "Enabled Hooks")
         )
 
-    def test_lists_hooks_in_githooks_order_not_directory_order(self) -> None:
+    def test_lists_hooks_in_a_stable_order(self) -> None:
         """Directory order is filesystem-dependent; the report should not be."""
         for name in ("post-commit", "pre-commit", "commit-msg"):
             self._write_hook(name)
         self.assertEqual(
-            ["pre-commit", "commit-msg", "post-commit"],
+            ["commit-msg", "post-commit", "pre-commit"],
             _section(bugreport(self.test_dir, env={}), "Enabled Hooks").split("\n"),
         )
 

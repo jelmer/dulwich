@@ -1404,40 +1404,6 @@ def var(
         raise KeyError(f"Variable {variable} has no value")
 
 
-# The hook names githooks(5) defines. `git bugreport` lists which of these are
-# present and executable, because a hook firing unexpectedly is a common cause
-# of behaviour a reporter cannot explain.
-BUGREPORT_HOOK_NAMES = (
-    "applypatch-msg",
-    "pre-applypatch",
-    "post-applypatch",
-    "pre-commit",
-    "pre-merge-commit",
-    "prepare-commit-msg",
-    "commit-msg",
-    "post-commit",
-    "pre-rebase",
-    "post-checkout",
-    "post-merge",
-    "pre-push",
-    "pre-receive",
-    "update",
-    "proc-receive",
-    "post-receive",
-    "post-update",
-    "reference-transaction",
-    "push-to-checkout",
-    "pre-auto-gc",
-    "post-rewrite",
-    "sendemail-validate",
-    "fsmonitor-watchman",
-    "p4-changelist",
-    "p4-prepare-changelist",
-    "p4-post-changelist",
-    "p4-pre-submit",
-    "post-index-change",
-)
-
 _BUGREPORT_TEMPLATE = """Thank you for filling out a Dulwich bug report!
 Please answer the following questions to help us understand your issue.
 
@@ -1524,16 +1490,30 @@ def _rust_extensions_loaded() -> bool:
 
 
 def _enabled_hooks(repo: RepoPath) -> Iterator[str]:
-    """Yield the githooks(5) hooks that are present and executable."""
+    """Yield the hooks that are installed and enabled, in sorted order.
+
+    This reads the hooks directory rather than filtering it against a list of
+    the names githooks(5) defines. A hardcoded list has to be revised every
+    time git grows a hook, and it silently hides the case a bug report most
+    needs to show: a file in the hooks directory that git will not run, or a
+    hook this version of dulwich has never heard of.
+    """
     with open_repo_closing(repo) as r:
         hooks_dir = os.path.join(r.controldir(), "hooks")
-        for name in BUGREPORT_HOOK_NAMES:
+        try:
+            names = sorted(os.listdir(hooks_dir))
+        except FileNotFoundError:
+            return
+        for name in names:
+            # git ships the templates as *.sample precisely so they do not run.
+            if name.endswith(".sample"):
+                continue
             path = os.path.join(hooks_dir, name)
+            if not os.path.isfile(path):
+                continue
             # Git treats a non-executable hook as disabled on POSIX. Windows
             # has no execute bit, so existence is the whole test there and
             # os.access would answer True for every readable file anyway.
-            if not os.path.isfile(path):
-                continue
             if sys.platform == "win32" or os.access(path, os.X_OK):
                 yield name
 

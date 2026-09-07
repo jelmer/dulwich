@@ -7293,6 +7293,72 @@ class StatusTests(PorcelainTestCase):
         self.assertEqual({"add": [], "delete": [], "modify": []}, results.staged)
         self.assertEqual([], results.unstaged)
 
+    def _prepare_status_stat_refresh(self) -> int:
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("unchanged content")
+
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"test status refresh",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        index = self.repo.open_index()
+        before_mtime = index[b"foo"].mtime
+
+        st = os.stat(fullpath)
+        os.utime(
+            fullpath,
+            ns=(st.st_atime_ns, st.st_mtime_ns + 5_000_000_000),
+        )
+
+        return before_mtime
+
+    def test_status_refreshes_unchanged_index_stat(self) -> None:
+        before_mtime = self._prepare_status_stat_refresh()
+
+        results = porcelain.status(self.repo)
+
+        self.assertEqual([], results.unstaged)
+        after_mtime = self.repo.open_index()[b"foo"].mtime
+        self.assertNotEqual(before_mtime, after_mtime)
+
+    def test_status_with_optional_locks_disabled_does_not_refresh_index_stat(
+        self,
+    ) -> None:
+        before_mtime = self._prepare_status_stat_refresh()
+
+        results = porcelain.status(
+            self.repo,
+            env={"GIT_OPTIONAL_LOCKS": "0"},
+        )
+
+        self.assertEqual([], results.unstaged)
+        after_mtime = self.repo.open_index()[b"foo"].mtime
+        self.assertEqual(before_mtime, after_mtime)
+
+    def test_status_with_optional_locks_enabled_refreshes_index_stat(self) -> None:
+        before_mtime = self._prepare_status_stat_refresh()
+
+        results = porcelain.status(
+            self.repo,
+            env={"GIT_OPTIONAL_LOCKS": "1"},
+        )
+
+        self.assertEqual([], results.unstaged)
+        after_mtime = self.repo.open_index()[b"foo"].mtime
+        self.assertNotEqual(before_mtime, after_mtime)
+
+    def test_status_rejects_invalid_optional_locks_value(self) -> None:
+        with self.assertRaises(ValueError):
+            porcelain.status(
+                self.repo,
+                env={"GIT_OPTIONAL_LOCKS": "invalid"},
+            )
+
     def test_status_base(self) -> None:
         """Integration test for `status` functionality."""
         # Commit a dummy file then modify it

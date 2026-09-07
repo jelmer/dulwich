@@ -104,7 +104,7 @@ from collections.abc import (
     Sequence,
     Set,
 )
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import (
     IO,
@@ -3227,13 +3227,28 @@ def _stat_matches_entry(
     return True
 
 
+def _refresh_index_entry_stat(entry: IndexEntry, st: os.stat_result) -> IndexEntry:
+    """Return an index entry with refreshed filesystem stat information."""
+    fresh_entry = index_entry_from_stat(st, entry.sha, mode=entry.mode)
+    return replace(
+        entry,
+        ctime=fresh_entry.ctime,
+        mtime=fresh_entry.mtime,
+        dev=fresh_entry.dev,
+        ino=fresh_entry.ino,
+        uid=fresh_entry.uid,
+        gid=fresh_entry.gid,
+        size=fresh_entry.size,
+    )
+
+
 def _check_entry_for_changes(
     tree_path: bytes,
     entry: IndexEntry | ConflictedIndexEntry,
     root_path: bytes,
     filter_blob_callback: Callable[[Blob, bytes], Blob] | None = None,
     trust_ctime: bool = True,
-) -> bytes | None:
+) -> tuple[bytes | None, IndexEntry | None]:
     """Check a single index entry for changes.
 
     Args:
@@ -3242,22 +3257,24 @@ def _check_entry_for_changes(
       root_path: Root filesystem path
       filter_blob_callback: Optional callback to filter blobs
       trust_ctime: If True, use ctime for change detection (default: True)
-    Returns: tree_path if changed, None otherwise
+
+    Returns:
+        Tuple of changed path and refreshed index entry. At most one is non-None.
     """
     if isinstance(entry, ConflictedIndexEntry):
         # Conflicted files are always unstaged
-        return tree_path
+        return tree_path, None
 
     full_path = _tree_to_fs_path(root_path, tree_path)
     try:
         st = os.lstat(full_path)
         if stat.S_ISDIR(st.st_mode):
             if _has_directory_changed(tree_path, entry):
-                return tree_path
-            return None
+                return tree_path, None
+            return None, None
 
         if not stat.S_ISREG(st.st_mode) and not stat.S_ISLNK(st.st_mode):
-            return None
+            return None, None
 
         # Optimization: If stat matches index entry (mtime and size unchanged),
         # we can skip reading and filtering the file entirely. This is a significant
@@ -3267,7 +3284,7 @@ def _check_entry_for_changes(
         # filter operation. This addresses performance issues with LFS repositories
         # where filter operations can be very slow.
         if _stat_matches_entry(st, entry, trust_ctime):
-            return None
+            return None, None
 
         blob = blob_from_path_and_stat(full_path, st)
 
@@ -3276,11 +3293,11 @@ def _check_entry_for_changes(
     except FileNotFoundError:
         # The file was removed, so we assume that counts as
         # different from whatever file used to exist.
-        return tree_path
+        return tree_path, None
     else:
         if blob.id != entry.sha:
-            return tree_path
-    return None
+            return tree_path, None
+    return None, _refresh_index_entry_stat(entry, st)
 
 
 def get_unstaged_changes(
@@ -3290,6 +3307,7 @@ def get_unstaged_changes(
     preload_index: bool = False,
     trust_ctime: bool = True,
     max_stat: int | None = None,
+    update_index: bool = False,
 ) -> Generator[bytes, None, None]:
     """Walk through an index and check for differences against working tree.
 
@@ -3301,8 +3319,11 @@ def get_unstaged_changes(
       trust_ctime: If True, use ctime for change detection (default: True)
       max_stat: If set, limit the number of stat operations performed.
         When the limit is reached, remaining files are assumed unchanged.
+      update_index: Whether to refresh unchanged entries with updated stat information.
     Returns: iterator over paths with unstaged changes
     """
+    index_updated = False
+
     # For each entry in the index check the sha1 & ensure not staged
     if not isinstance(root_path, bytes):
         root_path = os.fsencode(root_path)
@@ -3344,22 +3365,36 @@ def get_unstaged_changes(
                 ]
 
                 # Yield results as they complete
-                for future in futures:
-                    result = future.result()
-                    if result is not None:
-                        yield result
+                # Process results and update the index in the main thread
+                for (tree_path, _entry), future in zip(entries, futures):
+                    changed_path, refreshed_entry = future.result()
+
+                    if update_index and refreshed_entry is not None:
+                        index[tree_path] = refreshed_entry
+                        index_updated = True
+
+                    if changed_path is not None:
+                        yield changed_path
 
     if not preload_index:
         # Serial processing
         for tree_path, entry in index.iteritems():
             if max_stat is not None and stat_count >= max_stat:
-                return
-            result = _check_entry_for_changes(
+                break
+            changed_path, refreshed_entry = _check_entry_for_changes(
                 tree_path, entry, root_path, filter_blob_callback, trust_ctime
             )
             stat_count += 1
-            if result is not None:
-                yield result
+
+            if update_index and refreshed_entry is not None:
+                index[tree_path] = refreshed_entry
+                index_updated = True
+
+            if changed_path is not None:
+                yield changed_path
+
+    if update_index and index_updated:
+        index.write()
 
 
 def _decode_utf8_with_fallback(data: bytes) -> str:

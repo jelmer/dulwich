@@ -212,6 +212,9 @@ just have the LLM interact with the maintainers' code reviews.
 This adds no value - if I wanted to use a LLM I could just do so myself
 without a MITM, and give it review comments directly.
 
+If you find a bug, please file a bug report - that is so much useful than
+a rambling PR description that is clearly LLM-generated.
+
 So if you submit a PR of dubious quality that was obviously LLM-generated,
 expect it to be closed. This goes doubly for if you submit a burst of such
 PRs. This notably includes overly verbose and complex code, comments and

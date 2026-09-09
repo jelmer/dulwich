@@ -1,5 +1,9 @@
 1.2.15	UNRELEASED
 
+ * Reject reftable ``tables.list`` entries that contain a path separator or
+   are absolute, so a hostile repository cannot make a ref lookup open a file
+   outside the reftable directory. (netliomax25-code)
+
  * Support ``dulwich commit -C/--reuse-message`` and ``-c/--reedit-message``
    to reuse a commit's message, author and author date, optionally editing
    the message. The committer and new commit ancestry remain independent.

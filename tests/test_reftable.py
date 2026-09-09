@@ -21,6 +21,7 @@
 
 """Tests for the reftable refs storage format."""
 
+import os
 import shutil
 import tempfile
 import unittest
@@ -285,6 +286,46 @@ class TestReftableRefsContainer(unittest.TestCase):
         # Should have multiple table files
         table_files = self.container._get_table_files()
         self.assertGreaterEqual(len(table_files), 2)
+
+    def _write_tables_list(self, contents):
+        tables_list_path = os.path.join(self.container.reftable_dir, "tables.list")
+        with open(tables_list_path, "wb") as f:
+            f.write(contents)
+
+    def test_get_table_files_rejects_traversal(self):
+        """A hostile tables.list must not name paths outside reftable_dir."""
+        for bad in (
+            b"../../evil.ref\n",
+            b"/etc/hostname\n",
+            b"..\n",
+            b"sub/dir.ref\n",
+            b"a\\b.ref\n",
+            b"C:evil.ref\n",
+        ):
+            self._write_tables_list(bad)
+            with self.assertRaises(ValueError):
+                self.container._get_table_files()
+
+    def test_get_table_files_accepts_basename(self):
+        """A well-formed .ref basename is still resolved under reftable_dir."""
+        self._write_tables_list(b"0x0000000000000001-0x0000000000000001-deadbeef.ref\n")
+        (resolved,) = self.container._get_table_files()
+        self.assertEqual(
+            os.path.join(
+                self.container.reftable_dir,
+                "0x0000000000000001-0x0000000000000001-deadbeef.ref",
+            ),
+            resolved,
+        )
+
+    def test_allkeys_rejects_traversal(self):
+        """A ref read through a traversing tables.list must not open the target."""
+        outside = os.path.join(self.test_dir, "secret_outside.txt")
+        with open(outside, "wb") as f:
+            f.write(b"secret")
+        self._write_tables_list(b"../../secret_outside.txt\n")
+        with self.assertRaises(ValueError):
+            self.container.allkeys()
 
 
 if __name__ == "__main__":

@@ -961,8 +961,26 @@ class ReftableRefsContainer(RefsContainer):
         with open(tables_list_path, "rb") as f:
             for line in f:
                 table_name = line.decode().strip()
-                if table_name:
-                    files.append(os.path.join(self.reftable_dir, table_name))
+                if not table_name:
+                    continue
+                # tables.list is repository data that dulwich did not
+                # necessarily write. Every name git and dulwich emit is a
+                # bare "<...>.ref" basename, so reject any name with a path
+                # separator, drive/root component or "." / ".." before
+                # joining it under reftable_dir. Without this a corrupt or
+                # hostile tables.list can name a path outside the reftable
+                # directory (an absolute path discards the base entirely in
+                # os.path.join), turning a ref lookup into an open of an
+                # arbitrary file (backslash and colon matter on Windows).
+                if (
+                    "/" in table_name
+                    or "\\" in table_name
+                    or ":" in table_name
+                    or os.path.isabs(table_name)
+                    or table_name in (os.curdir, os.pardir)
+                ):
+                    raise ValueError(f"invalid reftable name {table_name!r}")
+                files.append(os.path.join(self.reftable_dir, table_name))
         return files
 
     def _read_all_tables(self) -> dict[Ref, tuple[int, bytes]]:

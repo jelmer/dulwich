@@ -2,7 +2,9 @@ All functionality should be available in pure Python. Optional Rust
 implementations may be written for performance reasons, but should never
 replace the Python implementation.
 
-Where possible include updates to NEWS along with your improvements.
+Where possible include updates to NEWS along with your improvements. Keep NEWS entries
+limited to 3 lines or less, meaningful to end users and include any issue numbers
+fixed if applicable.
 
 New functionality and bug fixes should be accompanied by matching unit tests.
 
@@ -218,7 +220,7 @@ a rambling PR description that is clearly LLM-generated.
 So if you submit a PR of dubious quality that was obviously LLM-generated,
 expect it to be closed. This goes doubly for if you submit a burst of such
 PRs. This notably includes overly verbose and complex code, comments and
-descriptions.
+PR descriptions.
 
 Licensing
 ---------

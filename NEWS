@@ -26,6 +26,11 @@
    ``ssh://user@host/git/repo.git`` as the remote URL, which points at a
    different repository. (Jelmer Vernooĳ, #2375)
 
+ * Name a symlink by its own path in ``porcelain.path_to_tree_path``, rather
+   than by the path of its target. ``porcelain.status`` listed a tracked
+   symlink as untracked whenever the file it pointed at was itself untracked
+   or missing, so a modified symlink was reported twice. (Jerry Xiao)
+
 1.2.14	2026-08-28
 
  * Collapse consecutive `**` segments in wildmatch translation, matching

@@ -7326,6 +7326,46 @@ class StatusTests(PorcelainTestCase):
         self.assertEqual(results.staged["add"][0], os.fsencode(filename_add))
         self.assertEqual(results.unstaged, [os.fsencode("foo")])
 
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_status_tracked_symlink_to_untracked_file(self) -> None:
+        # A tracked symlink is not untracked just because the file it points
+        # at is untracked. Git reports only the target file here.
+        link = os.path.join(self.repo.path, "link")
+        os.symlink("target", link)
+        porcelain.add(repo=self.repo.path, paths=[link])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"add symlink",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+        with open(os.path.join(self.repo.path, "target"), "w") as f:
+            f.write("stuff")
+
+        results = porcelain.status(self.repo)
+        self.assertEqual([b"target"], results.untracked)
+        self.assertEqual([], results.unstaged)
+
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_status_modified_symlink_reported_once(self) -> None:
+        # A tracked symlink pointed at a different name is modified, not
+        # untracked. Git reports the path once, as modified.
+        link = os.path.join(self.repo.path, "link")
+        os.symlink("target", link)
+        porcelain.add(repo=self.repo.path, paths=[link])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"add symlink",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+        os.remove(link)
+        os.symlink("other", link)
+
+        results = porcelain.status(self.repo)
+        self.assertEqual([b"link"], results.unstaged)
+        self.assertEqual([], results.untracked)
+
     def test_status_with_core_preloadindex(self) -> None:
         """Test status with core.preloadIndex enabled."""
         # Set core.preloadIndex to true
@@ -9853,6 +9893,18 @@ class PathToTreeTests(PorcelainTestCase):
         self.assertEqual(
             b"bar/baz",
             porcelain.path_to_tree_path(os.path.join(os.getcwd(), ".."), "baz"),
+        )
+
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_path_to_tree_path_symlink(self) -> None:
+        # A symlink is named in the index by its own path, not by the path of
+        # the file it points at, even when that file is inside the repository.
+        os.symlink("bar", os.path.join(self.test_dir, "link"))
+        self.assertEqual(
+            b"link",
+            porcelain.path_to_tree_path(
+                self.test_dir, os.path.join(self.test_dir, "link")
+            ),
         )
 
 

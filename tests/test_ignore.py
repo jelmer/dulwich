@@ -424,6 +424,16 @@ class IgnoreFilterTests(TestCase):
         self.assertEqual([Pattern(b"!c.c")], list(filter.find_matching(b"c.c")))
         self.assertEqual([], list(filter.find_matching(b"d.c")))
 
+    def test_empty_pattern_never_matches(self) -> None:
+        # Lines that carry no pattern once the negation prefix and the
+        # directory suffix are stripped are inert in git; a bare "!" in
+        # particular does not re-include an earlier ignored directory.
+        for line in [b"!", b"!/", b"/", b"//", b"!//"]:
+            filter = IgnoreFilter([b"build/", line])
+            self.assertIs(True, filter.is_ignored(b"build/"), line)
+            self.assertIs(True, filter.is_ignored(b"build/f"), line)
+            self.assertEqual([], list(filter.find_matching(b"other/")), line)
+
     def test_include_exclude_include(self) -> None:
         filter = IgnoreFilter([b"a.c", b"!a.c", b"a.c"])
         self.assertTrue(filter.is_ignored(b"a.c"))

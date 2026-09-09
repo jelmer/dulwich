@@ -283,6 +283,11 @@ class Pattern:
         # Check if this is a directory-only pattern
         self.is_directory_only = pattern.endswith(b"/")
 
+        # Lines like "!" or "/" carry no pattern once the negation prefix and
+        # the directory suffix are stripped. Git keeps them in its pattern list
+        # but they can never match a path, so neither do we.
+        self.is_empty = not pattern.rstrip(b"/")
+
         flags = 0
         if self.ignorecase:
             flags = re.IGNORECASE
@@ -334,6 +339,9 @@ class Pattern:
           path: Path to match (relative to ignore location)
         Returns: boolean
         """
+        if self.is_empty:
+            return False
+
         # For negation directory patterns (e.g., !dir/), only match directories
         if self.is_directory_only and not self.is_exclude and not path.endswith(b"/"):
             return False

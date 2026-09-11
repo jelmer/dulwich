@@ -192,13 +192,18 @@ class LineEndingFilter(FilterDriver):
 
     @classmethod
     def from_config(
-        cls, config: "Config | None", for_text_attr: bool = False
+        cls,
+        config: "Config | None",
+        for_text_attr: bool = False,
+        eol: bytes | str | None = None,
     ) -> "LineEndingFilter":
         """Create a LineEndingFilter from git configuration.
 
         Args:
             config: Git configuration
             for_text_attr: If True, always normalize on checkin (for text attribute)
+            eol: Optional per-path line ending attribute. When set to ``lf`` or
+                ``crlf``, it overrides the checkout behavior from the config.
 
         Returns:
             Configured LineEndingFilter instance
@@ -207,9 +212,12 @@ class LineEndingFilter(FilterDriver):
             # Default filter
             if for_text_attr:
                 # For text attribute: always normalize on checkin
+                smudge_filter = (
+                    convert_lf_to_crlf if eol in ("crlf", b"crlf") else None
+                )
                 return cls(
                     clean_conversion=convert_crlf_to_lf,
-                    smudge_conversion=None,
+                    smudge_conversion=smudge_filter,
                     binary_detection=True,
                 )
             else:
@@ -252,7 +260,12 @@ class LineEndingFilter(FilterDriver):
         if for_text_attr:
             # For text attribute: always normalize to LF on checkin
             # Smudge behavior depends on core.eol and core.autocrlf
-            smudge_filter = get_smudge_filter(core_eol, autocrlf)
+            if eol in ("crlf", b"crlf"):
+                smudge_filter = convert_lf_to_crlf
+            elif eol in ("lf", b"lf"):
+                smudge_filter = None
+            else:
+                smudge_filter = get_smudge_filter(core_eol, autocrlf)
             clean_filter: Callable[[bytes], bytes] | None = convert_crlf_to_lf
         else:
             # Normal autocrlf behavior

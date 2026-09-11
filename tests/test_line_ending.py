@@ -502,6 +502,32 @@ class LineEndingIntegrationTests(TestCase):
         checked_out = normalizer.checkout_normalize(checked_in, b"test.txt")
         self.assertEqual(checked_out.data, b"Hello\r\nWorld\r\n")
 
+    def test_gitattributes_eol_attr_overrides_autocrlf(self) -> None:
+        """Test per-path eol attributes override core.autocrlf."""
+        patterns = [
+            (Pattern(b"*.crlffile"), {b"text": True, b"eol": b"crlf"}),
+            (Pattern(b"*.lffile"), {b"text": True, b"eol": b"lf"}),
+        ]
+        gitattributes = GitAttributes(patterns)
+
+        for autocrlf in (b"false", b"true"):
+            config = ConfigDict()
+            config.set(b"core", b"autocrlf", autocrlf)
+            normalizer = FilterBlobNormalizer(config, gitattributes)
+
+            for path, expected_checkout in (
+                (b"sample.crlffile", b"line1\r\nline2\r\n"),
+                (b"sample.lffile", b"line1\nline2\n"),
+            ):
+                blob = Blob()
+                blob.data = b"line1\r\nline2\r\n"
+
+                checked_in = normalizer.checkin_normalize(blob, path)
+                self.assertEqual(checked_in.data, b"line1\nline2\n")
+
+                checked_out = normalizer.checkout_normalize(checked_in, path)
+                self.assertEqual(checked_out.data, expected_checkout)
+
     def test_mixed_filters(self) -> None:
         """Test multiple filters can coexist (line endings and LFS)."""
         # This would be a more complex test requiring LFS setup
@@ -569,6 +595,11 @@ class LineEndingFilterFromConfigTests(TestCase):
         self.assertIsNotNone(filter.clean_conversion)
         self.assertIsNone(filter.smudge_conversion)
         self.assertEqual(filter.safecrlf, b"false")
+
+        filter = LineEndingFilter.from_config(
+            None, for_text_attr=True, eol=b"crlf"
+        )
+        self.assertEqual(filter.smudge_conversion, convert_lf_to_crlf)
 
     def test_from_config_autocrlf_true(self) -> None:
         """Test from_config with autocrlf=true."""

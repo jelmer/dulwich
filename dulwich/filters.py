@@ -845,7 +845,15 @@ def get_filter_for_path(
     text_attr = attributes.get(b"text")
     if text_attr is True:
         # Add text filter for line ending conversion
-        text_filter = get_driver("text")
+        eol = attributes.get(b"eol")
+        if eol in (b"lf", b"crlf"):
+            from .line_ending import LineEndingFilter
+
+            text_filter = LineEndingFilter.from_config(
+                registry.config, for_text_attr=True, eol=eol
+            )
+        else:
+            text_filter = get_driver("text")
         if text_filter is not None:
             filters.append(text_filter)
     elif text_attr is False:

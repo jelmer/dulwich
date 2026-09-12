@@ -1391,9 +1391,7 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(tear_down_repo, s)
         self.assertEqual(s.get_refs(), c.fetch(s.path, t).refs)
 
-    def test_fetch_ref_prefix(self) -> None:
-        # ref_prefix is documented as filtered client side when the server
-        # cannot do it; a local fetch has no server at all.
+    def _fetch_ref_prefix_setup(self) -> tuple["LocalGitClient", Repo, Repo]:
         c = LocalGitClient()
         target = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target)
@@ -1401,6 +1399,23 @@ class LocalGitClientTests(TestCase):
         self.addCleanup(t.close)
         s = open_repo("a.git")
         self.addCleanup(tear_down_repo, s)
+        # The fixture has refs outside refs/heads/, so the prefix is doing
+        # real work below rather than matching everything.
+        self.assertEqual(
+            [
+                b"HEAD",
+                b"refs/heads/master",
+                b"refs/tags/mytag",
+                b"refs/tags/mytag-packed",
+            ],
+            sorted(s.get_refs()),
+        )
+        return c, s, t
+
+    def test_fetch_ref_prefix(self) -> None:
+        # ref_prefix is documented as filtered client side when the server
+        # cannot do it; a local fetch has no server at all.
+        c, s, t = self._fetch_ref_prefix_setup()
 
         result = c.fetch(s.path, t, ref_prefix=[b"refs/heads/"])
 
@@ -1408,9 +1423,48 @@ class LocalGitClientTests(TestCase):
             {b"refs/heads/master": b"a90fa2d900a17e99b433217e988c4eb4a2e9a097"},
             result.refs,
         )
-        # The wants are filtered too, so an unrequested ref's objects are not
+        # The wants are filtered too, so an excluded ref's objects are not
         # transferred -- not merely hidden from the result.
+        self.assertIn(b"a90fa2d900a17e99b433217e988c4eb4a2e9a097", t.object_store)
         self.assertNotIn(b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a", t.object_store)
+        self.assertNotIn(b"b0931cadc54336e78a1d980420e3268903b57a50", t.object_store)
+
+    def test_fetch_ref_prefix_no_match(self) -> None:
+        c, s, t = self._fetch_ref_prefix_setup()
+
+        result = c.fetch(s.path, t, ref_prefix=[b"refs/pull/"])
+
+        self.assertEqual({}, result.refs)
+        self.assertNotIn(b"a90fa2d900a17e99b433217e988c4eb4a2e9a097", t.object_store)
+
+    def test_fetch_ref_prefix_with_determine_wants(self) -> None:
+        # Both may be given: the prefix restricts what determine_wants is
+        # offered, as ls-refs' ref-prefix does for a remote fetch.
+        c, s, t = self._fetch_ref_prefix_setup()
+        offered = []
+
+        def determine_wants(
+            refs: dict[bytes, bytes], depth: int | None = None
+        ) -> list[bytes]:
+            offered.append(sorted(refs))
+            return list(refs.values())
+
+        result = c.fetch(
+            s.path,
+            t,
+            determine_wants=determine_wants,
+            ref_prefix=[b"refs/tags/"],
+        )
+
+        self.assertEqual([[b"refs/tags/mytag", b"refs/tags/mytag-packed"]], offered)
+        self.assertEqual(
+            {
+                b"refs/tags/mytag": b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a",
+                b"refs/tags/mytag-packed": b"b0931cadc54336e78a1d980420e3268903b57a50",
+            },
+            result.refs,
+        )
+        self.assertIn(b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a", t.object_store)
 
     def test_clone(self) -> None:
         c = LocalGitClient()

@@ -1,9 +1,9 @@
 1.2.15	UNRELEASED
 
  * Honour ``ref_prefix`` in ``LocalGitClient.fetch``. It was accepted and
-   ignored, so a local fetch returned every ref regardless. The wants are
-   filtered as well as the returned refs, so objects reachable only from an
-   unrequested ref are no longer copied. (Dipak Chaudhari)
+   ignored, so a local fetch returned every ref regardless. The prefix is
+   applied before ``determine_wants`` sees the refs, so objects reachable
+   only from an excluded ref are no longer copied. (Dipak Chaudhari)
 
  * Reject reftable ``tables.list`` entries that contain a path separator or
    are absolute, so a hostile repository cannot make a ref lookup open a file

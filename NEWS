@@ -1,5 +1,10 @@
 1.2.15	UNRELEASED
 
+ * ``urlmatch_credential_sections`` now decodes credential subsections as
+   UTF-8 rather than through the config's own ``encoding``. It accepts a
+   ``StackedConfig`` -- the type ``Repo.get_config_stack()`` returns -- which
+   previously raised ``AttributeError``. (Dipak Chaudhari)
+
  * Reject reftable ``tables.list`` entries that contain a path separator or
    are absolute, so a hostile repository cannot make a ref lookup open a file
    outside the reftable directory. (netliomax25-code)

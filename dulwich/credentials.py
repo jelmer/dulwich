@@ -32,11 +32,10 @@ __all__ = [
     "urlmatch_credential_sections",
 ]
 
-import sys
 from collections.abc import Iterator
 from urllib.parse import ParseResult, urlparse
 
-from .config import ConfigDict, SectionLike
+from .config import Config, SectionLike
 
 
 def match_urls(url: ParseResult, url_prefix: ParseResult) -> bool:
@@ -86,10 +85,9 @@ def match_partial_url(valid_url: ParseResult, partial_url: str) -> bool:
 
 
 def urlmatch_credential_sections(
-    config: ConfigDict, url: str | None
+    config: Config, url: str | None
 ) -> Iterator[SectionLike]:
     """Returns credential sections from the config which match the given URL."""
-    encoding = config.encoding or sys.getdefaultencoding()
     parsed_url = urlparse(url or "")
     for config_section in config.sections():
         if config_section[0] != b"credential":
@@ -99,7 +97,11 @@ def urlmatch_credential_sections(
             yield config_section
             continue
 
-        config_url = config_section[1].decode(encoding)
+        # git documents config files as UTF-8, and a credential subsection is
+        # a URL, which RFC 3986 restricts to ASCII. Decoding with the config's
+        # own ``encoding`` is wrong for a StackedConfig, whose backends may
+        # each declare a different one.
+        config_url = config_section[1].decode("utf-8", errors="replace")
         parsed_config_url = urlparse(config_url)
         if parsed_config_url.scheme and parsed_config_url.netloc:
             is_match = match_urls(parsed_url, parsed_config_url)

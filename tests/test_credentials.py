@@ -22,7 +22,7 @@
 
 from urllib.parse import urlparse
 
-from dulwich.config import ConfigDict
+from dulwich.config import ConfigDict, StackedConfig
 from dulwich.credentials import (
     match_partial_url,
     match_urls,
@@ -103,6 +103,68 @@ class TestCredentialHelpersUtils(TestCase):
         self.assertEqual(
             list(urlmatch_credential_sections(config, "missing_url")),
             [(b"credential",)],
+        )
+
+    def test_urlmatch_credential_sections_stacked_config(self) -> None:
+        """A StackedConfig is accepted; its backends are searched in order."""
+        first = ConfigDict()
+        first.set((b"credential", "https://github.com"), b"helper", "first")
+        second = ConfigDict()
+        second.set((b"credential", "https://git.sr.ht"), b"helper", "second")
+        second.set(b"credential", b"helper", "fallback")
+        config = StackedConfig([first, second])
+
+        self.assertEqual(
+            [
+                (b"credential", b"https://github.com"),
+                (b"credential",),
+            ],
+            list(urlmatch_credential_sections(config, "https://github.com")),
+        )
+        self.assertEqual(
+            [
+                (b"credential", b"https://git.sr.ht"),
+                (b"credential",),
+            ],
+            list(urlmatch_credential_sections(config, "https://git.sr.ht")),
+        )
+
+    def test_urlmatch_credential_sections_ignores_backend_encoding(self) -> None:
+        """Subsections decode as UTF-8 whatever a backend declares.
+
+        Reading a single ``encoding`` off the config and applying it to every
+        section decodes one backend's bytes with another backend's codec once
+        more than one backend is in play.
+        """
+        host = "ü.example.com"
+        latin1 = ConfigDict(encoding="latin-1")
+        latin1.set((b"credential", b"https://other.example.net"), b"helper", "a")
+        utf8 = ConfigDict(encoding="utf-8")
+        utf8.set((b"credential", ("https://" + host).encode()), b"helper", "b")
+
+        for backends in ([latin1, utf8], [utf8, latin1]):
+            self.assertEqual(
+                [(b"credential", ("https://" + host).encode())],
+                list(
+                    urlmatch_credential_sections(
+                        StackedConfig(backends), "https://" + host
+                    )
+                ),
+            )
+
+    def test_urlmatch_credential_sections_undecodable_subsection(self) -> None:
+        """A subsection that is not valid UTF-8 does not abort the lookup."""
+        config = ConfigDict()
+        config.set(
+            (b"credential", b"https://" + bytes([0xFF]) + b".example.com"),
+            b"helper",
+            "broken",
+        )
+        config.set(b"credential", b"helper", "fallback")
+
+        self.assertEqual(
+            [(b"credential",)],
+            list(urlmatch_credential_sections(config, "https://github.com")),
         )
 
     def test_urlmatch_credential_sections_with_other_sections(self) -> None:

@@ -68,6 +68,7 @@ from dulwich.porcelain import (
     commit,
 )
 from dulwich.porcelain.submodule import _check_submodule_path
+from dulwich.refs import HEADREF
 from dulwich.repo import NoIndexPresent, Repo
 from dulwich.server import DictBackend
 from dulwich.signature import (
@@ -1751,6 +1752,76 @@ class CloneTests(PorcelainTestCase):
         )
         self.addCleanup(r.close)
         self.assertEqual(r.path, target_path)
+
+    def _no_tags_source(self) -> bytes:
+        """A branch, a lightweight tag and an annotated one.
+
+        Returns the sha of the annotated tag *object*: its presence in a clone
+        would mean the objects travelled and only the ref was hidden.
+        """
+        f1_1 = make_object(Blob, data=b"f1")
+        (c1,) = build_commit_graph(self.repo.object_store, [[1]], {1: [(b"f1", f1_1)]})
+        self.repo.refs[b"refs/heads/master"] = c1.id
+        porcelain.tag_create(self.repo, b"v1.0")
+        porcelain.tag_create(
+            self.repo,
+            b"v2.0",
+            author=b"Test <test@example.com>",
+            message=b"release two",
+            annotated=True,
+        )
+        tag_sha = self.repo.refs[b"refs/tags/v2.0"]
+        self.assertNotEqual(c1.id, tag_sha)
+        return tag_sha
+
+    def _clone(self, **kwargs) -> Repo:
+        target_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_path)
+        r = porcelain.clone(
+            self.repo.path, target_path, checkout=False, errstream=BytesIO(), **kwargs
+        )
+        self.addCleanup(r.close)
+        return r
+
+    def test_clone_tags_by_default(self) -> None:
+        """The baseline --no-tags opts out of."""
+        tag_sha = self._no_tags_source()
+        r = self._clone()
+        self.assertIn(b"refs/tags/v1.0", r.get_refs())
+        self.assertIn(b"refs/tags/v2.0", r.get_refs())
+        self.assertIn(tag_sha, r.object_store)
+        self.assertRaises(
+            KeyError, r.get_config().get, (b"remote", b"origin"), b"tagOpt"
+        )
+
+    def test_clone_no_tags(self) -> None:
+        tag_sha = self._no_tags_source()
+        r = self._clone(no_tags=True)
+
+        self.assertEqual(
+            [], [ref for ref in r.get_refs() if ref.startswith(b"refs/tags/")]
+        )
+        # Narrowing the ref prefix must not narrow away the point of the clone.
+        self.assertIn(b"refs/heads/master", r.get_refs())
+        self.assertIn(b"refs/remotes/origin/master", r.get_refs())
+        # HEAD is requested explicitly; the branch prefix does not cover it.
+        self.assertIn(HEADREF, r.get_refs())
+        self.assertEqual(b"refs/heads/master", r.refs.follow(HEADREF)[0][-1])
+        # Skipping the refs is only half of it -- the objects stay behind too.
+        self.assertIn(self.repo.refs[b"refs/heads/master"], r.object_store)
+        self.assertNotIn(tag_sha, r.object_store)
+
+    def test_clone_no_tags_records_tag_opt(self) -> None:
+        """Without this the next bare fetch undoes the clone.
+
+        git writes ``remote.<name>.tagOpt = --no-tags`` for the same reason,
+        so the choice survives the command that made it.
+        """
+        self._no_tags_source()
+        r = self._clone(no_tags=True)
+        self.assertEqual(
+            b"--no-tags", r.get_config().get((b"remote", b"origin"), b"tagOpt")
+        )
 
 
 class InitTests(TestCase):

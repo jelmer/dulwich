@@ -190,6 +190,48 @@ class InitCommandTest(DulwichCliTestCase):
         self.assertEqual(b"sha256", config.get((b"extensions",), b"objectformat"))
 
 
+class CloneCommandTest(DulwichCliTestCase):
+    """Tests for clone command."""
+
+    def _source_with_a_tag(self) -> None:
+        path = os.path.join(self.repo_path, "foo")
+        with open(path, "w") as f:
+            f.write("contents")
+        porcelain.add(self.repo, paths=[path])
+        porcelain.commit(
+            self.repo,
+            message=b"initial",
+            author=b"Test <test@example.com>",
+            committer=b"Test <test@example.com>",
+        )
+        porcelain.tag_create(self.repo, b"v1.0")
+
+    def _clone(self, *extra_args) -> Repo:
+        target = os.path.join(self.test_dir, f"clone-{len(extra_args)}")
+        self._run_cli("clone", self.repo_path, target, *extra_args)
+        clone = Repo(target)
+        self.addCleanup(clone.close)
+        return clone
+
+    def test_clone_tags_by_default(self):
+        self._source_with_a_tag()
+        clone = self._clone()
+        self.assertIn(b"refs/tags/v1.0", clone.get_refs())
+
+    def test_clone_no_tags(self):
+        self._source_with_a_tag()
+        clone = self._clone("--no-tags")
+
+        self.assertIn(b"refs/heads/master", clone.get_refs())
+        self.assertEqual(
+            [], [ref for ref in clone.get_refs() if ref.startswith(b"refs/tags/")]
+        )
+        self.assertEqual(
+            b"--no-tags",
+            clone.get_config().get((b"remote", b"origin"), b"tagOpt"),
+        )
+
+
 class HelperFunctionsTest(TestCase):
     """Tests for CLI helper functions."""
 

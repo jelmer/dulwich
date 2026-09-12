@@ -2054,18 +2054,23 @@ class cmd_clone(Command):
         parsed_args = parser.parse_args(args)
 
         try:
-            porcelain.clone(
-                parsed_args.source,
-                parsed_args.target,
-                bare=parsed_args.bare,
-                depth=parsed_args.depth,
-                branch=parsed_args.branch,
-                refspec=parsed_args.refspec,
-                filter_spec=parsed_args.filter_spec,
-                protocol_version=parsed_args.protocol,
-                recurse_submodules=parsed_args.recurse_submodules,
-                no_tags=parsed_args.no_tags,
-            )
+            # Closed rather than discarded: the pack files it opened stay
+            # open otherwise, which on Windows locks the new directory.
+            with contextlib.closing(
+                porcelain.clone(
+                    parsed_args.source,
+                    parsed_args.target,
+                    bare=parsed_args.bare,
+                    depth=parsed_args.depth,
+                    branch=parsed_args.branch,
+                    refspec=parsed_args.refspec,
+                    filter_spec=parsed_args.filter_spec,
+                    protocol_version=parsed_args.protocol,
+                    recurse_submodules=parsed_args.recurse_submodules,
+                    no_tags=parsed_args.no_tags,
+                )
+            ):
+                pass
         except GitProtocolError as e:
             logger.exception(e)
         except InvalidPathError as e:

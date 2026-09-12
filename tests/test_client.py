@@ -1479,6 +1479,54 @@ class LocalGitClientTests(TestCase):
         expected[b"refs/remotes/origin/master"] = expected[b"refs/heads/master"]
         self.assertEqual(expected, result_repo.get_refs())
 
+    def test_clone_no_tags(self) -> None:
+        c = LocalGitClient()
+        s = open_repo("a.git")
+        self.addCleanup(tear_down_repo, s)
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+
+        result_repo = c.clone(s.path, target, mkdir=False, no_tags=True)
+        self.addCleanup(result_repo.close)
+
+        refs = result_repo.get_refs()
+        self.assertEqual([], [ref for ref in refs if ref.startswith(b"refs/tags/")])
+        self.assertIn(b"refs/heads/master", refs)
+        self.assertIn(b"refs/remotes/origin/master", refs)
+        self.assertIn(b"HEAD", refs)
+        # The tag objects stay behind, not merely the refs.
+        self.assertNotIn(
+            b"28237f4dc30d0d462658d6b937b08a0f0b6ef55a", result_repo.object_store
+        )
+        self.assertEqual(
+            b"--no-tags",
+            result_repo.get_config().get((b"remote", b"origin"), b"tagOpt"),
+        )
+
+    def test_clone_no_tags_keeps_an_explicit_ref_prefix(self) -> None:
+        # no_tags only supplies a default prefix; a caller that passed one
+        # keeps it, so the flag cannot silently widen the request.
+        c = LocalGitClient()
+        s = open_repo("a.git")
+        self.addCleanup(tear_down_repo, s)
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+
+        result_repo = c.clone(
+            s.path,
+            target,
+            mkdir=False,
+            no_tags=True,
+            ref_prefix=[b"refs/tags/mytag-packed"],
+        )
+        self.addCleanup(result_repo.close)
+
+        self.assertNotIn(b"refs/heads/master", result_repo.get_refs())
+        self.assertEqual(
+            b"--no-tags",
+            result_repo.get_config().get((b"remote", b"origin"), b"tagOpt"),
+        )
+
     def test_clone_invalid_path_keeps_repo(self) -> None:
         # A tree entry with an invalid path aborts the checkout, but the
         # clone itself is kept (objects, refs and HEAD), matching git.

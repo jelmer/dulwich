@@ -35,6 +35,9 @@
    ``/``. A bare ``!`` previously re-included a directory that an earlier
    pattern in the same file had ignored. (Jelmer Vernooĳ, #2398)
 
+ * Avoid quadratic cost in ``PktLineParser.parse``, which resliced its
+   remaining buffer once per pkt-line. (Jelmer Vernooĳ, #2408)
+
 1.2.14	2026-08-28
 
  * Collapse consecutive `**` segments in wildmatch translation, matching

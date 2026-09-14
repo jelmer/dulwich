@@ -1,4 +1,12 @@
-1.2.15	UNRELEASED
+1.2.15	2026-09-14
+
+ * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with
+   REF_DELTA objects that name each other sent ``get_raw`` into an
+   unbounded loop. Such chains now raise ``DeltaCycle``.
+
+ * Fix ``porcelain.clean`` when the target directory and the repository path
+   are spelled differently, such as via a relative path or a symlink.
+   (Jelmer Vernooĳ)
 
  * Memoize tag peeling on the object store, so refs sharing an annotated tag
    chain no longer re-walk it once per ref. ``show_ref --dereference`` and the
@@ -243,10 +251,6 @@
    untrusted commit) could inject additional, forged reflog entries with
    attacker-chosen SHAs. Newlines are now collapsed to spaces, matching git's
    ``copy_reflog_msg``. (netliomax25-code, #2300)
-
- * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with
-   REF_DELTA objects that name each other sent ``get_raw`` into an
-   unbounded loop. Such chains now raise ``DeltaCycle``.
 
 1.2.10	2026-07-07
 

@@ -914,20 +914,24 @@ class PktLineParser:
         buf = self._readahead.getvalue()
         if len(buf) < 4:
             return
-        while len(buf) >= 4:
-            size = _parse_pkt_line_length(buf[:4])
+        # Track an offset rather than reslicing buf per pkt-line: slicing copies
+        # the remainder each time, which makes a single call quadratic in the
+        # number of lines it contains.
+        pos = 0
+        while len(buf) - pos >= 4:
+            size = _parse_pkt_line_length(buf[pos : pos + 4])
             if size == 0:
                 self.handle_pkt(None)
-                buf = buf[4:]
+                pos += 4
             elif size < 4:
                 raise GitProtocolError(f"Invalid pkt-line length: {size:04x}")
-            elif size <= len(buf):
-                self.handle_pkt(buf[4:size])
-                buf = buf[size:]
+            elif size <= len(buf) - pos:
+                self.handle_pkt(buf[pos + 4 : pos + size])
+                pos += size
             else:
                 break
         self._readahead = BytesIO()
-        self._readahead.write(buf)
+        self._readahead.write(buf[pos:])
 
     def get_tail(self) -> bytes:
         """Read back any unused data."""

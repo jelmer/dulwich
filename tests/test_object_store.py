@@ -74,7 +74,7 @@ from dulwich.pack import (
 )
 from dulwich.repo import Repo
 from dulwich.tests.test_object_store import ObjectStoreTests, PackBasedObjectStoreTests
-from dulwich.tests.utils import build_pack, make_object
+from dulwich.tests.utils import build_pack, make_object, make_tag
 
 from . import TestCase
 
@@ -92,6 +92,19 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
     def setUp(self) -> None:
         TestCase.setUp(self)
         self.store = MemoryObjectStore()
+
+    def test_peel_cache_invalidated_on_delete(self) -> None:
+        """Deleting objects drops memoized peel results."""
+        base = testobject
+        self.store.add_object(base)
+        tag = make_tag(base, name=b"1")
+        self.store.add_object(tag)
+
+        self.assertEqual((tag, base), self.store.peel(tag.id))
+        self.assertEqual(base.id, self.store._peel_cache.get(tag.id))
+
+        del self.store[tag.id]
+        self.assertEqual(None, self.store._peel_cache.get(tag.id))
 
     def test_add_pack(self) -> None:
         o = MemoryObjectStore()

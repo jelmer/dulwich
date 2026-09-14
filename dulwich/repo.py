@@ -131,7 +131,6 @@ from .object_store import (
     PackBasedObjectStore,
     PackCapableObjectStore,
     find_shallow,
-    peel_sha,
 )
 from .objects import (
     Blob,
@@ -1215,7 +1214,7 @@ class BaseRepo:
         cached = self.refs.get_peeled(ref)
         if cached is not None:
             return cached
-        return peel_sha(self.object_store, self.refs[ref])[1].id
+        return self.object_store.peel(self.refs[ref])[1].id
 
     @property
     def notes(self) -> "Notes":

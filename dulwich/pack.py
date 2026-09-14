@@ -301,6 +301,17 @@ class ObjectContainer(Protocol):
         """Retrieve an object."""
         ...
 
+    def peel(self, sha: "ObjectID | RawObjectID") -> tuple[ShaFile, ShaFile]:
+        """Peel all tags from a SHA.
+
+        Args:
+          sha: The object SHA to peel.
+        Returns: Tuple of (unpeeled, peeled) objects.
+        """
+        from .object_store import peel_sha
+
+        return peel_sha(self, sha)
+
     def get_commit_graph(self) -> "CommitGraph | None":
         """Get the commit graph for this object store.
 

@@ -62,7 +62,14 @@ import sys
 import time
 import warnings
 from collections import deque
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Set
+from collections.abc import (
+    Callable,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+    Set,
+)
 from contextlib import closing, suppress
 from io import BytesIO
 from pathlib import Path
@@ -79,6 +86,7 @@ if TYPE_CHECKING:
 
 from .errors import NotTreeError
 from .file import GitFile, SharedPerm, _GitFile, adjust_shared_perm
+from .lru_cache import LRUCache
 from .midx import MultiPackIndex, load_midx
 from .objects import (
     DEFAULT_LOOSE_OBJECT_SIZE_LIMIT,
@@ -136,6 +144,21 @@ logger = logging.getLogger(__name__)
 # disappears between snapshot and lazy open (e.g. concurrent repack).
 # Mirrors git's bounded reprepare_packed_git() retry.
 _MAX_PACK_RESCAN_ATTEMPTS = 3
+
+# Number of tag-peel results to memoize per object store. Entries are tiny
+# (two object ids), so this mainly bounds growth in long-lived processes.
+PEEL_CACHE_SIZE = 1000
+
+
+class PeelCache(Protocol):
+    """Minimal mapping interface peel_sha() needs from a cache."""
+
+    def get(self, key: ObjectID, default: None = None) -> ObjectID | None:
+        """Return the peeled id for key, or None."""
+
+    def __setitem__(self, key: ObjectID, value: ObjectID) -> None:
+        """Record the peeled id for key."""
+
 
 _T = TypeVar("_T")
 
@@ -432,6 +455,34 @@ class BaseObjectStore:
         from .object_format import DEFAULT_OBJECT_FORMAT
 
         self.object_format = object_format if object_format else DEFAULT_OBJECT_FORMAT
+
+    def peel(self, sha: ObjectID | RawObjectID) -> tuple[ShaFile, ShaFile]:
+        """Peel all tags from a SHA, memoizing shared tag chains.
+
+        Peeling each ref separately is quadratic when many refs share one tag
+        chain, so results are kept in a bounded cache on the store. Git objects
+        are immutable, so an entry can only go stale if the objects behind it
+        are deleted; the deletion paths call _invalidate_peel_cache().
+
+        Args:
+          sha: The object SHA to peel.
+        Returns: Tuple of (unpeeled, peeled) objects.
+        """
+        return peel_sha(self, sha, cache=self._peel_cache)
+
+    @property
+    def _peel_cache(self) -> "LRUCache[ObjectID, ObjectID]":
+        cache: LRUCache[ObjectID, ObjectID] | None = getattr(
+            self, "_BaseObjectStore__peel_cache", None
+        )
+        if cache is None:
+            cache = LRUCache(max_cache=PEEL_CACHE_SIZE)
+            self.__peel_cache = cache
+        return cache
+
+    def _invalidate_peel_cache(self) -> None:
+        """Drop memoized peel results, after objects may have been removed."""
+        self._peel_cache.clear()
 
     def determine_wants_all(
         self, refs: Mapping[Ref, ObjectID], depth: int | None = None
@@ -2053,6 +2104,7 @@ class DiskObjectStore(PackBasedObjectStore):
           FileNotFoundError: If the object file doesn't exist
         """
         _remove_readonly(self._get_shafile_path(sha))
+        self._invalidate_peel_cache()
 
     def get_object_mtime(self, sha: ObjectID) -> float:
         """Get the modification time of an object.
@@ -2090,6 +2142,7 @@ class DiskObjectStore(PackBasedObjectStore):
         raise KeyError(sha)
 
     def _remove_pack(self, pack: Pack) -> None:
+        self._invalidate_peel_cache()
         # _pack_cache is keyed by the full pack basename (e.g. "pack-<hash>"
         # or "loose-<hash>"), matching pack._basename.
         basename = os.path.basename(pack._basename)
@@ -2904,6 +2957,7 @@ class MemoryObjectStore(PackCapableObjectStore):
     def __delitem__(self, name: ObjectID) -> None:
         """Delete an object from this store, for testing only."""
         del self._data[self._to_hexsha(name)]
+        self._invalidate_peel_cache()
 
     def add_object(self, obj: ShaFile) -> None:
         """Add a single object to this object store."""
@@ -3923,23 +3977,38 @@ def iter_commit_contents(
 
 
 def peel_sha(
-    store: ObjectContainer, sha: ObjectID | RawObjectID
+    store: ObjectContainer,
+    sha: ObjectID | RawObjectID,
+    cache: PeelCache | None = None,
 ) -> tuple[ShaFile, ShaFile]:
     """Peel all tags from a SHA.
 
     Args:
       store: Object store to get objects from
       sha: The object SHA to peel.
+      cache: Optional mapping from tag id to fully-peeled id, updated as tags
+        are peeled. Most callers want ObjectContainer.peel(), which supplies a
+        cache kept on the store.
     Returns: The fully-peeled SHA1 of a tag object, after peeling all
         intermediate tags; if the original ref does not point to a tag,
         this will equal the original SHA1.
     """
+    if cache is None:
+        cache = {}
     unpeeled = obj = store[sha]
+    seen: list[ObjectID] = []
     obj_class = object_class(obj.type_name)
     while obj_class is Tag:
         assert isinstance(obj, Tag)
+        cached = cache.get(obj.id)
+        if cached is not None:
+            obj = store[cached]
+            break
+        seen.append(obj.id)
         obj_class, sha = obj.object
         obj = store[sha]
+    for tag_id in seen:
+        cache[tag_id] = obj.id
     return unpeeled, obj
 
 

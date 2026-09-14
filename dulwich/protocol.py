@@ -1061,7 +1061,6 @@ def write_info_refs(
     Yields:
       Lines in info/refs format (sha + tab + refname)
     """
-    from .object_store import peel_sha
     from .refs import HEADREF
 
     for name, sha in sorted(refs.items()):
@@ -1073,7 +1072,7 @@ def write_info_refs(
             o = store[sha]
         except KeyError:
             continue
-        _unpeeled, peeled = peel_sha(store, sha)
+        _unpeeled, peeled = store.peel(sha)
         yield o.id + b"\t" + name + b"\n"
         if o.id != peeled.id:
             yield peeled.id + b"\t" + name + PEELED_TAG_SUFFIX + b"\n"
@@ -1096,12 +1095,10 @@ def serialize_refs(
     """
     import warnings
 
-    from .object_store import peel_sha
-
     ret: dict[bytes, ObjectID] = {}
     for ref, sha in refs.items():
         try:
-            unpeeled, peeled = peel_sha(store, ObjectID(sha))
+            unpeeled, peeled = store.peel(ObjectID(sha))
         except KeyError:
             warnings.warn(
                 "ref {} points at non-present sha {}".format(

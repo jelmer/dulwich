@@ -1,5 +1,9 @@
 1.2.15	UNRELEASED
 
+ * Memoize tag peeling on the object store, so refs sharing an annotated tag
+   chain no longer re-walk it once per ref. ``show_ref --dereference`` and the
+   ref advertisement were quadratic. (Jelmer Vernooĳ, #2406)
+
  * Give a ``.gitignore`` in a subdirectory precedence over one closer to the
    root, matching git. A negation in a deeper file no longer loses to a rule
    at the root, and a nested negation no longer re-includes a path whose

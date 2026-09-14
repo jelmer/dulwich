@@ -7494,7 +7494,10 @@ class StatusTests(PorcelainTestCase):
                 fh.write("x")
 
         _, _, untracked = porcelain.status(self.repo.path, untracked_files="all")
-        self.assertEqual([b".gitignore", b"__tmp/keep"], sorted(untracked))
+        self.assertEqual(
+            [b".gitignore", os.fsencode(os.path.join("__tmp", "keep"))],
+            sorted(untracked),
+        )
 
     def test_status_untracked_path_normal(self) -> None:
         # Create an untracked directory with multiple files

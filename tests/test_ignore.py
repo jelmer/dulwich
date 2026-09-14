@@ -33,8 +33,6 @@ from dulwich.ignore import (
     IgnoreFilterManager,
     IgnoreFilterStack,
     Pattern,
-    _check_parent_exclusion,
-    _pattern_excludes_parent,
     match_pattern,
     read_ignore_patterns,
     translate,
@@ -301,93 +299,30 @@ class BracketExpressionTests(TestCase):
 class ParentExclusionTests(TestCase):
     """Tests for parent directory exclusion helper functions."""
 
-    def test_check_parent_exclusion_direct_directory(self) -> None:
-        """Test _check_parent_exclusion with direct directory exclusion."""
-        # Pattern: dir/, !dir/file.txt
-        patterns = [Pattern(b"dir/"), Pattern(b"!dir/file.txt")]
+    def test_directory_exclusion_blocks_file_negation(self) -> None:
+        # A file cannot be re-included while its parent directory is excluded.
+        filter = IgnoreFilter([b"dir/", b"!dir/file.txt"])
+        self.assertIs(True, filter.is_ignored(b"dir/file.txt"))
+        self.assertIs(True, filter.is_ignored(b"dir/subdir/file.txt"))
+        self.assertIs(None, filter.is_ignored(b"other/file.txt"))
 
-        # dir/file.txt has parent 'dir' excluded
-        self.assertTrue(_check_parent_exclusion("dir/file.txt", patterns))
+    def test_no_negation_leaves_exclusion_alone(self) -> None:
+        filter = IgnoreFilter([b"*.log", b"build/"])
+        self.assertIs(True, filter.is_ignored(b"build/file.txt"))
 
-        # dir/subdir/file.txt also has parent 'dir' excluded
-        self.assertTrue(_check_parent_exclusion("dir/subdir/file.txt", patterns))
+    def test_double_asterisk_directory_blocks_negation(self) -> None:
+        filter = IgnoreFilter([b"**/node_modules/**", b"!foo/node_modules/bar/f"])
+        self.assertIs(True, filter.is_ignored(b"foo/node_modules/bar/f"))
+        self.assertIs(True, filter.is_ignored(b"node_modules/file.txt"))
+        self.assertIs(None, filter.is_ignored(b"foo/bar/file.txt"))
 
-        # other/file.txt has no parent excluded
-        self.assertFalse(_check_parent_exclusion("other/file.txt", patterns))
-
-    def test_check_parent_exclusion_no_negation(self) -> None:
-        """Test _check_parent_exclusion when there's no negation pattern."""
-        # Only exclusion patterns
-        patterns = [Pattern(b"*.log"), Pattern(b"build/")]
-
-        # No negation pattern, so no parent exclusion check needed
-        self.assertFalse(_check_parent_exclusion("build/file.txt", patterns))
-
-    def test_pattern_excludes_parent_directory_slash(self) -> None:
-        """Test _pattern_excludes_parent for patterns ending with /."""
-        # Pattern: parent/
-        self.assertTrue(
-            _pattern_excludes_parent("parent/", "parent/file.txt", "!parent/file.txt")
-        )
-        self.assertTrue(
-            _pattern_excludes_parent(
-                "parent/", "parent/sub/file.txt", "!parent/sub/file.txt"
-            )
-        )
-        self.assertFalse(
-            _pattern_excludes_parent("parent/", "other/file.txt", "!other/file.txt")
-        )
-        self.assertFalse(
-            _pattern_excludes_parent("parent/", "parent", "!parent")
-        )  # No / in path
-
-    def test_pattern_excludes_parent_double_asterisk(self) -> None:
-        """Test _pattern_excludes_parent for **/ patterns."""
-        # Pattern: **/node_modules/**
-        self.assertTrue(
-            _pattern_excludes_parent(
-                "**/node_modules/**",
-                "foo/node_modules/bar/file.txt",
-                "!foo/node_modules/bar/file.txt",
-            )
-        )
-        self.assertTrue(
-            _pattern_excludes_parent(
-                "**/node_modules/**", "node_modules/file.txt", "!node_modules/file.txt"
-            )
-        )
-        self.assertFalse(
-            _pattern_excludes_parent(
-                "**/node_modules/**", "foo/bar/file.txt", "!foo/bar/file.txt"
-            )
-        )
-
-    def test_pattern_excludes_parent_glob(self) -> None:
-        """Test _pattern_excludes_parent for dir/** patterns."""
-        # Pattern: logs/** - allows exact file negations for immediate children
-        self.assertFalse(
-            _pattern_excludes_parent("logs/**", "logs/file.txt", "!logs/file.txt")
-        )
-
-        # Directory negations still have parent exclusion
-        self.assertTrue(
-            _pattern_excludes_parent("logs/**", "logs/keep/", "!logs/keep/")
-        )
-
-        # Non-exact negations have parent exclusion
-        self.assertTrue(
-            _pattern_excludes_parent("logs/**", "logs/keep/", "!logs/keep/file.txt")
-        )
-
-        # Nested paths have parent exclusion
-        self.assertTrue(
-            _pattern_excludes_parent("logs/**", "logs/sub/file.txt", "!logs/sub/")
-        )
-        self.assertTrue(
-            _pattern_excludes_parent(
-                "logs/**", "logs/sub/file.txt", "!logs/sub/file.txt"
-            )
-        )
+    def test_glob_contents_allow_file_negation(self) -> None:
+        # "logs/**" covers the contents of logs rather than naming it, so a
+        # file below it can still be re-included, but a directory cannot.
+        filter = IgnoreFilter([b"logs/**", b"!logs/file.txt"])
+        self.assertIs(False, filter.is_ignored(b"logs/file.txt"))
+        filter = IgnoreFilter([b"logs/**", b"!logs/keep/"])
+        self.assertIs(True, filter.is_ignored(b"logs/keep/"))
 
 
 class IgnoreFilterTests(TestCase):
@@ -551,6 +486,59 @@ class IgnoreFilterManagerTests(TestCase):
         m = IgnoreFilterManager.from_repo(repo)
         self.assertTrue(m.is_ignored("foo/bar"))
 
+    def test_subdirectory_gitignore_overrides_root(self) -> None:
+        # Git gives a .gitignore in a subdirectory precedence over one closer
+        # to the root, so the root negation does not win here.
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b"!deps/v8/**\n")
+
+        os.makedirs(os.path.join(repo.path, "deps", "v8", "inner"))
+        with open(
+            os.path.join(repo.path, "deps", "v8", "inner", ".gitignore"), "wb"
+        ) as f:
+            f.write(b"Cargo.lock\n")
+
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertIs(True, m.is_ignored("deps/v8/inner/Cargo.lock"))
+
+    def test_subdirectory_gitignore_reincludes(self) -> None:
+        # The same precedence applies the other way round: a negation in a
+        # subdirectory beats an exclusion at the root.
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b".idea/\n")
+
+        os.makedirs(os.path.join(repo.path, "testbed", ".idea"))
+        with open(os.path.join(repo.path, "testbed", ".gitignore"), "wb") as f:
+            f.write(b"!.idea/\n")
+
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertIs(False, m.is_ignored("testbed/.idea/"))
+
+    def test_excluded_parent_blocks_nested_reinclude(self) -> None:
+        # A file cannot be re-included while a parent directory stays excluded,
+        # even when the negation lives in a deeper .gitignore.
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b".vscode\n")
+
+        os.makedirs(os.path.join(repo.path, "app", ".vscode"))
+        with open(os.path.join(repo.path, "app", ".gitignore"), "wb") as f:
+            f.write(b"!.vscode/extensions.json\n")
+
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertIs(True, m.is_ignored("app/.vscode/extensions.json"))
+
     def test_load_ignore_ignorecase(self) -> None:
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)
@@ -575,7 +563,8 @@ class IgnoreFilterManagerTests(TestCase):
         m = IgnoreFilterManager.from_repo(repo)
         os.mkdir(os.path.join(repo.path, "a"))
         self.assertIs(None, m.is_ignored("a"))
-        self.assertIs(None, m.is_ignored("a/"))
+        # Asking about "a/" asks about what it holds, which "a/*" excludes.
+        self.assertIs(True, m.is_ignored("a/"))
         self.assertFalse(m.is_ignored("a/b.txt"))
         self.assertTrue(m.is_ignored("a/c.dat"))
 
@@ -596,7 +585,8 @@ class IgnoreFilterManagerTests(TestCase):
             f.write(b"visible")
 
         m = IgnoreFilterManager.from_repo(repo)
-        self.assertFalse(m.is_ignored("dist/"))
+        # "dist/" asks about the contents too, and "dist/*" excludes them.
+        self.assertTrue(m.is_ignored("dist/"))
         self.assertTrue(m.is_ignored("dist/drop.txt"))
         self.assertFalse(m.is_ignored("dist/keep.txt"))
 

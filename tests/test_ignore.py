@@ -325,6 +325,41 @@ class ParentExclusionTests(TestCase):
         self.assertIs(True, filter.is_ignored(b"logs/keep/"))
 
 
+class MayPruneDirectoryTests(TestCase):
+    """Tests for deciding whether a walk can skip a directory."""
+
+    def test_named_directory_is_prunable(self) -> None:
+        # The pattern names the directory, so git stops there and the
+        # negation below it is never reached.
+        filter = IgnoreFilter([b"build/", b"!build/keep.txt"])
+        self.assertIs(True, filter.may_prune_directory(b"build/"))
+        filter = IgnoreFilter([b"build", b"!build/keep.txt"])
+        self.assertIs(True, filter.may_prune_directory(b"build/"))
+
+    def test_contents_pattern_is_not_prunable(self) -> None:
+        # "__tmp/*" describes what the directory holds rather than naming it,
+        # so git descends and "!__tmp/keep" still applies. check-ignore calls
+        # the directory ignored anyway, because "*" also matches the empty
+        # string, so the two answers differ here.
+        filter = IgnoreFilter([b"__tmp/*", b"!__tmp/keep"])
+        self.assertIs(True, filter.is_ignored(b"__tmp/"))
+        self.assertIs(False, filter.may_prune_directory(b"__tmp/"))
+        self.assertIs(False, filter.is_ignored(b"__tmp/keep"))
+
+    def test_double_asterisk_contents_is_not_prunable(self) -> None:
+        filter = IgnoreFilter([b"logs/**", b"!logs/important.log"])
+        self.assertIs(True, filter.is_ignored(b"logs/"))
+        self.assertIs(False, filter.may_prune_directory(b"logs/"))
+
+    def test_unmentioned_directory_is_not_prunable(self) -> None:
+        filter = IgnoreFilter([b"*.log"])
+        self.assertIs(False, filter.may_prune_directory(b"src/"))
+
+    def test_excluded_parent_makes_child_prunable(self) -> None:
+        filter = IgnoreFilter([b"build/"])
+        self.assertIs(True, filter.may_prune_directory(b"build/sub/"))
+
+
 class IgnoreFilterTests(TestCase):
     def test_included(self) -> None:
         filter = IgnoreFilter([b"a.c", b"b.c"])
@@ -589,6 +624,35 @@ class IgnoreFilterManagerTests(TestCase):
         self.assertTrue(m.is_ignored("dist/"))
         self.assertTrue(m.is_ignored("dist/drop.txt"))
         self.assertFalse(m.is_ignored("dist/keep.txt"))
+
+    def test_reincluded_file_under_glob_contents_is_walked(self) -> None:
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b"__tmp/*\n")
+            f.write(b"!__tmp/keep\n")
+        os.mkdir(os.path.join(repo.path, "__tmp"))
+
+        m = IgnoreFilterManager.from_repo(repo)
+        # check-ignore reports the directory as ignored, but the walk has to
+        # enter it for "!__tmp/keep" to take effect.
+        self.assertIs(True, m.is_ignored("__tmp/"))
+        self.assertIs(False, m.may_prune_directory("__tmp/"))
+        self.assertIs(False, m.is_ignored("__tmp/keep"))
+        self.assertIs(True, m.is_ignored("__tmp/other"))
+
+    def test_named_directory_may_be_pruned(self) -> None:
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b"__tmp/\n")
+            f.write(b"!__tmp/keep\n")
+        os.mkdir(os.path.join(repo.path, "__tmp"))
+
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertIs(True, m.may_prune_directory("__tmp/"))
 
     def test_issue_1203_directory_negation(self) -> None:
         """Test for issue #1203: gitignore patterns with directory negation."""

@@ -2044,7 +2044,7 @@ def add(
             if resolved_path.is_dir():
                 # Check if the directory itself is ignored
                 dir_relpath = posixpath.join(relpath, "") if relpath != "." else ""
-                if dir_relpath and ignore_manager.is_ignored(dir_relpath):
+                if dir_relpath and ignore_manager.may_prune_directory(dir_relpath):
                     ignored.add(dir_relpath)
                     continue
 
@@ -4153,8 +4153,9 @@ def get_untracked_paths(
             path = os.path.join(dirpath, dirnames[i])
             ip = os.path.join(os.path.relpath(path, basepath_str), "")
 
-            # Check if directory is ignored
-            if ignore_manager.is_ignored(ip) is True:
+            # A directory excluded only by a pattern covering its contents
+            # still has to be entered, so that a negation below it is seen.
+            if ignore_manager.may_prune_directory(ip):
                 if not exclude_ignored:
                     ignored_dirs.append(
                         os.path.join(os.path.relpath(path, frompath_str), "")

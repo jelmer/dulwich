@@ -346,6 +346,30 @@ class Pattern:
         """
         return f"{type(self).__name__}({self.pattern!r}, {self.ignorecase!r})"
 
+    def reopens_directory(self, path: bytes) -> bool:
+        """Check whether this negation re-includes a directory for descent.
+
+        A pattern such as ``!dir/**`` covers what is inside a directory; git
+        reports it as matching the directory too, so that it can be entered.
+        """
+        return (
+            not self.is_exclude
+            and self._container_re is not None
+            and bool(self._container_re.match(path))
+        )
+
+    def reopens_subdirectories(self, path: bytes) -> bool:
+        """Check whether this negation re-includes directories at every level.
+
+        ``!dir/**/`` re-includes the directories under dir, so git enters dir
+        itself; ``!dir/*/`` only reaches one level down and does not.
+        """
+        return (
+            self.is_directory_only
+            and self._container_spans_depth
+            and self.reopens_directory(path)
+        )
+
     def matches_entry(self, name: bytes) -> bool:
         """Check whether this pattern names an entry itself.
 
@@ -444,6 +468,11 @@ class IgnoreFilter:
         for pattern in self._patterns:
             if pattern.match(path):
                 yield pattern
+
+    @property
+    def patterns(self) -> list[Pattern]:
+        """Return the compiled patterns, in the order they were read."""
+        return self._patterns
 
     def is_ignored(self, path: bytes | str) -> bool | None:
         """Check whether a path is ignored using Git-compliant logic.
@@ -659,34 +688,24 @@ class IgnoreFilterManager:
         for depth, f in reversed(self._filters_for(path)):
             encoded = os.fsencode(self._relative(path, depth))
             candidate = None
-            for pattern in f._patterns:
+            for pattern in f.patterns:
                 if pattern.match(encoded):
                     # A pattern ending in a slash only matches a directory.
                     if pattern.is_directory_only and not is_dir:
                         continue
-                elif not (
-                    is_dir
-                    and not pattern.is_exclude
-                    and pattern._container_re is not None
-                    and pattern._container_re.match(encoded)
-                ):
+                elif not (is_dir and pattern.reopens_directory(encoded)):
                     continue
                 candidate = pattern
-            if candidate is not None:
-                # A negation describing the contents of a directory re-includes
-                # the directory only so it can be descended into; it cannot
-                # undo a pattern that named the directory itself.
-                if (
-                    not candidate.is_exclude
-                    and candidate._container_re is not None
-                    and not candidate.match(encoded)
-                ):
-                    for other in f._patterns:
-                        if other.is_exclude and other.matches_entry(
-                            encoded.rstrip(b"/")
-                        ):
-                            return other
-                return candidate
+            if candidate is None:
+                continue
+            # A negation that only reopens the directory for descent does not
+            # undo an exclusion that named the directory outright.
+            if candidate.reopens_directory(encoded) and not candidate.match(encoded):
+                name = encoded.rstrip(b"/")
+                for other in f.patterns:
+                    if other.is_exclude and other.matches_entry(name):
+                        return other
+            return candidate
         return None
 
     def is_ignored(self, path: str) -> bool | None:
@@ -726,26 +745,20 @@ class IgnoreFilterManager:
                 name = os.fsencode(self._relative(parent, depth))
                 withslash = name + b"/"
                 decision = None
-                for pattern in f._patterns:
+                for pattern in f.patterns:
                     if pattern.matches_entry(name) or (
                         not entry_only and pattern.match(withslash)
                     ):
                         decision = pattern
-                    elif (
-                        not pattern.is_exclude
-                        and pattern.is_directory_only
-                        and pattern._container_spans_depth
-                        and pattern._container_re is not None
-                        and pattern._container_re.match(withslash)
-                        # Such a negation re-includes the directory only so it
-                        # can be descended into; it cannot undo a pattern that
-                        # named the directory outright.
-                        and not (
-                            decision is not None
-                            and decision.is_exclude
-                            and decision.matches_entry(name)
-                        )
-                    ):
+                        continue
+                    # A negation reopening the directories below this one lets
+                    # git enter it, unless an exclusion named it outright.
+                    named = (
+                        decision is not None
+                        and decision.is_exclude
+                        and decision.matches_entry(name)
+                    )
+                    if pattern.reopens_subdirectories(withslash) and not named:
                         decision = pattern
                 if decision is not None:
                     if decision.is_exclude:

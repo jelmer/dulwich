@@ -21,6 +21,7 @@
 
 """Tests for the smart protocol utility functions."""
 
+import time
 from io import BytesIO
 
 from dulwich.errors import HangupException
@@ -385,6 +386,23 @@ class PktLineParserTests(TestCase):
     def test_non_hex_length(self) -> None:
         parser = PktLineParser(lambda pkt: None)
         self.assertRaises(GitProtocolError, parser.parse, b"+abcpayload")
+
+    def test_large_buffer_scales_linearly(self) -> None:
+        # parse() used to reslice the remaining buffer per pkt-line, making a
+        # single call quadratic in the number of lines it contained.
+        def elapsed(n):
+            parser = PktLineParser(lambda pkt: None)
+            data = b"0005x" * n
+            start = time.perf_counter()
+            parser.parse(data)
+            return time.perf_counter() - start
+
+        elapsed(1000)  # warm up
+        base = min(elapsed(10000) for _ in range(3))
+        wide = min(elapsed(80000) for _ in range(3))
+        # 8x the lines should cost roughly 8x, not 64x. Allow a wide margin so
+        # the test measures the complexity class rather than the machine.
+        self.assertLess(wide, max(base, 1e-4) * 24)
 
 
 class CapabilitiesTests(TestCase):

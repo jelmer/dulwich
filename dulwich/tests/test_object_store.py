@@ -39,6 +39,7 @@ from dulwich.objects import (
     Blob,
     Commit,
     ObjectID,
+    RawObjectID,
     ShaFile,
     Tag,
     Tree,
@@ -263,6 +264,33 @@ class ObjectStoreTests(Generic[_StoreT]):
         tag3 = self.make_tag(b"3", testobject)
         for obj in [testobject, tag1, tag2, tag3]:
             self.assertEqual((obj, testobject), peel_sha(self.store, obj.id))
+
+    def test_peel_cache(self) -> None:
+        """The store memoizes tag chains shared between refs."""
+        self.store.add_object(testobject)
+        chain = []
+        obj: ShaFile = testobject
+        for i in range(10):
+            obj = self.make_tag(b"%d" % i, obj)
+            chain.append(obj)
+
+        for tag in chain:
+            self.assertEqual((tag, testobject), self.store.peel(tag.id))
+
+        # Peeling the tip again only loads the tip and the object it peels to,
+        # rather than walking the whole chain.
+        loaded: list[bytes] = []
+        real_getitem = type(self.store).__getitem__
+
+        def counting_getitem(
+            store: "BaseObjectStore", sha: "ObjectID | RawObjectID"
+        ) -> ShaFile:
+            loaded.append(sha)
+            return real_getitem(store, sha)
+
+        with patch.object(type(self.store), "__getitem__", counting_getitem):
+            self.assertEqual((chain[-1], testobject), self.store.peel(chain[-1].id))
+        self.assertEqual([chain[-1].id, testobject.id], loaded)
 
     def test_get_raw(self) -> None:
         """Test getting raw object data."""

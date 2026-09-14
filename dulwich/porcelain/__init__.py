@@ -5213,16 +5213,12 @@ def show_ref(
             # Dereference tags if requested
             if dereference and ref.startswith(LOCAL_TAG_PREFIX):
                 try:
-                    obj = r.get_object(sha)
-                    # Peel tag objects to get the underlying commit/object
-                    while obj.type_name == b"tag":
-                        assert isinstance(obj, Tag)
-                        _obj_class, sha = obj.object
-                        obj = r.get_object(sha)
-                    result.append((sha, ref + b"^{}"))
+                    peeled = r.object_store.peel(sha)[1]
                 except KeyError:
                     # Object not found, skip dereferencing
                     pass
+                else:
+                    result.append((peeled.id, ref + b"^{}"))
 
     return result
 

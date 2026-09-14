@@ -169,6 +169,15 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
 
         self._assert_ignore_match(["app/.vscode/", "app/.vscode/extensions.json"])
 
+    def test_directory_negation_cannot_undo_named_directory(self) -> None:
+        """A "!dir/**/" negation does not undo an exclusion naming the dir."""
+        self._write_gitignore("build\n!build/**/\n")
+        self._create_dir("build/sub")
+        self._create_file("build/f", "content")
+        self._create_file("build/sub/g", "content")
+
+        self._assert_ignore_match(["build/", "build/f", "build/sub/", "build/sub/g"])
+
     def test_basic_patterns(self) -> None:
         """Test basic gitignore patterns."""
         self._write_gitignore("*.tmp\n*.log\n")

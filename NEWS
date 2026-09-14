@@ -2,10 +2,11 @@
 
  * Enter a directory whose contents are excluded by a pattern such as
    ``dir/*`` when walking the work tree, so a later negation can re-include a
-   file below it. ``dulwich add dir`` and ``status`` no longer drop a
-   re-included file. ``is_ignored`` still reports the directory as ignored,
-   matching ``git check-ignore``; walking callers should ask the new
-   ``may_prune_directory`` instead. (Jelmer Vernooĳ, #2409)
+   file below it. (Jelmer Vernooĳ, #2409)
+
+ * Memoize tag peeling on the object store, so refs sharing an annotated tag
+   chain no longer re-walk it once per ref. ``show_ref --dereference`` and the
+   ref advertisement were quadratic. (Jelmer Vernooĳ, #2406)
 
  * Give a ``.gitignore`` in a subdirectory precedence over one closer to the
    root, matching git. A negation in a deeper file no longer loses to a rule

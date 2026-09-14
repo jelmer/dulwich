@@ -48,7 +48,7 @@ from dulwich.cli import (
     parse_time_to_timestamp,
     write_columns,
 )
-from dulwich.objects import Blob, Tag, Tree
+from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.porcelain import gc, rev_parse
 from dulwich.repo import Repo
 from dulwich.tests.utils import (
@@ -1888,6 +1888,86 @@ class ShowRefCommandTest(DulwichCliTestCase):
 
         expected = f"{v1_sha} refs/tags/v1.0\n{v2_sha} refs/tags/v2.0"
         self.assertEqual(output, expected)
+
+    def test_show_ref_dereference_nested_tags(self):
+        """show-ref --dereference peels chains of annotated tags."""
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Test commit")
+        commit_sha = self.repo.refs[b"HEAD"]
+
+        # Build a chain of annotated tags on top of the commit, with two refs
+        # pointing at the tip so the shared chain is peeled more than once.
+        obj_id = commit_sha
+        obj_class = Commit
+        for i in range(3):
+            tag = Tag()
+            tag.name = b"nested-%d" % i
+            tag.message = b"nested tag\n"
+            tag.tagger = b"Test <test@example.com>"
+            tag.tag_time = 0
+            tag.tag_timezone = 0
+            tag.object = (obj_class, obj_id)
+            self.repo.object_store.add_object(tag)
+            obj_id, obj_class = tag.id, Tag
+
+        self.repo.refs[b"refs/tags/tip-a"] = obj_id
+        self.repo.refs[b"refs/tags/tip-b"] = obj_id
+
+        result = porcelain.show_ref(self.repo, tags=True, dereference=True)
+        self.assertEqual(
+            [
+                (obj_id, b"refs/tags/tip-a"),
+                (commit_sha, b"refs/tags/tip-a^{}"),
+                (obj_id, b"refs/tags/tip-b"),
+                (commit_sha, b"refs/tags/tip-b^{}"),
+            ],
+            result,
+        )
+
+    def test_show_ref_dereference_shared_chain_work_bound(self):
+        """Refs sharing a tag chain peel it once, not once per ref."""
+        test_file = os.path.join(self.repo_path, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test content")
+        self._run_cli("add", "test.txt")
+        self._run_cli("commit", "--message=Test commit")
+
+        depth = 20
+        obj_id = self.repo.refs[b"HEAD"]
+        obj_class = Commit
+        for i in range(depth):
+            tag = Tag()
+            tag.name = b"chain-%d" % i
+            tag.message = b"chain tag\n"
+            tag.tagger = b"Test <test@example.com>"
+            tag.tag_time = 0
+            tag.tag_timezone = 0
+            tag.object = (obj_class, obj_id)
+            self.repo.object_store.add_object(tag)
+            obj_id, obj_class = tag.id, Tag
+
+        refs = 20
+        for i in range(refs):
+            self.repo.refs[b"refs/tags/shared-%02d" % i] = obj_id
+
+        loaded: list[bytes] = []
+        store = self.repo.object_store
+        real_getitem = type(store).__getitem__
+
+        def counting_getitem(inner_store, sha):
+            loaded.append(sha)
+            return real_getitem(inner_store, sha)
+
+        with patch.object(type(store), "__getitem__", counting_getitem):
+            result = porcelain.show_ref(self.repo, tags=True, dereference=True)
+
+        self.assertEqual(2 * refs, len(result))
+        # Without memoization this is refs * depth; the chain is walked once
+        # and each remaining ref only costs its own lookup.
+        self.assertLess(len(loaded), depth + 2 * refs)
 
     def test_show_ref_hash_only(self):
         """Test show-ref with --hash option to show only OID."""

@@ -563,7 +563,8 @@ class IgnoreFilterManagerTests(TestCase):
         m = IgnoreFilterManager.from_repo(repo)
         os.mkdir(os.path.join(repo.path, "a"))
         self.assertIs(None, m.is_ignored("a"))
-        self.assertIs(None, m.is_ignored("a/"))
+        # Asking about "a/" asks about what it holds, which "a/*" excludes.
+        self.assertIs(True, m.is_ignored("a/"))
         self.assertFalse(m.is_ignored("a/b.txt"))
         self.assertTrue(m.is_ignored("a/c.dat"))
 
@@ -584,7 +585,8 @@ class IgnoreFilterManagerTests(TestCase):
             f.write(b"visible")
 
         m = IgnoreFilterManager.from_repo(repo)
-        self.assertFalse(m.is_ignored("dist/"))
+        # "dist/" asks about the contents too, and "dist/*" excludes them.
+        self.assertTrue(m.is_ignored("dist/"))
         self.assertTrue(m.is_ignored("dist/drop.txt"))
         self.assertFalse(m.is_ignored("dist/keep.txt"))
 

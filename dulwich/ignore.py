@@ -185,20 +185,13 @@ class Pattern:
         if self.ignorecase:
             flags = re.IGNORECASE
         self._re = re.compile(translate(pattern), flags)
-        # Git strips the trailing slash of a directory-only pattern and matches
-        # the rest against the entry name, so "dir/" and "dir" name the entry
-        # "dir" while "dir/**" only describes what is inside it.
-        self._entry_re = re.compile(translate(pattern.rstrip(b"/")), flags)
-        # Git reports a pattern covering the contents of a directory, such as
-        # "dir/*" or "dir/*/", as matching that directory too.
-        self._container_re = None
-        self._container_spans_depth = False
-        stripped = pattern.rstrip(b"/")
-        if stripped.endswith(b"/**"):
-            self._container_re = re.compile(translate(stripped[:-3] + b"/"), flags)
-            self._container_spans_depth = True
-        elif stripped.endswith(b"/*"):
-            self._container_re = re.compile(translate(stripped[:-2] + b"/"), flags)
+        # Git drops the trailing slash of a directory-only pattern and requires
+        # the entry to be a directory instead, so the pattern itself is matched
+        # against a plain name.
+        self._name_re = re.compile(translate(pattern.rstrip(b"/")), flags)
+        # "dir/**" and "dir/*" name no entry of their own; they describe what
+        # a directory holds.
+        self._describes_contents = pattern.rstrip(b"/").endswith((b"/*", b"/**"))
 
     def __bytes__(self) -> bytes:
         """Return the pattern as bytes.
@@ -239,40 +232,36 @@ class Pattern:
         """
         return f"{type(self).__name__}({self.pattern!r}, {self.ignorecase!r})"
 
-    def reopens_directory(self, path: bytes) -> bool:
-        """Check whether this negation re-includes a directory for descent.
+    def matches(self, name: bytes, is_dir: bool) -> bool:
+        """Check whether this pattern decides an entry.
 
-        A pattern such as ``!dir/**`` covers what is inside a directory; git
-        reports it as matching the directory too, so that it can be entered.
-        """
-        return (
-            not self.is_exclude
-            and self._container_re is not None
-            and bool(self._container_re.match(path))
-        )
+        Args:
+          name: Path of the entry, relative to the directory holding the
+            pattern and without a trailing slash.
+          is_dir: Whether the entry is a directory.
 
-    def reopens_subdirectories(self, path: bytes) -> bool:
-        """Check whether this negation re-includes directories at every level.
-
-        ``!dir/**/`` re-includes the directories under dir, so git enters dir
-        itself; ``!dir/*/`` only reaches one level down and does not.
-        """
-        return (
-            self.is_directory_only
-            and self._container_spans_depth
-            and self.reopens_directory(path)
-        )
-
-    def matches_entry(self, name: bytes) -> bool:
-        """Check whether this pattern names an entry itself.
-
-        Only such a pattern keeps git from descending into a directory; one
-        that merely covers its contents, such as ``dir/**``, leaves the
-        directory reachable.
+        A pattern written with a trailing slash only ever matches a directory;
+        git drops that slash and applies this flag instead. A pattern covering
+        what is inside a directory, such as ``dir/**``, names no entry of its
+        own and so only matches below it.
         """
         if self.is_empty:
             return False
-        return bool(self._entry_re.match(name))
+        if self.is_directory_only and not is_dir:
+            return False
+        return bool(self._name_re.match(name))
+
+    def reaches_inside(self, name: bytes) -> bool:
+        """Check whether this pattern decides entries below a directory.
+
+        A pattern such as ``dir/**`` names no entry itself, so it never
+        decides ``dir``; it does decide what ``dir`` holds, which is what a
+        query about the directory is really asking.
+        """
+        if not self._describes_contents:
+            return False
+        prefix = name + b"/"
+        return bool(self.match(prefix + b"x") or self.match(prefix + b"x/"))
 
     def match(self, path: bytes) -> bool:
         """Try to match a path against this ignore pattern.
@@ -316,88 +305,60 @@ def _relative_to(path: str, depth: int) -> str:
 
 
 def _last_matching_pattern(
-    filters: Sequence[_DepthFilter], path: str
+    filters: Sequence[_DepthFilter], name: str, is_dir: bool
 ) -> "Pattern | None":
-    """Return the pattern deciding path, or None if none applies.
+    """Return the pattern deciding an entry, or None if none applies.
 
     Git consults the .gitignore files from the deepest directory upwards and
     stops at the first file that has something to say, so a rule file in a
     subdirectory overrides one closer to the root. Within a file the last
     matching pattern wins.
     """
-    is_dir = path.endswith("/")
     for depth, f in reversed(filters):
-        encoded = os.fsencode(_relative_to(path, depth))
-        candidate = None
-        for pattern in f.patterns:
-            if pattern.match(encoded):
-                # A pattern ending in a slash only matches a directory.
-                if pattern.is_directory_only and not is_dir:
-                    continue
-            elif not (is_dir and pattern.reopens_directory(encoded)):
-                continue
-            candidate = pattern
-        if candidate is None:
-            continue
-        # A negation that only reopens the directory for descent does not undo
-        # an exclusion that named the directory outright.
-        if candidate.reopens_directory(encoded) and not candidate.match(encoded):
-            name = encoded.rstrip(b"/")
-            for other in f.patterns:
-                if other.is_exclude and other.matches_entry(name):
-                    return other
-        return candidate
+        relname = os.fsencode(_relative_to(name, depth))
+        for pattern in reversed(f.patterns):
+            if pattern.matches(relname, is_dir):
+                return pattern
     return None
 
 
-def _parent_excluded(filters_for: _FiltersFor, path: str, entry_only: bool) -> bool:
-    """Check whether a parent directory of path is excluded.
+def _decide(filters_for: _FiltersFor, path: str, is_dir: bool) -> bool | None:
+    """Decide whether an entry is ignored, given the filters applying to it.
 
-    With entry_only, only a pattern naming a parent directory itself counts;
-    otherwise a pattern covering its contents counts as well.
+    Git walks down from the top and stops at the first excluded directory, so
+    a rule below one is never reached and cannot re-include anything under it.
+    A negated match does not exclude, and so does not stop the walk.
     """
-    parts = path.rstrip("/").split("/")
+    name = path.rstrip("/")
+    parts = name.split("/")
     for i in range(1, len(parts)):
         parent = "/".join(parts[:i])
-        for depth, f in reversed(filters_for(parent + "/")):
-            name = os.fsencode(_relative_to(parent, depth))
-            withslash = name + b"/"
-            decision = None
-            for pattern in f.patterns:
-                if pattern.matches_entry(name) or (
-                    not entry_only and pattern.match(withslash)
-                ):
-                    decision = pattern
-                    continue
-                # A negation reopening the directories below this one lets git
-                # enter it, unless an exclusion named it outright.
-                named = (
-                    decision is not None
-                    and decision.is_exclude
-                    and decision.matches_entry(name)
-                )
-                if pattern.reopens_subdirectories(withslash) and not named:
-                    decision = pattern
-            if decision is not None:
-                if decision.is_exclude:
-                    return True
-                break
-    return False
+        pattern = _last_matching_pattern(filters_for(parent + "/"), parent, True)
+        if pattern is not None and pattern.is_exclude:
+            return True
 
-
-def _decide(filters_for: _FiltersFor, path: str) -> bool | None:
-    """Decide whether path is ignored, given the filters applying to it."""
-    pattern = _last_matching_pattern(filters_for(path), path)
+    filters = filters_for(path)
+    pattern = _last_matching_pattern(filters, name, is_dir)
     if pattern is not None and pattern.is_exclude:
         return True
 
-    # Git stops descending at an excluded directory, so nothing below one can
-    # be re-included. A directory is blocked by any pattern covering it, a file
-    # only by one naming a parent directory outright.
-    if _parent_excluded(filters_for, path, entry_only=not path.endswith("/")):
+    # A path written with a trailing slash asks about what the directory holds
+    # as well, so an exclusion reaching inside it applies even when nothing
+    # names the directory itself.
+    if path.endswith("/") and _excluded_inside(filters, name):
         return True
 
     return None if pattern is None else False
+
+
+def _excluded_inside(filters: Sequence[_DepthFilter], name: str) -> bool:
+    """Check whether the last pattern reaching inside a directory excludes."""
+    for depth, f in reversed(filters):
+        relname = os.fsencode(_relative_to(name, depth))
+        for pattern in reversed(f.patterns):
+            if pattern.reaches_inside(relname):
+                return pattern.is_exclude
+    return False
 
 
 class IgnoreFilter:
@@ -473,8 +434,10 @@ class IgnoreFilter:
         """
         if isinstance(path, bytes):
             path = path.decode()
-        # A single file's patterns are all rooted at the filter itself.
-        return _decide(lambda _path: [(0, self)], path)
+        # A single file's patterns are all rooted at the filter itself. Without
+        # a work tree to consult, a trailing slash is the only indication that
+        # the path is a directory.
+        return _decide(lambda _path: [(0, self)], path, path.endswith("/"))
 
     @classmethod
     def from_path(
@@ -650,7 +613,18 @@ class IgnoreFilterManager:
           None if the file is not mentioned, True if it is included,
           False if it is explicitly excluded.
         """
-        return _decide(self._filters_for, self._normalize(path))
+        path = self._normalize(path)
+        return _decide(self._filters_for, path, self._is_dir(path))
+
+    def _is_dir(self, path: str) -> bool:
+        """Check whether path names a directory in the work tree.
+
+        Git resolves this from the index or a stat of the entry; a trailing
+        slash says so outright, and otherwise the work tree is consulted.
+        """
+        if path.endswith("/"):
+            return True
+        return os.path.isdir(os.path.join(self._top_path, path))
 
     @classmethod
     def from_repo(

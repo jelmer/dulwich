@@ -673,6 +673,19 @@ class IgnoreFilterManager:
                     continue
                 candidate = pattern
             if candidate is not None:
+                # A negation describing the contents of a directory re-includes
+                # the directory only so it can be descended into; it cannot
+                # undo a pattern that named the directory itself.
+                if (
+                    not candidate.is_exclude
+                    and candidate._container_re is not None
+                    and not candidate.match(encoded)
+                ):
+                    for other in f._patterns:
+                        if other.is_exclude and other.matches_entry(
+                            encoded.rstrip(b"/")
+                        ):
+                            return other
                 return candidate
         return None
 
@@ -714,15 +727,23 @@ class IgnoreFilterManager:
                 withslash = name + b"/"
                 decision = None
                 for pattern in f._patterns:
-                    if (
-                        pattern.matches_entry(name)
-                        or (not entry_only and pattern.match(withslash))
-                        or (
-                            not pattern.is_exclude
-                            and pattern.is_directory_only
-                            and pattern._container_spans_depth
-                            and pattern._container_re is not None
-                            and pattern._container_re.match(withslash)
+                    if pattern.matches_entry(name) or (
+                        not entry_only and pattern.match(withslash)
+                    ):
+                        decision = pattern
+                    elif (
+                        not pattern.is_exclude
+                        and pattern.is_directory_only
+                        and pattern._container_spans_depth
+                        and pattern._container_re is not None
+                        and pattern._container_re.match(withslash)
+                        # Such a negation re-includes the directory only so it
+                        # can be descended into; it cannot undo a pattern that
+                        # named the directory outright.
+                        and not (
+                            decision is not None
+                            and decision.is_exclude
+                            and decision.matches_entry(name)
                         )
                     ):
                         decision = pattern

@@ -370,7 +370,7 @@ def _may_prune(filters_for: _FiltersFor, path: str) -> bool:
     something below. ``check-ignore`` reports such a directory as ignored --
     ``dir/*`` matches the text ``dir/`` because ``*`` also matches the empty
     string -- which is why walking callers must ask this instead of reading
-    :meth:`is_ignored` as permission to prune.
+    ``is_ignored`` as permission to prune.
     """
     name = path.rstrip("/")
     parts = name.split("/")

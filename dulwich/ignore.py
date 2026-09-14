@@ -292,6 +292,20 @@ class Pattern:
         if self.ignorecase:
             flags = re.IGNORECASE
         self._re = re.compile(translate(pattern), flags)
+        # Git strips the trailing slash of a directory-only pattern and matches
+        # the rest against the entry name, so "dir/" and "dir" name the entry
+        # "dir" while "dir/**" only describes what is inside it.
+        self._entry_re = re.compile(translate(pattern.rstrip(b"/")), flags)
+        # Git reports a pattern covering the contents of a directory, such as
+        # "dir/*" or "dir/*/", as matching that directory too.
+        self._container_re = None
+        self._container_spans_depth = False
+        stripped = pattern.rstrip(b"/")
+        if stripped.endswith(b"/**"):
+            self._container_re = re.compile(translate(stripped[:-3] + b"/"), flags)
+            self._container_spans_depth = True
+        elif stripped.endswith(b"/*"):
+            self._container_re = re.compile(translate(stripped[:-2] + b"/"), flags)
 
     def __bytes__(self) -> bytes:
         """Return the pattern as bytes.
@@ -331,6 +345,17 @@ class Pattern:
             A string representation for debugging.
         """
         return f"{type(self).__name__}({self.pattern!r}, {self.ignorecase!r})"
+
+    def matches_entry(self, name: bytes) -> bool:
+        """Check whether this pattern names an entry itself.
+
+        Only such a pattern keeps git from descending into a directory; one
+        that merely covers its contents, such as ``dir/**``, leaves the
+        directory reachable.
+        """
+        if self.is_empty:
+            return False
+        return bool(self._entry_re.match(name))
 
     def match(self, path: bytes) -> bool:
         """Try to match a path against this ignore pattern.
@@ -588,26 +613,68 @@ class IgnoreFilterManager:
         Returns:
           Iterator over Pattern instances
         """
+        path = self._normalize(path)
+        matches: list[Pattern] = []
+        for depth, f in self._filters_for(path):
+            matches.extend(f.find_matching(self._relative(path, depth)))
+        return iter(matches)
+
+    @staticmethod
+    def _normalize(path: str) -> str:
         if os.path.isabs(path):
             raise ValueError(f"{path} is an absolute path")
-        filters = [(0, f) for f in self._global_filters]
         if os.path.sep != "/":
             path = path.replace(os.path.sep, "/")
+        return path
+
+    @staticmethod
+    def _relative(path: str, depth: int) -> str:
+        """Return path as seen from the directory a filter lives in."""
+        return "/".join(path.split("/")[depth:])
+
+    def _filters_for(self, path: str) -> list[tuple[int, "IgnoreFilter"]]:
+        """Return the filters applying to path, shallowest first.
+
+        Each entry pairs a filter with the depth of the directory holding it,
+        so its patterns can be matched against a path relative to that
+        directory.
+        """
+        filters = [(0, f) for f in self._global_filters]
         parts = path.split("/")
-        matches = []
-        for i in range(len(parts) + 1):
-            dirname = "/".join(parts[:i])
-            for s, f in filters:
-                relpath = "/".join(parts[s:i])
-                if i < len(parts):
-                    # Paths leading up to the final part are all directories,
-                    # so need a trailing slash.
-                    relpath += "/"
-                matches += list(f.find_matching(relpath))
-            ignore_filter = self._load_path(dirname)
+        for i in range(len(parts)):
+            ignore_filter = self._load_path("/".join(parts[:i]))
             if ignore_filter is not None:
-                filters.insert(0, (i, ignore_filter))
-        return iter(matches)
+                filters.append((i, ignore_filter))
+        return filters
+
+    def _last_matching_pattern(self, path: str) -> "Pattern | None":
+        """Return the pattern deciding path, or None if none applies.
+
+        Git consults the .gitignore files from the deepest directory upwards
+        and stops at the first file that has something to say, so a rule file
+        in a subdirectory overrides one closer to the root. Within a file the
+        last matching pattern wins.
+        """
+        is_dir = path.endswith("/")
+        for depth, f in reversed(self._filters_for(path)):
+            encoded = os.fsencode(self._relative(path, depth))
+            candidate = None
+            for pattern in f._patterns:
+                if pattern.match(encoded):
+                    # A pattern ending in a slash only matches a directory.
+                    if pattern.is_directory_only and not is_dir:
+                        continue
+                elif not (
+                    is_dir
+                    and not pattern.is_exclude
+                    and pattern._container_re is not None
+                    and pattern._container_re.match(encoded)
+                ):
+                    continue
+                candidate = pattern
+            if candidate is not None:
+                return candidate
+        return None
 
     def is_ignored(self, path: str) -> bool | None:
         """Check whether a path is explicitly included or excluded in ignores.
@@ -619,52 +686,51 @@ class IgnoreFilterManager:
           None if the file is not mentioned, True if it is included,
           False if it is explicitly excluded.
         """
-        matches = list(self.find_matching(path))
-        if not matches:
-            return None
+        path = self._normalize(path)
 
-        # Standard behavior - last matching pattern wins
-        result = matches[-1].is_exclude
+        pattern = self._last_matching_pattern(path)
+        if pattern is not None and pattern.is_exclude:
+            return True
 
-        # Apply Git's parent directory exclusion rule for negations
-        if not result:  # Only check if we would include due to negation
-            result = _check_parent_exclusion(path, matches)
+        # Git stops descending at an excluded directory, so nothing below one
+        # can be re-included. A directory is blocked by any pattern covering
+        # it, a file only by one naming a parent directory outright.
+        if self._parent_excluded(path, entry_only=not path.endswith("/")):
+            return True
 
-        # Apply special case for issue #1203: directory traversal with ** patterns
-        if result and path.endswith("/"):
-            result = self._apply_directory_traversal_rule(path, matches)
+        return None if pattern is None else False
 
-        return result
+    def _parent_excluded(self, path: str, entry_only: bool) -> bool:
+        """Check whether a parent directory of path is excluded.
 
-    def _apply_directory_traversal_rule(
-        self, path: str, matches: list["Pattern"]
-    ) -> bool:
-        """Apply directory traversal rule for issue #1203.
-
-        If a directory would be ignored by a ** pattern, but there are negation
-        patterns for its subdirectories, then the directory itself should not
-        be ignored (to allow traversal).
+        With entry_only, only a pattern naming a parent directory itself
+        counts; otherwise a pattern covering its contents counts as well.
         """
-        # Original logic for traversal check
-        last_excluding_pattern = None
-        for match in matches:
-            if match.is_exclude:
-                last_excluding_pattern = match
-
-        if last_excluding_pattern and (
-            last_excluding_pattern.pattern.endswith(b"**")
-            or b"**" in last_excluding_pattern.pattern
-        ):
-            # Check if subdirectories would be unignored
-            test_subdir = path + "test/"
-            test_matches = list(self.find_matching(test_subdir))
-            if test_matches:
-                # Use standard logic for test case - last matching pattern wins
-                test_result = test_matches[-1].is_exclude
-                if test_result is False:
-                    return False
-
-        return True  # Keep original result
+        parts = path.rstrip("/").split("/")
+        for i in range(1, len(parts)):
+            parent = "/".join(parts[:i])
+            for depth, f in reversed(self._filters_for(parent + "/")):
+                name = os.fsencode(self._relative(parent, depth))
+                withslash = name + b"/"
+                decision = None
+                for pattern in f._patterns:
+                    if (
+                        pattern.matches_entry(name)
+                        or (not entry_only and pattern.match(withslash))
+                        or (
+                            not pattern.is_exclude
+                            and pattern.is_directory_only
+                            and pattern._container_spans_depth
+                            and pattern._container_re is not None
+                            and pattern._container_re.match(withslash)
+                        )
+                    ):
+                        decision = pattern
+                if decision is not None:
+                    if decision.is_exclude:
+                        return True
+                    break
+        return False
 
     @classmethod
     def from_repo(

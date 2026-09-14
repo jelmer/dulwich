@@ -54,6 +54,13 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
         with open(gitignore_path, "w") as f:
             f.write(content)
 
+    def _write_nested_gitignore(self, directory: str, content: str) -> None:
+        """Write a .gitignore in a subdirectory."""
+        full_dir = os.path.join(self.test_dir, directory)
+        os.makedirs(full_dir, exist_ok=True)
+        with open(os.path.join(full_dir, ".gitignore"), "w") as f:
+            f.write(content)
+
     def _create_file(self, path: str, content: str = "") -> None:
         """Create a file with given content."""
         full_path = os.path.join(self.test_dir, path)
@@ -135,6 +142,32 @@ class CheckIgnoreCompatTestCase(CompatTestCase):
 
         # Test the core case that issue #1203 was about
         self._assert_ignore_match(["data/test.dvc"])
+
+    def test_nested_gitignore_overrides_root(self) -> None:
+        """A .gitignore in a subdirectory takes precedence over one at the root."""
+        self._write_gitignore("!deps/v8/**\n")
+        self._write_nested_gitignore("deps/v8/inner", "Cargo.lock\n")
+        self._create_file("deps/v8/inner/Cargo.lock", "content")
+
+        self._assert_ignore_match(["deps/v8/inner/Cargo.lock"])
+
+    def test_nested_gitignore_reincludes(self) -> None:
+        """A negation in a subdirectory beats an exclusion at the root."""
+        self._write_gitignore(".idea/\n")
+        self._write_nested_gitignore("testbed", "!.idea/\n")
+        self._create_dir("testbed/.idea")
+        self._create_file("testbed/.idea/workspace.xml", "content")
+
+        self._assert_ignore_match(["testbed/.idea/", "testbed/.idea/workspace.xml"])
+
+    def test_nested_gitignore_excluded_parent(self) -> None:
+        """A nested negation cannot re-include below an excluded directory."""
+        self._write_gitignore(".vscode\n")
+        self._write_nested_gitignore("app", "!.vscode/extensions.json\n")
+        self._create_dir("app/.vscode")
+        self._create_file("app/.vscode/extensions.json", "content")
+
+        self._assert_ignore_match(["app/.vscode/", "app/.vscode/extensions.json"])
 
     def test_basic_patterns(self) -> None:
         """Test basic gitignore patterns."""

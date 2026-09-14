@@ -1,5 +1,10 @@
 1.2.15	UNRELEASED
 
+ * Give a ``.gitignore`` in a subdirectory precedence over one closer to the
+   root, matching git. A negation in a deeper file no longer loses to a rule
+   at the root, and a nested negation no longer re-includes a path whose
+   parent directory stays excluded. (Jelmer Vernooĳ, #2399)
+
  * Reject reftable ``tables.list`` entries that contain a path separator or
    are absolute, so a hostile repository cannot make a ref lookup open a file
    outside the reftable directory. (netliomax25-code)

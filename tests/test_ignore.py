@@ -551,6 +551,59 @@ class IgnoreFilterManagerTests(TestCase):
         m = IgnoreFilterManager.from_repo(repo)
         self.assertTrue(m.is_ignored("foo/bar"))
 
+    def test_subdirectory_gitignore_overrides_root(self) -> None:
+        # Git gives a .gitignore in a subdirectory precedence over one closer
+        # to the root, so the root negation does not win here.
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b"!deps/v8/**\n")
+
+        os.makedirs(os.path.join(repo.path, "deps", "v8", "inner"))
+        with open(
+            os.path.join(repo.path, "deps", "v8", "inner", ".gitignore"), "wb"
+        ) as f:
+            f.write(b"Cargo.lock\n")
+
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertIs(True, m.is_ignored("deps/v8/inner/Cargo.lock"))
+
+    def test_subdirectory_gitignore_reincludes(self) -> None:
+        # The same precedence applies the other way round: a negation in a
+        # subdirectory beats an exclusion at the root.
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b".idea/\n")
+
+        os.makedirs(os.path.join(repo.path, "testbed", ".idea"))
+        with open(os.path.join(repo.path, "testbed", ".gitignore"), "wb") as f:
+            f.write(b"!.idea/\n")
+
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertIs(False, m.is_ignored("testbed/.idea/"))
+
+    def test_excluded_parent_blocks_nested_reinclude(self) -> None:
+        # A file cannot be re-included while a parent directory stays excluded,
+        # even when the negation lives in a deeper .gitignore.
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+
+        with open(os.path.join(repo.path, ".gitignore"), "wb") as f:
+            f.write(b".vscode\n")
+
+        os.makedirs(os.path.join(repo.path, "app", ".vscode"))
+        with open(os.path.join(repo.path, "app", ".gitignore"), "wb") as f:
+            f.write(b"!.vscode/extensions.json\n")
+
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertIs(True, m.is_ignored("app/.vscode/extensions.json"))
+
     def test_load_ignore_ignorecase(self) -> None:
         tmp_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp_dir)

@@ -1872,6 +1872,23 @@ class AddTests(PorcelainTestCase):
         self.assertEqual({"bar"}, set(added))
         self.assertEqual({"foo", "subdir/"}, ignored)
 
+    def test_add_directory_with_reincluded_file(self) -> None:
+        # "__tmp/*" excludes the contents rather than naming the directory, so
+        # git descends into it and "!__tmp/keep" still applies.
+        with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
+            f.write("__tmp/*\n!__tmp/keep\n")
+        os.mkdir(os.path.join(self.repo.path, "__tmp"))
+        for name in ("keep", "other"):
+            with open(os.path.join(self.repo.path, "__tmp", name), "w") as f:
+                f.write("x")
+
+        (added, ignored) = porcelain.add(
+            self.repo.path, paths=[os.path.join(self.repo.path, "__tmp")]
+        )
+        self.assertEqual({"__tmp/keep"}, set(added))
+        self.assertEqual({"__tmp/other"}, ignored)
+        self.assertIn(b"__tmp/keep", self.repo.open_index())
+
     def test_add_from_ignored_directory(self) -> None:
         # Test for issue #550 - adding files when cwd is in ignored directory
         # Create .gitignore that ignores build/
@@ -7464,6 +7481,22 @@ class StatusTests(PorcelainTestCase):
         _, _, untracked = porcelain.status(self.repo.path, untracked_files="all")
         self.assertEqual(
             untracked, [os.fsencode(os.path.join("untracked_dir", "untracked_file"))]
+        )
+
+    def test_status_untracked_reincluded_under_glob_contents(self) -> None:
+        # "__tmp/*" excludes the contents rather than naming the directory, so
+        # the walk enters it and reports the re-included file.
+        with open(os.path.join(self.repo_path, ".gitignore"), "w") as f:
+            f.write("__tmp/*\n!__tmp/keep\n")
+        os.mkdir(os.path.join(self.repo_path, "__tmp"))
+        for name in ("keep", "other"):
+            with open(os.path.join(self.repo_path, "__tmp", name), "w") as fh:
+                fh.write("x")
+
+        _, _, untracked = porcelain.status(self.repo.path, untracked_files="all")
+        self.assertEqual(
+            [b".gitignore", os.fsencode(os.path.join("__tmp", "keep"))],
+            sorted(untracked),
         )
 
     def test_status_untracked_path_normal(self) -> None:

@@ -8,6 +8,10 @@
    are spelled differently, such as via a relative path or a symlink.
    (Jelmer Vernooĳ)
 
+ * Enter a directory whose contents are excluded by a pattern such as
+   ``dir/*`` when walking the work tree, so a later negation can re-include a
+   file below it. (Jelmer Vernooĳ, #2409)
+
  * Memoize tag peeling on the object store, so refs sharing an annotated tag
    chain no longer re-walk it once per ref. ``show_ref --dereference`` and the
    ref advertisement were quadratic. (Jelmer Vernooĳ, #2406)

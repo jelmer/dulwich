@@ -3231,14 +3231,9 @@ def _refresh_index_entry_stat(entry: IndexEntry, st: os.stat_result) -> IndexEnt
     """Return an index entry with refreshed filesystem stat information."""
     fresh_entry = index_entry_from_stat(st, entry.sha, mode=entry.mode)
     return replace(
-        entry,
-        ctime=fresh_entry.ctime,
-        mtime=fresh_entry.mtime,
-        dev=fresh_entry.dev,
-        ino=fresh_entry.ino,
-        uid=fresh_entry.uid,
-        gid=fresh_entry.gid,
-        size=fresh_entry.size,
+        fresh_entry,
+        flags=entry.flags,
+        extended_flags=entry.extended_flags,
     )
 
 

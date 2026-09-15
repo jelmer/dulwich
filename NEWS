@@ -25,6 +25,10 @@
    are absolute, so a hostile repository cannot make a ref lookup open a file
    outside the reftable directory. (netliomax25-code)
 
+ * Support ``GIT_OPTIONAL_LOCKS=0`` for status operations, avoiding
+   optional index refresh writes when locking is disabled.
+   (Sudhanshu Shekhar Karn, #1861)
+
  * Support ``dulwich commit -C/--reuse-message`` and ``-c/--reedit-message``
    to reuse a commit's message, author and author date, optionally editing
    the message. The committer and new commit ancestry remain independent.

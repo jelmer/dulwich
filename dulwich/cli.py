@@ -86,7 +86,14 @@ from .errors import (
     ApplyDeltaError,
     FileFormatException,
     GitProtocolError,
+    HookError,
     NotGitRepository,
+)
+from .hooks import (
+    CommitMsgShellHook,
+    PostCommitShellHook,
+    PreCommitShellHook,
+    UpdateShellHook,
 )
 from .index import Index, InvalidPathError
 from .log_utils import _configure_logging_from_trace
@@ -7769,6 +7776,55 @@ class cmd_am(Command):
                 sys.stdout.write(sha.decode("ascii") + "\n")
 
 
+class cmd_hook_run(Command):
+    """Run hooks manually."""
+
+    def run(self, args: Sequence[str]) -> int | None:
+        """Run a hook manually.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("hook_name", help="Name of the hook to run")
+        parser.add_argument("args", nargs="*", help="Arguments to pass to the hook")
+        parsed_args = parser.parse_args(args)
+
+        hook_name = parsed_args.hook_name
+        hook_args = [a.encode() for a in parsed_args.args]
+
+        try:
+            with porcelain.open_repo_closing(None) as r:
+                controldir = r.controldir()
+                if hook_name == "pre-commit":
+                    PreCommitShellHook(r.path, controldir).execute(*hook_args)
+                elif hook_name == "post-commit":
+                    PostCommitShellHook(controldir).execute(*hook_args)
+                elif hook_name == "commit-msg":
+                    msg = CommitMsgShellHook(controldir).execute(*hook_args)
+                    if msg is not None:
+                        sys.stdout.buffer.write(msg)
+                elif hook_name == "update":
+                    out, err = UpdateShellHook(controldir).execute(*hook_args)
+                    sys.stdout.buffer.write(out)
+                    sys.stderr.buffer.write(err)
+                else:
+                    logger.error(f"unsupported hook: {hook_name}")
+                    return 1
+        except HookError as e:
+            logger.error(f"error: {e}")
+            return 1
+        return None
+
+
+class cmd_hook(SuperCommand):
+    """Manage git hooks."""
+
+    subcommands: ClassVar[dict[str, type[Command]]] = {
+        "run": cmd_hook_run,
+    }
+
+
 commands = {
     "add": cmd_add,
     "am": cmd_am,
@@ -7809,6 +7865,7 @@ commands = {
     "grep": cmd_grep,
     "hash-object": cmd_hash_object,
     "help": cmd_help,
+    "hook": cmd_hook,
     "init": cmd_init,
     "interpret-trailers": cmd_interpret_trailers,
     "lfs": cmd_lfs,

@@ -295,6 +295,26 @@ class WalkerTest(TestCase):
         self.assertWalkYields([m3, y2, x1], [m3.id], paths=[b"a"])
         self.assertWalkYields([y2, x1], [m4.id], paths=[b"a"])
 
+    def test_paths_octopus_merge_unchanged_against_first_parent(self) -> None:
+        # Regression test for #2412: tree_changes_for_merge yields None for
+        # parents the path is unchanged against, which the walker must skip
+        # rather than assume every element is a TreeChange.
+        blob_a1 = make_object(Blob, data=b"a1")
+        blob_a2 = make_object(Blob, data=b"a2")
+        blob_b = make_object(Blob, data=b"b")
+        x1, y2, _z3, m4 = self.make_commits(
+            [[1], [2], [3], [4, 1, 2, 3]],
+            trees={
+                1: [(b"a", blob_a1)],
+                2: [(b"a", blob_a2)],
+                3: [(b"z", blob_b)],
+                # Matches parent 1 for "a", so parent 1's slot is None, and
+                # differs from every parent overall via "b".
+                4: [(b"a", blob_a1), (b"b", blob_b)],
+            },
+        )
+        self.assertWalkYields([m4, y2, x1], [m4.id], paths=[b"a"])
+
     def test_changes_with_renames(self) -> None:
         blob = make_object(Blob, data=b"blob")
         _c1, c2 = self.make_linear_commits(

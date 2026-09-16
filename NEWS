@@ -1,3 +1,11 @@
+1.2.16	UNRELEASED
+
+ * Fix a crash in ``dulwich log <path>`` on merge commits where the path is
+   unchanged relative to one parent. ``tree_changes_for_merge`` reports
+   ``None`` for such parents, which the walker and the ``--name-status`` and
+   ``--name-only`` output wrongly assumed to be a ``TreeChange``.
+   (Jelmer Vernooĳ, #2412)
+
 1.2.15	2026-09-14
 
  * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with

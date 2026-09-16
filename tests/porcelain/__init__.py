@@ -45,7 +45,7 @@ from dulwich import porcelain
 from dulwich.am import AmConflict
 from dulwich.client import SendPackResult
 from dulwich.commit_graph import read_commit_graph
-from dulwich.diff_tree import tree_changes
+from dulwich.diff_tree import TreeChange, tree_changes
 from dulwich.errors import CommitError, WorkingTreeModifiedError
 from dulwich.index import (
     Index,
@@ -54,7 +54,15 @@ from dulwich.index import (
     validate_path_element_ntfs,
 )
 from dulwich.object_store import DEFAULT_TEMPFILE_GRACE_PERIOD
-from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, Commit, Tag, Tree
+from dulwich.objects import (
+    S_IFGITLINK,
+    ZERO_SHA,
+    Blob,
+    Commit,
+    Tag,
+    Tree,
+    TreeEntry,
+)
 from dulwich.patch import PatchApplicationFailure
 from dulwich.porcelain import (
     CheckoutError,  # Hypothetical or real error class
@@ -66,6 +74,8 @@ from dulwich.porcelain import (
     _ssh_command_from_env,
     add,
     commit,
+    print_name_only,
+    print_name_status,
 )
 from dulwich.porcelain.submodule import _check_submodule_path
 from dulwich.repo import NoIndexPresent, Repo
@@ -2982,6 +2992,21 @@ Date:   Fri Jan 01 2010 00:00:00 +0000
         porcelain.log(self.repo.path, outstream=outstream, name_only=True)
         output = outstream.getvalue()
         self.assertIn("testfile.txt", output)
+
+    def test_name_status_merge_with_unchanged_parent(self) -> None:
+        # Regression test for #2412: for merge commits, changes() contains
+        # None for parents the path is unchanged against.
+        change = TreeChange.add(TreeEntry(b"a", 0o100644, b"1" * 40))
+        self.assertEqual(
+            ["A" + " " * 7 + "a" + " " * 39],
+            list(print_name_status([[None, change]])),
+        )
+        self.assertEqual([], list(print_name_status([[None, None]])))
+
+    def test_name_only_merge_with_unchanged_parent(self) -> None:
+        change = TreeChange.add(TreeEntry(b"a", 0o100644, b"1" * 40))
+        self.assertEqual(["a"], list(print_name_only([[None, change]])))
+        self.assertEqual([], list(print_name_only([[None, None]])))
 
     def _commit_file(self, filename: str, content: bytes) -> bytes:
         """Helper to create a commit with a file."""

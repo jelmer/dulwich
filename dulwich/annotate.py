@@ -102,12 +102,14 @@ def annotate_lines(
     revs: list[tuple[Commit, TreeEntry]] = []
     for log_entry in walker:
         for tree_change in log_entry.changes():
-            changes: list[TreeChange]
+            changes: list[TreeChange | None]
             if isinstance(tree_change, list):
-                changes = tree_change
+                changes = list(tree_change)
             else:
                 changes = [tree_change]
             for change in changes:
+                if change is None:
+                    continue
                 if change.new is not None and change.new.path == path:
                     if change.old is not None and change.old.path is not None:
                         path = change.old.path

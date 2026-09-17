@@ -613,10 +613,6 @@ class FilterContext:
         # Update the registry's config
         self.filter_registry.config = config
 
-        # Re-setup line ending filter with new config
-        # This will update the text filter factory to use new autocrlf settings
-        self.filter_registry._setup_line_ending_filter()
-
         # The get_driver method will now handle checking reuse() for cached drivers
 
     def __del__(self) -> None:
@@ -646,13 +642,21 @@ class FilterRegistry:
         self.repo = repo
         self._drivers: dict[str, FilterDriver] = {}
         self._factories: dict[str, Callable[[FilterRegistry], FilterDriver]] = {}
+        # Cache of the line ending settings, keyed on the config they came
+        # from so that refresh_config() invalidates it.
+        self._eol_config: tuple[Config | None, tuple[str, bytes, bytes]] | None = None
 
         # Register built-in filter factories
         self.register_factory("lfs", self._create_lfs_filter)
         self.register_factory("text", self._create_text_filter)
 
-        # Auto-register line ending filter if autocrlf is enabled
-        self._setup_line_ending_filter()
+    def get_eol_config(self) -> tuple[str, bytes, bytes]:
+        """Return the values of core.eol, core.autocrlf and core.safecrlf."""
+        from .line_ending import read_eol_config
+
+        if self._eol_config is None or self._eol_config[0] is not self.config:
+            self._eol_config = (self.config, read_eol_config(self.config))
+        return self._eol_config[1]
 
     def register_factory(
         self, name: str, factory: Callable[["FilterRegistry"], FilterDriver]
@@ -785,28 +789,6 @@ class FilterRegistry:
 
         return LineEndingFilter.from_config(self.config, for_text_attr=True)
 
-    def _setup_line_ending_filter(self) -> None:
-        """Automatically register line ending filter if configured."""
-        if self.config is None:
-            return
-
-        # Parse autocrlf as bytes
-        try:
-            autocrlf_raw = self.config.get("core", "autocrlf")
-        except KeyError:
-            return
-        else:
-            autocrlf: bytes = (
-                autocrlf_raw.lower()
-                if isinstance(autocrlf_raw, bytes)
-                else str(autocrlf_raw).lower().encode("ascii")
-            )
-
-        # If autocrlf is enabled, register the text filter
-        if autocrlf in (b"true", b"input"):
-            # Pre-create the text filter so it's available
-            self.get_driver("text")
-
 
 def get_filter_for_path(
     path: bytes,
@@ -825,6 +807,11 @@ def get_filter_for_path(
     Returns:
         FilterDriver instance or None
     """
+    # Imported here rather than at module level: line_ending imports
+    # FilterBlobNormalizer and FilterRegistry from this module for its
+    # deprecated BlobNormalizer classes.
+    from .line_ending import line_ending_filter_for_action, resolve_crlf_action
+
     # Use filter_context if provided, otherwise fall back to registry
     if filter_context is not None:
         registry = filter_context.filter_registry
@@ -841,35 +828,15 @@ def get_filter_for_path(
     # Collect filters to apply
     filters: list[FilterDriver] = []
 
-    # Check for text attribute first (it should be applied before custom filters)
-    text_attr = attributes.get(b"text")
-    if text_attr is True:
-        # Add text filter for line ending conversion
-        text_filter = get_driver("text")
-        if text_filter is not None:
-            filters.append(text_filter)
-    elif text_attr is False:
-        # -text means binary, no conversion - but still check for custom filters
-        pass
-    else:
-        # If no explicit text attribute, check if autocrlf is enabled
-        # When autocrlf is true/input, files are treated as text by default
-        if registry.config is not None:
-            try:
-                autocrlf_raw = registry.config.get("core", "autocrlf")
-            except KeyError:
-                pass
-            else:
-                autocrlf: bytes = (
-                    autocrlf_raw.lower()
-                    if isinstance(autocrlf_raw, bytes)
-                    else str(autocrlf_raw).lower().encode("ascii")
-                )
-                if autocrlf in (b"true", b"input"):
-                    # Add text filter for files without explicit attributes
-                    text_filter = get_driver("text")
-                    if text_filter is not None:
-                        filters.append(text_filter)
+    # Line ending conversion is applied before custom filters. The conversion
+    # depends on the path's text/eol attributes as well as the configuration,
+    # so it cannot come from a single registry-wide driver.
+    core_eol, autocrlf, safecrlf = registry.get_eol_config()
+    line_ending_filter = line_ending_filter_for_action(
+        resolve_crlf_action(attributes, core_eol, autocrlf), safecrlf=safecrlf
+    )
+    if line_ending_filter is not None:
+        filters.append(line_ending_filter)
 
     # Check if there's a filter attribute
     filter_name = attributes.get(b"filter")

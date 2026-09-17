@@ -3893,6 +3893,7 @@ def status(
     repo: str | os.PathLike[str] | Repo | None = None,
     ignored: bool = False,
     untracked_files: str = "normal",
+    env: Mapping[str, str] | None = None,
 ) -> GitStatus:
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
@@ -3907,12 +3908,20 @@ def status(
           contains many untracked files/directories.
         Using untracked_files="normal" provides a good balance, only showing
           directories that are entirely untracked without listing all their contents.
+      env: Environment variables to read Git settings from (defaults to os.environ)
 
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (filesystem paths as bytes)
         unstaged -  list of unstaged paths (filesystem paths as bytes)
         untracked - list of untracked paths (filesystem paths as bytes)
     """
+    if env is None:
+        env = os.environ
+
+    optional_locks = "GIT_OPTIONAL_LOCKS" not in env or _parse_env_bool(
+        env, "GIT_OPTIONAL_LOCKS"
+    )
+
     with open_repo_closing(repo) as r:
         # Open the index once and reuse it for both staged and unstaged checks
         index = r.open_index(config=r.get_config_stack())
@@ -3945,6 +3954,7 @@ def status(
                 preload_index,
                 trust_ctime,
                 max_stat,
+                update_index=optional_locks,
             )
         )
 

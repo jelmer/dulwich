@@ -3553,7 +3553,7 @@ class cmd_status(Command):
             help="Display untracked files in columns",
         )
         parsed_args = parser.parse_args(args)
-        status = porcelain.status(parsed_args.gitdir)
+        status = porcelain.status(parsed_args.gitdir, env=os.environ)
         if any(names for (kind, names) in status.staged.items()):
             sys.stdout.write("Changes to be committed:\n\n")
             for kind, names in status.staged.items():

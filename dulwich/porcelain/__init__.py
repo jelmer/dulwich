@@ -2564,14 +2564,21 @@ def show_object(
     handler(repo, obj, decode, outstream)
 
 
-def print_name_status(changes: Iterator[TreeChange]) -> Iterator[str]:
+def print_name_status(
+    changes: Iterable[TreeChange | list[TreeChange | None] | None],
+) -> Iterator[str]:
     """Print a simple status summary, listing changed files."""
     for change in changes:
         if not change:
             continue
         change_item: TreeChange
         if isinstance(change, list):
-            change_item = cast(TreeChange, change[0])
+            # Merge commits yield one entry per parent; entries are None for
+            # parents the path was unchanged against.
+            non_none = [c for c in change if c is not None]
+            if not non_none:
+                continue
+            change_item = non_none[0]
         else:
             change_item = change
         if change_item.type == CHANGE_ADD:
@@ -2620,7 +2627,9 @@ def print_name_status(changes: Iterator[TreeChange]) -> Iterator[str]:
         yield f"{kind:<8}{path1_str:<20}{path2_str:<20}"
 
 
-def print_name_only(changes: Iterator[TreeChange]) -> Iterator[str]:
+def print_name_only(
+    changes: Iterable[TreeChange | list[TreeChange | None] | None],
+) -> Iterator[str]:
     """Print only the names of changed files.
 
     Args:
@@ -2633,7 +2642,12 @@ def print_name_only(changes: Iterator[TreeChange]) -> Iterator[str]:
             continue
         change_item: TreeChange
         if isinstance(change, list):
-            change_item = cast(TreeChange, change[0])
+            # Merge commits yield one entry per parent; entries are None for
+            # parents the path was unchanged against.
+            non_none = [c for c in change if c is not None]
+            if not non_none:
+                continue
+            change_item = non_none[0]
         else:
             change_item = change
         if change_item.type == CHANGE_DELETE:
@@ -2828,21 +2842,11 @@ def log(
                 )
             if name_status:
                 outstream.writelines(
-                    [
-                        line + "\n"
-                        for line in print_name_status(
-                            cast(Iterator[TreeChange], entry.changes())
-                        )
-                    ]
+                    [line + "\n" for line in print_name_status(entry.changes())]
                 )
             if name_only:
                 outstream.writelines(
-                    [
-                        line + "\n"
-                        for line in print_name_only(
-                            cast(Iterator[TreeChange], entry.changes())
-                        )
-                    ]
+                    [line + "\n" for line in print_name_only(entry.changes())]
                 )
             if stat:
                 print_stat(r.object_store, commit, outstream)

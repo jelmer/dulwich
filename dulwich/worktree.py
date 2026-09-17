@@ -440,7 +440,9 @@ class WorkTree:
                     blob = blob_from_path_and_stat(full_path, st)
                     blob = blob_normalizer.checkin_normalize(blob, fs_path)
                     self._repo.object_store.add_object(blob)
-                    index[tree_path] = index_entry_from_stat(st, blob.id)
+                    index[tree_path] = index_entry_from_stat(
+                        st, ObjectID(blob.get_id(self._repo.object_format))
+                    )
         index.write()
 
     def unstage(
@@ -583,13 +585,16 @@ class WorkTree:
         if config is None:
             config = self._repo.get_config_stack()
 
+        object_format = self._repo.object_format
         c = Commit()
         if tree is None:
             index = self._repo.open_index(config=config)
             c.tree = index.commit(self._repo.object_store)
         else:
-            if len(tree) != 40:
-                raise ValueError("tree must be a 40-byte hex sha string")
+            if len(tree) != object_format.hex_length:
+                raise ValueError(
+                    f"tree must be a {object_format.hex_length}-byte hex sha string"
+                )
             c.tree = tree
 
         if merge_heads is None:
@@ -724,6 +729,7 @@ class WorkTree:
                 vendor = get_signature_vendor(config=config)
                 c.gpgsig = vendor.sign(c.as_raw_string(), keyid=keyid)
             self._repo.object_store.add_object(c)
+            commit_id = ObjectID(c.get_id(object_format))
         else:
             try:
                 old_head = self._repo.refs[ref]
@@ -733,13 +739,14 @@ class WorkTree:
                     vendor = get_signature_vendor(config=config)
                     c.gpgsig = vendor.sign(c.as_raw_string(), keyid=keyid)
                 self._repo.object_store.add_object(c)
+                commit_id = ObjectID(c.get_id(object_format))
                 message_bytes = (
                     message.encode() if isinstance(message, str) else message
                 )
                 ok = self._repo.refs.set_if_equals(
                     ref,
                     old_head,
-                    c.id,
+                    commit_id,
                     message=b"commit: " + message_bytes,
                     committer=committer,
                     timestamp=int(commit_timestamp)
@@ -755,12 +762,13 @@ class WorkTree:
                     vendor = get_signature_vendor(config=config)
                     c.gpgsig = vendor.sign(c.as_raw_string(), keyid=keyid)
                 self._repo.object_store.add_object(c)
+                commit_id = ObjectID(c.get_id(object_format))
                 message_bytes = (
                     message.encode() if isinstance(message, str) else message
                 )
                 ok = self._repo.refs.add_if_new(
                     ref,
-                    c.id,
+                    commit_id,
                     message=b"commit: " + message_bytes,
                     committer=committer,
                     timestamp=int(commit_timestamp)
@@ -787,7 +795,7 @@ class WorkTree:
 
         maybe_auto_gc(self._repo)
 
-        return c.id
+        return commit_id
 
     def reset_index(
         self,
@@ -847,6 +855,7 @@ class WorkTree:
             validate_path_element=validate_path_element,
             symlink_fn=symlink_fn,  # type: ignore[arg-type,unused-ignore]
             blob_normalizer=blob_normalizer,
+            object_format=self._repo.object_format,
         )
 
     def _sparse_checkout_file_path(self) -> str:

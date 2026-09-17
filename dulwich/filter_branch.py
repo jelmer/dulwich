@@ -207,7 +207,11 @@ class CommitFilter:
             tmp_index_path = tmp_index.name
 
         try:
-            index = Index(tmp_index_path, read=False)
+            index = Index(
+                tmp_index_path,
+                read=False,
+                object_format=self.object_store.object_format,
+            )
             for entry in iter_tree_contents(self.object_store, tree_sha):
                 assert (
                     entry.path is not None
@@ -225,7 +229,10 @@ class CommitFilter:
 
             new_tree_sha = self.index_filter(tree_sha, tmp_index_path)
             if new_tree_sha is None:
-                index = Index(tmp_index_path)
+                index = Index(
+                    tmp_index_path,
+                    object_format=self.object_store.object_format,
+                )
                 new_tree_sha = index.commit(self.object_store)
 
             self._tree_cache[tree_sha] = new_tree_sha

@@ -7732,31 +7732,55 @@ class cmd_hook_run(Command):
         """
         parser = argparse.ArgumentParser()
         parser.add_argument("hook_name", help="Name of the hook to run")
-        parser.add_argument("args", nargs="*", help="Arguments to pass to the hook")
+        parser.add_argument(
+            "args", nargs=argparse.REMAINDER, help="Arguments to pass to the hook"
+        )
         parsed_args = parser.parse_args(args)
 
         hook_name = parsed_args.hook_name
-        hook_args = [a.encode() for a in parsed_args.args]
+        hook_args = parsed_args.args
 
         try:
             with porcelain.open_repo_closing(None) as r:
                 controldir = r.controldir()
                 if hook_name == "pre-commit":
-                    PreCommitShellHook(r.path, controldir).execute(*hook_args)
+                    PreCommitShellHook(r.path, controldir).execute(
+                        *(a.encode() for a in hook_args)
+                    )
                 elif hook_name == "post-commit":
-                    PostCommitShellHook(controldir).execute(*hook_args)
+                    PostCommitShellHook(controldir).execute(
+                        *(a.encode() for a in hook_args)
+                    )
                 elif hook_name == "commit-msg":
-                    msg = CommitMsgShellHook(controldir).execute(*hook_args)
-                    if msg is not None:
-                        sys.stdout.buffer.write(msg)
+                    if len(hook_args) != 1:
+                        logger.error(
+                            "commit-msg takes a single argument: "
+                            "the commit message file"
+                        )
+                        return 1
+                    with open(hook_args[0], "rb") as f:
+                        msg = f.read()
+                    new_msg = CommitMsgShellHook(controldir).execute(msg)
+                    if new_msg is not None:
+                        with open(hook_args[0], "wb") as f:
+                            f.write(new_msg)
                 elif hook_name == "update":
-                    out, err = UpdateShellHook(controldir).execute(*hook_args)
+                    if len(hook_args) != 3:
+                        logger.error(
+                            "update takes three arguments: "
+                            "<ref-name> <old-sha> <new-sha>"
+                        )
+                        return 1
+                    ref_name, old_sha, new_sha = (a.encode() for a in hook_args)
+                    out, err = UpdateShellHook(controldir).execute(
+                        ref_name, old_sha, new_sha
+                    )
                     sys.stdout.buffer.write(out)
                     sys.stderr.buffer.write(err)
                 else:
                     logger.error(f"unsupported hook: {hook_name}")
                     return 1
-        except HookError as e:
+        except (HookError, OSError) as e:
             logger.error(f"error: {e}")
             return 1
         return None

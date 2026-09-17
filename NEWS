@@ -6,6 +6,11 @@
    ``--name-only`` output wrongly assumed to be a ``TreeChange``.
    (Jelmer Vernooĳ, #2412)
 
+ * Carry the repository's object format through the index and the work tree.
+   ``add`` and ``commit`` on a SHA-256 repository wrote SHA-1 identities into
+   the index, trees and refs, leaving a repository neither dulwich nor git
+   could read back. (Jelmer Vernooĳ, #2416)
+
 1.2.15	2026-09-14
 
  * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with

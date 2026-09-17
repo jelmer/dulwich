@@ -11,6 +11,12 @@
    the index, trees and refs, leaving a repository neither dulwich nor git
    could read back. (Jelmer Vernooĳ, #2416)
 
+ * Honour the ``eol`` gitattribute. Line ending conversion is now resolved per
+   path from the ``text``/``crlf`` and ``eol`` attributes, falling back to
+   ``core.autocrlf`` and ``core.eol`` only where the attributes are silent, so
+   ``eol=crlf`` and ``eol=lf`` take precedence over the configuration as they
+   do in git. (Jelmer Vernooĳ, #2403)
+
 1.2.15	2026-09-14
 
  * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with

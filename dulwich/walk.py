@@ -70,12 +70,14 @@ class WalkEntry:
         self.commit = commit
         self._store = walker.store
         self._get_parents = walker.get_parents
-        self._changes: dict[bytes | None, list[TreeChange]] = {}
+        self._changes: dict[
+            bytes | None, list[TreeChange] | list[list[TreeChange | None]]
+        ] = {}
         self._rename_detector = walker.rename_detector
 
     def changes(
         self, path_prefix: bytes | None = None
-    ) -> list[TreeChange] | list[list[TreeChange]]:
+    ) -> list[TreeChange] | list[list[TreeChange | None]]:
         """Get the tree changes for this entry.
 
         Args:
@@ -391,9 +393,9 @@ class Walker:
                 return True
         return False
 
-    def _change_matches(self, change: TreeChange) -> bool:
+    def _change_matches(self, change: TreeChange | None) -> bool:
         assert self.paths
-        if not change:
+        if change is None:
             return False
 
         old_path = change.old.path if change.old is not None else None
@@ -429,40 +431,19 @@ class Walker:
             return True
 
         if len(self.get_parents(commit)) > 1:
-            changes_result = entry.changes()
-            # For merge commits, changes() returns list[list[TreeChange]]
-            assert isinstance(changes_result, list)
-            for path_changes in changes_result:
+            for path_changes in entry.changes():
                 # For merge commits, only include changes with conflicts for
                 # this path. Since a rename conflict may include different
                 # old.paths, we have to check all of them.
                 assert isinstance(path_changes, list)
                 for change in path_changes:
-                    from .diff_tree import TreeChange
-
-                    assert isinstance(change, TreeChange)
                     if self._change_matches(change):
                         return True
         else:
-            changes = entry.changes()
-            from .diff_tree import TreeChange
-
-            # Handle both list[TreeChange] and list[list[TreeChange]]
-            if changes and isinstance(changes[0], list):
-                # It's list[list[TreeChange]], flatten it
-                for change_list in changes:
-                    assert isinstance(change_list, list)
-                    for change in change_list:
-                        assert isinstance(change, TreeChange)
-                        if self._change_matches(change):
-                            return True
-            else:
-                # It's list[TreeChange]
-                assert isinstance(changes, list)
-                for item in changes:
-                    assert isinstance(item, TreeChange)
-                    if self._change_matches(item):
-                        return True
+            for single_change in entry.changes():
+                assert not isinstance(single_change, list)
+                if self._change_matches(single_change):
+                    return True
         return None
 
     def _next(self) -> WalkEntry | None:

@@ -106,8 +106,8 @@ attribute defined in ``.gitattributes``; it takes three possible values:
 
     - ``true``: This forces all files on the working directory to have CRLF
       line-endings in the working directory and convert line-endings to LF
-      when writing to the index. When autocrlf is set to true, eol value is
-      ignored.
+      when writing to the index. An explicit ``eol`` attribute still takes
+      precedence over it.
     - ``input``: Quite similar to the ``true`` value but only applies the clean
       filter, ie line-ending of new files added to the index will get their
       line-endings converted to LF.
@@ -141,6 +141,7 @@ __all__ = [
     "CRLF",
     "LF",
     "BlobNormalizer",
+    "CRLFAction",
     "LineEndingFilter",
     "TreeBlobNormalizer",
     "check_safecrlf",
@@ -150,19 +151,24 @@ __all__ = [
     "get_clean_filter_autocrlf",
     "get_smudge_filter",
     "get_smudge_filter_autocrlf",
+    "line_ending_filter_for_action",
     "normalize_blob",
+    "read_eol_config",
+    "resolve_crlf_action",
 ]
 
 import logging
+import os
 from collections.abc import Callable, Mapping
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .config import Config
     from .object_store import BaseObjectStore
 
-from .attrs import GitAttributes, Pattern
-from .filters import FilterBlobNormalizer, FilterContext, FilterDriver, FilterRegistry
+from .attrs import AttributeValue, GitAttributes, Pattern
+from .filters import FilterBlobNormalizer, FilterContext, FilterRegistry
 from .object_store import iter_tree_contents
 from .objects import Blob, ObjectID
 from .patch import is_binary
@@ -174,8 +180,191 @@ LF = b"\n"
 logger = logging.getLogger(__name__)
 
 
-class LineEndingFilter(FilterDriver):
-    """Filter driver for line ending conversion."""
+def read_eol_config(config: "Config | None") -> tuple[str, bytes, bytes]:
+    """Read the line ending related settings from a configuration.
+
+    Returns: Tuple with the values of ``core.eol``, ``core.autocrlf`` and
+        ``core.safecrlf``
+    """
+    if config is None:
+        return "native", b"false", b"false"
+
+    try:
+        core_eol_raw = config.get("core", "eol")
+    except KeyError:
+        core_eol = "native"
+    else:
+        core_eol = (
+            core_eol_raw.decode("ascii")
+            if isinstance(core_eol_raw, bytes)
+            else str(core_eol_raw)
+        ).lower()
+
+    try:
+        autocrlf_raw = config.get("core", "autocrlf")
+    except KeyError:
+        autocrlf = b"false"
+    else:
+        autocrlf = (
+            autocrlf_raw.lower()
+            if isinstance(autocrlf_raw, bytes)
+            else str(autocrlf_raw).lower().encode("ascii")
+        )
+
+    try:
+        safecrlf_raw = config.get("core", "safecrlf")
+    except KeyError:
+        safecrlf = b"false"
+    else:
+        safecrlf = (
+            safecrlf_raw
+            if isinstance(safecrlf_raw, bytes)
+            else safecrlf_raw.encode("utf-8")
+        )
+
+    return core_eol, autocrlf, safecrlf
+
+
+class CRLFAction(Enum):
+    """The line ending conversion to apply to a path.
+
+    This mirrors git's ``enum convert_crlf_action`` in convert.c.
+    ``UNDEFINED``, ``TEXT`` and ``AUTO`` are intermediate states only;
+    :func:`resolve_crlf_action` always resolves them into one of the
+    others.
+    """
+
+    UNDEFINED = "undefined"
+    BINARY = "binary"
+    TEXT = "text"
+    TEXT_INPUT = "text-input"
+    TEXT_CRLF = "text-crlf"
+    AUTO = "auto"
+    AUTO_INPUT = "auto-input"
+    AUTO_CRLF = "auto-crlf"
+
+
+# Actions where git applies its text/binary heuristic rather than trusting the
+# attributes, and so refuses to touch files that already contain CR.
+_AUTO_ACTIONS = (CRLFAction.AUTO, CRLFAction.AUTO_INPUT, CRLFAction.AUTO_CRLF)
+
+
+def _crlf_action_from_attr(value: AttributeValue) -> CRLFAction:
+    """Translate a ``text`` (or obsolete ``crlf``) attribute into an action."""
+    if value is True:
+        return CRLFAction.TEXT
+    elif value is False:
+        return CRLFAction.BINARY
+    elif value == b"input":
+        return CRLFAction.TEXT_INPUT
+    elif value == b"auto":
+        return CRLFAction.AUTO
+    return CRLFAction.UNDEFINED
+
+
+def _text_eol_is_crlf(core_eol: str, autocrlf: bytes) -> bool:
+    """Decide the working tree line ending when only the config says so."""
+    if autocrlf == b"true":
+        return True
+    elif autocrlf == b"input":
+        return False
+    if core_eol == "crlf":
+        return True
+    if core_eol == "native":
+        return os.linesep == "\r\n"
+    return False
+
+
+def resolve_crlf_action(
+    attributes: Mapping[bytes, AttributeValue],
+    core_eol: str = "native",
+    autocrlf: bytes = b"false",
+) -> CRLFAction:
+    """Determine the line ending conversion for a path.
+
+    This follows ``convert_attrs`` in git's convert.c: the ``text`` attribute
+    (or the obsolete ``crlf`` one) selects whether conversion happens at all,
+    an explicit ``eol`` attribute then pins the working tree line ending, and
+    ``core.autocrlf``/``core.eol`` only apply where the attributes are silent.
+
+    Args:
+      attributes: Attributes matched for the path
+      core_eol: Value of ``core.eol``
+      autocrlf: Value of ``core.autocrlf``
+
+    Returns: The action to apply
+    """
+    action = _crlf_action_from_attr(attributes.get(b"text"))
+    if action == CRLFAction.UNDEFINED:
+        action = _crlf_action_from_attr(attributes.get(b"crlf"))
+
+    if action != CRLFAction.BINARY:
+        eol_attr = attributes.get(b"eol")
+        if action == CRLFAction.AUTO and eol_attr == b"lf":
+            action = CRLFAction.AUTO_INPUT
+        elif action == CRLFAction.AUTO and eol_attr == b"crlf":
+            action = CRLFAction.AUTO_CRLF
+        elif eol_attr == b"lf":
+            action = CRLFAction.TEXT_INPUT
+        elif eol_attr == b"crlf":
+            action = CRLFAction.TEXT_CRLF
+
+    if action in (CRLFAction.TEXT, CRLFAction.AUTO):
+        # Neither the attributes nor an "eol" attribute pinned the working
+        # tree line ending, so fall back to the configuration.
+        crlf = _text_eol_is_crlf(core_eol, autocrlf)
+        if action == CRLFAction.TEXT:
+            action = CRLFAction.TEXT_CRLF if crlf else CRLFAction.TEXT_INPUT
+        else:
+            action = CRLFAction.AUTO_CRLF if crlf else CRLFAction.AUTO_INPUT
+    if action == CRLFAction.UNDEFINED:
+        if autocrlf == b"true":
+            action = CRLFAction.AUTO_CRLF
+        elif autocrlf == b"input":
+            action = CRLFAction.AUTO_INPUT
+        else:
+            action = CRLFAction.BINARY
+
+    return action
+
+
+def line_ending_filter_for_action(
+    action: CRLFAction, safecrlf: bytes = b"false"
+) -> "LineEndingFilter | None":
+    """Build the filter implementing a resolved :class:`CRLFAction`.
+
+    Args:
+      action: Action as returned by :func:`resolve_crlf_action`
+      safecrlf: Value of ``core.safecrlf``
+
+    Returns: A filter, or None if the action converts nothing
+    """
+    if action == CRLFAction.BINARY:
+        return None
+
+    smudge: Callable[[bytes], bytes] | None = (
+        convert_lf_to_crlf
+        if action in (CRLFAction.TEXT_CRLF, CRLFAction.AUTO_CRLF)
+        else None
+    )
+    return LineEndingFilter(
+        clean_conversion=convert_crlf_to_lf,
+        smudge_conversion=smudge,
+        binary_detection=True,
+        safecrlf=safecrlf,
+        # Only the "auto" family leaves files with existing CRs alone; an
+        # explicit "text" attribute means the user has already decided.
+        require_lf_only=action in _AUTO_ACTIONS,
+    )
+
+
+class LineEndingFilter:
+    """Filter driver for line ending conversion.
+
+    Satisfies the :class:`dulwich.filters.FilterDriver` protocol structurally,
+    without inheriting from it, so that the line ending logic this module
+    exports can be imported from ``filters`` without a circular import.
+    """
 
     def __init__(
         self,
@@ -183,12 +372,23 @@ class LineEndingFilter(FilterDriver):
         smudge_conversion: Callable[[bytes], bytes] | None = None,
         binary_detection: bool = True,
         safecrlf: bytes = b"false",
+        require_lf_only: bool = False,
     ):
-        """Initialize LineEndingFilter."""
+        """Initialize LineEndingFilter.
+
+        Args:
+          clean_conversion: Conversion to apply on checkin
+          smudge_conversion: Conversion to apply on checkout
+          binary_detection: Skip files detected as binary
+          safecrlf: Value of ``core.safecrlf``
+          require_lf_only: Only smudge content whose line endings are all LF,
+            as git does for ``text=auto`` and ``core.autocrlf``
+        """
         self.clean_conversion = clean_conversion
         self.smudge_conversion = smudge_conversion
         self.binary_detection = binary_detection
         self.safecrlf = safecrlf
+        self.require_lf_only = require_lf_only
 
     @classmethod
     def from_config(
@@ -216,38 +416,7 @@ class LineEndingFilter(FilterDriver):
                 # No config: no conversion
                 return cls()
 
-        # Get core.eol setting
-        try:
-            core_eol_raw = config.get("core", "eol")
-            core_eol: str = (
-                core_eol_raw.decode("ascii")
-                if isinstance(core_eol_raw, bytes)
-                else str(core_eol_raw)
-            )
-        except KeyError:
-            core_eol = "native"
-
-        # Get core.autocrlf setting
-        try:
-            autocrlf_raw = config.get("core", "autocrlf")
-            autocrlf: bytes = (
-                autocrlf_raw.lower()
-                if isinstance(autocrlf_raw, bytes)
-                else str(autocrlf_raw).lower().encode("ascii")
-            )
-        except KeyError:
-            autocrlf = b"false"
-
-        # Get core.safecrlf setting
-        try:
-            safecrlf_raw = config.get("core", "safecrlf")
-            safecrlf = (
-                safecrlf_raw
-                if isinstance(safecrlf_raw, bytes)
-                else safecrlf_raw.encode("utf-8")
-            )
-        except KeyError:
-            safecrlf = b"false"
+        core_eol, autocrlf, safecrlf = read_eol_config(config)
 
         if for_text_attr:
             # For text attribute: always normalize to LF on checkin
@@ -290,6 +459,11 @@ class LineEndingFilter(FilterDriver):
 
         # Skip binary files if detection is enabled
         if self.binary_detection and is_binary(data):
+            return data
+
+        # Git leaves content that already contains CR alone when the decision
+        # came from a heuristic rather than an explicit attribute.
+        if self.require_lf_only and b"\r" in data:
             return data
 
         converted = self.smudge_conversion(data)

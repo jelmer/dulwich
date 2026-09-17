@@ -23,9 +23,15 @@
 
 from dulwich.attrs import GitAttributes, Pattern
 from dulwich.config import ConfigDict
-from dulwich.filters import FilterBlobNormalizer, FilterContext, FilterRegistry
+from dulwich.filters import (
+    FilterBlobNormalizer,
+    FilterContext,
+    FilterDriver,
+    FilterRegistry,
+)
 from dulwich.line_ending import (
     BlobNormalizer,
+    CRLFAction,
     LineEndingFilter,
     TreeBlobNormalizer,
     check_safecrlf,
@@ -33,7 +39,10 @@ from dulwich.line_ending import (
     convert_lf_to_crlf,
     get_clean_filter_autocrlf,
     get_smudge_filter_autocrlf,
+    line_ending_filter_for_action,
     normalize_blob,
+    read_eol_config,
+    resolve_crlf_action,
 )
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, Tree
@@ -675,3 +684,302 @@ class SafeCRLFTests(TestCase):
             result = filter_warn.clean(unsafe_data, b"test.txt")
             self.assertEqual(result, b"line1\nline2\nline3\n")
             self.assertEqual(len(cm.output), 1)
+
+
+def _filter_for(attrs, config=None):
+    """Build the line ending filter a path's attributes and config imply."""
+    core_eol, autocrlf, safecrlf = read_eol_config(config)
+    return line_ending_filter_for_action(
+        resolve_crlf_action(attrs, core_eol, autocrlf), safecrlf=safecrlf
+    )
+
+
+class ResolveCRLFActionTests(TestCase):
+    """Test resolving the conversion for a path from attributes and config."""
+
+    def test_no_attributes(self) -> None:
+        self.assertEqual(CRLFAction.BINARY, resolve_crlf_action({}))
+
+    def test_no_attributes_autocrlf_true(self) -> None:
+        self.assertEqual(
+            CRLFAction.AUTO_CRLF, resolve_crlf_action({}, autocrlf=b"true")
+        )
+
+    def test_no_attributes_autocrlf_input(self) -> None:
+        self.assertEqual(
+            CRLFAction.AUTO_INPUT, resolve_crlf_action({}, autocrlf=b"input")
+        )
+
+    def test_text_attribute_follows_core_eol(self) -> None:
+        self.assertEqual(
+            CRLFAction.TEXT_CRLF,
+            resolve_crlf_action({b"text": True}, core_eol="crlf"),
+        )
+        self.assertEqual(
+            CRLFAction.TEXT_INPUT,
+            resolve_crlf_action({b"text": True}, core_eol="lf"),
+        )
+
+    def test_binary_attribute(self) -> None:
+        self.assertEqual(
+            CRLFAction.BINARY,
+            resolve_crlf_action({b"text": False}, autocrlf=b"true"),
+        )
+
+    def test_eol_attribute_ignored_for_binary(self) -> None:
+        self.assertEqual(
+            CRLFAction.BINARY,
+            resolve_crlf_action({b"text": False, b"eol": b"crlf"}),
+        )
+
+    def test_eol_attribute_beats_autocrlf(self) -> None:
+        self.assertEqual(
+            CRLFAction.TEXT_CRLF,
+            resolve_crlf_action({b"text": True, b"eol": b"crlf"}, autocrlf=b"true"),
+        )
+        self.assertEqual(
+            CRLFAction.TEXT_INPUT,
+            resolve_crlf_action({b"text": True, b"eol": b"lf"}, autocrlf=b"true"),
+        )
+
+    def test_eol_attribute_beats_core_eol(self) -> None:
+        self.assertEqual(
+            CRLFAction.TEXT_CRLF,
+            resolve_crlf_action({b"text": True, b"eol": b"crlf"}, core_eol="lf"),
+        )
+        self.assertEqual(
+            CRLFAction.TEXT_INPUT,
+            resolve_crlf_action({b"text": True, b"eol": b"lf"}, core_eol="crlf"),
+        )
+
+    def test_eol_attribute_without_text(self) -> None:
+        self.assertEqual(CRLFAction.TEXT_CRLF, resolve_crlf_action({b"eol": b"crlf"}))
+        self.assertEqual(CRLFAction.TEXT_INPUT, resolve_crlf_action({b"eol": b"lf"}))
+
+    def test_text_auto(self) -> None:
+        self.assertEqual(
+            CRLFAction.AUTO_CRLF,
+            resolve_crlf_action({b"text": b"auto"}, autocrlf=b"true"),
+        )
+        self.assertEqual(
+            CRLFAction.AUTO_INPUT,
+            resolve_crlf_action({b"text": b"auto"}, core_eol="lf"),
+        )
+
+    def test_text_auto_with_eol(self) -> None:
+        self.assertEqual(
+            CRLFAction.AUTO_CRLF,
+            resolve_crlf_action({b"text": b"auto", b"eol": b"crlf"}),
+        )
+        self.assertEqual(
+            CRLFAction.AUTO_INPUT,
+            resolve_crlf_action({b"text": b"auto", b"eol": b"lf"}, autocrlf=b"true"),
+        )
+
+    def test_text_input(self) -> None:
+        self.assertEqual(
+            CRLFAction.TEXT_INPUT,
+            resolve_crlf_action({b"text": b"input"}, autocrlf=b"true"),
+        )
+
+    def test_obsolete_crlf_attribute(self) -> None:
+        self.assertEqual(CRLFAction.BINARY, resolve_crlf_action({b"crlf": False}))
+        self.assertEqual(
+            CRLFAction.TEXT_CRLF,
+            resolve_crlf_action({b"crlf": True}, core_eol="crlf"),
+        )
+
+    def test_text_attribute_beats_crlf_attribute(self) -> None:
+        self.assertEqual(
+            CRLFAction.BINARY,
+            resolve_crlf_action({b"text": False, b"crlf": True}),
+        )
+
+
+class LineEndingFilterForAttrsTests(TestCase):
+    """Test building a filter from a path's attributes."""
+
+    def test_binary_has_no_filter(self) -> None:
+        self.assertIsNone(_filter_for({b"text": False}))
+        self.assertIsNone(_filter_for({}))
+
+    def test_eol_crlf_smudges_to_crlf(self) -> None:
+        filter = _filter_for({b"text": True, b"eol": b"crlf"})
+        assert filter is not None
+        self.assertEqual(b"a\r\nb\r\n", filter.smudge(b"a\nb\n"))
+        self.assertEqual(b"a\nb\n", filter.clean(b"a\r\nb\r\n"))
+
+    def test_eol_lf_leaves_lf(self) -> None:
+        config = ConfigDict()
+        config.set((b"core",), b"autocrlf", b"true")
+        filter = _filter_for({b"text": True, b"eol": b"lf"}, config)
+        assert filter is not None
+        self.assertEqual(b"a\nb\n", filter.smudge(b"a\nb\n"))
+        self.assertEqual(b"a\nb\n", filter.clean(b"a\r\nb\r\n"))
+
+    def test_eol_crlf_with_autocrlf_input(self) -> None:
+        config = ConfigDict()
+        config.set((b"core",), b"autocrlf", b"input")
+        filter = _filter_for({b"text": True, b"eol": b"crlf"}, config)
+        assert filter is not None
+        self.assertEqual(b"a\r\nb\r\n", filter.smudge(b"a\nb\n"))
+
+    def test_auto_leaves_content_with_crlf_alone(self) -> None:
+        """text=auto does not touch content that already contains CR."""
+        config = ConfigDict()
+        config.set((b"core",), b"autocrlf", b"true")
+        filter = _filter_for({b"text": b"auto"}, config)
+        assert filter is not None
+        self.assertEqual(b"a\r\nb\n", filter.smudge(b"a\r\nb\n"))
+        self.assertEqual(b"a\r\nb\r\n", filter.smudge(b"a\nb\n"))
+
+    def test_explicit_text_converts_mixed_content(self) -> None:
+        """An explicit eol attribute converts even mixed content."""
+        filter = _filter_for({b"text": True, b"eol": b"crlf"})
+        assert filter is not None
+        self.assertEqual(b"a\r\nb\r\n", filter.smudge(b"a\r\nb\n"))
+
+    def test_safecrlf_is_honoured(self) -> None:
+        config = ConfigDict()
+        config.set((b"core",), b"safecrlf", b"true")
+        filter = _filter_for({b"text": True, b"eol": b"crlf"}, config)
+        assert filter is not None
+        self.assertEqual(b"true", filter.safecrlf)
+
+
+class EOLAttributeCheckoutTests(TestCase):
+    """End-to-end checkout tests for the eol attribute (issue #2403)."""
+
+    def _normalizer(self, autocrlf: bytes | None = None) -> FilterBlobNormalizer:
+        config = ConfigDict()
+        if autocrlf is not None:
+            config.set((b"core",), b"autocrlf", autocrlf)
+        patterns = [
+            (Pattern(b"*.crlffile"), {b"text": True, b"eol": b"crlf"}),
+            (Pattern(b"*.lffile"), {b"text": True, b"eol": b"lf"}),
+        ]
+        registry = FilterRegistry(config)
+        return FilterBlobNormalizer(
+            config, GitAttributes(patterns), filter_context=FilterContext(registry)
+        )
+
+    def _checkout(self, normalizer: FilterBlobNormalizer, path: bytes) -> bytes:
+        blob = Blob()
+        blob.data = b"first line\nsecond line\n"
+        return normalizer.checkout_normalize(blob, path).data
+
+    def test_eol_crlf_without_autocrlf(self) -> None:
+        normalizer = self._normalizer()
+        self.assertEqual(
+            b"first line\r\nsecond line\r\n",
+            self._checkout(normalizer, b"sample.crlffile"),
+        )
+
+    def test_eol_lf_without_autocrlf(self) -> None:
+        normalizer = self._normalizer()
+        self.assertEqual(
+            b"first line\nsecond line\n", self._checkout(normalizer, b"sample.lffile")
+        )
+
+    def test_eol_crlf_with_autocrlf_true(self) -> None:
+        normalizer = self._normalizer(b"true")
+        self.assertEqual(
+            b"first line\r\nsecond line\r\n",
+            self._checkout(normalizer, b"sample.crlffile"),
+        )
+
+    def test_eol_lf_with_autocrlf_true(self) -> None:
+        normalizer = self._normalizer(b"true")
+        self.assertEqual(
+            b"first line\nsecond line\n", self._checkout(normalizer, b"sample.lffile")
+        )
+
+    def test_eol_crlf_with_autocrlf_input(self) -> None:
+        normalizer = self._normalizer(b"input")
+        self.assertEqual(
+            b"first line\r\nsecond line\r\n",
+            self._checkout(normalizer, b"sample.crlffile"),
+        )
+
+    def test_paths_with_different_eol_side_by_side(self) -> None:
+        """Two paths in one tree can ask for different line endings."""
+        normalizer = self._normalizer()
+        self.assertEqual(
+            b"first line\r\nsecond line\r\n",
+            self._checkout(normalizer, b"sample.crlffile"),
+        )
+        self.assertEqual(
+            b"first line\nsecond line\n", self._checkout(normalizer, b"sample.lffile")
+        )
+
+    def test_checkin_always_normalizes_to_lf(self) -> None:
+        normalizer = self._normalizer()
+        blob = Blob()
+        blob.data = b"first line\r\nsecond line\r\n"
+        for path in (b"sample.crlffile", b"sample.lffile"):
+            self.assertEqual(
+                b"first line\nsecond line\n",
+                normalizer.checkin_normalize(blob, path).data,
+            )
+
+
+class EOLConfigCacheTests(TestCase):
+    """The registry caches the line ending settings, keyed on the config."""
+
+    def test_values_are_cached(self) -> None:
+        config = ConfigDict()
+        config.set((b"core",), b"autocrlf", b"true")
+        registry = FilterRegistry(config)
+        self.assertEqual(("native", b"true", b"false"), registry.get_eol_config())
+        self.assertEqual(registry.get_eol_config(), registry.get_eol_config())
+
+    def test_refresh_config_invalidates(self) -> None:
+        config = ConfigDict()
+        config.set((b"core",), b"autocrlf", b"true")
+        registry = FilterRegistry(config)
+        context = FilterContext(registry)
+        self.assertEqual(b"true", registry.get_eol_config()[1])
+
+        new_config = ConfigDict()
+        new_config.set((b"core",), b"autocrlf", b"input")
+        context.refresh_config(new_config)
+        self.assertEqual(b"input", registry.get_eol_config()[1])
+
+    def test_checkout_follows_refreshed_config(self) -> None:
+        """A refreshed config changes the conversion applied to a path."""
+        config = ConfigDict()
+        patterns = [(Pattern(b"*.txt"), {b"text": b"auto"})]
+        registry = FilterRegistry(config)
+        context = FilterContext(registry)
+        normalizer = FilterBlobNormalizer(
+            config, GitAttributes(patterns), filter_context=context
+        )
+        blob = Blob()
+        blob.data = b"a\nb\n"
+        self.assertEqual(b"a\nb\n", normalizer.checkout_normalize(blob, b"x.txt").data)
+
+        new_config = ConfigDict()
+        new_config.set((b"core",), b"autocrlf", b"true")
+        context.refresh_config(new_config)
+        self.assertEqual(
+            b"a\r\nb\r\n", normalizer.checkout_normalize(blob, b"x.txt").data
+        )
+
+
+class LineEndingFilterProtocolTests(TestCase):
+    """LineEndingFilter conforms to FilterDriver without inheriting from it."""
+
+    def test_satisfies_filter_driver_protocol(self) -> None:
+        filter = LineEndingFilter()
+        for method in ("clean", "smudge", "cleanup", "reuse"):
+            self.assertTrue(callable(getattr(filter, method)), method)
+
+    def test_does_not_inherit_from_filter_driver(self) -> None:
+        """Inheriting would tighten the import cycle between the modules."""
+        self.assertNotIn(FilterDriver, LineEndingFilter.__mro__)
+
+    def test_usable_as_a_registry_driver(self) -> None:
+        registry = FilterRegistry(ConfigDict())
+        filter = LineEndingFilter(smudge_conversion=convert_lf_to_crlf)
+        registry.register_driver("text", filter)
+        self.assertIs(filter, registry.get_driver("text"))

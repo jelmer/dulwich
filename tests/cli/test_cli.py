@@ -2723,28 +2723,50 @@ class HookCommandTest(DulwichCliTestCase):
             self.skipTest("shell hook tests requires POSIX shell")
         self.assertTrue(os.path.exists("/bin/sh"))
 
-    def test_hook_run_unsupported(self):
-        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
-            result, _stdout, _stderr = self._run_cli("hook", "run", "not-a-real-hook")
-            log_output = "\n".join(cm.output)
-            self.assertEqual(result, 1)
-            self.assertIn("unsupported hook", log_output)
+    def _install_hook(self, name, script):
+        path = os.path.join(self.repo_path, ".git", "hooks", name)
+        with open(path, "w") as f:
+            f.write(script)
+        os.chmod(path, 0o755)
 
-    def test_hook_run_post_receive_unsupported(self):
+    def test_hook_run_pre_commit(self):
+        marker = os.path.join(self.repo_path, "pre-commit-ran")
+        self._install_hook("pre-commit", f'#!/bin/sh\ntouch "{marker}"\n')
+        result, _stdout, _stderr = self._run_cli("hook", "run", "pre-commit")
+        self.assertIsNone(result)
+        self.assertTrue(os.path.exists(marker))
+
+    def test_hook_run_post_commit(self):
+        marker = os.path.join(self.repo_path, "post-commit-ran")
+        self._install_hook("post-commit", f'#!/bin/sh\ntouch "{marker}"\n')
+        result, _stdout, _stderr = self._run_cli("hook", "run", "post-commit")
+        self.assertIsNone(result)
+        self.assertTrue(os.path.exists(marker))
+
+    def test_hook_run_commit_msg(self):
+        self._install_hook(
+            "commit-msg", '#!/bin/sh\necho "Signed-off-by: Test User" >> "$1"\n'
+        )
+        msg_file = os.path.join(self.repo_path, "COMMIT_EDITMSG")
+        with open(msg_file, "w") as f:
+            f.write("Initial commit\n")
+
+        result, _stdout, _stderr = self._run_cli("hook", "run", "commit-msg", msg_file)
+        self.assertIsNone(result)
+        with open(msg_file) as f:
+            self.assertEqual(f.read(), "Initial commit\nSigned-off-by: Test User\n")
+
+    def test_hook_run_commit_msg_requires_file(self):
         with self.assertLogs("dulwich.cli", level="ERROR") as cm:
-            result, _stdout, _stderr = self._run_cli("hook", "run", "post-receive")
+            result, _stdout, _stderr = self._run_cli("hook", "run", "commit-msg")
             self.assertEqual(result, 1)
-            log_output = "\n".join(cm.output)
-            self.assertIn("unsupported hook", log_output)
+            self.assertIn("commit-msg takes a single argument", "\n".join(cm.output))
 
     def test_hook_run_update(self):
-        test_file = os.path.join(self.repo_path, ".git", "hooks", "update")
-        with open(test_file, "w") as f:
-            f.write(
-                '#!/bin/sh\necho "stdout: $1 $2 $3"\necho "stderr output" >&2\nexit 0\n'
-            )
-        os.chmod(test_file, 0o755)
-
+        self._install_hook(
+            "update",
+            '#!/bin/sh\necho "stdout: $1 $2 $3"\necho "stderr output" >&2\n',
+        )
         result, stdout_text, stderr_text = self._run_cli(
             "hook", "run", "update", "refs/heads/main", "abc123", "def456"
         )
@@ -2752,18 +2774,23 @@ class HookCommandTest(DulwichCliTestCase):
         self.assertIn("stdout: refs/heads/main abc123 def456", stdout_text)
         self.assertIn("stderr output", stderr_text)
 
-    def test_hook_run_commit_msg(self):
-        test_file = os.path.join(self.repo_path, ".git", "hooks", "commit-msg")
-        with open(test_file, "w") as f:
-            f.write('#!/bin/sh\necho "Signed-off-by: Test User" >> "$1"\nexit 0\n')
-        os.chmod(test_file, 0o755)
+    def test_hook_run_update_wrong_args(self):
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, _stdout, _stderr = self._run_cli("hook", "run", "update")
+            self.assertEqual(result, 1)
+            self.assertIn("update takes three arguments", "\n".join(cm.output))
 
-        result, stdout_text, _stderr_text = self._run_cli(
-            "hook", "run", "commit-msg", "Initial commit\n"
-        )
-        self.assertIsNone(result)
-        self.assertIn("Initial commit", stdout_text)
-        self.assertIn("Signed-off-by: Test User", stdout_text)
+    def test_hook_run_unsupported(self):
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, _stdout, _stderr = self._run_cli("hook", "run", "not-a-real-hook")
+            self.assertEqual(result, 1)
+            self.assertIn("unsupported hook", "\n".join(cm.output))
+
+    def test_hook_run_post_receive_unsupported(self):
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, _stdout, _stderr = self._run_cli("hook", "run", "post-receive")
+            self.assertEqual(result, 1)
+            self.assertIn("unsupported hook", "\n".join(cm.output))
 
 
 class CheckIgnoreCommandTest(DulwichCliTestCase):

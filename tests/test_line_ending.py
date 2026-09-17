@@ -948,6 +948,9 @@ class EOLConfigCacheTests(TestCase):
     def test_checkout_follows_refreshed_config(self) -> None:
         """A refreshed config changes the conversion applied to a path."""
         config = ConfigDict()
+        # Pin core.eol so the pre-refresh expectation does not depend on the
+        # platform's native line ending.
+        config.set((b"core",), b"eol", b"lf")
         patterns = [(Pattern(b"*.txt"), {b"text": b"auto"})]
         registry = FilterRegistry(config)
         context = FilterContext(registry)

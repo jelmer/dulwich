@@ -2067,6 +2067,7 @@ class Repo(BaseRepo):
             version=index_version,
             shared_perm=shared_perm,
             path_normalizer=make_path_normalizer(config),
+            object_format=self.object_format,
         )
 
     def has_index(self) -> bool:

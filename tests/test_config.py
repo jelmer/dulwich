@@ -243,6 +243,17 @@ class ConfigFileTests(TestCase):
             reparsed = self.from_file(f.getvalue())
             self.assertEqual(b"v", reparsed.get((b"branch", name), b"k"))
 
+    def test_value_roundtrip_with_carriage_return(self) -> None:
+        # A \r escape makes git reject the whole file, so carriage returns
+        # are written literally inside quotes instead.
+        for value in (b"a\rb", b"a\r\nb", b"ab\r", b"\rab"):
+            c = ConfigFile()
+            c.set((b"core",), b"k", value)
+            f = BytesIO()
+            c.write_to_file(f)
+            reparsed = self.from_file(f.getvalue())
+            self.assertEqual(value, reparsed.get((b"core",), b"k"))
+
     def test_write_to_file_subsection_rejects_newline(self) -> None:
         c = ConfigFile()
         c.set((b"branch", b"foo\nbar"), b"k", b"v")
@@ -1191,6 +1202,10 @@ class EscapeValueTests(TestCase):
     def test_newline(self) -> None:
         self.assertEqual(b"foo\\n", _escape_value(b"foo\n"))
 
+    def test_carriage_return_is_literal(self) -> None:
+        # git rejects a \r escape, so the byte is written as-is.
+        self.assertEqual(b"foo\r", _escape_value(b"foo\r"))
+
 
 class FormatStringTests(TestCase):
     def test_quoted(self) -> None:
@@ -1200,6 +1215,11 @@ class FormatStringTests(TestCase):
     def test_not_quoted(self) -> None:
         self.assertEqual(b"foo", _format_string(b"foo"))
         self.assertEqual(b"foo bar", _format_string(b"foo bar"))
+
+    def test_carriage_return_quoted(self) -> None:
+        # Without the quotes a trailing \r would be read back as a line ending.
+        self.assertEqual(b'"foo\rbar"', _format_string(b"foo\rbar"))
+        self.assertEqual(b'"foo\r"', _format_string(b"foo\r"))
 
 
 class ParseStringTests(TestCase):

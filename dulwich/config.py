@@ -748,6 +748,9 @@ def _format_string(value: bytes) -> bytes:
         value.startswith((b" ", b"\t"))
         or value.endswith((b" ", b"\t"))
         or b"#" in value
+        # A carriage return is written literally, so it has to be quoted:
+        # an unquoted trailing one would be read back as a line ending.
+        or b"\r" in value
     ):
         return b'"' + _escape_value(value) + b'"'
     else:
@@ -819,9 +822,13 @@ def _parse_string(value: bytes) -> bytes:
 
 
 def _escape_value(value: bytes) -> bytes:
-    """Escape a value."""
+    r"""Escape a value.
+
+    git only recognizes the \n, \t, \b, \" and \\ escapes; a \r escape makes
+    it reject the whole file, so a carriage return is written literally
+    and ``_format_string`` quotes the value instead.
+    """
     value = value.replace(b"\\", b"\\\\")
-    value = value.replace(b"\r", b"\\r")
     value = value.replace(b"\n", b"\\n")
     value = value.replace(b"\t", b"\\t")
     value = value.replace(b'"', b'\\"')

@@ -27,7 +27,7 @@ from unittest import TestCase
 from unittest.mock import Mock
 
 from dulwich.dumb import DumbHTTPObjectStore, DumbRemoteHTTPRepo
-from dulwich.errors import NotGitRepository
+from dulwich.errors import NotGitRepository, ObjectFormatException
 from dulwich.objects import ZERO_SHA, Blob, Commit, ShaFile, Tag, Tree, sha_to_hex
 
 
@@ -130,6 +130,44 @@ class DumbHTTPObjectStoreTests(TestCase):
         self._add_response(path, b"invalid data")
 
         self.assertRaises(Exception, self.store._fetch_loose_object, sha)
+
+    def test_fetch_loose_object_rejects_sha_mismatch(self) -> None:
+        # A malicious dumb server can substitute a different (e.g. much
+        # larger) object for the one requested; the mismatch must be detected
+        # before the content is handed to the caller.
+        requested = Blob()
+        requested.data = b"expected content"
+        substituted = Blob()
+        substituted.data = b"A" * 4096
+        hex_sha = requested.id
+        path = f"objects/{hex_sha[:2].decode('ascii')}/{hex_sha[2:].decode('ascii')}"
+        self._add_response(path, self._make_object(substituted))
+
+        self.assertRaises(
+            ObjectFormatException, self.store._fetch_loose_object, requested.id
+        )
+
+    def test_fetch_loose_object_truncated(self) -> None:
+        blob = Blob()
+        blob.data = b"Hello, world!"
+        hex_sha = blob.id
+        path = f"objects/{hex_sha[:2].decode('ascii')}/{hex_sha[2:].decode('ascii')}"
+        self._add_response(path, self._make_object(blob)[:-4])
+
+        self.assertRaises(zlib.error, self.store._fetch_loose_object, blob.id)
+
+    def test_fetch_loose_object_spills_large_object_to_disk(self) -> None:
+        # Objects above the spool threshold are inflated to a temporary file
+        # while being hashed, rather than buffered in memory up front.
+        blob = Blob()
+        blob.data = b"x" * (2 * 1024 * 1024)
+        hex_sha = blob.id
+        path = f"objects/{hex_sha[:2].decode('ascii')}/{hex_sha[2:].decode('ascii')}"
+        self._add_response(path, self._make_object(blob))
+
+        type_num, content = self.store._fetch_loose_object(blob.id)
+        self.assertEqual(Blob.type_num, type_num)
+        self.assertEqual(blob.data, content)
 
     def test_load_packs_empty(self) -> None:
         # No packs file

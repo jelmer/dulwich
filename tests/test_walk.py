@@ -293,7 +293,29 @@ class WalkerTest(TestCase):
             },
         )  # Non-conflicting
         self.assertWalkYields([m3, y2, x1], [m3.id], paths=[b"a"])
-        self.assertWalkYields([y2, x1], [m4.id], paths=[b"a"])
+        # m4 is TREESAME to its first parent (x1) for "a", so git's default
+        # history simplification only follows that parent.
+        self.assertWalkYields([x1], [m4.id], paths=[b"a"])
+
+    def test_paths_merge_treesame_side_branch_pruned(self) -> None:
+        # Regression test for #2414: both sides of the merge changed "a" but
+        # the merge takes the first parent's version. The second parent's
+        # change to "a" does not explain the final state, so git's default
+        # history simplification drops it (dulwich used to match
+        # "git log --full-history" here instead).
+        blob_f1 = make_object(Blob, data=b"f1")
+        blob_f2 = make_object(Blob, data=b"f2")
+        blob_f3 = make_object(Blob, data=b"f3")
+        base, bra, _brb, m = self.make_commits(
+            [[1], [2, 1], [3, 1], [4, 2, 3]],
+            trees={
+                1: [(b"subtrees/f", blob_f1)],
+                2: [(b"subtrees/f", blob_f2)],
+                3: [(b"subtrees/f", blob_f3)],
+                4: [(b"subtrees/f", blob_f2)],
+            },
+        )
+        self.assertWalkYields([bra, base], [m.id], paths=[b"subtrees/f"])
 
     def test_paths_octopus_merge_unchanged_against_first_parent(self) -> None:
         # Regression test for #2412: tree_changes_for_merge yields None for
@@ -302,7 +324,7 @@ class WalkerTest(TestCase):
         blob_a1 = make_object(Blob, data=b"a1")
         blob_a2 = make_object(Blob, data=b"a2")
         blob_b = make_object(Blob, data=b"b")
-        x1, y2, _z3, m4 = self.make_commits(
+        x1, _y2, _z3, m4 = self.make_commits(
             [[1], [2], [3], [4, 1, 2, 3]],
             trees={
                 1: [(b"a", blob_a1)],
@@ -313,7 +335,9 @@ class WalkerTest(TestCase):
                 4: [(b"a", blob_a1), (b"b", blob_b)],
             },
         )
-        self.assertWalkYields([m4, y2, x1], [m4.id], paths=[b"a"])
+        # m4 is TREESAME to its first parent (x1) for "a", so only that
+        # parent's history is followed, as with "git log -- a".
+        self.assertWalkYields([x1], [m4.id], paths=[b"a"])
 
     def test_changes_with_renames(self) -> None:
         blob = make_object(Blob, data=b"blob")

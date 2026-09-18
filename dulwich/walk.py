@@ -237,8 +237,15 @@ class _CommitTimeQueue:
                 continue
             self._done.add(sha)
 
-            for parent_id in self._get_parents(commit):
-                self._push(parent_id)
+            # History simplification (git log default): when a path filter
+            # is active and a merge is TREESAME to one of its parents, only
+            # that parent's history explains the final state of the paths.
+            treesame_parent = self._walker._first_treesame_parent(commit)
+            if treesame_parent is None:
+                for parent_id in self._get_parents(commit):
+                    self._push(parent_id)
+            else:
+                self._push(self._get_parents(commit)[treesame_parent])
 
             reset_extra_commits = True
             is_excluded = sha in self._excluded
@@ -431,6 +438,11 @@ class Walker:
             return True
 
         if len(self.get_parents(commit)) > 1:
+            if self._first_treesame_parent(commit) is not None:
+                # Git's default history simplification: a merge that is
+                # TREESAME to one of its parents is not selected, and only
+                # that parent's history is followed (done in the queue).
+                return False
             for path_changes in entry.changes():
                 # For merge commits, only include changes with conflicts for
                 # this path. Since a rename conflict may include different
@@ -444,6 +456,42 @@ class Walker:
                 assert not isinstance(single_change, list)
                 if self._change_matches(single_change):
                     return True
+        return None
+
+    def _first_treesame_parent(self, commit: Commit) -> int | None:
+        """Find the first parent a merge commit is TREESAME to, for paths.
+
+        A merge is TREESAME to a parent when none of the requested paths
+        changed relative to that parent. Git's default history
+        simplification follows only one TREESAME parent of such a merge,
+        pruning the other sides entirely.
+
+        Args:
+          commit: The merge commit to inspect
+        Returns: The index of the first parent the commit is TREESAME to,
+            or None when there is no such parent (or no path filter).
+        """
+        from .diff_tree import tree_changes
+
+        if self.paths is None:
+            return None
+        for i, parent_id in enumerate(self.get_parents(commit)):
+            parent_commit = self.store[parent_id]
+            assert isinstance(parent_commit, Commit)
+            if (
+                next(
+                    tree_changes(
+                        self.store,
+                        parent_commit.tree,
+                        commit.tree,
+                        rename_detector=self.rename_detector,
+                        paths=sorted(self.paths),
+                    ),
+                    None,
+                )
+                is None
+            ):
+                return i
         return None
 
     def _next(self) -> WalkEntry | None:

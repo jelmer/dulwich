@@ -17,6 +17,9 @@
    ``eol=crlf`` and ``eol=lf`` take precedence over the configuration as they
    do in git. (Jelmer Vernooĳ, #2403)
 
+ * Write carriage returns in configuration values literally rather than as a
+   ``\r`` escape. (Jelmer Vernooĳ)
+
 1.2.15	2026-09-14
 
  * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with

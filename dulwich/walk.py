@@ -240,7 +240,13 @@ class _CommitTimeQueue:
             # History simplification (git log default): when a path filter
             # is active and a merge is TREESAME to one of its parents, only
             # that parent's history explains the final state of the paths.
-            treesame_parent = self._walker._first_treesame_parent(commit)
+            # TREESAME simplification only applies to merges; skipping the
+            # check for ordinary commits avoids a tree diff per commit.
+            treesame_parent = (
+                self._walker._first_treesame_parent(commit)
+                if len(self._get_parents(commit)) > 1
+                else None
+            )
             if treesame_parent is None:
                 for parent_id in self._get_parents(commit):
                     self._push(parent_id)
@@ -471,6 +477,8 @@ class Walker:
         Returns: The index of the first parent the commit is TREESAME to,
             or None when there is no such parent (or no path filter).
         """
+        if len(self.get_parents(commit)) < 2:
+            return None
         from .diff_tree import tree_changes
 
         if self.paths is None:

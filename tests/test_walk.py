@@ -339,6 +339,38 @@ class WalkerTest(TestCase):
         # parent's history is followed, as with "git log -- a".
         self.assertWalkYields([x1], [m4.id], paths=[b"a"])
 
+    def test_paths_merge_treesame_with_renames(self) -> None:
+        # Regression test for #2414: TREESAME against a parent must be
+        # judged on the path-filtered diff alone. A merge that takes the
+        # first parent's version of the path but carries an unrelated
+        # change against that parent is still simplified away, and rename
+        # detection must not widen the comparison to the whole tree.
+        blob_f1 = make_object(Blob, data=b"f1")
+        blob_f2 = make_object(Blob, data=b"f2")
+        blob_f3 = make_object(Blob, data=b"f3")
+        blob_o1 = make_object(Blob, data=b"o1")
+        blob_o2 = make_object(Blob, data=b"o2")
+        base, a, _b, m = self.make_commits(
+            [[1], [2, 1], [3, 1], [4, 2, 3]],
+            trees={
+                1: [(b"f", blob_f1), (b"other", blob_o1)],
+                2: [(b"f", blob_f2), (b"other", blob_o1)],
+                3: [(b"f", blob_f3), (b"other", blob_o1)],
+                # Matches parent 2 for "f" but modifies "other", which is
+                # outside the path filter.
+                4: [(b"f", blob_f2), (b"other", blob_o2)],
+            },
+        )
+        # m is TREESAME to its first parent (a) for "f", so only that
+        # parent's history is followed, as with "git log -- f". The same
+        # simplification applies with rename detection enabled, whether
+        # via follow or an explicit detector.
+        self.assertWalkYields([a, base], [m.id], paths=[b"f"])
+        self.assertWalkYields([a, base], [m.id], paths=[b"f"], follow=True)
+        self.assertWalkYields(
+            [a, base], [m.id], paths=[b"f"], rename_detector=RenameDetector(self.store)
+        )
+
     def test_changes_with_renames(self) -> None:
         blob = make_object(Blob, data=b"blob")
         _c1, c2 = self.make_linear_commits(

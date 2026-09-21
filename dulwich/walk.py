@@ -492,7 +492,6 @@ class Walker:
                         self.store,
                         parent_commit.tree,
                         commit.tree,
-                        rename_detector=self.rename_detector,
                         paths=sorted(self.paths),
                     ),
                     None,

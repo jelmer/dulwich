@@ -20,6 +20,13 @@
  * Write carriage returns in configuration values literally rather than as a
    ``\r`` escape. (Jelmer Vernooĳ)
 
+ * Stop ``porcelain.cherry_pick`` from discarding uncommitted changes. It
+   rebuilt the work tree from the merged tree before checking it, so an edited
+   tracked file was replaced and the cherry-pick reported success. It now
+   updates the work tree the way ``merge`` does and raises
+   ``WorkingTreeModifiedError``, leaving the file and ``HEAD`` untouched.
+   (adarshsm, #2422)
+
 1.2.15	2026-09-14
 
  * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with

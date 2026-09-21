@@ -7878,6 +7878,8 @@ def cherry_pick(  # noqa: D417
 
     Raises:
       Error: If there is no HEAD reference, commit cannot be found, or operation fails
+      WorkingTreeModifiedError: If a file the cherry-pick changes has uncommitted
+        modifications in the working tree
     """
     from ..merge import three_way_merge
 
@@ -7987,12 +7989,9 @@ def cherry_pick(  # noqa: D417
         # Add merged tree to object store
         r.object_store.add_object(merged_tree)
 
-        # Update working tree and index
-        # Reset index to match merged tree
-        r.get_worktree().reset_index(merged_tree.id, config=r.get_config_stack())
-
-        # Update working tree from the new index
-        # Allow overwriting because we're applying the merge result
+        # Update index and working tree, as merge does. update_working_tree
+        # compares each changed path against HEAD first, so uncommitted work is
+        # reported rather than silently replaced.
         assert isinstance(head_commit, Commit)
         changes = tree_changes(r.object_store, head_commit.tree, merged_tree.id)
         update_working_tree(
@@ -8000,7 +7999,6 @@ def cherry_pick(  # noqa: D417
             head_commit.tree,
             merged_tree.id,
             change_iterator=changes,
-            allow_overwrite_modified=True,
             config=r.get_config_stack(),
         )
 

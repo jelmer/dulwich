@@ -26,6 +26,8 @@ import os
 import tempfile
 
 from dulwich import porcelain
+from dulwich.errors import WorkingTreeModifiedError
+from dulwich.repo import Repo
 
 from .. import DependencyMissing, TestCase
 
@@ -145,6 +147,44 @@ class PorcelainCherryPickTests(TestCase):
 
             self.assertIn("Conflicts in:", str(cm.exception))
             self.assertIn("file1.txt", str(cm.exception))
+
+    def test_cherry_pick_keeps_uncommitted_changes(self):
+        """Cherry-pick refuses to overwrite uncommitted changes to a tracked file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Initialize repo
+            porcelain.init(tmpdir)
+
+            # Create initial commit
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Initial content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            head_before = porcelain.commit(tmpdir, message=b"Initial commit")
+
+            # Create a branch and modify the file there
+            porcelain.branch_create(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
+
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Feature content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            feature_commit = porcelain.commit(tmpdir, message=b"Modify file on feature")
+
+            # Go back to master and edit the same file without committing
+            porcelain.checkout(tmpdir, "master")
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Uncommitted local content\n")
+
+            with self.assertRaises(WorkingTreeModifiedError) as cm:
+                porcelain.cherry_pick(tmpdir, feature_commit)
+
+            self.assertIn("Your local changes", str(cm.exception))
+            self.assertIn("file1.txt", str(cm.exception))
+
+            # The local content survives and HEAD did not move
+            with open(os.path.join(tmpdir, "file1.txt")) as f:
+                self.assertEqual(f.read(), "Uncommitted local content\n")
+            with Repo(tmpdir) as r:
+                self.assertEqual(head_before, r.refs[b"HEAD"])
 
     def test_cherry_pick_root_commit(self):
         """Test cherry-pick of root commit (should fail)."""

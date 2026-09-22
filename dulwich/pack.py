@@ -4451,6 +4451,8 @@ class Pack:
         self._idx = None
         self._bitmap = None
         self._released_from_cache = False
+        # Reentrant because loading the data checks it against the index.
+        self._load_lock = threading.RLock()
         # Capture paths in the loaders to avoid a reference cycle through
         # self, which would delay closing the files until garbage collection.
         idx_path = self._idx_path = self._basename + ".idx"
@@ -4510,14 +4512,17 @@ class Pack:
     @property
     def data(self) -> PackData:
         """The pack data object being used."""
-        if self._data is None:
-            assert self._data_load
-            try:
-                self._data = self._data_load()
-            except FileNotFoundError as exc:
-                raise PackFileDisappeared(self) from exc
-            self.check_length_and_checksum()
-        return self._data
+        if self._data is not None:
+            return self._data
+        with self._load_lock:
+            if self._data is None:
+                assert self._data_load
+                try:
+                    self._data = self._data_load()
+                except FileNotFoundError as exc:
+                    raise PackFileDisappeared(self) from exc
+                self.check_length_and_checksum()
+            return self._data
 
     @property
     def index(self) -> PackIndex:
@@ -4525,13 +4530,16 @@ class Pack:
 
         Note: This may be an in-memory index
         """
-        if self._idx is None:
-            assert self._idx_load
-            try:
-                self._idx = self._idx_load()
-            except FileNotFoundError as exc:
-                raise PackFileDisappeared(self) from exc
-        return self._idx
+        if self._idx is not None:
+            return self._idx
+        with self._load_lock:
+            if self._idx is None:
+                assert self._idx_load
+                try:
+                    self._idx = self._idx_load()
+                except FileNotFoundError as exc:
+                    raise PackFileDisappeared(self) from exc
+            return self._idx
 
     @property
     def bitmap(self) -> "PackBitmap | None":

@@ -792,6 +792,32 @@ class TestPack(PackTests):
             expected = {p[s] for s in [commit_sha, tree_sha, a_sha]}
             self.assertEqual(expected, set(list(p.iterobjects())))
 
+    def test_concurrent_first_access_loads_once(self) -> None:
+        for attr, load_attr in [("index", "_idx_load"), ("data", "_data_load")]:
+            with self.subTest(attr=attr), self.get_pack(pack1_sha) as pack:
+                load = getattr(pack, load_attr)
+                calls: list[None] = []
+                second_call = threading.Event()
+
+                def load_slowly() -> object:
+                    calls.append(None)
+                    if len(calls) == 2:
+                        second_call.set()
+                    # Give the other thread time to start loading too.
+                    second_call.wait(timeout=0.2)
+                    return load()
+
+                setattr(pack, load_attr, load_slowly)
+                threads = [
+                    threading.Thread(target=getattr, args=(pack, attr))
+                    for _ in range(2)
+                ]
+                for thread in threads:
+                    thread.start()
+                for thread in threads:
+                    thread.join()
+                self.assertEqual(1, len(calls))
+
     def test_iterators_keep_released_pack_alive(self) -> None:
         iterator_factories = {
             "iter": iter,

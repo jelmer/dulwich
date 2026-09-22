@@ -22,6 +22,7 @@
 
 """Tests for Dulwich packs."""
 
+import gc
 import os
 import shutil
 import sys
@@ -29,6 +30,7 @@ import tempfile
 import threading
 import tracemalloc
 import types
+import weakref
 import zlib
 from hashlib import sha1
 from io import BytesIO
@@ -789,6 +791,30 @@ class TestPack(PackTests):
         with self.get_pack(pack1_sha) as p:
             expected = {p[s] for s in [commit_sha, tree_sha, a_sha]}
             self.assertEqual(expected, set(list(p.iterobjects())))
+
+    def test_iterators_keep_released_pack_alive(self) -> None:
+        iterator_factories = {
+            "iter": iter,
+            "iterobjects": lambda pack: pack.iterobjects(),
+            "iterobjects_subset": lambda pack: pack.iterobjects_subset([commit_sha]),
+            "entries": lambda pack: pack.entries(),
+        }
+
+        for name, factory in iterator_factories.items():
+            with self.subTest(name=name):
+                pack = self.get_pack(pack1_sha)
+                iterator = factory(pack)
+                pack._release_from_cache()
+                pack_ref = weakref.ref(pack)
+                del pack
+                gc.collect()
+
+                self.assertIsNotNone(pack_ref())
+                self.assertTrue(list(iterator))
+                # On CPython, this must not depend on cycle collection.
+                if sys.implementation.name != "cpython":
+                    gc.collect()
+                self.assertIsNone(pack_ref())
 
     def test_pack_tuples(self) -> None:
         with self.get_pack(pack1_sha) as p:

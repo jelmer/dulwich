@@ -1,5 +1,11 @@
 1.2.16	UNRELEASED
 
+ * Merge multiple merge bases against their own common ancestors when building
+   the virtual base for a recursive merge. They were merged with no ancestor,
+   so a conflict between them kept one side, and a criss-cross merge where the
+   two branches disagree could be committed cleanly with one side's content
+   instead of reporting the conflict. (#2419)
+
  * Fix a crash in ``dulwich log <path>`` on merge commits where the path is
    unchanged relative to one parent. ``tree_changes_for_merge`` reports
    ``None`` for such parents, which the walker and the ``--name-status`` and

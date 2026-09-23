@@ -45,6 +45,7 @@ else:
 
 from dulwich.attrs import GitAttributes
 from dulwich.config import Config
+from dulwich.graph import _find_lcas
 from dulwich.merge_drivers import get_merge_driver_registry
 from dulwich.object_store import BaseObjectStore
 from dulwich.objects import S_ISGITLINK, Blob, Commit, ObjectID, Tree, is_blob, is_tree
@@ -572,6 +573,30 @@ def _create_virtual_commit(
     return commit
 
 
+def _find_merge_bases(
+    object_store: BaseObjectStore, c1: ObjectID, c2s: list[ObjectID]
+) -> list[ObjectID]:
+    """Find the lowest common ancestors of c1 and any of c2s.
+
+    Returns an empty list if part of the history is missing (e.g. shallow).
+    """
+
+    def lookup_commit(cmtid: ObjectID) -> Commit:
+        obj = object_store[cmtid]
+        assert isinstance(obj, Commit)
+        return obj
+
+    try:
+        return _find_lcas(
+            lambda c: lookup_commit(c).parents,
+            c1,
+            c2s,
+            lambda c: lookup_commit(c).commit_time,
+        )
+    except KeyError:
+        return []
+
+
 def recursive_merge(
     object_store: BaseObjectStore,
     merge_bases: list[ObjectID],
@@ -631,6 +656,7 @@ def recursive_merge(
             )
 
         # Recursively merge each additional base
+        merged_base_ids = [virtual_base_id]
         for next_base_id in merge_bases[1:]:
             next_base_obj = object_store[next_base_id]
             if not isinstance(next_base_obj, Commit):
@@ -638,23 +664,19 @@ def recursive_merge(
                     f"Expected commit, got {next_base_obj.type_name.decode()}"
                 )
 
-            # Find merge base of these two bases
-            # Import here to avoid circular dependency
-
-            # We need access to the repo for find_merge_base
-            # For now, we'll perform a simple three-way merge without recursion
-            # between the two virtual commits
-            # A proper implementation would require passing the repo object
-
-            # Perform three-way merge of the two bases (using None as their base)
-            merged_tree, _conflicts = three_way_merge(
+            # Merge the bases against their own common ancestors, like Git.
+            # Merging them with no ancestor turns every file they both
+            # changed into an add/add conflict that keeps our side, which
+            # makes the virtual base equal one side and hides real conflicts.
+            merged_tree, _conflicts = recursive_merge(
                 object_store,
-                None,  # No common ancestor for virtual merge bases
+                _find_merge_bases(object_store, next_base_id, merged_base_ids),
                 virtual_commit_obj,
                 next_base_obj,
                 gitattributes,
                 config,
             )
+            merged_base_ids.append(next_base_id)
 
             # Create a virtual commit with this merged tree
             virtual_commit_obj = _create_virtual_commit(

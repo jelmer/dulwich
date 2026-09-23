@@ -179,3 +179,15 @@ Signed-off-by: Alice <alice@example.com>
         input_text = b"hello\n\nworld\n"
         expected = b"hello\n\nworld\n"
         self.assertEqual(stripspace(input_text), expected)
+
+    def test_many_leading_blank_lines(self):
+        """Test that a large run of leading blank lines is handled linearly.
+
+        The leading blank lines used to be removed with a ``pop(0)`` loop,
+        which is O(n) per call and made an all-blank input O(n^2). Feeding a
+        large run of blank lines exercises that path; it also verifies the
+        output is unchanged.
+        """
+        input_text = b"\n" * 100000 + b"hello\nworld\n"
+        self.assertEqual(stripspace(input_text), b"hello\nworld\n")
+        self.assertEqual(stripspace(b"\n" * 100000), b"")

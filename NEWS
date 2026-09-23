@@ -1,5 +1,10 @@
 1.2.16	UNRELEASED
 
+ * Implement default history simplification in ``Walker`` for path-filtered
+   walks: a merge that is TREESAME to a parent now follows only that parent,
+   so ``dulwich log <path>`` no longer matches ``git log --full-history``.
+   (#2414)
+
  * Fix a crash in ``dulwich log <path>`` on merge commits where the path is
    unchanged relative to one parent. ``tree_changes_for_merge`` reports
    ``None`` for such parents, which the walker and the ``--name-status`` and

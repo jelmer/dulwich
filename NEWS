@@ -20,6 +20,10 @@
  * Write carriage returns in configuration values literally rather than as a
    ``\r`` escape. (Jelmer Vernooĳ)
 
+ * Strip leading blank lines in ``stripspace`` in a single pass. The previous
+   ``pop(0)`` loop made an all-blank input O(n^2); it is now linear like git.
+   (Kartik Kenchi)
+
 1.2.15	2026-09-14
 
  * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with

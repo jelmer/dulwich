@@ -1,5 +1,13 @@
 1.2.16	UNRELEASED
 
+ * Make the object store pack cache safe for concurrent readers. Evicted
+   packs stay open until their last reader finishes, including when
+   ``core.packedGitLimit`` is set. (Bojan Zivanovic, #2424)
+
+ * ``PackBasedObjectStore`` subclasses must replace ``_update_pack_cache``
+   overrides with ``_scan_pack_names`` and ``_open_pack`` implementations.
+   (Bojan Zivanovic)
+
  * Fix a crash in ``dulwich log <path>`` on merge commits where the path is
    unchanged relative to one parent. ``tree_changes_for_merge`` reports
    ``None`` for such parents, which the walker and the ``--name-status`` and

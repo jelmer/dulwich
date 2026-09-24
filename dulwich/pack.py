@@ -4450,8 +4450,13 @@ class Pack:
         self._data = None
         self._idx = None
         self._bitmap = None
-        self._idx_path = self._basename + ".idx"
-        self._data_path = self._basename + ".pack"
+        self._released_from_cache = False
+        # Reentrant because loading the data checks it against the index.
+        self._load_lock = threading.RLock()
+        # Capture paths in the loaders to avoid a reference cycle through
+        # self, which would delay closing the files until garbage collection.
+        idx_path = self._idx_path = self._basename + ".idx"
+        data_path = self._data_path = self._basename + ".pack"
         self._bitmap_path = self._basename + ".bitmap"
         self.delta_window_size = delta_window_size
         self.window_memory = window_memory
@@ -4460,9 +4465,9 @@ class Pack:
         self.threads = threads
         self.big_file_threshold = big_file_threshold
         self.delta_base_cache_limit = delta_base_cache_limit
-        self._idx_load = lambda: load_pack_index(self._idx_path, object_format)
+        self._idx_load = lambda: load_pack_index(idx_path, object_format)
         self._data_load = lambda: PackData(
-            self._data_path,
+            data_path,
             delta_window_size=delta_window_size,
             window_memory=window_memory,
             delta_cache_size=delta_cache_size,
@@ -4507,14 +4512,17 @@ class Pack:
     @property
     def data(self) -> PackData:
         """The pack data object being used."""
-        if self._data is None:
-            assert self._data_load
-            try:
-                self._data = self._data_load()
-            except FileNotFoundError as exc:
-                raise PackFileDisappeared(self) from exc
-            self.check_length_and_checksum()
-        return self._data
+        if self._data is not None:
+            return self._data
+        with self._load_lock:
+            if self._data is None:
+                assert self._data_load
+                try:
+                    self._data = self._data_load()
+                except FileNotFoundError as exc:
+                    raise PackFileDisappeared(self) from exc
+                self.check_length_and_checksum()
+            return self._data
 
     @property
     def index(self) -> PackIndex:
@@ -4522,13 +4530,16 @@ class Pack:
 
         Note: This may be an in-memory index
         """
-        if self._idx is None:
-            assert self._idx_load
-            try:
-                self._idx = self._idx_load()
-            except FileNotFoundError as exc:
-                raise PackFileDisappeared(self) from exc
-        return self._idx
+        if self._idx is not None:
+            return self._idx
+        with self._load_lock:
+            if self._idx is None:
+                assert self._idx_load
+                try:
+                    self._idx = self._idx_load()
+                except FileNotFoundError as exc:
+                    raise PackFileDisappeared(self) from exc
+            return self._idx
 
     @property
     def bitmap(self) -> "PackBitmap | None":
@@ -4638,14 +4649,26 @@ class Pack:
             self._idx.close()
             self._idx = None
 
+    def _release_from_cache(self) -> None:
+        """Mark the pack as released from the cache without closing it.
+
+        ``__del__`` will close the files without a resource warning once the
+        last reference is gone.
+        """
+        self._released_from_cache = True
+
     def __del__(self) -> None:
         """Ensure pack file is closed when Pack is garbage collected."""
         if self._data is not None or self._idx is not None:
-            import warnings
+            if not self._released_from_cache:
+                import warnings
 
-            warnings.warn(
-                f"unclosed Pack {self!r}", ResourceWarning, stacklevel=2, source=self
-            )
+                warnings.warn(
+                    f"unclosed Pack {self!r}",
+                    ResourceWarning,
+                    stacklevel=2,
+                    source=self,
+                )
             try:
                 self.close()
             except Exception:
@@ -4681,7 +4704,7 @@ class Pack:
 
     def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over all the sha1s of the objects in this pack."""
-        return iter(self.index)
+        yield from self.index
 
     def check_length_and_checksum(self) -> None:
         """Sanity check the length and checksum of the pack index and data."""
@@ -4741,15 +4764,15 @@ class Pack:
 
     def iterobjects(self) -> Iterator[ShaFile]:
         """Iterate over the objects in this pack."""
-        return iter(
-            PackInflater.for_pack_data(self.data, resolve_ext_ref=self.resolve_ext_ref)
+        yield from PackInflater.for_pack_data(
+            self.data, resolve_ext_ref=self.resolve_ext_ref
         )
 
     def iterobjects_subset(
         self, shas: Iterable[ObjectID], *, allow_missing: bool = False
     ) -> Iterator[ShaFile]:
         """Iterate over a subset of objects in this pack."""
-        return (
+        yield from (
             uo
             for uo in PackInflater.for_pack_subset(
                 self,
@@ -4952,7 +4975,7 @@ class Pack:
             object count.
         Returns: iterator of tuples with (sha, offset, crc32)
         """
-        return self.data.iterentries(
+        yield from self.data.iterentries(
             progress=progress, resolve_ext_ref=self.resolve_ext_ref
         )
 

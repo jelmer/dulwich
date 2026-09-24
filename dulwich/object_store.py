@@ -59,6 +59,7 @@ import logging
 import os
 import stat
 import sys
+import threading
 import time
 import warnings
 from collections import deque
@@ -1009,7 +1010,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           pack_threads: Number of threads to use for packing
           pack_big_file_threshold: Threshold for treating files as "big"
           packed_git_limit: Maximum total bytes for mmapped pack files.
-            When exceeded, least-recently-used packs are closed to free memory.
+            When exceeded, least-recently-used packs are evicted from the
+            cache to free memory.
           delta_base_cache_limit: Maximum bytes for caching delta base objects.
             Controls memory used to cache resolved base objects during delta
             unpacking, corresponding to Git's core.deltaBaseCacheLimit.
@@ -1018,6 +1020,9 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         super().__init__(object_format=object_format)
         self._pack_cache: dict[str, Pack] = {}
         self._pack_access_order: list[str] = []
+        # Protect _pack_cache and _pack_access_order. Pack reads run outside
+        # this lock.
+        self._pack_cache_lock = threading.RLock()
         self.packed_git_limit = packed_git_limit
         self.delta_base_cache_limit = delta_base_cache_limit
         self.pack_compression_level = pack_compression_level
@@ -1132,13 +1137,14 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
     def _add_cached_pack(self, base_name: str, pack: Pack) -> None:
         """Add a newly appeared pack to the cache by path."""
-        prev_pack = self._pack_cache.get(base_name)
-        if prev_pack is not pack:
-            self._pack_cache[base_name] = pack
-            if prev_pack:
-                prev_pack.close()
-        self._mark_pack_used(base_name)
-        self._enforce_packed_git_limit()
+        with self._pack_cache_lock:
+            prev_pack = self._pack_cache.get(base_name)
+            if prev_pack is not pack:
+                self._pack_cache[base_name] = pack
+                if prev_pack is not None:
+                    prev_pack._release_from_cache()
+            self._mark_pack_used(base_name)
+            self._enforce_packed_git_limit()
 
     def generate_pack_data(
         self,
@@ -1172,41 +1178,72 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         )
 
     def _clear_cached_packs(self) -> None:
-        pack_cache = self._pack_cache
-        self._pack_cache = {}
-        self._pack_access_order = []
+        with self._pack_cache_lock:
+            pack_cache = self._pack_cache
+            self._pack_cache = {}
+            self._pack_access_order = []
         while pack_cache:
             (_name, pack) = pack_cache.popitem()
             pack.close()
 
     def _total_pack_mmap_size(self) -> int:
-        """Return the total mmapped memory across all cached packs."""
+        """Return the total mmapped memory across all cached packs.
+
+        The caller must hold ``_pack_cache_lock``.
+        """
         return sum(pack.mmap_size for pack in self._pack_cache.values())
 
     def _mark_pack_used(self, pack_hash: str) -> None:
-        """Mark a pack as recently used for LRU tracking."""
+        """Mark a cached pack as recently used for LRU tracking.
+
+        Ignore packs evicted by another thread during a read.
+
+        The caller must hold ``_pack_cache_lock``.
+        """
+        if pack_hash not in self._pack_cache:
+            return
         try:
             self._pack_access_order.remove(pack_hash)
         except ValueError:
             pass
         self._pack_access_order.append(pack_hash)
 
+    def _drop_cached_pack(self, pack_hash: str) -> None:
+        """Remove a pack from the cache and LRU order without closing it.
+
+        The caller must hold ``_pack_cache_lock``.
+        """
+        pack = self._pack_cache.pop(pack_hash, None)
+        if pack is not None:
+            pack._release_from_cache()
+        try:
+            self._pack_access_order.remove(pack_hash)
+        except ValueError:
+            pass
+
     def _enforce_packed_git_limit(self) -> None:
-        """Evict least-recently-used packs if the memory limit is exceeded."""
+        """Evict least-recently-used packs if the memory limit is exceeded.
+
+        Skip packs with no mapped memory: evicting them frees nothing and
+        forces another scan on the next miss.
+
+        The caller must hold ``_pack_cache_lock``.
+        """
         if self.packed_git_limit is None:
             return
-        while (
-            self._pack_access_order
-            and self._total_pack_mmap_size() > self.packed_git_limit
-        ):
-            oldest = self._pack_access_order.pop(0)
-            pack = self._pack_cache.get(oldest)
-            if pack is not None:
-                pack.close()
-                del self._pack_cache[oldest]
+        total = self._total_pack_mmap_size()
+        for pack_hash in list(self._pack_access_order):
+            if total <= self.packed_git_limit:
+                break
+            size = self._pack_cache[pack_hash].mmap_size
+            if not size:
+                continue
+            self._drop_cached_pack(pack_hash)
+            total -= size
 
-    def _iter_cached_packs(self) -> Iterator[Pack]:
-        return iter(list(self._pack_cache.values()))
+    def _cached_packs(self) -> list[tuple[str, Pack]]:
+        with self._pack_cache_lock:
+            return list(self._pack_cache.items())
 
     def _evict_pack(self, pack: "Pack | FilePackIndex") -> None:
         """Evict a pack from the cache after its backing file disappeared.
@@ -1215,60 +1252,90 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         latter case the index's owning ``Pack`` is matched via the cached
         pack's ``_idx`` reference.
         """
-        for key, cached in list(self._pack_cache.items()):
-            if cached is pack or cached._idx is pack:
-                del self._pack_cache[key]
-                try:
-                    self._pack_access_order.remove(key)
-                except ValueError:
-                    pass
-                try:
-                    cached.close()
-                except OSError:
-                    pass
-                break
+        with self._pack_cache_lock:
+            for key, cached in list(self._pack_cache.items()):
+                if cached is pack or cached._idx is pack:
+                    self._drop_cached_pack(key)
+                    break
 
     def _lookup_in_packs(self, lookup: "Callable[[Pack], _T]") -> "_T":
         """Run ``lookup(pack)`` against each cached pack and return the first hit.
 
         ``lookup`` should raise ``KeyError`` if the pack does not contain the
-        target. ``PackFileDisappeared`` from a concurrent ``git repack`` /
-        ``gc --auto`` is caught: the stale pack is evicted, the pack
-        directory is rescanned, and the search retries — bounded, mirroring
-        git's ``reprepare_packed_git()``. If no cached pack has the object
-        the pack directory is rescanned once to pick up any newly-arrived
-        packs (e.g. another writer just landed one). ``KeyError`` is raised
-        if no pack — old or new — has the object.
+        target. If no cached pack has the object, rescan and try any remaining
+        candidates. Evict packs that raise ``PackFileDisappeared`` so they can
+        be reopened on retry.
+
+        Rescan again only after a pack disappeared, for at most
+        ``_MAX_PACK_RESCAN_ATTEMPTS`` passes. Raise ``KeyError`` if the object
+        is not found.
         """
-        rescanned = False
-        for _attempt in range(_MAX_PACK_RESCAN_ATTEMPTS):
-            disappeared = False
-            for pack_hash, pack in list(self._pack_cache.items()):
+        tried: set[str] = set()
+        packs = self._cached_packs()
+        for attempt in range(_MAX_PACK_RESCAN_ATTEMPTS):
+            if attempt:
+                packs = [
+                    (pack_hash, pack)
+                    for pack_hash, pack in self._rescan_packs()
+                    if pack_hash not in tried
+                ]
+                if not packs:
+                    break
+            disappeared: set[str] = set()
+            for pack_hash, pack in packs:
                 try:
                     result = lookup(pack)
                 except KeyError:
                     continue
                 except PackFileDisappeared as exc:
                     self._evict_pack(exc.obj)
-                    disappeared = True
+                    disappeared.add(pack_hash)
                     continue
-                self._mark_pack_used(pack_hash)
-                self._enforce_packed_git_limit()
+                with self._pack_cache_lock:
+                    self._mark_pack_used(pack_hash)
+                    self._enforce_packed_git_limit()
                 return result
-            if disappeared:
-                self._update_pack_cache()
-                rescanned = True
-                continue
-            if not rescanned:
-                # Maybe another process just landed a pack with the object.
-                if self._update_pack_cache():
-                    rescanned = True
-                    continue
-            break
+            if attempt and not disappeared:
+                break
+            # Pack names identify their contents, so reopening a pack cannot
+            # turn a previous miss into a hit.
+            tried.update(h for h, _pack in packs if h not in disappeared)
         raise KeyError
 
-    def _update_pack_cache(self) -> list[Pack]:
-        raise NotImplementedError(self._update_pack_cache)
+    def _scan_pack_names(self) -> set[str]:
+        """Return the names of the packs currently in the backing store.
+
+        Called without ``_pack_cache_lock`` so I/O does not block cache updates.
+        """
+        raise NotImplementedError(self._scan_pack_names)
+
+    def _open_pack(self, name: str) -> Pack:
+        """Return a ``Pack`` for a name reported by ``_scan_pack_names``."""
+        raise NotImplementedError(self._open_pack)
+
+    def _update_pack_cache(self) -> None:
+        """Rescan the backing store and update the cache.
+
+        Subclasses should implement ``_scan_pack_names`` and ``_open_pack``.
+        """
+        self._rescan_packs()
+
+    def _rescan_packs(self) -> list[tuple[str, Pack]]:
+        """Rescan the backing store and return a snapshot of the cache.
+
+        Hold the lock while updating and copying the cache so newly opened
+        packs cannot be evicted before they are included in the snapshot.
+        """
+        pack_names = self._scan_pack_names()
+        with self._pack_cache_lock:
+            for name in pack_names - self._pack_cache.keys():
+                self._pack_cache[name] = self._open_pack(name)
+                self._mark_pack_used(name)
+            for name in self._pack_cache.keys() - pack_names:
+                self._drop_cached_pack(name)
+            packs = list(self._pack_cache.items())
+            self._enforce_packed_git_limit()
+            return packs
 
     def close(self) -> None:
         """Close the object store and release resources.
@@ -1293,8 +1360,12 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
     @property
     def packs(self) -> list[Pack]:
-        """List with pack objects."""
-        return list(self._iter_cached_packs()) + list(self._update_pack_cache())
+        """Return the packs currently in the backing store.
+
+        Rescan to exclude packs removed by another process, even if existing
+        readers still have them open.
+        """
+        return [pack for _name, pack in self._rescan_packs()]
 
     def count_pack_files(self) -> int:
         """Count the number of pack files.
@@ -1440,8 +1511,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
 
     def __iter__(self) -> Iterator[ObjectID]:
         """Iterate over the SHAs that are present in this store."""
-        self._update_pack_cache()
-        for pack in self._iter_cached_packs():
+        for _pack_hash, pack in self._rescan_packs():
             try:
                 yield from pack
             except PackFileDisappeared as exc:
@@ -1512,7 +1582,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           KeyError: If an object is missing and allow_missing is False
         """
         todo: set[ObjectID | RawObjectID] = set(shas)
-        for p in self._iter_cached_packs():
+        cached = dict(self._cached_packs())
+        for p in cached.values():
             try:
                 for unpacked in p.iter_unpacked_subset(
                     todo,
@@ -1527,7 +1598,11 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
                 self._evict_pack(exc.obj)
         # Maybe something else has added a pack with the object
         # in the mean time?
-        for p in self._update_pack_cache():
+        for pack_hash, p in self._rescan_packs():
+            # Compare by identity so packs reopened since the snapshot are
+            # searched again.
+            if cached.get(pack_hash) is p:
+                continue
             try:
                 for unpacked in p.iter_unpacked_subset(
                     todo,
@@ -1570,7 +1645,8 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
           KeyError: If an object is missing and allow_missing is False
         """
         todo: set[ObjectID] = set(shas)
-        for p in self._iter_cached_packs():
+        cached = dict(self._cached_packs())
+        for p in cached.values():
             try:
                 for o in p.iterobjects_subset(todo, allow_missing=True):
                     yield o
@@ -1579,7 +1655,11 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
                 self._evict_pack(exc.obj)
         # Maybe something else has added a pack with the object
         # in the mean time?
-        for p in self._update_pack_cache():
+        for pack_hash, p in self._rescan_packs():
+            # Compare by identity so packs reopened since the snapshot are
+            # searched again.
+            if cached.get(pack_hash) is p:
+                continue
             try:
                 for o in p.iterobjects_subset(todo, allow_missing=True):
                     yield o
@@ -1985,13 +2065,12 @@ class DiskObjectStore(PackBasedObjectStore):
             path = os.path.join(self.path, path)
         self.alternates.append(DiskObjectStore(path))
 
-    def _update_pack_cache(self) -> list[Pack]:
-        """Read and iterate over new pack files and cache them."""
+    def _scan_pack_names(self) -> set[str]:
         try:
             pack_dir_contents = set(os.listdir(self.pack_dir))
         except FileNotFoundError:
-            return []
-        pack_files = set()
+            return set()
+        pack_names = set()
         for name in pack_dir_contents:
             # Index any ".pack" file with a matching ".idx", not just
             # "pack-<hash>". ``git maintenance`` writes packs named
@@ -2001,35 +2080,21 @@ class DiskObjectStore(PackBasedObjectStore):
             if name.endswith(".pack"):
                 basename = name[: -len(".pack")]
                 if basename + ".idx" in pack_dir_contents:
-                    pack_files.add(basename)
+                    pack_names.add(basename)
+        return pack_names
 
-        # Open newly appeared pack files
-        new_packs = []
-        for basename in pack_files:
-            if basename not in self._pack_cache:
-                pack = Pack(
-                    os.path.join(self.pack_dir, basename),
-                    object_format=self.object_format,
-                    delta_window_size=self.pack_delta_window_size,
-                    window_memory=self.pack_window_memory,
-                    delta_cache_size=self.pack_delta_cache_size,
-                    depth=self.pack_depth,
-                    threads=self.pack_threads,
-                    big_file_threshold=self.pack_big_file_threshold,
-                    delta_base_cache_limit=self.delta_base_cache_limit,
-                )
-                new_packs.append(pack)
-                self._pack_cache[basename] = pack
-                self._mark_pack_used(basename)
-        # Remove disappeared pack files
-        for f in set(self._pack_cache) - pack_files:
-            self._pack_cache.pop(f).close()
-            try:
-                self._pack_access_order.remove(f)
-            except ValueError:
-                pass
-        self._enforce_packed_git_limit()
-        return new_packs
+    def _open_pack(self, name: str) -> Pack:
+        return Pack(
+            os.path.join(self.pack_dir, name),
+            object_format=self.object_format,
+            delta_window_size=self.pack_delta_window_size,
+            window_memory=self.pack_window_memory,
+            delta_cache_size=self.pack_delta_cache_size,
+            depth=self.pack_depth,
+            threads=self.pack_threads,
+            big_file_threshold=self.pack_big_file_threshold,
+            delta_base_cache_limit=self.delta_base_cache_limit,
+        )
 
     def _get_shafile_path(self, sha: ObjectID) -> str:
         # Reject anything that is neither a valid hex object id nor a raw
@@ -2146,11 +2211,8 @@ class DiskObjectStore(PackBasedObjectStore):
         # _pack_cache is keyed by the full pack basename (e.g. "pack-<hash>"
         # or "loose-<hash>"), matching pack._basename.
         basename = os.path.basename(pack._basename)
-        self._pack_cache.pop(basename, None)
-        try:
-            self._pack_access_order.remove(basename)
-        except ValueError:
-            pass
+        with self._pack_cache_lock:
+            self._drop_cached_pack(basename)
         # Store paths before closing to avoid re-opening files on Windows
         data_path = pack._data_path
         idx_path = pack._idx_path
@@ -2636,19 +2698,10 @@ class DiskObjectStore(PackBasedObjectStore):
         if not os.path.exists(pack_path + ".pack"):
             raise KeyError(f"Pack {pack_name} not found")
 
-        pack = Pack(
-            pack_path,
-            object_format=self.object_format,
-            delta_window_size=self.pack_delta_window_size,
-            window_memory=self.pack_window_memory,
-            delta_cache_size=self.pack_delta_cache_size,
-            depth=self.pack_depth,
-            threads=self.pack_threads,
-            big_file_threshold=self.pack_big_file_threshold,
-            delta_base_cache_limit=self.delta_base_cache_limit,
-        )
-        self._pack_cache[basename] = pack
-        self._mark_pack_used(basename)
+        pack = self._open_pack(basename)
+        with self._pack_cache_lock:
+            pack = self._pack_cache.setdefault(basename, pack)
+            self._mark_pack_used(basename)
         return pack
 
     def contains_packed(self, sha: ObjectID | RawObjectID) -> bool:
@@ -3768,20 +3821,11 @@ class BucketBasedObjectStore(PackBasedObjectStore):
     def _get_pack(self, name: str) -> Pack:
         raise NotImplementedError(self._get_pack)
 
-    def _update_pack_cache(self) -> list[Pack]:
-        pack_files = set(self._iter_pack_names())
+    def _scan_pack_names(self) -> set[str]:
+        return set(self._iter_pack_names())
 
-        # Open newly appeared pack files
-        new_packs = []
-        for f in pack_files:
-            if f not in self._pack_cache:
-                pack = self._get_pack(f)
-                new_packs.append(pack)
-                self._pack_cache[f] = pack
-        # Remove disappeared pack files
-        for f in set(self._pack_cache) - pack_files:
-            self._pack_cache.pop(f).close()
-        return new_packs
+    def _open_pack(self, name: str) -> Pack:
+        return self._get_pack(name)
 
     def _upload_pack(
         self, basename: str, pack_file: BinaryIO, index_file: BinaryIO

@@ -1199,20 +1199,41 @@ class SSHGitClientTests(TestCase):
         # relative and must not be turned into absolute paths.
         c = SSHGitClient("git.samba.org", username="user")
 
+        self.assertEqual("user@git.samba.org:git/repo.git", c.get_url("git/repo.git"))
+
+    def test_get_url_relative_path_with_port(self) -> None:
+        # scp-style URLs cannot carry a port, so fall back to git's /~/ form.
+        c = SSHGitClient("git.samba.org", port=2222, username="user")
+
         self.assertEqual(
-            "ssh://user@git.samba.org/~/git/repo.git", c.get_url("git/repo.git")
+            "ssh://user@git.samba.org:2222/~/git/repo.git", c.get_url("git/repo.git")
         )
 
     def test_get_url_tilde_path(self) -> None:
         c = SSHGitClient("git.samba.org", username="user")
 
         self.assertEqual(
-            "ssh://user@git.samba.org/~/git/repo.git", c.get_url("~/git/repo.git")
+            "user@git.samba.org:~/git/repo.git", c.get_url("~/git/repo.git")
         )
         self.assertEqual(
-            "ssh://user@git.samba.org/~other/git/repo.git",
+            "user@git.samba.org:~other/git/repo.git",
             c.get_url("~other/git/repo.git"),
         )
+
+    def test_get_url_relative_path_round_trip(self) -> None:
+        # The URL recorded by clone must send the same path on a later fetch.
+        # GitHub rejects '~/owner/repo', see #2428.
+        c = SSHGitClient("github.com", username="git")
+        url = c.get_url("octocat/Hello-World.git")
+
+        c2, path = get_transport_and_path(url)
+        proto, _, _ = c2._connect(b"upload-pack", path)
+        try:
+            self.assertEqual(
+                b"git-upload-pack 'octocat/Hello-World.git'", self.server.command
+            )
+        finally:
+            proto.close()
 
     def test_default_command(self) -> None:
         self.assertEqual(b"git-upload-pack", self.client._get_cmd_path(b"upload-pack"))

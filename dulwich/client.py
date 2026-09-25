@@ -3975,8 +3975,15 @@ class SSHGitClient(TraditionalGitClient):
 
         if not path.startswith("/"):
             # Paths in ssh:// URLs are absolute, but scp-style URLs take a
-            # path relative to the home directory. Use git's /~/ form so the
-            # URL still refers to the same repository.
+            # path relative to the home directory. Hand those back in
+            # scp-style form, as git records them: hosts such as GitHub
+            # reject the ~/ path that git's ssh://host/~/ form sends.
+            user_host = self.host
+            if self.username is not None:
+                user_host = self.username + "@" + user_host
+            if self.port is None and ":" not in user_host:
+                return user_host + ":" + path
+            # scp-style URLs cannot carry a port, so use git's /~/ form.
             if not path.startswith("~"):
                 path = "~/" + path
             path = "/" + path

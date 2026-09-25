@@ -1,5 +1,12 @@
 1.2.16	UNRELEASED
 
+ * Record a clone from an scp-style URL with a relative path, such as
+   ``git@github.com:owner/repo.git``, in scp-style form again, as git does.
+   Since 1.2.15 it was recorded as ``ssh://host/~/owner/repo.git``, which
+   sends ``~/owner/repo.git`` on the next fetch, and GitHub rejects that
+   as not a valid repository name. The ``/~/`` form is still used when a port
+   is set, since scp-style URLs cannot carry one. (#2428)
+
  * Fix a crash in ``dulwich log <path>`` on merge commits where the path is
    unchanged relative to one parent. ``tree_changes_for_merge`` reports
    ``None`` for such parents, which the walker and the ``--name-status`` and

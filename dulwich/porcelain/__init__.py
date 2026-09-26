@@ -7988,11 +7988,6 @@ def cherry_pick(  # noqa: D417
         r.object_store.add_object(merged_tree)
 
         # Update working tree and index
-        # Reset index to match merged tree
-        r.get_worktree().reset_index(merged_tree.id, config=r.get_config_stack())
-
-        # Update working tree from the new index
-        # Allow overwriting because we're applying the merge result
         assert isinstance(head_commit, Commit)
         changes = tree_changes(r.object_store, head_commit.tree, merged_tree.id)
         update_working_tree(
@@ -8000,7 +7995,6 @@ def cherry_pick(  # noqa: D417
             head_commit.tree,
             merged_tree.id,
             change_iterator=changes,
-            allow_overwrite_modified=True,
             config=r.get_config_stack(),
         )
 

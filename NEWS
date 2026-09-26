@@ -24,6 +24,9 @@
    ``pop(0)`` loop made an all-blank input O(n^2); it is now linear like git.
    (Kartik Kenchi)
 
+ * Prevent ``cherry_pick`` from overwriting staged or untracked working tree
+   files. (Stan Shkolnyi, #2430)
+
 1.2.15	2026-09-14
 
  * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with

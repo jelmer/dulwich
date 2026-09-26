@@ -44,6 +44,7 @@ from dulwich.diff_tree import (
     TreeChange,
     tree_changes,
 )
+from dulwich.errors import WorkingTreeModifiedError
 from dulwich.index import (
     EXTENDED_FLAG_SKIP_WORKTREE,
     SDIR_EXTENSION,
@@ -4102,6 +4103,59 @@ class TestUpdateWorkingTree(TestCase):
 
         # file2 should still be a directory
         self.assertTrue(os.path.isdir(file2_path))
+
+    def test_update_working_tree_preserves_untracked_added_file(self):
+        """Test that an added path does not overwrite an untracked file."""
+        # Old tree does not contain new-file.txt.
+        old_blob = Blob()
+        old_blob.data = b"base content"
+        self.repo.object_store.add_object(old_blob)
+
+        old_tree = Tree()
+        old_tree[b"base.txt"] = (0o100644, old_blob.id)
+        self.repo.object_store.add_object(old_tree)
+
+        # Materialize the old tree first.
+        changes = tree_changes(self.repo.object_store, None, old_tree.id)
+        update_working_tree(
+            self.repo,
+            None,
+            old_tree.id,
+            change_iterator=changes,
+        )
+
+        # New tree adds new-file.txt.
+        new_blob = Blob()
+        new_blob.data = b"new tracked content"
+        self.repo.object_store.add_object(new_blob)
+
+        new_tree = Tree()
+        new_tree[b"base.txt"] = (0o100644, old_blob.id)
+        new_tree[b"new-file.txt"] = (0o100644, new_blob.id)
+        self.repo.object_store.add_object(new_tree)
+
+        # Create an untracked file at the path the update wants to add.
+        file_path = os.path.join(self.tempdir, "new-file.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"local untracked content")
+
+        changes = tree_changes(
+            self.repo.object_store,
+            old_tree.id,
+            new_tree.id,
+        )
+
+        with self.assertRaises(WorkingTreeModifiedError):
+            update_working_tree(
+                self.repo,
+                old_tree.id,
+                new_tree.id,
+                change_iterator=changes,
+            )
+
+        # The existing untracked file must remain untouched.
+        with open(file_path, "rb") as f:
+            self.assertEqual(b"local untracked content", f.read())
 
     def test_ensure_parent_dir_exists_windows_drive(self):
         """Test that _ensure_parent_dir_exists handles Windows drive letters correctly."""

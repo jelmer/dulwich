@@ -44,6 +44,7 @@ from dulwich.diff_tree import (
     TreeChange,
     tree_changes,
 )
+from dulwich.errors import WorkingTreeModifiedError
 from dulwich.index import (
     EXTENDED_FLAG_SKIP_WORKTREE,
     FLAG_EXTENDED,
@@ -4481,6 +4482,247 @@ class TestUpdateWorkingTree(TestCase):
 
         # file2 should still be a directory
         self.assertTrue(os.path.isdir(file2_path))
+
+    def test_update_working_tree_preserves_modified_symlink_type_change(self):
+        """A symlink-to-file transition must not destroy local symlink changes."""
+        if sys.platform == "win32":
+            self.skipTest("Symlinks not fully supported on Windows")
+
+        old_blob = Blob.from_string(b"original")
+        new_blob = Blob.from_string(b"feature file")
+        self.repo.object_store.add_object(old_blob)
+        self.repo.object_store.add_object(new_blob)
+
+        old_tree = Tree()
+        old_tree[b"link"] = (0o120000, old_blob.id)
+        self.repo.object_store.add_object(old_tree)
+        new_tree = Tree()
+        new_tree[b"link"] = (0o100644, new_blob.id)
+        self.repo.object_store.add_object(new_tree)
+
+        update_working_tree(
+            self.repo,
+            None,
+            old_tree.id,
+            change_iterator=tree_changes(self.repo.object_store, None, old_tree.id),
+        )
+        link_path = os.path.join(self.tempdir, "link")
+        os.unlink(link_path)
+        os.symlink("local", link_path)
+
+        changes = list(tree_changes(self.repo.object_store, old_tree.id, new_tree.id))
+        self.assertTrue(any(change.type == CHANGE_ADD for change in changes))
+        with self.assertRaises(WorkingTreeModifiedError):
+            update_working_tree(
+                self.repo,
+                old_tree.id,
+                new_tree.id,
+                change_iterator=iter(changes),
+            )
+
+        # Also exercise the CHANGE_ADD guard directly; regular type changes
+        # are emitted as a DELETE and ADD pair by tree_changes().
+        additions = (change for change in changes if change.type == CHANGE_ADD)
+        with self.assertRaises(WorkingTreeModifiedError):
+            update_working_tree(
+                self.repo,
+                old_tree.id,
+                new_tree.id,
+                change_iterator=additions,
+            )
+
+        self.assertTrue(os.path.islink(link_path))
+        self.assertEqual("local", os.readlink(link_path))
+
+    def test_update_working_tree_preserves_untracked_added_file(self):
+        """Test that an added path does not overwrite an untracked file."""
+        # Old tree does not contain new-file.txt.
+        old_blob = Blob()
+        old_blob.data = b"base content"
+        self.repo.object_store.add_object(old_blob)
+
+        old_tree = Tree()
+        old_tree[b"base.txt"] = (0o100644, old_blob.id)
+        self.repo.object_store.add_object(old_tree)
+
+        # Materialize the old tree first.
+        changes = tree_changes(self.repo.object_store, None, old_tree.id)
+        update_working_tree(
+            self.repo,
+            None,
+            old_tree.id,
+            change_iterator=changes,
+        )
+
+        # New tree adds new-file.txt.
+        new_blob = Blob()
+        new_blob.data = b"new tracked content"
+        self.repo.object_store.add_object(new_blob)
+
+        new_tree = Tree()
+        new_tree[b"base.txt"] = (0o100644, old_blob.id)
+        new_tree[b"new-file.txt"] = (0o100644, new_blob.id)
+        self.repo.object_store.add_object(new_tree)
+
+        # Create an untracked file at the path the update wants to add.
+        file_path = os.path.join(self.tempdir, "new-file.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"local untracked content")
+
+        changes = tree_changes(
+            self.repo.object_store,
+            old_tree.id,
+            new_tree.id,
+        )
+
+        with self.assertRaises(WorkingTreeModifiedError):
+            update_working_tree(
+                self.repo,
+                old_tree.id,
+                new_tree.id,
+                change_iterator=changes,
+            )
+
+        # The existing untracked file must remain untouched.
+        with open(file_path, "rb") as f:
+            self.assertEqual(b"local untracked content", f.read())
+
+    def test_update_working_tree_replaces_ignored_file(self):
+        """Ignore patterns allow checkout to replace expendable local files."""
+        old_blob = Blob()
+        old_blob.data = b"base"
+        new_blob = Blob()
+        new_blob.data = b"checked out"
+        for blob in (old_blob, new_blob):
+            self.repo.object_store.add_object(blob)
+        old_tree = Tree()
+        old_tree[b"base.txt"] = (0o100644, old_blob.id)
+        new_tree = Tree()
+        new_tree[b"base.txt"] = (0o100644, old_blob.id)
+        new_tree[b"ignored.txt"] = (0o100644, new_blob.id)
+        for tree in (old_tree, new_tree):
+            self.repo.object_store.add_object(tree)
+        with open(os.path.join(self.tempdir, ".gitignore"), "wb") as f:
+            f.write(b"ignored.txt\n")
+        path = os.path.join(self.tempdir, "ignored.txt")
+        with open(path, "wb") as f:
+            f.write(b"local ignored data")
+        update_working_tree(
+            self.repo,
+            old_tree.id,
+            new_tree.id,
+            change_iterator=tree_changes(
+                self.repo.object_store, old_tree.id, new_tree.id
+            ),
+        )
+        with open(path, "rb") as f:
+            self.assertEqual(b"checked out", f.read())
+
+    def test_update_working_tree_replaces_empty_directory(self):
+        """An added file is allowed to replace an empty directory."""
+        old_blob = Blob()
+        old_blob.data = b"base"
+        new_blob = Blob()
+        new_blob.data = b"file content"
+        for blob in (old_blob, new_blob):
+            self.repo.object_store.add_object(blob)
+        old_tree = Tree()
+        old_tree[b"base.txt"] = (0o100644, old_blob.id)
+        new_tree = Tree()
+        new_tree[b"base.txt"] = (0o100644, old_blob.id)
+        new_tree[b"new.txt"] = (0o100644, new_blob.id)
+        for tree in (old_tree, new_tree):
+            self.repo.object_store.add_object(tree)
+        os.mkdir(os.path.join(self.tempdir, "new.txt"))
+        update_working_tree(
+            self.repo,
+            old_tree.id,
+            new_tree.id,
+            change_iterator=tree_changes(
+                self.repo.object_store, old_tree.id, new_tree.id
+            ),
+        )
+        with open(os.path.join(self.tempdir, "new.txt"), "rb") as f:
+            self.assertEqual(b"file content", f.read())
+
+    def test_update_working_tree_preserves_staged_added_file_missing_on_disk(self):
+        """An added index entry remains protected after its worktree file is deleted."""
+        base_blob = Blob.from_string(b"base")
+        staged_blob = Blob.from_string(b"staged value")
+        target_blob = Blob.from_string(b"different target value")
+        for blob in (base_blob, staged_blob, target_blob):
+            self.repo.object_store.add_object(blob)
+
+        old_tree = Tree()
+        old_tree[b"base.txt"] = (0o100644, base_blob.id)
+        new_tree = Tree()
+        new_tree[b"base.txt"] = (0o100644, base_blob.id)
+        new_tree[b"added.txt"] = (0o100644, target_blob.id)
+        for tree in (old_tree, new_tree):
+            self.repo.object_store.add_object(tree)
+
+        update_working_tree(
+            self.repo,
+            None,
+            old_tree.id,
+            change_iterator=tree_changes(self.repo.object_store, None, old_tree.id),
+        )
+        file_path = os.path.join(self.tempdir, "added.txt")
+        with open(file_path, "wb") as f:
+            f.write(b"staged value")
+        index = self.repo.open_index()
+        index[b"added.txt"] = index_entry_from_stat(os.lstat(file_path), staged_blob.id)
+        index.write()
+        os.unlink(file_path)
+
+        with self.assertRaises(WorkingTreeModifiedError):
+            update_working_tree(
+                self.repo,
+                old_tree.id,
+                new_tree.id,
+                change_iterator=tree_changes(
+                    self.repo.object_store, old_tree.id, new_tree.id
+                ),
+            )
+        self.assertEqual(staged_blob.id, self.repo.open_index()[b"added.txt"].sha)
+        self.assertFalse(os.path.lexists(file_path))
+
+    def test_update_working_tree_tracked_file_to_untracked_directory_collision(self):
+        """Lookup under an old-tree file detects a collision before writing."""
+        old_blob = Blob.from_string(b"tracked old file")
+        new_blob = Blob.from_string(b"new tracked child")
+        for blob in (old_blob, new_blob):
+            self.repo.object_store.add_object(blob)
+        old_tree = Tree()
+        old_tree[b"a"] = (0o100644, old_blob.id)
+        new_tree = Tree()
+        new_tree[b"a/b"] = (0o100644, new_blob.id)
+        for tree in (old_tree, new_tree):
+            self.repo.object_store.add_object(tree)
+        update_working_tree(
+            self.repo,
+            None,
+            old_tree.id,
+            change_iterator=tree_changes(self.repo.object_store, None, old_tree.id),
+        )
+        parent = os.path.join(self.tempdir, "a")
+        os.unlink(parent)
+        os.mkdir(parent)
+        child = os.path.join(parent, "b")
+        with open(child, "wb") as f:
+            f.write(b"local untracked child")
+
+        with self.assertRaises(WorkingTreeModifiedError):
+            update_working_tree(
+                self.repo,
+                old_tree.id,
+                new_tree.id,
+                change_iterator=tree_changes(
+                    self.repo.object_store, old_tree.id, new_tree.id
+                ),
+            )
+        with open(child, "rb") as f:
+            self.assertEqual(b"local untracked child", f.read())
 
     def test_ensure_parent_dir_exists_windows_drive(self):
         """Test that _ensure_parent_dir_exists handles Windows drive letters correctly."""

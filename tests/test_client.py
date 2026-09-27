@@ -1404,6 +1404,48 @@ class LocalGitClientTests(TestCase):
         expected[b"refs/remotes/origin/master"] = expected[b"refs/heads/master"]
         self.assertEqual(expected, result_repo.get_refs())
 
+    def test_clone_origin_url(self) -> None:
+        c = LocalGitClient()
+        s = open_repo("a.git")
+        self.addCleanup(tear_down_repo, s)
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        result_repo = c.clone(
+            s.path, target, mkdir=False, origin_url="user@host:repo.git"
+        )
+        self.addCleanup(result_repo.close)
+        config = result_repo.get_config()
+        self.assertEqual(
+            b"user@host:repo.git", config.get((b"remote", b"origin"), b"url")
+        )
+
+    def test_git_client_clone_origin_url(self) -> None:
+        class CustomGitClient(client.GitClient):
+            def fetch(self, path, target, **kwargs):
+                return FetchPackResult(
+                    refs={}, symrefs={b"HEAD": b"refs/heads/master"}, agent=None
+                )
+
+            def get_url(self, path: str) -> str:
+                return f"ssh://synthesized/{path}"
+
+        c = CustomGitClient()
+        target = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target)
+        result_repo = c.clone(
+            "some/path",
+            target,
+            mkdir=False,
+            origin_url="git@github.com:owner/repo.git",
+            checkout=False,
+        )
+        self.addCleanup(result_repo.close)
+        config = result_repo.get_config()
+        self.assertEqual(
+            b"git@github.com:owner/repo.git",
+            config.get((b"remote", b"origin"), b"url"),
+        )
+
     def test_clone_invalid_path_keeps_repo(self) -> None:
         # A tree entry with an invalid path aborts the checkout, but the
         # clone itself is kept (objects, refs and HEAD), matching git.

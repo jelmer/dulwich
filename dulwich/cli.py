@@ -94,7 +94,7 @@ from .objects import Commit, ObjectID, RawObjectID, sha_to_hex, valid_hexsha
 from .objectspec import parse_commit, parse_commit_range
 from .pack import Pack
 from .patch import DiffAlgorithmNotAvailable
-from .repo import Repo
+from .repo import Repo, get_user_identity
 from .stripspace import stripspace
 
 if sys.version_info >= (3, 11):
@@ -2348,6 +2348,28 @@ class cmd_config(Command):
         return 1
 
 
+def _get_fixup_message(commit: Commit, messages: Sequence[str]) -> str:
+    """Build a plain fixup message from the first nonempty subject paragraph."""
+    subject: list[str] = []
+    for line in porcelain.commit_decode(commit, commit.message).split("\n"):
+        line = line.rstrip(" \t\r\v\f")
+        if not line:
+            if subject:
+                break
+            continue
+        subject.append(line)
+
+    message = "fixup! " + " ".join(subject)
+    if messages:
+        message += "\n\n" + "\n\n".join(messages)
+    lines: list[str] = []
+    for line in message.split("\n"):
+        line = line.rstrip(" \t\r\v\f")
+        if line or (lines and lines[-1]):
+            lines.append(line)
+    return "\n".join(lines).rstrip("\n") + "\n"
+
+
 class cmd_commit(Command):
     """Record changes to the repository."""
 
@@ -2359,7 +2381,7 @@ class cmd_commit(Command):
         """
         parser = argparse.ArgumentParser()
         messages = parser.add_mutually_exclusive_group()
-        messages.add_argument("--message", "-m", help="Commit message")
+        messages.add_argument("--message", "-m", action="append", help="Commit message")
         messages.add_argument(
             "--reuse-message",
             "-C",
@@ -2371,6 +2393,11 @@ class cmd_commit(Command):
             "-c",
             metavar="COMMIT",
             help="Reuse authorship and edit a commit's message",
+        )
+        parser.add_argument(
+            "--fixup",
+            metavar="COMMIT",
+            help="Create a plain fixup commit for autosquash",
         )
         parser.add_argument("--author", help="Override commit author (Name <email>)")
         parser.add_argument(
@@ -2388,16 +2415,38 @@ class cmd_commit(Command):
 
         message: bytes | str | Callable[[Repo | None, Commit | None], bytes]
         reused_commit = None
+        fixup_commit = None
+        fixup_encoding = None
+        author = (
+            parsed_args.author.encode("utf-8")
+            if parsed_args.author is not None
+            else None
+        )
         source = (
             parsed_args.reuse_message
             if parsed_args.reuse_message is not None
             else parsed_args.reedit_message
         )
-        if source is not None:
+        if parsed_args.fixup is not None:
+            if source is not None:
+                parser.error("--fixup cannot be combined with -C or -c")
+            if parsed_args.fixup.startswith(("amend:", "reword:")):
+                parser.error("only plain --fixup=COMMIT is supported")
+            with porcelain.open_repo_closing(None) as repo:
+                fixup_commit = parse_commit(repo, parsed_args.fixup)
+                config = porcelain._config_stack(repo)
+                if author is None and parsed_args.amend:
+                    # Fixup amend uses current authorship rather than HEAD's author.
+                    author = get_user_identity(config, kind="AUTHOR")
+                with contextlib.suppress(KeyError):
+                    fixup_encoding = config.get((b"i18n",), b"commitEncoding")
+        elif source is not None:
             with porcelain.open_repo_closing(None) as repo:
                 reused_commit = parse_commit(repo, source)
 
-        if reused_commit is not None:
+        if fixup_commit is not None:
+            message = _get_fixup_message(fixup_commit, parsed_args.message or [])
+        elif reused_commit is not None:
             if parsed_args.reedit_message is not None:
                 initial_message = reused_commit.message
 
@@ -2411,8 +2460,8 @@ class cmd_commit(Command):
                 message = get_reused_message
             else:
                 message = reused_commit.message
-        elif parsed_args.message:
-            message = parsed_args.message
+        elif any(parsed_args.message or []):
+            message = "\n\n".join(parsed_args.message)
         elif parsed_args.amend:
             # For amend, create a callable that opens editor with original message pre-populated
             def get_amend_message(repo: Repo | None, commit: Commit | None) -> bytes:
@@ -2440,8 +2489,8 @@ class cmd_commit(Command):
             porcelain.commit(
                 None,
                 message=message,
-                author=parsed_args.author.encode("utf-8")
-                if parsed_args.author is not None
+                author=author
+                if author is not None
                 else reused_commit.author
                 if reused_commit is not None
                 else None,
@@ -2451,7 +2500,9 @@ class cmd_commit(Command):
                 author_timezone=reused_commit.author_timezone
                 if reused_commit is not None
                 else None,
-                encoding=reused_commit.encoding if reused_commit is not None else None,
+                encoding=reused_commit.encoding
+                if reused_commit is not None
+                else fixup_encoding,
                 all=parsed_args.all,
                 amend=parsed_args.amend,
             )

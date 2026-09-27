@@ -1246,6 +1246,11 @@ class DiskRefsContainer(RefsContainer):
             realname = realnames[-1]
         except (KeyError, IndexError, SymrefLoop):
             realname = name
+        # follow() copies a symref target into realname verbatim, so the
+        # resolved name may escape the ref store even though name itself was
+        # checked above. Validate it before building the on-disk path, as
+        # add_if_new already does.
+        self._check_refname(realname)
         filename = self.refpath(realname)
 
         # make sure none of the ancestor folders is in packed refs
@@ -1881,6 +1886,9 @@ class locked_ref:
         except (KeyError, IndexError, SymrefLoop):
             self._realname = self._refname
 
+        # The resolved symref target can escape the ref store; validate it
+        # before opening its on-disk path, matching set_if_equals/add_if_new.
+        self._refs_container._check_refname(self._realname)
         filename = self._refs_container.refpath(self._realname)
         ensure_dir_exists(os.path.dirname(filename))
         f = GitFile(filename, "wb")

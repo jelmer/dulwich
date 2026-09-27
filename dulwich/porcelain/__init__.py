@@ -153,6 +153,7 @@ __all__ = [
     "gc",
     "get_branch_merge",
     "get_branch_remote",
+    "get_fixup_message",
     "get_object_by_path",
     "get_remote_repo",
     "get_tree_changes",
@@ -2369,6 +2370,34 @@ def commit_encode(
     else:
         encoding = default_encoding
     return contents.encode(encoding)
+
+
+def get_fixup_message(commit: Commit, messages: Sequence[str] = ()) -> str:
+    """Build a plain fixup message for a commit.
+
+    Args:
+      commit: Commit whose first subject paragraph is used
+      messages: Additional message paragraphs
+    Returns: Fixup message with a trailing newline
+    """
+    subject: list[str] = []
+    for line in commit_decode(commit, commit.message).split("\n"):
+        line = line.rstrip(" \t\r\v\f")
+        if not line:
+            if subject:
+                break
+            continue
+        subject.append(line)
+
+    message = "fixup! " + " ".join(subject)
+    if messages:
+        message += "\n\n" + "\n\n".join(messages)
+    lines: list[str] = []
+    for line in message.split("\n"):
+        line = line.rstrip(" \t\r\v\f")
+        if line or (lines and lines[-1]):
+            lines.append(line)
+    return "\n".join(lines).rstrip("\n") + "\n"
 
 
 class _TextStream(TypingProtocol):

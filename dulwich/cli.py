@@ -2348,28 +2348,6 @@ class cmd_config(Command):
         return 1
 
 
-def _get_fixup_message(commit: Commit, messages: Sequence[str]) -> str:
-    """Build a plain fixup message from the first nonempty subject paragraph."""
-    subject: list[str] = []
-    for line in porcelain.commit_decode(commit, commit.message).split("\n"):
-        line = line.rstrip(" \t\r\v\f")
-        if not line:
-            if subject:
-                break
-            continue
-        subject.append(line)
-
-    message = "fixup! " + " ".join(subject)
-    if messages:
-        message += "\n\n" + "\n\n".join(messages)
-    lines: list[str] = []
-    for line in message.split("\n"):
-        line = line.rstrip(" \t\r\v\f")
-        if line or (lines and lines[-1]):
-            lines.append(line)
-    return "\n".join(lines).rstrip("\n") + "\n"
-
-
 class cmd_commit(Command):
     """Record changes to the repository."""
 
@@ -2381,7 +2359,7 @@ class cmd_commit(Command):
         """
         parser = argparse.ArgumentParser()
         messages = parser.add_mutually_exclusive_group()
-        messages.add_argument("--message", "-m", action="append", help="Commit message")
+        parser.add_argument("--message", "-m", action="append", help="Commit message")
         messages.add_argument(
             "--reuse-message",
             "-C",
@@ -2394,7 +2372,7 @@ class cmd_commit(Command):
             metavar="COMMIT",
             help="Reuse authorship and edit a commit's message",
         )
-        parser.add_argument(
+        messages.add_argument(
             "--fixup",
             metavar="COMMIT",
             help="Create a plain fixup commit for autosquash",
@@ -2412,6 +2390,13 @@ class cmd_commit(Command):
             help="Replace the tip of the current branch by creating a new commit",
         )
         parsed_args = parser.parse_args(args)
+        source = (
+            parsed_args.reuse_message
+            if parsed_args.reuse_message is not None
+            else parsed_args.reedit_message
+        )
+        if source is not None and parsed_args.message is not None:
+            parser.error("-m cannot be combined with -C or -c")
 
         message: bytes | str | Callable[[Repo | None, Commit | None], bytes]
         reused_commit = None
@@ -2422,14 +2407,7 @@ class cmd_commit(Command):
             if parsed_args.author is not None
             else None
         )
-        source = (
-            parsed_args.reuse_message
-            if parsed_args.reuse_message is not None
-            else parsed_args.reedit_message
-        )
         if parsed_args.fixup is not None:
-            if source is not None:
-                parser.error("--fixup cannot be combined with -C or -c")
             if parsed_args.fixup.startswith(("amend:", "reword:")):
                 parser.error("only plain --fixup=COMMIT is supported")
             with porcelain.open_repo_closing(None) as repo:
@@ -2445,7 +2423,9 @@ class cmd_commit(Command):
                 reused_commit = parse_commit(repo, source)
 
         if fixup_commit is not None:
-            message = _get_fixup_message(fixup_commit, parsed_args.message or [])
+            message = porcelain.get_fixup_message(
+                fixup_commit, parsed_args.message or []
+            )
         elif reused_commit is not None:
             if parsed_args.reedit_message is not None:
                 initial_message = reused_commit.message

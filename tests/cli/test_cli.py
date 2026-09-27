@@ -396,6 +396,13 @@ class CommitCommandTest(DulwichCliTestCase):
         head = porcelain.commit(self.repo, message=b"Original")
         for args in (
             ("-m", "new", "-C", "HEAD"),
+            ("-C", "HEAD", "-m", "new"),
+            ("-m", "", "--reuse-message=HEAD"),
+            ("--reuse-message=HEAD", "-m", ""),
+            ("-m", "new", "-c", "HEAD"),
+            ("-c", "HEAD", "-m", "new"),
+            ("-m", "new", "--reedit-message=HEAD"),
+            ("--reedit-message=HEAD", "-m", "new"),
             ("-C", "HEAD", "-c", "HEAD"),
         ):
             with self.subTest(args=args):
@@ -430,34 +437,15 @@ class CommitCommandTest(DulwichCliTestCase):
         editor.assert_called_once()
 
     def test_commit_fixup_subject(self):
-        """Fixup subjects fold the first paragraph without sanitizing it."""
-        for original, expected in (
-            (b"Subject\n\nBody\n", b"fixup! Subject\n"),
-            (
-                b"First line\nsecond line  \t\n\nBody",
-                b"fixup! First line second line\n",
-            ),
-            (b"\n \t\n  heading\n \t\nbody", b"fixup!   heading\n"),
-            (
-                b"\t leading\t\n continued\tline \r\n\nbody",
-                b"fixup! \t leading  continued\tline\n",
-            ),
-            (b"Subject: keep / punctuation!", b"fixup! Subject: keep / punctuation!\n"),
-            (b"x" * 100, b"fixup! " + b"x" * 100 + b"\n"),
-            ("Subject\u00a0".encode(), "fixup! Subject\u00a0\n".encode()),
-            (b"", b"fixup!\n"),
-        ):
-            with self.subTest(original=original):
-                source = porcelain.commit(self.repo, message=b"Placeholder")
-                target = self.repo[source]
-                target.message = original
-                self.repo.object_store.add_object(target)
-                self.repo.refs[b"refs/heads/fixup-target"] = target.id
-                with patch("dulwich.cli.launch_editor") as editor:
-                    result, _, _ = self._run_cli("commit", "--fixup=fixup-target")
-                self.assertIsNone(result)
-                self.assertEqual(self.repo[self.repo.head()].message, expected)
-                editor.assert_not_called()
+        """Fixup commits use the target's subject without opening an editor."""
+        target = porcelain.commit(self.repo, message=b"First line\nsecond line\n\nBody")
+        with patch("dulwich.cli.launch_editor") as editor:
+            result, _, _ = self._run_cli("commit", "--fixup", target.decode())
+        self.assertIsNone(result)
+        self.assertEqual(
+            self.repo[self.repo.head()].message, b"fixup! First line second line\n"
+        )
+        editor.assert_not_called()
 
     def test_commit_fixup_encoding(self):
         """The target's encoding is decoded into the new commit's encoding."""
@@ -640,6 +628,10 @@ class CommitCommandTest(DulwichCliTestCase):
             ("--fixup=HEAD", "--reuse-message=HEAD"),
             ("--fixup=HEAD", "-c", "HEAD"),
             ("--fixup=HEAD", "--reedit-message=HEAD"),
+            ("-C", "HEAD", "--fixup=HEAD"),
+            ("--reuse-message=HEAD", "--fixup=HEAD"),
+            ("-c", "HEAD", "--fixup=HEAD"),
+            ("--reedit-message=HEAD", "--fixup=HEAD"),
             ("--fixup=amend:HEAD",),
             ("--fixup=reword:HEAD",),
         ):

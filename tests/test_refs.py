@@ -47,6 +47,7 @@ from dulwich.refs import (
     local_branch_name,
     local_replace_name,
     local_tag_name,
+    locked_ref,
     parse_remote_ref,
     parse_symref_value,
     read_packed_refs,
@@ -614,6 +615,38 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(None, self._refs.read_loose_ref(b"../secret"))
         self.assertRaises(KeyError, lambda: self._refs[b"../secret"])
         self.assertEqual(None, self._refs.read_loose_ref(b"/etc/passwd"))
+
+    def test_set_if_equals_symref_target_escape(self) -> None:
+        # A loose symref whose target escapes the ref store must not let a
+        # ref update write outside it. read_loose_ref and add_if_new already
+        # validate the resolved name; set_if_equals must too.
+        outside = os.path.join(os.path.dirname(self._repo.path), "escape")
+        self.assertFalse(os.path.exists(outside))
+        evil = os.path.join(self._refs.path, b"refs", b"heads", b"evil")
+        with open(evil, "wb") as f:
+            f.write(b"ref: ../../../escape\n")
+        self.assertRaises(
+            errors.RefFormatError,
+            self._refs.set_if_equals,
+            b"refs/heads/evil",
+            None,
+            b"1" * 40,
+        )
+        self.assertFalse(os.path.exists(outside))
+
+    def test_locked_ref_symref_target_escape(self) -> None:
+        outside = os.path.join(os.path.dirname(self._repo.path), "escape")
+        self.assertFalse(os.path.exists(outside))
+        evil = os.path.join(self._refs.path, b"refs", b"heads", b"evil")
+        with open(evil, "wb") as f:
+            f.write(b"ref: ../../../escape\n")
+
+        def acquire() -> None:
+            with locked_ref(self._refs, b"refs/heads/evil"):
+                pass
+
+        self.assertRaises(errors.RefFormatError, acquire)
+        self.assertFalse(os.path.exists(outside))
 
     def test_delete_refs_container(self) -> None:
         # We shouldn't delete the refs directory

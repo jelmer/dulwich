@@ -1,10 +1,7 @@
 1.2.16	UNRELEASED
 
- * Preserve the source URL in remote origin configuration when cloning,
-   matching git behavior. Cloning with an scp-style URL like
-   ``git@github.com:owner/repo.git`` previously stored a synthesized
-   ``ssh://...`` URL that broke subsequent fetches against servers that do
-   not accept tilde paths. (Suprovo Ghosh, #2428)
+ * Preserve original URL in remote origin configuration when cloning,
+   matching C git behavior. (Suprovo Ghosh, #2428)
 
  * Fix a crash in ``dulwich log <path>`` on merge commits where the path is
    unchanged relative to one parent. ``tree_changes_for_merge`` reports

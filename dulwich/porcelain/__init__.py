@@ -3283,7 +3283,9 @@ def reset(
                     sha=entry.sha,
                     flags=0,
                 )
-                index[entry.path] = index_entry
+                # Use set_verbatim so case-differing tree entries aren't
+                # folded together under core.ignorecase.
+                index.set_verbatim(entry.path, index_entry)
 
             # Write the updated index
             index.write()

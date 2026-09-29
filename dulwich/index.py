@@ -1411,7 +1411,8 @@ class Index:
             )
             self._version = version
             self._extensions = extensions
-            self.update(entries)
+            for name, value in entries.items():
+                self.set_verbatim(name, value)
             # Extensions have already been read by read_index_dict_with_version
             checksum_reader.check_checksum(allow_empty=True)
         finally:
@@ -1485,6 +1486,23 @@ class Index:
         is_new = name not in self._byname
         self._byname[name] = value
         if is_new and self._normalized is not None:
+            assert self._path_normalizer is not None
+            self._normalized.setdefault(self._path_normalizer(name), name)
+
+    def set_verbatim(
+        self, name: bytes, value: IndexEntry | ConflictedIndexEntry
+    ) -> None:
+        """Set an entry without folding onto an existing normalized key.
+
+        Use this when populating the index from an authoritative source
+        that may legitimately hold two entries whose paths only differ by
+        case (or NFD/NFC form), such as an on-disk index or a tree from
+        the object store. ``__setitem__`` would collapse the second entry
+        onto the first via the path normalizer, losing content.
+        """
+        assert isinstance(name, bytes)
+        self._byname[name] = value
+        if self._normalized is not None:
             assert self._path_normalizer is not None
             self._normalized.setdefault(self._path_normalizer(name), name)
 

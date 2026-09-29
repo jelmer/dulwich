@@ -4462,6 +4462,41 @@ class ResetTests(PorcelainTestCase):
         with open(fullpath) as f:
             self.assertEqual(f.read(), "MODIFIED")
 
+    def test_mixed_reset_preserves_case_differing_entries(self) -> None:
+        # Build a commit whose tree holds two blobs whose paths only differ
+        # by case. Real git creates these in a case-insensitive repo via
+        # ``git update-index --cacheinfo``; here we assemble the objects
+        # directly so the test is platform-independent.
+        config = self.repo.get_config()
+        config.set((b"core",), b"ignorecase", b"true")
+        config.write_to_path()
+
+        blob_upper = Blob.from_string(b"AAA")
+        blob_lower = Blob.from_string(b"BBB")
+        self.repo.object_store.add_object(blob_upper)
+        self.repo.object_store.add_object(blob_lower)
+
+        tree = Tree()
+        tree.add(b"Foo.py", 0o100644, blob_upper.id)
+        tree.add(b"foo.py", 0o100644, blob_lower.id)
+        self.repo.object_store.add_object(tree)
+
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = commit.committer = b"Test <test@example.com>"
+        commit.author_time = commit.commit_time = 0
+        commit.author_timezone = commit.commit_timezone = 0
+        commit.message = b"case-differing entries"
+        self.repo.object_store.add_object(commit)
+        self.repo.refs[b"HEAD"] = commit.id
+
+        porcelain.reset(self.repo, "mixed", commit.id)
+
+        index = self.repo.open_index()
+        self.assertEqual([b"Foo.py", b"foo.py"], sorted(index))
+        self.assertEqual(blob_upper.id, index[b"Foo.py"].sha)
+        self.assertEqual(blob_lower.id, index[b"foo.py"].sha)
+
     def test_soft_reset(self) -> None:
         # Create initial commit
         fullpath = os.path.join(self.repo.path, "foo")

@@ -215,7 +215,11 @@ class Stash:
                 except FileNotFoundError:
                     # File doesn't exist yet, use dummy stats
                     st = os.stat_result((tree_entry.mode, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-                repo_index[tree_entry.path] = index_entry_from_stat(st, tree_entry.sha)
+                # Tree paths are authoritative; use set_verbatim so
+                # case-differing entries aren't folded together.
+                repo_index.set_verbatim(
+                    tree_entry.path, index_entry_from_stat(st, tree_entry.sha)
+                )
 
         # Apply working tree changes from the stash
         safe_prefix: list[bytes] = []

@@ -1762,6 +1762,52 @@ class CloneTests(PorcelainTestCase):
         self.addCleanup(r.close)
         self.assertEqual(r.path, target_path)
 
+    def test_clone_scp_url_stores_original_url(self) -> None:
+        from dulwich.client import LocalGitClient
+
+        real = porcelain.get_transport_and_path
+
+        def get_transport_and_path(location, **kwargs):
+            client = LocalGitClient()
+            return client, self.repo.path
+
+        porcelain.get_transport_and_path = get_transport_and_path
+        self.addCleanup(setattr, porcelain, "get_transport_and_path", real)
+
+        target_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_dir)
+        target = os.path.join(target_dir, "clone")
+        scp_url = "git@github.com:octocat/Hello-World.git"
+        with porcelain.clone(scp_url, target) as r:
+            config = r.get_config()
+            self.assertEqual(
+                b"git@github.com:octocat/Hello-World.git",
+                config.get((b"remote", b"origin"), b"url"),
+            )
+
+    def test_clone_bytes_url_stores_original_url(self) -> None:
+        from dulwich.client import LocalGitClient
+
+        real = porcelain.get_transport_and_path
+
+        def get_transport_and_path(location, **kwargs):
+            client = LocalGitClient()
+            return client, self.repo.path
+
+        porcelain.get_transport_and_path = get_transport_and_path
+        self.addCleanup(setattr, porcelain, "get_transport_and_path", real)
+
+        target_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, target_dir)
+        target = os.path.join(target_dir, "clone")
+        source = b"git@github.com:octocat/Hello-World.git"
+        with porcelain.clone(source, target) as r:
+            config = r.get_config()
+            self.assertEqual(
+                b"git@github.com:octocat/Hello-World.git",
+                config.get((b"remote", b"origin"), b"url"),
+            )
+
 
 class InitTests(TestCase):
     def test_non_bare(self) -> None:

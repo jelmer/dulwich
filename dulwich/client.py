@@ -1450,6 +1450,7 @@ class GitClient:
         filter_spec: bytes | None = None,
         protocol_version: int | None = None,
         bundle_uri: str | None = None,
+        origin_url: str | bytes | None = None,
     ) -> Repo:
         """Clone a repository.
 
@@ -1470,6 +1471,8 @@ class GitClient:
             This can be a URL to a bundle file or a bundle list.
             Using a bundle URI can speed up the clone by downloading
             pre-computed pack data.
+          origin_url: Optional original URL or location for the remote
+            configuration (defaults to synthesized URL from path).
 
         Returns:
           The newly created Repo object
@@ -1493,7 +1496,13 @@ class GitClient:
                 target = Repo.init_bare(target_path)
 
             # TODO(jelmer): abstract method for get_location?
-            if isinstance(self, LocalGitClient | SubprocessGitClient):
+            if origin_url is not None:
+                encoded_path = (
+                    origin_url.encode("utf-8")
+                    if isinstance(origin_url, str)
+                    else origin_url
+                )
+            elif isinstance(self, LocalGitClient | SubprocessGitClient):
                 encoded_path = path.encode("utf-8")
             else:
                 encoded_path = self.get_url(path).encode("utf-8")
@@ -3246,6 +3255,7 @@ class LocalGitClient(GitClient):
         filter_spec: bytes | None = None,
         protocol_version: int | None = None,
         bundle_uri: str | None = None,
+        origin_url: str | bytes | None = None,
     ) -> Repo:
         """Clone a local repository.
 
@@ -3275,7 +3285,14 @@ class LocalGitClient(GitClient):
                     raise ValueError("checkout and bare are incompatible")
                 target = Repo.init_bare(target_path, object_format=object_format_name)
 
-            encoded_path = path.encode("utf-8")
+            if origin_url is not None:
+                encoded_path = (
+                    origin_url.encode("utf-8")
+                    if isinstance(origin_url, str)
+                    else origin_url
+                )
+            else:
+                encoded_path = path.encode("utf-8")
 
             assert target is not None
             if origin is not None:

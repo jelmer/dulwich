@@ -1,5 +1,8 @@
 1.2.16	UNRELEASED
 
+ * Preserve original URL in remote origin configuration when cloning,
+   matching C git behavior. (Suprovo Ghosh, #2428)
+
  * Preserve index entries that differ only by case when loading the index,
    resetting mixed, or restoring a stashed index tree under core.ignorecase.
    (Jelmer Vernooĳ, #2434)

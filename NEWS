@@ -1,5 +1,9 @@
 1.2.16	UNRELEASED
 
+ * Preserve index entries that differ only by case when loading the index,
+   resetting mixed, or restoring a stashed index tree under core.ignorecase.
+   (Jelmer Vernooĳ, #2434)
+
  * Fix a crash in ``dulwich log <path>`` on merge commits where the path is
    unchanged relative to one parent. ``tree_changes_for_merge`` reports
    ``None`` for such parents, which the walker and the ``--name-status`` and

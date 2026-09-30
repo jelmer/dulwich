@@ -338,6 +338,7 @@ if TYPE_CHECKING:
     from ..filter_branch import CommitData
     from ..gc import GCStats
     from ..maintenance import MaintenanceResult
+    from ..merge import MergeConflictInfo
     from ..objects import RawObjectID
 from ..archive import tar_stream
 from ..bisect import BisectState
@@ -7177,6 +7178,55 @@ def write_tree(repo: RepoPath | None = None) -> bytes:
         return r.open_index(config=r.get_config_stack()).commit(r.object_store)
 
 
+def _record_merge_conflicts(
+    r: Repo,
+    conflict_info: "Mapping[bytes, MergeConflictInfo]",
+    merge_commit_id: ObjectID,
+    message: bytes | str | None,
+) -> None:
+    """Rewrite the index and merge state files for a conflicted merge.
+
+    For each conflicted path, replace the index entry with stage 1/2/3
+    entries describing the ancestor, ours, and theirs blobs. Also write
+    MERGE_HEAD and MERGE_MSG so ``git commit`` can pick up where dulwich
+    left off.
+    """
+    from ..index import ConflictedIndexEntry, IndexEntry
+
+    def entry(mode: int | None, sha: ObjectID | None) -> IndexEntry | None:
+        if mode is None or sha is None:
+            return None
+        return IndexEntry(
+            ctime=(0, 0),
+            mtime=(0, 0),
+            dev=0,
+            ino=0,
+            mode=mode,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=sha,
+        )
+
+    index = r.open_index()
+    for path, info in conflict_info.items():
+        index[path] = ConflictedIndexEntry(
+            ancestor=entry(*info.ancestor),
+            this=entry(*info.ours),
+            other=entry(*info.theirs),
+        )
+    index.write()
+
+    with open(os.path.join(r.controldir(), "MERGE_HEAD"), "wb") as f:
+        f.write(merge_commit_id + b"\n")
+    if message is None:
+        msg_bytes = f"Merge commit '{merge_commit_id.decode()[:7]}'\n".encode()
+    else:
+        msg_bytes = message.encode() if isinstance(message, str) else message
+    with open(os.path.join(r.controldir(), "MERGE_MSG"), "wb") as f:
+        f.write(msg_bytes)
+
+
 def _do_merge(
     r: Repo,
     merge_commit_id: ObjectID,
@@ -7204,7 +7254,7 @@ def _do_merge(
       if no_commit=True or there were conflicts
     """
     from ..graph import find_merge_base
-    from ..merge import recursive_merge
+    from ..merge import Merger, recursive_merge
 
     # Get HEAD commit
     try:
@@ -7253,8 +7303,15 @@ def _do_merge(
     # Perform recursive merge (handles multiple merge bases automatically)
     gitattributes = r.get_gitattributes()
     config = r.get_config()
+    merger = Merger(r.object_store, gitattributes, config)
     merged_tree, conflicts = recursive_merge(
-        r.object_store, merge_bases, head_commit, merge_commit, gitattributes, config
+        r.object_store,
+        merge_bases,
+        head_commit,
+        merge_commit,
+        gitattributes,
+        config,
+        merger=merger,
     )
 
     # Add merged tree to object store
@@ -7270,8 +7327,13 @@ def _do_merge(
         config=r.get_config_stack(),
     )
 
-    if conflicts or no_commit:
-        # Don't create a commit if there are conflicts or no_commit is True
+    if conflicts:
+        # Rewrite the index so conflicted paths carry stage 1/2/3 entries and
+        # record MERGE_HEAD/MERGE_MSG so `git commit` can finish the merge.
+        _record_merge_conflicts(r, merger.conflict_info, merge_commit_id, message)
+        return (None, conflicts)
+
+    if no_commit:
         return (None, conflicts)
 
     # Create merge commit

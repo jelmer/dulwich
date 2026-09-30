@@ -2983,6 +2983,15 @@ class HookCommandTest(DulwichCliTestCase):
         self.assertIsNone(result)
         self.assertTrue(os.path.exists(marker))
 
+    def test_hook_run_pre_commit_rejects_args(self):
+        self._install_hook("pre-commit", "#!/bin/sh\nexit 0\n")
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, _stdout, _stderr = self._run_cli(
+                "hook", "run", "pre-commit", "unexpected"
+            )
+            self.assertEqual(result, 1)
+            self.assertIn("pre-commit takes no arguments", "\n".join(cm.output))
+
     def test_hook_run_post_commit(self):
         marker = os.path.join(self.repo_path, "post-commit-ran")
         self._install_hook("post-commit", f'#!/bin/sh\ntouch "{marker}"\n')
@@ -3004,6 +3013,7 @@ class HookCommandTest(DulwichCliTestCase):
             self.assertEqual(f.read(), "Initial commit\nSigned-off-by: Test User\n")
 
     def test_hook_run_commit_msg_requires_file(self):
+        self._install_hook("commit-msg", "#!/bin/sh\nexit 0\n")
         with self.assertLogs("dulwich.cli", level="ERROR") as cm:
             result, _stdout, _stderr = self._run_cli("hook", "run", "commit-msg")
             self.assertEqual(result, 1)
@@ -3022,10 +3032,23 @@ class HookCommandTest(DulwichCliTestCase):
         self.assertIn("stderr output", stderr_text)
 
     def test_hook_run_update_wrong_args(self):
+        self._install_hook("update", "#!/bin/sh\nexit 0\n")
         with self.assertLogs("dulwich.cli", level="ERROR") as cm:
             result, _stdout, _stderr = self._run_cli("hook", "run", "update")
             self.assertEqual(result, 1)
             self.assertIn("update takes three arguments", "\n".join(cm.output))
+
+    def test_hook_run_missing_errors(self):
+        with self.assertLogs("dulwich.cli", level="ERROR") as cm:
+            result, _stdout, _stderr = self._run_cli("hook", "run", "pre-commit")
+            self.assertEqual(result, 1)
+            self.assertIn("cannot find a hook named pre-commit", "\n".join(cm.output))
+
+    def test_hook_run_missing_ignored(self):
+        result, _stdout, _stderr = self._run_cli(
+            "hook", "run", "--ignore-missing", "pre-commit"
+        )
+        self.assertIsNone(result)
 
     def test_hook_run_unsupported(self):
         with self.assertLogs("dulwich.cli", level="ERROR") as cm:

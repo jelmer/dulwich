@@ -1,5 +1,9 @@
 1.2.16	UNRELEASED
 
+ * Honour `GIT_OPTIONAL_LOCKS=0` in `dulwich status`, skipping the
+   index stat-cache refresh that would otherwise lock the index.
+   (Jelmer Vernooĳ, #1861)
+
  * Preserve original URL in remote origin configuration when cloning,
    matching C git behavior. (Suprovo Ghosh, #2428)
 

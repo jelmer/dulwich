@@ -3435,6 +3435,7 @@ def _check_entry_for_changes(
     filter_blob_callback: Callable[[Blob, bytes], Blob] | None = None,
     trust_ctime: bool = True,
     object_format: ObjectFormat = DEFAULT_OBJECT_FORMAT,
+    refresh_stat: list[tuple[bytes, os.stat_result]] | None = None,
 ) -> bytes | None:
     """Check a single index entry for changes.
 
@@ -3445,6 +3446,9 @@ def _check_entry_for_changes(
       filter_blob_callback: Optional callback to filter blobs
       trust_ctime: If True, use ctime for change detection (default: True)
       object_format: Object format to hash the working tree blob with
+      refresh_stat: If provided, entries with drifted stat but matching
+        content have their (tree_path, stat_result) appended so the
+        caller can update the index stat cache in a single pass.
     Returns: tree_path if changed, None otherwise
     """
     if isinstance(entry, ConflictedIndexEntry):
@@ -3483,6 +3487,8 @@ def _check_entry_for_changes(
     else:
         if blob.get_id(object_format) != entry.sha:
             return tree_path
+        if refresh_stat is not None:
+            refresh_stat.append((tree_path, st))
     return None
 
 
@@ -3493,6 +3499,7 @@ def get_unstaged_changes(
     preload_index: bool = False,
     trust_ctime: bool = True,
     max_stat: int | None = None,
+    refresh_stat: list[tuple[bytes, os.stat_result]] | None = None,
 ) -> Generator[bytes, None, None]:
     """Walk through an index and check for differences against working tree.
 
@@ -3504,6 +3511,10 @@ def get_unstaged_changes(
       trust_ctime: If True, use ctime for change detection (default: True)
       max_stat: If set, limit the number of stat operations performed.
         When the limit is reached, remaining files are assumed unchanged.
+      refresh_stat: If provided, entries whose stat has drifted but whose
+        content is unchanged are appended as ``(tree_path, stat_result)``
+        pairs so the caller can update the index stat cache without a
+        second pass.
     Returns: iterator over paths with unstaged changes
     """
     # For each entry in the index check the sha1 & ensure not staged
@@ -3531,6 +3542,12 @@ def get_unstaged_changes(
             # Use number of CPUs but cap at 8 threads to avoid overhead
             num_workers = min(multiprocessing.cpu_count(), 8)
 
+            # Per-thread refresh accumulators so appends stay lock-free,
+            # then merged into the caller's list once workers finish.
+            worker_refresh: list[list[tuple[bytes, os.stat_result]] | None] = [
+                [] if refresh_stat is not None else None for _ in entries
+            ]
+
             # Process entries in parallel
             with ThreadPoolExecutor(max_workers=num_workers) as executor:
                 # Submit all tasks
@@ -3543,8 +3560,9 @@ def get_unstaged_changes(
                         filter_blob_callback,
                         trust_ctime,
                         index.object_format,
+                        worker_refresh[i],
                     )
-                    for tree_path, entry in entries
+                    for i, (tree_path, entry) in enumerate(entries)
                 ]
 
                 # Yield results as they complete
@@ -3552,6 +3570,11 @@ def get_unstaged_changes(
                     result = future.result()
                     if result is not None:
                         yield result
+
+            if refresh_stat is not None:
+                for bucket in worker_refresh:
+                    if bucket:
+                        refresh_stat.extend(bucket)
 
     if not preload_index:
         # Serial processing
@@ -3565,6 +3588,7 @@ def get_unstaged_changes(
                 filter_blob_callback,
                 trust_ctime,
                 index.object_format,
+                refresh_stat,
             )
             stat_count += 1
             if result is not None:
@@ -3822,6 +3846,29 @@ def refresh_index(index: Index, root_path: bytes) -> None:
     ):
         if entry:
             index[path] = entry
+
+
+def apply_stat_refresh(
+    index: Index, refreshed: Iterable[tuple[bytes, os.stat_result]]
+) -> bool:
+    """Apply refreshed stat info collected during an index walk.
+
+    ``refreshed`` should be the list populated by passing ``refresh_stat``
+    into `get_unstaged_changes`: it contains (tree_path, stat_result)
+    pairs for entries whose on-disk stat drifted but whose content still
+    matches the index entry sha.
+
+    Returns True if any entries were updated (caller may want to write
+    the index).
+    """
+    updated = False
+    for tree_path, st in refreshed:
+        entry = index[tree_path]
+        if isinstance(entry, ConflictedIndexEntry):
+            continue
+        index[tree_path] = index_entry_from_stat(st, entry.sha, mode=entry.mode)
+        updated = True
+    return updated
 
 
 class locked_index:

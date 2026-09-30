@@ -64,6 +64,7 @@ from dulwich.index import (
     _has_dos_drive_prefix,
     _is_reserved_windows_device_name,
     _tree_to_fs_path,
+    apply_stat_refresh,
     build_index_from_tree,
     cleanup_mode,
     commit_tree,
@@ -1696,6 +1697,63 @@ class GetUnstagedChangesTests(TestCase):
             # Neither should report changes since content is unchanged
             self.assertEqual(changes_with_ctime, [])
             self.assertEqual(changes_without_ctime, [])
+
+
+class StatRefreshTests(TestCase):
+    def _make_repo_with_file(self) -> tuple[Repo, str]:
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        repo = Repo.init(repo_dir)
+        self.addCleanup(repo.close)
+        fullpath = os.path.join(repo_dir, "foo")
+        with open(fullpath, "wb") as f:
+            f.write(b"stuff")
+        repo.get_worktree().stage(["foo"])
+        repo.get_worktree().commit(
+            message=b"initial",
+            committer=b"committer <email>",
+            author=b"author <email>",
+        )
+        return repo, fullpath
+
+    def test_collects_stat_drift(self) -> None:
+        repo, fullpath = self._make_repo_with_file()
+        os.utime(fullpath, (0, 0))
+        refresh: list[tuple[bytes, os.stat_result]] = []
+        list(get_unstaged_changes(repo.open_index(), repo.path, refresh_stat=refresh))
+        self.assertEqual([p for p, _ in refresh], [b"foo"])
+
+    def test_no_drift_no_collection(self) -> None:
+        repo, _ = self._make_repo_with_file()
+        refresh: list[tuple[bytes, os.stat_result]] = []
+        list(get_unstaged_changes(repo.open_index(), repo.path, refresh_stat=refresh))
+        self.assertEqual(refresh, [])
+
+    def test_modified_content_not_collected(self) -> None:
+        repo, fullpath = self._make_repo_with_file()
+        with open(fullpath, "wb") as f:
+            f.write(b"different")
+        refresh: list[tuple[bytes, os.stat_result]] = []
+        changes = list(
+            get_unstaged_changes(repo.open_index(), repo.path, refresh_stat=refresh)
+        )
+        self.assertEqual(changes, [b"foo"])
+        self.assertEqual(refresh, [])
+
+    def test_apply_stat_refresh_updates_index(self) -> None:
+        repo, fullpath = self._make_repo_with_file()
+        os.utime(fullpath, (0, 0))
+        index = repo.open_index()
+        stale_mtime = index[b"foo"].mtime
+        refresh: list[tuple[bytes, os.stat_result]] = []
+        list(get_unstaged_changes(index, repo.path, refresh_stat=refresh))
+        self.assertTrue(apply_stat_refresh(index, refresh))
+        self.assertNotEqual(index[b"foo"].mtime, stale_mtime)
+
+    def test_apply_stat_refresh_empty(self) -> None:
+        repo, _ = self._make_repo_with_file()
+        index = repo.open_index()
+        self.assertFalse(apply_stat_refresh(index, []))
 
 
 class TestValidatePathElement(TestCase):

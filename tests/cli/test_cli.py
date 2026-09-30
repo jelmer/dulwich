@@ -41,6 +41,7 @@ from dulwich import cli, porcelain
 from dulwich.cli import (
     AutoFlushBinaryIOWrapper,
     AutoFlushTextIOWrapper,
+    _optional_locks_enabled,
     _should_auto_flush,
     detect_terminal_width,
     format_bytes,
@@ -4699,6 +4700,25 @@ class GitFlushTest(TestCase):
 
         with wrapper as w:
             self.assertIs(w, wrapper)
+
+
+class OptionalLocksEnvTests(TestCase):
+    """Tests for GIT_OPTIONAL_LOCKS environment variable support."""
+
+    def test_unset(self):
+        self.assertTrue(_optional_locks_enabled(env={}))
+
+    def test_set_zero(self):
+        self.assertFalse(_optional_locks_enabled(env={"GIT_OPTIONAL_LOCKS": "0"}))
+
+    def test_set_one(self):
+        self.assertTrue(_optional_locks_enabled(env={"GIT_OPTIONAL_LOCKS": "1"}))
+
+    def test_set_zero_with_whitespace(self):
+        self.assertFalse(_optional_locks_enabled(env={"GIT_OPTIONAL_LOCKS": " 0 "}))
+
+    def test_empty_string(self):
+        self.assertTrue(_optional_locks_enabled(env={"GIT_OPTIONAL_LOCKS": ""}))
 
 
 class MaintenanceCommandTest(DulwichCliTestCase):

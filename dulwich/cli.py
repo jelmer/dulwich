@@ -7776,8 +7776,14 @@ class cmd_am(Command):
                 sys.stdout.write(sha.decode("ascii") + "\n")
 
 
+SUPPORTED_HOOKS = ("pre-commit", "post-commit", "commit-msg", "update")
+
+
 class cmd_hook_run(Command):
-    """Run hooks manually."""
+    """Run hooks manually.
+
+    Supported hooks: pre-commit, post-commit, commit-msg, update.
+    """
 
     def run(self, args: Sequence[str]) -> int | None:
         """Run a hook manually.
@@ -7785,27 +7791,47 @@ class cmd_hook_run(Command):
         Args:
             args: Command line arguments
         """
-        parser = argparse.ArgumentParser()
+        parser = argparse.ArgumentParser(
+            description="Run a git hook manually. "
+            f"Supported hooks: {', '.join(SUPPORTED_HOOKS)}."
+        )
+        parser.add_argument(
+            "--ignore-missing",
+            action="store_true",
+            help="Exit successfully when the hook is not installed",
+        )
         parser.add_argument("hook_name", help="Name of the hook to run")
         parser.add_argument(
-            "args", nargs=argparse.REMAINDER, help="Arguments to pass to the hook"
+            "hook_args", nargs="*", help="Arguments to pass to the hook"
         )
         parsed_args = parser.parse_args(args)
 
         hook_name = parsed_args.hook_name
-        hook_args = parsed_args.args
+        hook_args = parsed_args.hook_args
+
+        if hook_name not in SUPPORTED_HOOKS:
+            logger.error(f"unsupported hook: {hook_name}")
+            return 1
 
         try:
             with porcelain.open_repo_closing(None) as r:
                 controldir = r.controldir()
+                hook_path = os.path.join(controldir, "hooks", hook_name)
+                if not os.path.exists(hook_path):
+                    if parsed_args.ignore_missing:
+                        return None
+                    logger.error(f"cannot find a hook named {hook_name}")
+                    return 1
                 if hook_name == "pre-commit":
-                    PreCommitShellHook(r.path, controldir).execute(
-                        *(a.encode() for a in hook_args)
-                    )
+                    if hook_args:
+                        logger.error("pre-commit takes no arguments")
+                        return 1
+                    PreCommitShellHook(r.path, controldir).execute()
                 elif hook_name == "post-commit":
-                    PostCommitShellHook(controldir).execute(
-                        *(a.encode() for a in hook_args)
-                    )
+                    if hook_args:
+                        logger.error("post-commit takes no arguments")
+                        return 1
+                    PostCommitShellHook(controldir).execute()
                 elif hook_name == "commit-msg":
                     if len(hook_args) != 1:
                         logger.error(
@@ -7832,9 +7858,6 @@ class cmd_hook_run(Command):
                     )
                     sys.stdout.buffer.write(out)
                     sys.stderr.buffer.write(err)
-                else:
-                    logger.error(f"unsupported hook: {hook_name}")
-                    return 1
         except (HookError, OSError) as e:
             logger.error(f"error: {e}")
             return 1

@@ -119,6 +119,20 @@ def to_display_str(value: bytes | str) -> str:
     return value
 
 
+def _optional_locks_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """Check whether optional locks are enabled via GIT_OPTIONAL_LOCKS.
+
+    Args:
+        env: Environment variables dict (defaults to os.environ)
+
+    Returns:
+        False when GIT_OPTIONAL_LOCKS is set to "0", True otherwise.
+    """
+    if env is None:
+        env = os.environ
+    return env.get("GIT_OPTIONAL_LOCKS", "").strip() != "0"
+
+
 def _should_auto_flush(
     stream: TextIO | BinaryIO, env: Mapping[str, str] | None = None
 ) -> bool:
@@ -3560,7 +3574,9 @@ class cmd_status(Command):
             help="Display untracked files in columns",
         )
         parsed_args = parser.parse_args(args)
-        status = porcelain.status(parsed_args.gitdir)
+        status = porcelain.status(
+            parsed_args.gitdir, optional_locks=_optional_locks_enabled()
+        )
         if any(names for (kind, names) in status.staged.items()):
             sys.stdout.write("Changes to be committed:\n\n")
             for kind, names in status.staged.items():

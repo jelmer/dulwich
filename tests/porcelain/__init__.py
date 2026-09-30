@@ -8458,6 +8458,80 @@ class StatusTests(PorcelainTestCase):
         results = porcelain.status(self.repo)
         self.assertIsNotNone(results)
 
+    def test_status_refresh_stat_cache(self) -> None:
+        """Status refreshes the index stat cache for unchanged files."""
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("stuff")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"initial",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        # Rewrite the file with the same content but a different mtime.
+        # After this, the stat cache in the index no longer matches disk,
+        # even though the content sha is unchanged.
+        os.utime(fullpath, (0, 0))
+        index = self.repo.open_index()
+        entry = index[b"foo"]
+        stale_mtime = entry.mtime
+
+        results = porcelain.status(self.repo)
+        self.assertEqual([], results.unstaged)
+
+        # The refresh should have updated the mtime in the index.
+        index = self.repo.open_index()
+        self.assertNotEqual(index[b"foo"].mtime, stale_mtime)
+
+    def test_status_optional_locks_false_skips_refresh(self) -> None:
+        """When optional_locks=False, the index is not written back."""
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("stuff")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"initial",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+
+        os.utime(fullpath, (0, 0))
+        index_path = os.path.join(self.repo.controldir(), "index")
+        mtime_before = os.stat(index_path).st_mtime_ns
+
+        results = porcelain.status(self.repo, optional_locks=False)
+        self.assertEqual([], results.unstaged)
+
+        # The index file should not have been rewritten.
+        self.assertEqual(mtime_before, os.stat(index_path).st_mtime_ns)
+
+    @skipIf(sys.platform == "win32", "chmod semantics differ on Windows")
+    def test_status_tolerates_readonly_gitdir(self) -> None:
+        """Status does not fail when it cannot lock the index for refresh."""
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("stuff")
+        porcelain.add(repo=self.repo.path, paths=[fullpath])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"initial",
+            author=b"author <email>",
+            committer=b"committer <email>",
+        )
+        os.utime(fullpath, (0, 0))
+        gitdir = self.repo.controldir()
+        old_mode = os.stat(gitdir).st_mode
+        os.chmod(gitdir, 0o555)
+        try:
+            results = porcelain.status(self.repo)
+        finally:
+            os.chmod(gitdir, old_mode)
+        self.assertEqual([], results.unstaged)
+
 
 # TODO(jelmer): Add test for dulwich.porcelain.daemon
 

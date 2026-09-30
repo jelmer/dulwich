@@ -86,7 +86,14 @@ from .errors import (
     ApplyDeltaError,
     FileFormatException,
     GitProtocolError,
+    HookError,
     NotGitRepository,
+)
+from .hooks import (
+    CommitMsgShellHook,
+    PostCommitShellHook,
+    PreCommitShellHook,
+    UpdateShellHook,
 )
 from .index import Index, InvalidPathError
 from .log_utils import _configure_logging_from_trace
@@ -7776,6 +7783,102 @@ class cmd_am(Command):
                 sys.stdout.write(sha.decode("ascii") + "\n")
 
 
+SUPPORTED_HOOKS = ("pre-commit", "post-commit", "commit-msg", "update")
+
+
+class cmd_hook_run(Command):
+    """Run hooks manually.
+
+    Supported hooks: pre-commit, post-commit, commit-msg, update.
+    """
+
+    def run(self, args: Sequence[str]) -> int | None:
+        """Run a hook manually.
+
+        Args:
+            args: Command line arguments
+        """
+        parser = argparse.ArgumentParser(
+            description="Run a git hook manually. "
+            f"Supported hooks: {', '.join(SUPPORTED_HOOKS)}."
+        )
+        parser.add_argument(
+            "--ignore-missing",
+            action="store_true",
+            help="Exit successfully when the hook is not installed",
+        )
+        parser.add_argument("hook_name", help="Name of the hook to run")
+        parser.add_argument(
+            "hook_args", nargs="*", help="Arguments to pass to the hook"
+        )
+        parsed_args = parser.parse_args(args)
+
+        hook_name = parsed_args.hook_name
+        hook_args = parsed_args.hook_args
+
+        if hook_name not in SUPPORTED_HOOKS:
+            logger.error(f"unsupported hook: {hook_name}")
+            return 1
+
+        try:
+            with porcelain.open_repo_closing(None) as r:
+                controldir = r.controldir()
+                hook_path = os.path.join(controldir, "hooks", hook_name)
+                if not os.path.exists(hook_path):
+                    if parsed_args.ignore_missing:
+                        return None
+                    logger.error(f"cannot find a hook named {hook_name}")
+                    return 1
+                if hook_name == "pre-commit":
+                    if hook_args:
+                        logger.error("pre-commit takes no arguments")
+                        return 1
+                    PreCommitShellHook(r.path, controldir).execute()
+                elif hook_name == "post-commit":
+                    if hook_args:
+                        logger.error("post-commit takes no arguments")
+                        return 1
+                    PostCommitShellHook(controldir).execute()
+                elif hook_name == "commit-msg":
+                    if len(hook_args) != 1:
+                        logger.error(
+                            "commit-msg takes a single argument: "
+                            "the commit message file"
+                        )
+                        return 1
+                    with open(hook_args[0], "rb") as f:
+                        msg = f.read()
+                    new_msg = CommitMsgShellHook(controldir).execute(msg)
+                    if new_msg is not None:
+                        with open(hook_args[0], "wb") as f:
+                            f.write(new_msg)
+                elif hook_name == "update":
+                    if len(hook_args) != 3:
+                        logger.error(
+                            "update takes three arguments: "
+                            "<ref-name> <old-sha> <new-sha>"
+                        )
+                        return 1
+                    ref_name, old_sha, new_sha = (a.encode() for a in hook_args)
+                    out, err = UpdateShellHook(controldir).execute(
+                        ref_name, old_sha, new_sha
+                    )
+                    sys.stdout.buffer.write(out)
+                    sys.stderr.buffer.write(err)
+        except (HookError, OSError) as e:
+            logger.error(f"error: {e}")
+            return 1
+        return None
+
+
+class cmd_hook(SuperCommand):
+    """Manage git hooks."""
+
+    subcommands: ClassVar[dict[str, type[Command]]] = {
+        "run": cmd_hook_run,
+    }
+
+
 commands = {
     "add": cmd_add,
     "am": cmd_am,
@@ -7816,6 +7919,7 @@ commands = {
     "grep": cmd_grep,
     "hash-object": cmd_hash_object,
     "help": cmd_help,
+    "hook": cmd_hook,
     "init": cmd_init,
     "interpret-trailers": cmd_interpret_trailers,
     "lfs": cmd_lfs,

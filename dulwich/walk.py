@@ -45,8 +45,8 @@ from .diff_tree import (
     tree_changes,
     tree_changes_for_merge,
 )
-from .errors import MissingCommitError
-from .objects import Commit, ObjectID, Tag, Tree
+from .errors import MissingCommitError, NotTreeError
+from .objects import Commit, ObjectID, SubmoduleEncountered, Tag, Tree
 
 ORDER_DATE = "date"
 ORDER_TOPO = "topo"
@@ -237,7 +237,7 @@ class _CommitTimeQueue:
                 continue
             self._done.add(sha)
 
-            for parent_id in self._get_parents(commit):
+            for parent_id in self._walker._parents_to_follow(commit):
                 self._push(parent_id)
 
             reset_extra_commits = True
@@ -324,6 +324,7 @@ class Walker:
         until: int | None = None,
         get_parents: Callable[[Commit], list[ObjectID]] = lambda commit: commit.parents,
         queue_cls: type = _CommitTimeQueue,
+        simplify_history: bool = False,
     ) -> None:
         """Constructor.
 
@@ -350,6 +351,13 @@ class Walker:
           queue_cls: A class to use for a queue of commits, supporting the
             iterator protocol. The constructor takes a single argument, the
             Walker.
+          simplify_history: If True and paths is set, perform history
+            simplification: at a merge commit that is TREESAME to at least
+            one parent for the requested paths, follow only that parent
+            (matching git's default ``git log <path>``). The default is
+            False, matching ``git log --full-history <path>``. Ignored when
+            paths is None or when follow is set, since rename following
+            requires visiting all parents.
         """
         # Note: when adding arguments to this method, please also update
         # dulwich.repo.BaseRepo.get_walker
@@ -373,6 +381,7 @@ class Walker:
         self.follow = follow
         self.since = since
         self.until = until
+        self.simplify_history = simplify_history
 
         self._num_entries = 0
         self._queue = queue_cls(self)
@@ -392,6 +401,60 @@ class Walker:
             ):
                 return True
         return False
+
+    def _tree_entry_for_paths(
+        self, tree_id: ObjectID
+    ) -> tuple[tuple[bytes, int | None, ObjectID | None], ...]:
+        """Return a hashable snapshot of the tracked paths in a tree.
+
+        Two trees produce equal snapshots iff they agree on every tracked
+        path (both missing at a path counts as equal). Used for TREESAME
+        checks during history simplification.
+        """
+        assert self.paths is not None
+        try:
+            tree = self.store[tree_id]
+        except KeyError:
+            return tuple((path, None, None) for path in sorted(self.paths))
+        if not isinstance(tree, Tree):
+            return tuple((path, None, None) for path in sorted(self.paths))
+        entries: list[tuple[bytes, int | None, ObjectID | None]] = []
+        for path in sorted(self.paths):
+            try:
+                mode, sha = tree.lookup_path(self.store.__getitem__, path)
+            except (KeyError, SubmoduleEncountered, NotTreeError):
+                entries.append((path, None, None))
+            else:
+                entries.append((path, mode, sha))
+        return tuple(entries)
+
+    def _parents_to_follow(self, commit: Commit) -> list[ObjectID]:
+        """Return the parents of commit that the walk should descend into.
+
+        With ``simplify_history=True``, implements git's default history
+        simplification: at a merge commit that is TREESAME to at least one
+        parent for the requested paths, follow only that parent. Otherwise
+        returns all parents.
+        """
+        parents = self.get_parents(commit)
+        if (
+            not self.simplify_history
+            or self.follow
+            or self.paths is None
+            or len(parents) < 2
+        ):
+            return parents
+        commit_snapshot = self._tree_entry_for_paths(commit.tree)
+        for parent_id in parents:
+            try:
+                parent_commit = self.store[parent_id]
+            except KeyError:
+                continue
+            if not isinstance(parent_commit, Commit):
+                continue
+            if self._tree_entry_for_paths(parent_commit.tree) == commit_snapshot:
+                return [parent_id]
+        return parents
 
     def _change_matches(self, change: TreeChange | None) -> bool:
         assert self.paths

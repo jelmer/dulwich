@@ -1494,6 +1494,12 @@ class cmd_log(Command):
             action="store_true",
             help="Follow file renames",
         )
+        parser.add_argument(
+            "--full-history",
+            action="store_true",
+            help="Show every commit that touched the path, without git's "
+            "default history simplification",
+        )
         parser.add_argument("paths", nargs="*", help="Paths to show log for")
         parsed_args = parser.parse_args(args)
 
@@ -1519,6 +1525,7 @@ class cmd_log(Command):
                     stat=parsed_args.stat,
                     patch=parsed_args.patch,
                     follow=parsed_args.follow,
+                    full_history=parsed_args.full_history,
                     outstream=outstream,
                 )
 

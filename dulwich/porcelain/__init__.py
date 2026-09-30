@@ -2738,6 +2738,7 @@ def log(
     stat: bool = False,
     patch: bool = False,
     follow: bool = False,
+    full_history: bool = False,
 ) -> None:
     """Write commit logs.
 
@@ -2761,6 +2762,10 @@ def log(
       stat: Show diffstat for each commit
       patch: Show patch (diff) for each commit
       follow: Follow file renames
+      full_history: When paths is set, show every commit that touched the
+        path, matching ``git log --full-history <path>``. The default
+        applies git's history simplification, so at a merge that is
+        TREESAME to some parent for the path, only that parent is followed.
     """
     import re
 
@@ -2803,6 +2808,7 @@ def log(
             since=since_ts,
             until=until_ts,
             follow=follow,
+            simplify_history=bool(paths_bytes) and not full_history,
         )
 
         count = 0

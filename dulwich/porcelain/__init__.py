@@ -1904,6 +1904,7 @@ def clone(
 
     mkdir = not os.path.exists(target)
 
+    origin_url: str | bytes | None = None
     if isinstance(source, Repo):
         # For direct repo cloning, use LocalGitClient
         from ..client import GitClient, LocalGitClient
@@ -1911,6 +1912,7 @@ def clone(
         client: GitClient = LocalGitClient(config=config)
         path = source.path
     else:
+        origin_url = source
         source_str = source.decode() if isinstance(source, bytes) else source
         transport_kwargs = _filter_transport_kwargs(**kwargs)
         if ssh_command is None:
@@ -1937,6 +1939,7 @@ def clone(
         depth=depth,
         filter_spec=filter_spec_bytes,
         protocol_version=protocol_version,
+        origin_url=origin_url,
     )
 
     # Initialize and update submodules if requested
@@ -3280,7 +3283,9 @@ def reset(
                     sha=entry.sha,
                     flags=0,
                 )
-                index[entry.path] = index_entry
+                # Use set_verbatim so case-differing tree entries aren't
+                # folded together under core.ignorecase.
+                index.set_verbatim(entry.path, index_entry)
 
             # Write the updated index
             index.write()

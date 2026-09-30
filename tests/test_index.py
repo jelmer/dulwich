@@ -317,6 +317,41 @@ class IndexPathNormalizerTestCase(TestCase):
         self.assertIn(b"Foo.txt", reopened)
         self.assertEqual(b"foo.txt", reopened.canonical_path(b"FOO.TXT"))
 
+    def test_set_verbatim_keeps_case_differing_entries(self) -> None:
+        index = Index(
+            os.path.join(self.tempdir, "idx"),
+            read=False,
+            path_normalizer=lambda p: p.lower(),
+        )
+        index.set_verbatim(b"Foo.py", self._entry())
+        index.set_verbatim(b"foo.py", self._entry())
+        self.assertEqual([b"Foo.py", b"foo.py"], sorted(index))
+        # Normalized lookup still finds the first entry inserted.
+        self.assertEqual(b"Foo.py", index.canonical_path(b"FOO.PY"))
+
+    def test_read_preserves_case_differing_entries(self) -> None:
+        path = os.path.join(self.tempdir, "idx")
+        index = Index(path, read=False)
+        entry_lower = IndexEntry(
+            ctime=(0, 0),
+            mtime=(0, 0),
+            dev=0,
+            ino=0,
+            mode=0o100644,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=b"1" * 40,
+        )
+        index[b"Foo.py"] = self._entry()
+        index[b"foo.py"] = entry_lower
+        index.write()
+
+        reopened = Index(path, path_normalizer=lambda p: p.lower())
+        self.assertEqual([b"Foo.py", b"foo.py"], sorted(reopened))
+        self.assertEqual(b"0" * 40, reopened[b"Foo.py"].sha)
+        self.assertEqual(b"1" * 40, reopened[b"foo.py"].sha)
+
 
 class MakePathNormalizerTests(TestCase):
     def _config(self, **kwargs: bytes) -> ConfigFile:

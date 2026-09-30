@@ -479,8 +479,6 @@ class Walker:
         """
         if len(self.get_parents(commit)) < 2:
             return None
-        from .diff_tree import tree_changes
-
         if self.paths is None:
             return None
         for i, parent_id in enumerate(self.get_parents(commit)):

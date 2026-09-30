@@ -1,9 +1,15 @@
 1.2.16	UNRELEASED
 
+ * Preserve original URL in remote origin configuration when cloning,
+   matching C git behavior. (Suprovo Ghosh, #2428)
+
+ * Preserve index entries that differ only by case when loading the index,
+   resetting mixed, or restoring a stashed index tree under core.ignorecase.
+   (Jelmer Vernooĳ, #2434)
  * Implement default history simplification in ``Walker`` for path-filtered
    walks: a merge that is TREESAME to a parent now follows only that parent,
    so ``dulwich log <path>`` no longer matches ``git log --full-history``.
-   (#2414)
+   (Ivan Iukanen, #2414)
 
  * Fix a crash in ``dulwich log <path>`` on merge commits where the path is
    unchanged relative to one parent. ``tree_changes_for_merge`` reports
@@ -24,6 +30,10 @@
 
  * Write carriage returns in configuration values literally rather than as a
    ``\r`` escape. (Jelmer Vernooĳ)
+
+ * Strip leading blank lines in ``stripspace`` in a single pass. The previous
+   ``pop(0)`` loop made an all-blank input O(n^2); it is now linear like git.
+   (Kartik Kenchi)
 
 1.2.15	2026-09-14
 

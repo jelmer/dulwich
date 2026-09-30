@@ -100,9 +100,13 @@ def stripspace(
     def is_blank(line: bytes) -> bool:
         return line.strip() == b""
 
-    # Remove leading blank lines
-    while processed_lines and is_blank(processed_lines[0]):
-        processed_lines.pop(0)
+    # Remove leading blank lines. Slice past them in one pass rather than
+    # repeatedly pop(0)-ing, which is O(n) per call and makes an all-blank
+    # input O(n^2); git's stripspace processes the buffer in a single pass.
+    start = 0
+    while start < len(processed_lines) and is_blank(processed_lines[start]):
+        start += 1
+    processed_lines = processed_lines[start:]
 
     # Remove trailing blank lines
     while processed_lines and is_blank(processed_lines[-1]):

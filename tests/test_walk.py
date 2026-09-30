@@ -315,6 +315,69 @@ class WalkerTest(TestCase):
         )
         self.assertWalkYields([m4, y2, x1], [m4.id], paths=[b"a"])
 
+    def test_paths_simplify_history(self) -> None:
+        # #2414: with simplify_history, a merge that is TREESAME to some
+        # parent for the requested paths follows only that parent (git's
+        # default ``git log <path>`` behavior).
+        blob_a1 = make_object(Blob, data=b"a1")
+        blob_a2 = make_object(Blob, data=b"a2")
+        blob_a3 = make_object(Blob, data=b"a3")
+        x1, y2, m3, m4 = self.make_commits(
+            [[1], [2], [3, 1, 2], [4, 1, 2]],
+            trees={
+                1: [(b"a", blob_a1)],
+                2: [(b"a", blob_a2)],
+                3: [(b"a", blob_a3)],  # differs from both parents
+                4: [(b"a", blob_a1)],  # TREESAME to x1
+            },
+        )
+        # m3 is not TREESAME to any parent, so both branches are followed.
+        self.assertWalkYields(
+            [m3, y2, x1], [m3.id], paths=[b"a"], simplify_history=True
+        )
+        # m4 is TREESAME to x1: only x1 is followed, y2 is pruned.
+        self.assertWalkYields([x1], [m4.id], paths=[b"a"], simplify_history=True)
+        # Without simplification, y2 still shows up.
+        self.assertWalkYields([y2, x1], [m4.id], paths=[b"a"])
+
+    def test_paths_simplify_history_subtree(self) -> None:
+        # Simplification uses the tree state at the requested subtree, so a
+        # merge that takes one side's version of a subtree prunes the other.
+        blob_a = make_object(Blob, data=b"a")
+        blob_b1 = make_object(Blob, data=b"b1")
+        blob_b2 = make_object(Blob, data=b"b2")
+        x1, _y2, m3 = self.make_commits(
+            [[1], [2], [3, 1, 2]],
+            trees={
+                1: [(b"sub/f", blob_a), (b"other", blob_b1)],
+                2: [(b"sub/f", blob_b1), (b"other", blob_b2)],
+                # Merge keeps x1's sub/f and y2's other.
+                3: [(b"sub/f", blob_a), (b"other", blob_b2)],
+            },
+        )
+        self.assertWalkYields([x1], [m3.id], paths=[b"sub"], simplify_history=True)
+
+    def test_paths_simplify_history_follow_disables(self) -> None:
+        # ``follow`` requires visiting all parents to detect renames, so
+        # simplification is skipped even when requested.
+        blob_a1 = make_object(Blob, data=b"a1")
+        blob_a2 = make_object(Blob, data=b"a2")
+        x1, y2, m3 = self.make_commits(
+            [[1], [2], [3, 1, 2]],
+            trees={
+                1: [(b"a", blob_a1)],
+                2: [(b"a", blob_a2)],
+                3: [(b"a", blob_a1)],  # TREESAME to x1
+            },
+        )
+        self.assertWalkYields(
+            [y2, x1],
+            [m3.id],
+            paths=[b"a"],
+            simplify_history=True,
+            follow=True,
+        )
+
     def test_changes_with_renames(self) -> None:
         blob = make_object(Blob, data=b"blob")
         _c1, c2 = self.make_linear_commits(

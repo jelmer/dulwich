@@ -23,6 +23,10 @@
    ``--name-only`` output wrongly assumed to be a ``TreeChange``.
    (Jelmer Vernooĳ, #2412)
 
+ * ``dulwich log <path>`` now applies git's default history simplification.
+   Pass ``--full-history`` for the old behavior. ``Walker`` and
+   ``get_walker`` gain a ``simplify_history`` flag. (Jelmer Vernooĳ, #2414)
+
  * Carry the repository's object format through the index and the work tree.
    ``add`` and ``commit`` on a SHA-256 repository wrote SHA-1 identities into
    the index, trees and refs, leaving a repository neither dulwich nor git

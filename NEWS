@@ -3,6 +3,11 @@
  * Preserve original URL in remote origin configuration when cloning,
    matching C git behavior. (Suprovo Ghosh, #2428)
 
+ * Report conflicts in criss-cross merges where the merge bases disagree on a
+   file. The recursive merge silently kept one base's blob as the virtual
+   base, so the final three-way merge published the other side's content
+   without recording a conflict. (Jelmer Vernooĳ, #2419)
+
  * Preserve index entries that differ only by case when loading the index,
    resetting mixed, or restoring a stashed index tree under core.ignorecase.
    (Jelmer Vernooĳ, #2434)

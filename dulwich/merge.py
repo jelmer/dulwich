@@ -408,10 +408,36 @@ class Merger:
                     conflicts.extend(sub_conflicts)
                     self.object_store.add_object(sub_merged)
                     merged_entries[name] = (ours_mode, sub_merged.id)
+                elif (
+                    ours_mode is not None
+                    and theirs_mode is not None
+                    and not stat.S_ISDIR(ours_mode)
+                    and not stat.S_ISDIR(theirs_mode)
+                    and not S_ISGITLINK(ours_mode)
+                    and not S_ISGITLINK(theirs_mode)
+                ):
+                    # Both added a blob at the same name with different content.
+                    # Merge the blobs without a base so the result carries
+                    # conflict markers, which matters when this tree is used as
+                    # a virtual merge base in a recursive merge.
+                    ours_obj = self.object_store[ours_sha]
+                    theirs_obj = self.object_store[theirs_sha]
+                    if not is_blob(ours_obj) or not is_blob(theirs_obj):
+                        raise TypeError(f"Expected blobs for {path!r}")
+                    assert isinstance(ours_obj, Blob)
+                    assert isinstance(theirs_obj, Blob)
+                    merged_content, had_conflict = self.merge_blobs(
+                        None, ours_obj, theirs_obj, path
+                    )
+                    if had_conflict:
+                        conflicts.append(path)
+                    merged_blob = Blob.from_string(merged_content)
+                    self.object_store.add_object(merged_blob)
+                    merged_entries[name] = (ours_mode, merged_blob.id)
                 else:
-                    # Different additions - conflict
+                    # Different additions we cannot merge (e.g. file vs.
+                    # submodule, or mode mismatch) - conflict; keep ours.
                     conflicts.append(path)
-                    # For now, keep ours
                     merged_entries[name] = (ours_mode, ours_sha)
                 continue
 

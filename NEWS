@@ -8,6 +8,11 @@
    base, so the final three-way merge published the other side's content
    without recording a conflict. (Jelmer Vernooĳ, #2419)
 
+ * Record merge conflicts in the index with stages 1/2/3 and write
+   MERGE_HEAD/MERGE_MSG when ``porcelain.merge`` leaves conflicts, so the
+   working tree matches git's state and ``git commit`` can finish the merge.
+   (Jelmer Vernooĳ)
+
  * Preserve index entries that differ only by case when loading the index,
    resetting mixed, or restoring a stashed index tree under core.ignorecase.
    (Jelmer Vernooĳ, #2434)

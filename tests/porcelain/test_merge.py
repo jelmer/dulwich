@@ -214,6 +214,24 @@ class PorcelainMergeTests(TestCase):
                 self.assertIn(b"=======", content)
                 self.assertIn(b">>>>>>> theirs", content)
 
+            # Index carries stage 1/2/3 entries and MERGE_HEAD/MERGE_MSG are
+            # written so `git commit` can finish the merge.
+            from dulwich.index import ConflictedIndexEntry
+
+            with Repo(tmpdir) as r:
+                entry = r.open_index()[b"file1.txt"]
+                self.assertIsInstance(entry, ConflictedIndexEntry)
+                assert isinstance(entry, ConflictedIndexEntry)
+                self.assertIsNotNone(entry.ancestor)
+                self.assertIsNotNone(entry.this)
+                self.assertIsNotNone(entry.other)
+                self.assertTrue(
+                    os.path.exists(os.path.join(r.controldir(), "MERGE_HEAD"))
+                )
+                self.assertTrue(
+                    os.path.exists(os.path.join(r.controldir(), "MERGE_MSG"))
+                )
+
     def test_merge_no_commit(self):
         """Test merge with no_commit flag."""
         with tempfile.TemporaryDirectory() as tmpdir:

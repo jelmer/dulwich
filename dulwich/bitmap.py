@@ -693,16 +693,13 @@ def read_bitmap_file(
 
         # Resolve object position to SHA if we have a pack index
         if pack_index is not None:
-            # Get the SHA at the given position in the sorted index
-            sha = None
-            for idx, (entry_sha, _offset, _crc32) in enumerate(
-                pack_index.iterentries()
-            ):
-                if idx == obj_pos:
-                    sha = entry_sha
-                    break
-
-            if sha is not None:
+            # Positions refer to the sorted pack index directly; an
+            # out-of-range position (as from a corrupt bitmap) is skipped.
+            try:
+                sha = pack_index.object_sha_at_position(obj_pos)
+            except IndexError:
+                pass
+            else:
                 bitmap.entries[sha] = entry
                 bitmap.entries_list.append((sha, entry))
         else:

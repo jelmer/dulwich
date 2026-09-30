@@ -949,6 +949,25 @@ class PackIndex:
         else:
             raise KeyError(index)
 
+    def object_sha_at_position(self, pos: int) -> RawObjectID:
+        """Return the name of the object at the given position in the index.
+
+        Positions count objects in the sorted order of the index, starting at
+        zero; this is how pack bitmaps refer to objects.
+
+        Args:
+          pos: Position of the object in the sorted index
+        Returns: Binary object name
+        Raises:
+          IndexError: If pos is out of range
+        """
+        if pos < 0:
+            raise IndexError(pos)
+        for i, name in enumerate(self._itersha()):
+            if i == pos:
+                return RawObjectID(name)
+        raise IndexError(pos)
+
     def _object_offset(self, sha: bytes) -> int:
         """See object_offset.
 
@@ -1037,6 +1056,12 @@ class MemoryPackIndex(PackIndex):
     def object_sha1(self, index: int) -> bytes:
         """Return the SHA1 for the object at the given offset."""
         return self._by_offset[index]
+
+    def object_sha_at_position(self, pos: int) -> RawObjectID:
+        """Return the name of the object at the given position in the index."""
+        if not 0 <= pos < len(self._entries):
+            raise IndexError(pos)
+        return RawObjectID(self._entries[pos][0])
 
     def _itersha(self) -> Iterator[bytes]:
         """Iterate over all SHA1s in the index."""
@@ -1193,6 +1218,12 @@ class FilePackIndex(PackIndex):
         """
         for i in range(len(self)):
             yield self._unpack_entry(i)
+
+    def object_sha_at_position(self, pos: int) -> RawObjectID:
+        """Return the name of the object at the given position in the index."""
+        if not 0 <= pos < len(self):
+            raise IndexError(pos)
+        return RawObjectID(self._unpack_name(pos))
 
     def _read_fan_out_table(self, start_offset: int) -> list[int]:
         """Read the fan-out table from the index.

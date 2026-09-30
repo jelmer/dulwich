@@ -360,7 +360,7 @@ from ..diff_tree import (
     tree_changes,
 )
 from ..errors import SendPackError
-from ..file import open_nofollow
+from ..file import FileLocked, open_nofollow
 from ..graph import can_fast_forward
 from ..ignore import IgnoreFilterManager
 from ..index import (
@@ -368,6 +368,7 @@ from ..index import (
     Index,
     IndexEntry,
     _fs_to_tree_path,
+    apply_stat_refresh,
     blob_from_path_and_stat,
     build_file_from_blob,
     get_path_element_validator,
@@ -3905,6 +3906,7 @@ def status(
     repo: str | os.PathLike[str] | Repo | None = None,
     ignored: bool = False,
     untracked_files: str = "normal",
+    optional_locks: bool = True,
 ) -> GitStatus:
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
@@ -3919,6 +3921,9 @@ def status(
           contains many untracked files/directories.
         Using untracked_files="normal" provides a good balance, only showing
           directories that are entirely untracked without listing all their contents.
+      optional_locks: If False, do not perform operations that require taking
+        optional locks (such as refreshing the stat cache in the index).
+        Mirrors git's GIT_OPTIONAL_LOCKS=0 behavior.
 
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (filesystem paths as bytes)
@@ -3949,6 +3954,14 @@ def status(
             max_stat = None
         precompose_unicode = config.get_boolean(b"core", b"precomposeunicode", False)
 
+        # Collect drifted-stat/unchanged-content entries during the walk
+        # so we can update the index stat cache without a second pass.
+        # When optional_locks=False the caller wants no index writes, so
+        # skip the extra bookkeeping entirely (matching git's
+        # GIT_OPTIONAL_LOCKS=0 behaviour).
+        refresh_stat: list[tuple[bytes, os.stat_result]] | None = (
+            [] if optional_locks else None
+        )
         unstaged_changes_tree = list(
             get_unstaged_changes(
                 index,
@@ -3957,6 +3970,7 @@ def status(
                 preload_index,
                 trust_ctime,
                 max_stat,
+                refresh_stat,
             )
         )
 
@@ -3969,6 +3983,13 @@ def status(
             precompose_unicode=precompose_unicode,
             repo=r,
         )
+
+        if refresh_stat:
+            try:
+                if apply_stat_refresh(index, refresh_stat):
+                    index.write()
+            except (OSError, FileLocked) as exc:
+                logger.debug("index stat-cache refresh skipped: %s", exc)
 
         # Convert all paths to filesystem encoding
         # Convert staged changes (dict with lists of tree paths)

@@ -1240,6 +1240,7 @@ class BaseRepo:
         since: int | None = None,
         until: int | None = None,
         queue_cls: type | None = None,
+        simplify_history: bool = False,
     ) -> "Walker":
         """Obtain a walker for this repository.
 
@@ -1263,6 +1264,11 @@ class BaseRepo:
           until: Timestamp to list commits before.
           queue_cls: A class to use for a queue of commits, supporting the
             iterator protocol. The constructor takes a single argument, the Walker.
+          simplify_history: If True and paths is set, perform git-style
+            history simplification: at a merge commit that is TREESAME to
+            at least one parent for the requested paths, follow only that
+            parent (matches ``git log <path>``). The default of False
+            matches ``git log --full-history <path>``.
 
         Returns: A `Walker` object
         """
@@ -1286,6 +1292,7 @@ class BaseRepo:
             until=until,
             get_parents=lambda commit: self.get_parents(commit.id, commit),
             queue_cls=queue_cls if queue_cls is not None else _CommitTimeQueue,
+            simplify_history=simplify_history,
         )
 
     def __getitem__(self, name: ObjectID | Ref | bytes) -> "ShaFile":

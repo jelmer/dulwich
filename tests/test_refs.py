@@ -52,6 +52,7 @@ from dulwich.refs import (
     parse_symref_value,
     read_packed_refs,
     read_packed_refs_with_peeled,
+    refname_is_safe,
     shorten_ref_name,
     write_packed_refs,
 )
@@ -93,6 +94,38 @@ class CheckRefFormatTests(TestCase):
         self.assertFalse(check_ref_format(b"refs/a.lock/a"))
         self.assertFalse(check_ref_format(b"refs/heads/a.lock/a"))
         self.assertFalse(check_ref_format(b"@"))
+
+
+class RefnameIsSafeTests(TestCase):
+    """Tests for the refname_is_safe function.
+
+    These mirror the cases covered by git's refname_is_safe().
+    """
+
+    def test_safe(self) -> None:
+        self.assertTrue(refname_is_safe(b"refs/heads/master"))
+        self.assertTrue(refname_is_safe(b"refs/stash"))
+        self.assertTrue(refname_is_safe(b"refs/heads/foo..bar"))
+        self.assertTrue(refname_is_safe(b"HEAD"))
+        self.assertTrue(refname_is_safe(b"MERGE_HEAD"))
+
+    def test_repeated_slashes(self) -> None:
+        # _check_refname only deprecates these, so they stay accepted here;
+        # they cannot escape the ref store.
+        self.assertTrue(refname_is_safe(b"refs//heads/master"))
+        self.assertTrue(refname_is_safe(b"refs/remotes//HEAD"))
+
+    def test_unsafe(self) -> None:
+        self.assertFalse(refname_is_safe(b"refs/"))
+        self.assertFalse(refname_is_safe(b"refs/heads/master/"))
+        self.assertFalse(refname_is_safe(b"refs/../escape"))
+        self.assertFalse(refname_is_safe(b"refs/heads/../../escape"))
+        self.assertFalse(refname_is_safe(b"refs/heads/./master"))
+        self.assertFalse(refname_is_safe(b"refs/heads/..\\..\\escape"))
+        self.assertFalse(refname_is_safe(b"../escape"))
+        self.assertFalse(refname_is_safe(b"/etc/passwd"))
+        self.assertFalse(refname_is_safe(b"head"))
+        self.assertFalse(refname_is_safe(b""))
 
 
 ONES = b"1" * 40
@@ -618,8 +651,8 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_set_if_equals_symref_target_escape(self) -> None:
         # A loose symref whose target escapes the ref store must not let a
-        # ref update write outside it. read_loose_ref and add_if_new already
-        # validate the resolved name; set_if_equals must too.
+        # ref update write outside it, the same way git checks a resolved
+        # refname with refname_is_safe() before locking it.
         outside = os.path.join(os.path.dirname(self._repo.path), "escape")
         self.assertFalse(os.path.exists(outside))
         evil = os.path.join(self._refs.path, b"refs", b"heads", b"evil")

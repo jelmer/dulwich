@@ -73,10 +73,11 @@
    resetting mixed, or restoring a stashed index tree under core.ignorecase.
    (Jelmer Vernooĳ, #2434)
 
- * Validate the resolved symref target before writing a loose ref in
-   ``DiskRefsContainer.set_if_equals`` and ``locked_ref``, matching
-   ``add_if_new`` and ``read_loose_ref``, so a ref whose on-disk symref target
-   escapes the ref store can no longer write outside it. (Kartik Kenchi)
+ * Add ``dulwich.refs.refname_is_safe``, the equivalent of git's
+   ``refname_is_safe()``, and use it on the resolved symref target before
+   writing a loose ref in ``DiskRefsContainer.set_if_equals`` and
+   ``locked_ref``, so a ref whose on-disk symref target escapes the ref store
+   can no longer write outside it. (Kartik Kenchi)
 
  * Fix a crash in ``dulwich log <path>`` on merge commits where the path is
    unchanged relative to one parent. ``tree_changes_for_merge`` reports

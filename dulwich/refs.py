@@ -50,6 +50,7 @@ __all__ = [
     "read_info_refs",
     "read_packed_refs",
     "read_packed_refs_with_peeled",
+    "refname_is_safe",
     "set_ref_from_raw",
     "shorten_ref_name",
     "write_packed_refs",
@@ -158,6 +159,59 @@ def check_ref_format(refname: Ref) -> bool:
 def _collapse_slashes(refname: bytes) -> bytes:
     """Collapse runs of consecutive slashes in a ref name into a single slash."""
     return b"/".join(component for component in refname.split(b"/") if component)
+
+
+def _normalize_ref_path(path: bytes) -> bytes | None:
+    """Resolve "." and ".." components in a relative, slash-separated path.
+
+    Args:
+      path: The path to normalize
+    Returns: The normalized path, or None if it escapes above the top
+    """
+    components: list[bytes] = []
+    for component in path.split(b"/"):
+        if component in (b"", b"."):
+            continue
+        if component == b"..":
+            if not components:
+                return None
+            components.pop()
+        else:
+            components.append(component)
+    return b"/".join(components)
+
+
+def refname_is_safe(refname: Ref) -> bool:
+    """Check if a refname is safe to use as a path within the ref store.
+
+    This is the equivalent of git's ``refname_is_safe()``: a weaker check than
+    :func:`check_ref_format`, meant for refnames that have already been
+    resolved (such as the target of a symref read from disk) and only
+    establishes that turning the name into a path cannot escape the ref store.
+
+    A name under ``refs/`` must already be normalized, so that neither
+    ``refs/../x`` nor ``refs/heads/../../x`` is accepted. Any other name must
+    be a pseudoref, i.e. consist only of uppercase letters and underscores
+    (e.g. ``HEAD`` or ``MERGE_HEAD``).
+
+    Args:
+      refname: The refname to check
+    Returns: True if the refname is safe, False otherwise
+    """
+    if refname.startswith(b"refs/"):
+        rest = refname[len(b"refs/") :]
+        # rest must not be empty or end with "/"
+        if not rest or rest.endswith(b"/"):
+            return False
+        # refpath() maps "/" onto os.sep, so on Windows a backslash would act
+        # as a second separator; check_ref_format rejects it as well.
+        if b"\\" in rest:
+            return False
+        # Unlike git, repeated slashes are tolerated here rather than treated
+        # as a denormalized name, because _check_refname still only deprecates
+        # them; only "." and ".." components make a name unsafe.
+        return _normalize_ref_path(rest) == _collapse_slashes(rest)
+    return bool(refname) and all(c in b"ABCDEFGHIJKLMNOPQRSTUVWXYZ_" for c in refname)
 
 
 def parse_remote_ref(ref: bytes) -> tuple[bytes, bytes]:
@@ -1248,9 +1302,10 @@ class DiskRefsContainer(RefsContainer):
             realname = name
         # follow() copies a symref target into realname verbatim, so the
         # resolved name may escape the ref store even though name itself was
-        # checked above. Validate it before building the on-disk path, as
-        # add_if_new already does.
-        self._check_refname(realname)
+        # checked above. Check it before building the on-disk path, like git
+        # does with refname_is_safe() on a resolved name.
+        if not refname_is_safe(realname):
+            raise RefFormatError(realname)
         filename = self.refpath(realname)
 
         # make sure none of the ancestor folders is in packed refs
@@ -1886,9 +1941,10 @@ class locked_ref:
         except (KeyError, IndexError, SymrefLoop):
             self._realname = self._refname
 
-        # The resolved symref target can escape the ref store; validate it
-        # before opening its on-disk path, matching set_if_equals/add_if_new.
-        self._refs_container._check_refname(self._realname)
+        # The resolved symref target can escape the ref store; check it
+        # before opening its on-disk path, as set_if_equals does.
+        if not refname_is_safe(self._realname):
+            raise RefFormatError(self._realname)
         filename = self._refs_container.refpath(self._realname)
         ensure_dir_exists(os.path.dirname(filename))
         f = GitFile(filename, "wb")

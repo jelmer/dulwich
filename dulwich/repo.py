@@ -66,6 +66,7 @@ import sys
 import time
 import warnings
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from io import BytesIO
 from types import TracebackType
 from typing import (
@@ -552,6 +553,26 @@ class ParentsProvider:
             commit = obj
         result: list[ObjectID] = commit.parents
         return result
+
+
+@dataclass
+class SHA1InWantPolicy:
+    """Which unadvertised objects a client may request from upload-pack.
+
+    Mirrors git's ``uploadpack.allowAnySHA1InWant``,
+    ``uploadpack.allowReachableSHA1InWant`` and
+    ``uploadpack.allowTipSHA1InWant`` options.
+    """
+
+    allow_any: bool = False
+    allow_reachable: bool = False
+    allow_tip: bool = False
+
+    def __post_init__(self) -> None:
+        # As in git, allowing any object implies the two narrower options.
+        if self.allow_any:
+            self.allow_reachable = True
+            self.allow_tip = True
 
 
 class BaseRepo:
@@ -1162,6 +1183,26 @@ class BaseRepo:
 
         backends += StackedConfig.default_backends()
         return StackedConfig(backends, writable=local_config)
+
+    def get_sha1_in_want_policy(self) -> SHA1InWantPolicy:
+        """Read the uploadpack.allow*SHA1InWant settings for this repository.
+
+        Returns: The configured policy. All three options default to false.
+        """
+        config = self.get_config_stack()
+
+        def get(name: bytes) -> bool:
+            try:
+                return config.get_boolean((b"uploadpack",), name, False)
+            except ValueError:
+                logger.warning("Ignoring invalid uploadpack.%s value", name.decode())
+                return False
+
+        return SHA1InWantPolicy(
+            allow_any=get(b"allowAnySHA1InWant"),
+            allow_reachable=get(b"allowReachableSHA1InWant"),
+            allow_tip=get(b"allowTipSHA1InWant"),
+        )
 
     def get_shallow(self) -> set[ObjectID]:
         """Get the set of shallow commits.

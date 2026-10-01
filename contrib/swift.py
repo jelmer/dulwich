@@ -88,7 +88,7 @@ from dulwich.pack import (
 )
 from dulwich.protocol import TCP_GIT_PORT, split_peeled_refs, write_info_refs
 from dulwich.refs import HEADREF, Ref, RefsContainer, read_info_refs
-from dulwich.repo import OBJECTDIR, BaseRepo
+from dulwich.repo import OBJECTDIR, BaseRepo, SHA1InWantPolicy
 from dulwich.server import Backend, BackendRepo, TCPGitServer
 
 from .greenthreads import GreenThreadsMissingObjectFinder
@@ -1181,6 +1181,14 @@ class SwiftRepo(BaseRepo):
         Returns: True if permissions can be trusted, False otherwise.
         """
         return False
+
+    def get_sha1_in_want_policy(self) -> SHA1InWantPolicy:
+        """Return the policy for serving unadvertised objects.
+
+        Swift repositories do not provide access to Git configuration, so use
+        Git's default policy of refusing all unadvertised wants.
+        """
+        return SHA1InWantPolicy()
 
     def _put_named_file(self, filename: str, contents: bytes) -> None:
         """Put an object in a Swift container.

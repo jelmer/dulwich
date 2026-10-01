@@ -961,12 +961,7 @@ class PackIndex:
         Raises:
           IndexError: If pos is out of range
         """
-        if pos < 0:
-            raise IndexError(pos)
-        for i, name in enumerate(self._itersha()):
-            if i == pos:
-                return RawObjectID(name)
-        raise IndexError(pos)
+        raise NotImplementedError(self.object_sha_at_position)
 
     def _object_offset(self, sha: bytes) -> int:
         """See object_offset.

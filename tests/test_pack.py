@@ -49,7 +49,6 @@ from dulwich.pack import (
     Pack,
     PackData,
     PackFileDisappeared,
-    PackIndex,
     PackIndex3,
     PackStreamReader,
     UnpackedObject,
@@ -167,22 +166,6 @@ class PackIndexTests(PackTests):
         self.assertEqual(hex_to_sha(commit_sha), p.object_sha_at_position(2))
         self.assertRaises(IndexError, p.object_sha_at_position, len(p))
         self.assertRaises(IndexError, p.object_sha_at_position, -1)
-
-    def test_object_sha_at_position_default(self) -> None:
-        """The PackIndex default implementation only needs _itersha."""
-        p = self.get_pack_index(pack1_sha)
-        names = [sha for sha, _offset, _crc32 in p.iterentries()]
-
-        class OnlyIterShaIndex(PackIndex):
-            def _itersha(self):
-                return iter(names)
-
-        idx = OnlyIterShaIndex()
-        self.assertEqual(
-            names, [idx.object_sha_at_position(i) for i in range(len(names))]
-        )
-        self.assertRaises(IndexError, idx.object_sha_at_position, len(names))
-        self.assertRaises(IndexError, idx.object_sha_at_position, -1)
 
     def test_iter_prefix(self) -> None:
         p = self.get_pack_index(pack1_sha)

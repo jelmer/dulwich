@@ -419,6 +419,13 @@
    ``pop(0)`` loop made an all-blank input O(n^2); it is now linear like git.
    (Kartik Kenchi)
 
+ * Support ``uploadpack.allowTipSHA1InWant``,
+   ``uploadpack.allowReachableSHA1InWant`` and
+   ``uploadpack.allowAnySHA1InWant`` in ``UploadPackHandler``: unadvertised
+   wants are validated against the configured policy and the corresponding
+   capabilities are advertised. All three remain disabled by default.
+   (Bojan Zivanovic)
+
 1.2.15	2026-09-14
 
  * Detect delta cycles in ``Pack.resolve_object``: a crafted pack with

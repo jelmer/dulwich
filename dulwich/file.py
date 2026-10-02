@@ -31,6 +31,7 @@ __all__ = [
     "calc_shared_perm",
     "ensure_dir_exists",
     "open_nofollow",
+    "open_nofollow_read",
 ]
 
 import errno
@@ -41,7 +42,7 @@ import warnings
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from types import TracebackType
-from typing import IO, Any, ClassVar, Literal, overload
+from typing import IO, Any, BinaryIO, ClassVar, Literal, overload
 
 from ._typing import Buffer
 
@@ -166,6 +167,44 @@ def open_nofollow(
         raise OSError(errno.ELOOP, os.strerror(errno.ELOOP), os.fspath(path))
 
     return os.fdopen(os.open(path, flags, mode), "wb")
+
+
+def open_nofollow_read(
+    path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+) -> BinaryIO | None:
+    """Open an in-tree file for reading, treating a symlink as absent.
+
+    ``.gitignore`` and ``.gitattributes`` are read from the work tree at names
+    the tree supplies, so following a symlink there would read a file from
+    anywhere on the filesystem in their place. git opens both with
+    ``open_nofollow()`` and carries on without the file when that fails.
+
+    Args:
+      path: File to read
+
+    Returns:
+      A binary file object open for reading, or None if the path does not
+      exist or is a symlink
+    """
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    elif os.path.islink(path):
+        # Windows has no O_NOFOLLOW; this check races, but creating symlinks
+        # there requires privileges that make the attack far less reachable.
+        return None
+
+    try:
+        fd = os.open(path, flags)
+    except (FileNotFoundError, NotADirectoryError):
+        return None
+    except OSError as e:
+        # O_NOFOLLOW on a symlink reports ELOOP, or EMLINK on some BSDs.
+        if e.errno not in (errno.ELOOP, errno.EMLINK):
+            raise
+        return None
+
+    return os.fdopen(fd, "rb")
 
 
 def _fancy_rename(oldname: str | bytes, newname: str | bytes) -> None:

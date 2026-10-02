@@ -24,9 +24,11 @@
 import os
 import re
 import shutil
+import sys
 import tempfile
 from io import BytesIO
 from pathlib import Path
+from unittest import skipIf
 
 from dulwich.ignore import (
     IgnoreFilter,
@@ -487,6 +489,23 @@ class IgnoreFilterManagerTests(TestCase):
         self.assertFalse(m.is_ignored("dir3"))
         self.assertTrue(m.is_ignored("dir3/"))
         self.assertTrue(m.is_ignored("dir3/bla"))
+
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_symlinked_gitignore_is_not_followed(self) -> None:
+        # A tree can ship .gitignore as a symlink pointing anywhere on the
+        # filesystem. Reading it would let a file outside the work tree decide
+        # what is ignored, so treat it as absent, as git does.
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        outside = os.path.join(tmp_dir, "outside")
+        with open(outside, "wb") as f:
+            f.write(b"/secret\n")
+        repo = Repo.init(os.path.join(tmp_dir, "repo"), mkdir=True)
+        self.addCleanup(repo.close)
+        os.symlink(outside, os.path.join(repo.path, ".gitignore"))
+
+        m = IgnoreFilterManager.from_repo(repo)
+        self.assertIs(None, m.is_ignored("secret"))
 
     def test_trailing_double_asterisk_slash_is_directory_only(self) -> None:
         # "foo/**/" is a directory pattern: Git ignores the directories below

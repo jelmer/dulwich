@@ -23,8 +23,10 @@
 """Tests for gitattributes parsing and matching."""
 
 import os
+import sys
 import tempfile
 from io import BytesIO
+from unittest import skipIf
 
 from dulwich.attrs import (
     GitAttributes,
@@ -444,6 +446,19 @@ class FileOperationsTests(TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             patterns = read_gitattributes(tmpdir)
             self.assertEqual(patterns, [])
+
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_read_gitattributes_symlink(self):
+        """A symlinked .gitattributes is not followed out of the directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outside = os.path.join(tmpdir, "outside")
+            with open(outside, "wb") as f:
+                f.write(b"*.py diff=python\n")
+            workdir = os.path.join(tmpdir, "work")
+            os.mkdir(workdir)
+            os.symlink(outside, os.path.join(workdir, ".gitattributes"))
+
+            self.assertEqual([], read_gitattributes(workdir))
 
 
 class GitAttributesTests(TestCase):

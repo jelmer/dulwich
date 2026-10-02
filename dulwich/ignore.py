@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from .repo import Repo
 
 from .config import Config, get_xdg_config_home_path
+from .file import open_nofollow_read
 from .wildmatch import MalformedPattern
 from .wildmatch import translate as translate_wildmatch
 
@@ -584,17 +585,23 @@ class IgnoreFilterManager:
             pass
 
         p = os.path.join(self._top_path, path, ".gitignore")
+        # The name comes from the tree, so a symlink here would read patterns
+        # from a file outside the work tree. git refuses the same way.
         try:
-            self._path_filters[path] = IgnoreFilter.from_path(p, self._ignorecase)
-        except (FileNotFoundError, NotADirectoryError):
-            self._path_filters[path] = None
+            f = open_nofollow_read(p)
         except OSError as e:
             # On Windows, opening a path that contains a symlink can fail with
             # errno 22 (Invalid argument) when the symlink points outside the repo
-            if e.errno == 22:
-                self._path_filters[path] = None
-            else:
+            if e.errno != 22:
                 raise
+            f = None
+        if f is None:
+            self._path_filters[path] = None
+        else:
+            with f:
+                self._path_filters[path] = IgnoreFilter(
+                    read_ignore_patterns(f), self._ignorecase, path=p
+                )
         return self._path_filters[path]
 
     def find_matching(self, path: str) -> Iterable[Pattern]:

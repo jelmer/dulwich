@@ -403,6 +403,21 @@ class RepositoryRootTests(TestCase):
         self.assertEqual(len(attrs), 1)
         self.assertEqual(attrs.match_path(b"file.txt"), {b"text": True})
 
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_get_gitattributes_worktree_symlink(self) -> None:
+        # The work tree .gitattributes name comes from the tree, so following
+        # a symlink there would read attributes from outside the work tree.
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        outside = os.path.join(tmp_dir, "outside")
+        with open(outside, "wb") as f:
+            f.write(b"*.txt text\n")
+        r = Repo.init(os.path.join(tmp_dir, "repo"), mkdir=True)
+        self.addCleanup(r.close)
+        os.symlink(outside, os.path.join(r.path, ".gitattributes"))
+
+        self.assertEqual({}, r.get_gitattributes().match_path(b"file.txt"))
+
     def test_contains_missing(self) -> None:
         r = self.open_repo("a.git")
         self.assertNotIn(b"bar", r)

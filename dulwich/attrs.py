@@ -39,6 +39,7 @@ import re
 from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from typing import IO
 
+from .file import open_nofollow_read
 from .wildmatch import MalformedPattern
 from .wildmatch import translate as translate_wildmatch
 
@@ -250,6 +251,10 @@ def read_gitattributes(
 ) -> list[tuple[Pattern, Mapping[bytes, AttributeValue]]]:
     """Read .gitattributes from a directory.
 
+    A ``.gitattributes`` that is a symlink is ignored rather than followed, so
+    a tree cannot name a file outside the work tree and have its contents read
+    as attributes. git refuses the same way.
+
     Args:
         path: Directory path to check for .gitattributes
 
@@ -260,10 +265,13 @@ def read_gitattributes(
         path = path.decode("utf-8")
 
     gitattributes_path = os.path.join(path, ".gitattributes")
-    if os.path.exists(gitattributes_path):
-        return parse_gitattributes_file(gitattributes_path)
-
-    return []
+    f = open_nofollow_read(gitattributes_path)
+    if f is None:
+        return []
+    with f:
+        return compile_gitattributes_patterns(
+            parse_git_attributes(f), gitattributes_path.encode("utf-8")
+        )
 
 
 class GitAttributes:

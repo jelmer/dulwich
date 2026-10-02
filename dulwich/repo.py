@@ -113,6 +113,7 @@ from .file import (
     GitFile,
     SharedPerm,
     adjust_shared_perm,
+    open_nofollow_read,
 )
 from .hooks import (
     CommitMsgShellHook,
@@ -2599,14 +2600,18 @@ class Repo(BaseRepo):
     def _read_gitattributes(self) -> dict[bytes, dict[bytes, bytes]]:
         """Read .gitattributes file from working tree.
 
+        A ``.gitattributes`` that is a symlink is ignored rather than
+        followed, as git does.
+
         Returns:
             Dictionary mapping file patterns to attributes
         """
         gitattributes = {}
         gitattributes_path = os.path.join(self.path, ".gitattributes")
 
-        if os.path.exists(gitattributes_path):
-            with open(gitattributes_path, "rb") as f:
+        f = open_nofollow_read(gitattributes_path)
+        if f is not None:
+            with f:
                 for line in f:
                     line = line.strip()
                     if not line or line.startswith(b"#"):
@@ -2729,10 +2734,13 @@ class Repo(BaseRepo):
                     )
                 )
 
-        # Read .gitattributes from working directory (if it exists)
+        # Read .gitattributes from working directory (if it exists). The name
+        # comes from the tree, so a symlink there would read attributes from a
+        # file outside the work tree; git refuses the same way.
         working_attrs_path = os.path.join(self.path, ".gitattributes")
-        if os.path.exists(working_attrs_path):
-            with open(working_attrs_path, "rb") as f:
+        working_attrs_file = open_nofollow_read(working_attrs_path)
+        if working_attrs_file is not None:
+            with working_attrs_file as f:
                 patterns.extend(
                     compile_gitattributes_patterns(
                         parse_git_attributes(f), working_attrs_path

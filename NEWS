@@ -39,6 +39,10 @@
    made ``sha in repo.object_store`` disagree with ``repo.object_store[sha]``.
    (Kartik Kenchi)
 
+ * Don't follow a symlink when reading ``.gitignore`` or ``.gitattributes``
+   from the work tree. A tree could point either name at a file outside the
+   repository and have its contents drive dulwich. (Kartik Kenchi)
+
  * Honour `GIT_OPTIONAL_LOCKS=0` in `dulwich status`, skipping the
    index stat-cache refresh that would otherwise lock the index.
    (Jelmer Vernooĳ, #1861)

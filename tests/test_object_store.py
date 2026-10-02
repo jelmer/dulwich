@@ -1537,6 +1537,40 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         # Unknown hex SHA: clean False, no exception.
         self.assertFalse(store.contains_packed(b"0" * 40))
 
+    def test_contains_packed_midx_entry_for_removed_pack(self) -> None:
+        """A MIDX entry whose pack is gone must not report the object present.
+
+        ``repack`` and ``prune`` write new packs and remove the old ones
+        without rewriting ``multi-pack-index``, so the MIDX outlives the packs
+        it names. git re-checks the pack in ``fill_midx_entry`` for the same
+        reason.
+        """
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+
+        b = make_object(Blob, data=b"midx-pack-removed")
+        f, commit, _abort = store.add_pack()
+        write_pack_objects(f.write, [(b, None)], object_format=DEFAULT_OBJECT_FORMAT)
+        doomed = commit()
+        self.assertIsNotNone(doomed)
+        store.write_midx()
+
+        assert doomed is not None
+        doomed.close()
+        os.remove(doomed._idx_path)
+        os.remove(doomed._data_path)
+
+        # Drop any cached state so the MIDX written above is loaded from disk.
+        store.close()
+        store = DiskObjectStore(self.store_dir)
+        self.addCleanup(store.close)
+        self.assertIsNotNone(store.get_midx())
+
+        self.assertFalse(store.contains_packed(b.id))
+        self.assertNotIn(b.id, store)
+        # determine_wants_all computes a fetch's wants from this answer.
+        self.assertEqual([b.id], store.determine_wants_all({b"refs/heads/x": b.id}))
+
     def _rename_pack_to_loose(self, store) -> str:
         """Rename the single pack in the store from pack-<h> to loose-<h>.
 

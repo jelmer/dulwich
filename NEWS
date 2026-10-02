@@ -1,5 +1,10 @@
 1.2.16	UNRELEASED
 
+ * Ignore a ``multi-pack-index`` entry whose pack has been removed when
+   answering whether an object is present. After a prune the stale index
+   made ``sha in repo.object_store`` disagree with ``repo.object_store[sha]``.
+   (Kartik Kenchi)
+
  * Honour `GIT_OPTIONAL_LOCKS=0` in `dulwich status`, skipping the
    index stat-cache refresh that would otherwise lock the index.
    (Jelmer Vernooĳ, #1861)

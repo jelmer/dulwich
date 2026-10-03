@@ -154,6 +154,19 @@ class PackIndexTests(PackTests):
         self.assertEqual(p.object_sha1(138), hex_to_sha(tree_sha))
         self.assertEqual(p.object_sha1(12), hex_to_sha(commit_sha))
 
+    def test_object_sha_at_position(self) -> None:
+        """Positions follow the sorted order of the index, as in a bitmap."""
+        p = self.get_pack_index(pack1_sha)
+        self.assertEqual(
+            [sha for sha, _offset, _crc32 in p.iterentries()],
+            [p.object_sha_at_position(i) for i in range(len(p))],
+        )
+        self.assertEqual(hex_to_sha(a_sha), p.object_sha_at_position(0))
+        self.assertEqual(hex_to_sha(tree_sha), p.object_sha_at_position(1))
+        self.assertEqual(hex_to_sha(commit_sha), p.object_sha_at_position(2))
+        self.assertRaises(IndexError, p.object_sha_at_position, len(p))
+        self.assertRaises(IndexError, p.object_sha_at_position, -1)
+
     def test_iter_prefix(self) -> None:
         p = self.get_pack_index(pack1_sha)
         self.assertEqual([p.object_sha1(178)], list(p.iter_prefix(hex_to_sha(a_sha))))
@@ -1325,6 +1338,16 @@ class BaseTestPackIndexWriting:
                 self.assertEqual(my_crc, actual_crc)
             else:
                 self.assertIsNone(actual_crc)
+
+    def test_object_sha_at_position(self) -> None:
+        entry1_sha = hex_to_sha("4e6388232ec39792661e2e75db8fb117fc869ce6")
+        entry2_sha = hex_to_sha("e98f071751bd77f59967bfa671cd2caebdccc9a2")
+        entries = [(entry1_sha, 12, 24), (entry2_sha, 178, 92)]
+        idx = self.index("positions.idx", entries, pack_checksum)
+        self.assertEqual(entry1_sha, idx.object_sha_at_position(0))
+        self.assertEqual(entry2_sha, idx.object_sha_at_position(1))
+        self.assertRaises(IndexError, idx.object_sha_at_position, 2)
+        self.assertRaises(IndexError, idx.object_sha_at_position, -1)
 
 
 class BaseTestFilePackIndexWriting(BaseTestPackIndexWriting):

@@ -815,7 +815,7 @@ class WorkTree:
         from .index import (
             build_index_from_tree,
             get_path_element_validator,
-            symlink,
+            get_symlink_fn,
         )
 
         if tree is None:
@@ -831,19 +831,7 @@ class WorkTree:
         config = self._repo.get_config()
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
         validate_path_element = get_path_element_validator(config)
-        if config.get_boolean(b"core", b"symlinks", True):
-            symlink_fn = symlink
-        else:
-
-            def symlink_fn(  # type: ignore[misc,unused-ignore]
-                src: str | bytes,
-                dst: str | bytes,
-                target_is_directory: bool = False,
-                *,
-                dir_fd: int | None = None,
-            ) -> None:
-                with open(dst, "w" + ("b" if isinstance(src, bytes) else "")) as f:
-                    f.write(src)
+        symlink_fn = get_symlink_fn(config)
 
         blob_normalizer = self._repo.get_blob_normalizer(config=stacked_config)
         return build_index_from_tree(
@@ -853,7 +841,7 @@ class WorkTree:
             tree,
             honor_filemode=honor_filemode,
             validate_path_element=validate_path_element,
-            symlink_fn=symlink_fn,  # type: ignore[arg-type,unused-ignore]
+            symlink_fn=symlink_fn,
             blob_normalizer=blob_normalizer,
             object_format=self._repo.object_format,
         )

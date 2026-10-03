@@ -338,6 +338,7 @@ if TYPE_CHECKING:
     from ..filter_branch import CommitData
     from ..gc import GCStats
     from ..maintenance import MaintenanceResult
+    from ..merge import MergeConflictInfo
     from ..objects import RawObjectID
 from ..archive import tar_stream
 from ..bisect import BisectState
@@ -359,7 +360,7 @@ from ..diff_tree import (
     tree_changes,
 )
 from ..errors import SendPackError
-from ..file import open_nofollow
+from ..file import FileLocked, open_nofollow
 from ..graph import can_fast_forward
 from ..ignore import IgnoreFilterManager
 from ..index import (
@@ -367,11 +368,12 @@ from ..index import (
     Index,
     IndexEntry,
     _fs_to_tree_path,
+    apply_stat_refresh,
     blob_from_path_and_stat,
     build_file_from_blob,
     get_path_element_validator,
+    get_symlink_fn,
     get_unstaged_changes,
-    symlink,
     update_working_tree,
 )
 from ..object_store import BaseObjectStore, tree_lookup_path
@@ -2737,6 +2739,7 @@ def log(
     stat: bool = False,
     patch: bool = False,
     follow: bool = False,
+    full_history: bool = False,
 ) -> None:
     """Write commit logs.
 
@@ -2760,6 +2763,10 @@ def log(
       stat: Show diffstat for each commit
       patch: Show patch (diff) for each commit
       follow: Follow file renames
+      full_history: When paths is set, show every commit that touched the
+        path, matching ``git log --full-history <path>``. The default
+        applies git's history simplification, so at a merge that is
+        TREESAME to some parent for the path, only that parent is followed.
     """
     import re
 
@@ -2802,6 +2809,7 @@ def log(
             since=since_ts,
             until=until_ts,
             follow=follow,
+            simplify_history=bool(paths_bytes) and not full_history,
         )
 
         count = 0
@@ -3898,6 +3906,7 @@ def status(
     repo: str | os.PathLike[str] | Repo | None = None,
     ignored: bool = False,
     untracked_files: str = "normal",
+    optional_locks: bool = True,
 ) -> GitStatus:
     """Returns staged, unstaged, and untracked changes relative to the HEAD.
 
@@ -3912,6 +3921,9 @@ def status(
           contains many untracked files/directories.
         Using untracked_files="normal" provides a good balance, only showing
           directories that are entirely untracked without listing all their contents.
+      optional_locks: If False, do not perform operations that require taking
+        optional locks (such as refreshing the stat cache in the index).
+        Mirrors git's GIT_OPTIONAL_LOCKS=0 behavior.
 
     Returns: GitStatus tuple,
         staged -  dict with lists of staged paths (filesystem paths as bytes)
@@ -3942,6 +3954,14 @@ def status(
             max_stat = None
         precompose_unicode = config.get_boolean(b"core", b"precomposeunicode", False)
 
+        # Collect drifted-stat/unchanged-content entries during the walk
+        # so we can update the index stat cache without a second pass.
+        # When optional_locks=False the caller wants no index writes, so
+        # skip the extra bookkeeping entirely (matching git's
+        # GIT_OPTIONAL_LOCKS=0 behaviour).
+        refresh_stat: list[tuple[bytes, os.stat_result]] | None = (
+            [] if optional_locks else None
+        )
         unstaged_changes_tree = list(
             get_unstaged_changes(
                 index,
@@ -3950,6 +3970,7 @@ def status(
                 preload_index,
                 trust_ctime,
                 max_stat,
+                refresh_stat,
             )
         )
 
@@ -3962,6 +3983,13 @@ def status(
             precompose_unicode=precompose_unicode,
             repo=r,
         )
+
+        if refresh_stat:
+            try:
+                if apply_stat_refresh(index, refresh_stat):
+                    index.write()
+            except (OSError, FileLocked) as exc:
+                logger.debug("index stat-cache refresh skipped: %s", exc)
 
         # Convert all paths to filesystem encoding
         # Convert staged changes (dict with lists of tree paths)
@@ -5909,26 +5937,7 @@ def _get_worktree_update_config(
     # apply together, so defer to the shared selector rather than picking one.
     validate_path_element = get_path_element_validator(config)
 
-    if config.get_boolean(b"core", b"symlinks", True):
-
-        def symlink_wrapper(
-            source: str | bytes | os.PathLike[str],
-            target: str | bytes | os.PathLike[str],
-        ) -> None:
-            symlink(source, target)  # type: ignore[arg-type,unused-ignore]
-
-        symlink_fn = symlink_wrapper
-    else:
-
-        def symlink_fallback(
-            source: str | bytes | os.PathLike[str],
-            target: str | bytes | os.PathLike[str],
-        ) -> None:
-            mode = "w" + ("b" if isinstance(source, bytes) else "")
-            with open(target, mode) as f:
-                f.write(source)
-
-        symlink_fn = symlink_fallback
+    symlink_fn = get_symlink_fn(config)
 
     return honor_filemode, validate_path_element, symlink_fn
 
@@ -7177,6 +7186,55 @@ def write_tree(repo: RepoPath | None = None) -> bytes:
         return r.open_index(config=r.get_config_stack()).commit(r.object_store)
 
 
+def _record_merge_conflicts(
+    r: Repo,
+    conflict_info: "Mapping[bytes, MergeConflictInfo]",
+    merge_commit_id: ObjectID,
+    message: bytes | str | None,
+) -> None:
+    """Rewrite the index and merge state files for a conflicted merge.
+
+    For each conflicted path, replace the index entry with stage 1/2/3
+    entries describing the ancestor, ours, and theirs blobs. Also write
+    MERGE_HEAD and MERGE_MSG so ``git commit`` can pick up where dulwich
+    left off.
+    """
+    from ..index import ConflictedIndexEntry, IndexEntry
+
+    def entry(mode: int | None, sha: ObjectID | None) -> IndexEntry | None:
+        if mode is None or sha is None:
+            return None
+        return IndexEntry(
+            ctime=(0, 0),
+            mtime=(0, 0),
+            dev=0,
+            ino=0,
+            mode=mode,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=sha,
+        )
+
+    index = r.open_index()
+    for path, info in conflict_info.items():
+        index[path] = ConflictedIndexEntry(
+            ancestor=entry(*info.ancestor),
+            this=entry(*info.ours),
+            other=entry(*info.theirs),
+        )
+    index.write()
+
+    with open(os.path.join(r.controldir(), "MERGE_HEAD"), "wb") as f:
+        f.write(merge_commit_id + b"\n")
+    if message is None:
+        msg_bytes = f"Merge commit '{merge_commit_id.decode()[:7]}'\n".encode()
+    else:
+        msg_bytes = message.encode() if isinstance(message, str) else message
+    with open(os.path.join(r.controldir(), "MERGE_MSG"), "wb") as f:
+        f.write(msg_bytes)
+
+
 def _do_merge(
     r: Repo,
     merge_commit_id: ObjectID,
@@ -7204,7 +7262,7 @@ def _do_merge(
       if no_commit=True or there were conflicts
     """
     from ..graph import find_merge_base
-    from ..merge import recursive_merge
+    from ..merge import Merger, recursive_merge
 
     # Get HEAD commit
     try:
@@ -7253,8 +7311,15 @@ def _do_merge(
     # Perform recursive merge (handles multiple merge bases automatically)
     gitattributes = r.get_gitattributes()
     config = r.get_config()
+    merger = Merger(r.object_store, gitattributes, config)
     merged_tree, conflicts = recursive_merge(
-        r.object_store, merge_bases, head_commit, merge_commit, gitattributes, config
+        r.object_store,
+        merge_bases,
+        head_commit,
+        merge_commit,
+        gitattributes,
+        config,
+        merger=merger,
     )
 
     # Add merged tree to object store
@@ -7270,8 +7335,13 @@ def _do_merge(
         config=r.get_config_stack(),
     )
 
-    if conflicts or no_commit:
-        # Don't create a commit if there are conflicts or no_commit is True
+    if conflicts:
+        # Rewrite the index so conflicted paths carry stage 1/2/3 entries and
+        # record MERGE_HEAD/MERGE_MSG so `git commit` can finish the merge.
+        _record_merge_conflicts(r, merger.conflict_info, merge_commit_id, message)
+        return (None, conflicts)
+
+    if no_commit:
         return (None, conflicts)
 
     # Create merge commit

@@ -5,8 +5,27 @@
    of re-scanning the index for every entry, which made loading quadratic in
    the pack size, unlike git. (Kartik Kenchi)
 
+ * Ignore a ``multi-pack-index`` entry whose pack has been removed when
+   answering whether an object is present. After a prune the stale index
+   made ``sha in repo.object_store`` disagree with ``repo.object_store[sha]``.
+   (Kartik Kenchi)
+
+ * Honour `GIT_OPTIONAL_LOCKS=0` in `dulwich status`, skipping the
+   index stat-cache refresh that would otherwise lock the index.
+   (Jelmer Vernooĳ, #1861)
+
  * Preserve original URL in remote origin configuration when cloning,
    matching C git behavior. (Suprovo Ghosh, #2428)
+
+ * Report conflicts in criss-cross merges where the merge bases disagree on a
+   file. The recursive merge silently kept one base's blob as the virtual
+   base, so the final three-way merge published the other side's content
+   without recording a conflict. (Jelmer Vernooĳ, #2419)
+
+ * Record merge conflicts in the index with stages 1/2/3 and write
+   MERGE_HEAD/MERGE_MSG when ``porcelain.merge`` leaves conflicts, so the
+   working tree matches git's state and ``git commit`` can finish the merge.
+   (Jelmer Vernooĳ)
 
  * Preserve index entries that differ only by case when loading the index,
    resetting mixed, or restoring a stashed index tree under core.ignorecase.
@@ -17,6 +36,10 @@
    ``None`` for such parents, which the walker and the ``--name-status`` and
    ``--name-only`` output wrongly assumed to be a ``TreeChange``.
    (Jelmer Vernooĳ, #2412)
+
+ * ``dulwich log <path>`` now applies git's default history simplification.
+   Pass ``--full-history`` for the old behavior. ``Walker`` and
+   ``get_walker`` gain a ``simplify_history`` flag. (Jelmer Vernooĳ, #2414)
 
  * Carry the repository's object format through the index and the work tree.
    ``add`` and ``commit`` on a SHA-256 repository wrote SHA-1 identities into
@@ -112,6 +135,10 @@
  * Speed up cached `PackData.get_object_at` lookups by acquiring the
    offset-cache lock directly instead of through a `with` statement.
    (Bojan Zivanovic)
+
+ * Add `dulwich hook run <name>` CLI command for manually executing the
+   pre-commit, post-commit, commit-msg and update git hooks, for testing
+   and debugging. (Muhammad, #1842)
 
  * Bound fetch negotiation the way C Git's ``MAX_IN_VAIN`` does: give up
    after 256 unacknowledged "have" lines instead of draining the whole

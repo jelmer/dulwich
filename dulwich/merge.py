@@ -23,6 +23,7 @@
 
 __all__ = [
     "MergeConflict",
+    "MergeConflictInfo",
     "Merger",
     "make_merge3",
     "merge_blobs",
@@ -33,6 +34,7 @@ __all__ = [
 
 import stat
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -78,6 +80,22 @@ class MergeConflict(Exception):
         """
         self.path = path
         super().__init__(f"Merge conflict in {path!r}: {message}")
+
+
+@dataclass(frozen=True)
+class MergeConflictInfo:
+    """Details of a single merge conflict.
+
+    The (mode, sha) tuples describe the three sides of the conflict so callers
+    can populate index stages 1 (ancestor), 2 (ours) and 3 (theirs). Any side
+    may be ``(None, None)`` when that side is absent (add/add without a common
+    ancestor, delete/modify, etc.).
+    """
+
+    path: bytes
+    ancestor: tuple[int | None, ObjectID | None]
+    ours: tuple[int | None, ObjectID | None]
+    theirs: tuple[int | None, ObjectID | None]
 
 
 def _can_merge_lines(
@@ -297,6 +315,7 @@ class Merger:
         self.object_store = object_store
         self.gitattributes = gitattributes
         self.config = config
+        self.conflict_info: dict[bytes, MergeConflictInfo] = {}
 
     def merge_blobs(
         self,
@@ -345,6 +364,18 @@ class Merger:
             raise TypeError(f"Expected tree for {sha!r}, got {obj.type_name.decode()}")
         assert isinstance(obj, Tree)
         return obj
+
+    def _record_conflict(
+        self,
+        path: bytes,
+        base: tuple[int | None, ObjectID | None],
+        ours: tuple[int | None, ObjectID | None],
+        theirs: tuple[int | None, ObjectID | None],
+    ) -> None:
+        """Record per-path conflict details for later index stage writing."""
+        self.conflict_info[path] = MergeConflictInfo(
+            path=path, ancestor=base, ours=ours, theirs=theirs
+        )
 
     def _merge_trees(
         self,
@@ -408,10 +439,48 @@ class Merger:
                     conflicts.extend(sub_conflicts)
                     self.object_store.add_object(sub_merged)
                     merged_entries[name] = (ours_mode, sub_merged.id)
+                elif (
+                    ours_mode is not None
+                    and theirs_mode is not None
+                    and not stat.S_ISDIR(ours_mode)
+                    and not stat.S_ISDIR(theirs_mode)
+                    and not S_ISGITLINK(ours_mode)
+                    and not S_ISGITLINK(theirs_mode)
+                ):
+                    # Both added a blob at the same name with different content.
+                    # Merge the blobs without a base so the result carries
+                    # conflict markers, which matters when this tree is used as
+                    # a virtual merge base in a recursive merge.
+                    ours_obj = self.object_store[ours_sha]
+                    theirs_obj = self.object_store[theirs_sha]
+                    if not is_blob(ours_obj) or not is_blob(theirs_obj):
+                        raise TypeError(f"Expected blobs for {path!r}")
+                    assert isinstance(ours_obj, Blob)
+                    assert isinstance(theirs_obj, Blob)
+                    merged_content, had_conflict = self.merge_blobs(
+                        None, ours_obj, theirs_obj, path
+                    )
+                    if had_conflict:
+                        conflicts.append(path)
+                        self._record_conflict(
+                            path,
+                            (None, None),
+                            (ours_mode, ours_sha),
+                            (theirs_mode, theirs_sha),
+                        )
+                    merged_blob = Blob.from_string(merged_content)
+                    self.object_store.add_object(merged_blob)
+                    merged_entries[name] = (ours_mode, merged_blob.id)
                 else:
-                    # Different additions - conflict
+                    # Different additions we cannot merge (e.g. file vs.
+                    # submodule, or mode mismatch) - conflict; keep ours.
                     conflicts.append(path)
-                    # For now, keep ours
+                    self._record_conflict(
+                        path,
+                        (None, None),
+                        (ours_mode, ours_sha),
+                        (theirs_mode, theirs_sha),
+                    )
                     merged_entries[name] = (ours_mode, ours_sha)
                 continue
 
@@ -422,6 +491,12 @@ class Merger:
                 and theirs_mode is not None
             ):
                 conflicts.append(path)
+                self._record_conflict(
+                    path,
+                    (base_mode, base_sha),
+                    (ours_mode, ours_sha),
+                    (theirs_mode, theirs_sha),
+                )
                 # For now, keep ours
                 merged_entries[name] = (ours_mode, ours_sha)
                 continue
@@ -445,6 +520,12 @@ class Merger:
                 else:
                     # They modified, we deleted - conflict
                     conflicts.append(path)
+                    self._record_conflict(
+                        path,
+                        (base_mode, base_sha),
+                        (None, None),
+                        (theirs_mode, theirs_sha),
+                    )
             elif theirs_sha is None:
                 # They deleted
                 if base_sha == ours_sha:
@@ -453,12 +534,24 @@ class Merger:
                 else:
                     # We modified, they deleted - conflict
                     conflicts.append(path)
+                    self._record_conflict(
+                        path,
+                        (base_mode, base_sha),
+                        (ours_mode, ours_sha),
+                        (None, None),
+                    )
                     merged_entries[name] = (ours_mode, ours_sha)
             else:
                 # Both modified differently
                 if S_ISGITLINK(ours_mode or 0) or S_ISGITLINK(theirs_mode or 0):
                     # Submodule conflict - can't merge submodule contents
                     conflicts.append(path)
+                    self._record_conflict(
+                        path,
+                        (base_mode, base_sha),
+                        (ours_mode, ours_sha),
+                        (theirs_mode, theirs_sha),
+                    )
                     merged_entries[name] = (ours_mode, ours_sha)
                 elif stat.S_ISDIR(ours_mode or 0) and stat.S_ISDIR(theirs_mode or 0):
                     # Both sides are subtrees modified differently: recurse
@@ -480,6 +573,12 @@ class Merger:
                 elif stat.S_ISDIR(ours_mode or 0) or stat.S_ISDIR(theirs_mode or 0):
                     # File/directory type transition on one side - conflict.
                     conflicts.append(path)
+                    self._record_conflict(
+                        path,
+                        (base_mode, base_sha),
+                        (ours_mode, ours_sha),
+                        (theirs_mode, theirs_sha),
+                    )
                     merged_entries[name] = (ours_mode, ours_sha)
                 else:
                     # Try to merge blobs
@@ -518,6 +617,12 @@ class Merger:
 
                     if had_conflict:
                         conflicts.append(path)
+                        self._record_conflict(
+                            path,
+                            (base_mode, base_sha),
+                            (ours_mode, ours_sha),
+                            (theirs_mode, theirs_sha),
+                        )
 
                     # Store merged blob
                     merged_blob = Blob.from_string(merged_content)
@@ -579,6 +684,7 @@ def recursive_merge(
     theirs_commit: Commit,
     gitattributes: GitAttributes | None = None,
     config: Config | None = None,
+    merger: "Merger | None" = None,
 ) -> tuple[Tree, list[bytes]]:
     """Perform a recursive merge with multiple merge bases.
 
@@ -596,6 +702,12 @@ def recursive_merge(
         theirs_commit: Their commit
         gitattributes: Optional GitAttributes object for checking merge drivers
         config: Optional Config object for loading merge driver configuration
+        merger: Optional Merger instance used for the final three-way merge.
+            After the call, its ``conflict_info`` maps each conflicted path to
+            a :class:`MergeConflictInfo` describing the ancestor/ours/theirs
+            (mode, sha) triples, which callers need to write index stages
+            1/2/3. Intermediate virtual-base merges use their own Merger and
+            do not populate this instance's ``conflict_info``.
 
     Returns:
         tuple of (merged_tree, list_of_conflicted_paths)
@@ -603,7 +715,13 @@ def recursive_merge(
     if not merge_bases:
         # No common ancestor - use None as base
         return three_way_merge(
-            object_store, None, ours_commit, theirs_commit, gitattributes, config
+            object_store,
+            None,
+            ours_commit,
+            theirs_commit,
+            gitattributes,
+            config,
+            merger=merger,
         )
     elif len(merge_bases) == 1:
         # Single merge base - simple three-way merge
@@ -619,6 +737,7 @@ def recursive_merge(
             theirs_commit,
             gitattributes,
             config,
+            merger=merger,
         )
     else:
         # Multiple merge bases - need to create a virtual merge base
@@ -672,6 +791,7 @@ def recursive_merge(
             theirs_commit,
             gitattributes,
             config,
+            merger=merger,
         )
 
 
@@ -682,6 +802,7 @@ def three_way_merge(
     theirs_commit: Commit,
     gitattributes: GitAttributes | None = None,
     config: Config | None = None,
+    merger: "Merger | None" = None,
 ) -> tuple[Tree, list[bytes]]:
     """Perform a three-way merge between commits.
 
@@ -692,11 +813,15 @@ def three_way_merge(
         theirs_commit: Their commit
         gitattributes: Optional GitAttributes object for checking merge drivers
         config: Optional Config object for loading merge driver configuration
+        merger: Optional Merger instance to reuse. If provided, its
+            ``conflict_info`` will contain per-path conflict details after
+            the call and ``gitattributes``/``config`` are ignored.
 
     Returns:
         tuple of (merged_tree, list_of_conflicted_paths)
     """
-    merger = Merger(object_store, gitattributes, config)
+    if merger is None:
+        merger = Merger(object_store, gitattributes, config)
 
     base_tree = None
     if base_commit:

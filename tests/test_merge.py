@@ -658,41 +658,34 @@ class RecursiveMergeTests(unittest.TestCase):
         self.assertEqual(conflicts[0], b"file.txt")
 
     def test_recursive_merge_multiple_bases_clean(self):
-        """Test recursive merge with multiple bases where merge is clean."""
+        """Test recursive merge with multiple bases converging to identical content."""
         # Create initial commit
         _blob_id, tree_id = self._create_blob_and_tree(
             b"initial content\n", b"file.txt"
         )
         initial_commit = self._create_commit(tree_id, [], b"Initial commit")
 
-        # Create two merge bases
-        _blob_id, tree_id = self._create_blob_and_tree(b"base1 content\n", b"file.txt")
+        # Two merge bases with identical file contents (bases agree on the file).
+        _blob_id, tree_id = self._create_blob_and_tree(b"shared content\n", b"file.txt")
         base1_commit = self._create_commit(
             tree_id, [initial_commit.id], b"Base 1 commit"
         )
-
-        _blob_id, tree_id = self._create_blob_and_tree(b"base2 content\n", b"file.txt")
         base2_commit = self._create_commit(
             tree_id, [initial_commit.id], b"Base 2 commit"
         )
 
-        # Create ours commit that modifies the file
+        # Ours modifies the file
         _blob_id, tree_id = self._create_blob_and_tree(b"ours content\n", b"file.txt")
         ours_commit = self._create_commit(
             tree_id, [base1_commit.id, base2_commit.id], b"Ours commit"
         )
 
-        # Create theirs commit that keeps one of the base contents
-        # The recursive merge will create a virtual base by merging base1 and base2
-        # Since theirs has the same content as base1, and ours modified from both bases,
-        # the three-way merge will see: virtual_base vs ours (modified) vs theirs (closer to base)
-        # This should result in taking ours content (clean merge)
-        _blob_id, tree_id = self._create_blob_and_tree(b"base1 content\n", b"file.txt")
+        # Theirs keeps the shared base content
+        _blob_id, tree_id = self._create_blob_and_tree(b"shared content\n", b"file.txt")
         theirs_commit = self._create_commit(
             tree_id, [base1_commit.id, base2_commit.id], b"Theirs commit"
         )
 
-        # Perform recursive merge
         merged_tree, conflicts = recursive_merge(
             self.repo.object_store,
             [base1_commit.id, base2_commit.id],
@@ -700,10 +693,8 @@ class RecursiveMergeTests(unittest.TestCase):
             theirs_commit,
         )
 
-        # The merge should complete without errors
+        # Bases agree, so the virtual base is clean and the merge takes ours.
         self.assertIsNotNone(merged_tree)
-        # There should be no conflicts - this is a clean merge since one side didn't change
-        # from the virtual merge base in a conflicting way
         self.assertEqual(len(conflicts), 0)
 
     def test_recursive_merge_three_bases(self):
@@ -826,17 +817,11 @@ class RecursiveMergeTests(unittest.TestCase):
             theirs_commit,
         )
 
-        # The recursive merge creates a virtual base by merging base1 and base2
-        # Virtual base will have: file1 from base1 (conflict between base1 and base2's file1)
-        #                         file2 from base2 (conflict between base1 and base2's file2)
-        # Then comparing ours vs virtual vs theirs:
-        # - file1: ours modified, theirs unchanged from virtual -> take ours (no conflict)
-        # - file2: ours unchanged from virtual, theirs modified -> take theirs (no conflict)
-        # Actually, the virtual merge itself will have conflicts, but let's check what we get
-        # Based on the result, it seems only one file has a conflict
-        self.assertEqual(len(conflicts), 1)
-        # The conflict is likely in file2 since both sides modified it differently
-        self.assertIn(b"file2.txt", conflicts)
+        # The virtual merge base of base1 and base2 has conflict markers on
+        # both file1 and file2 (they disagree between the two bases). The final
+        # merge against that virtual base therefore reports both paths as
+        # conflicted rather than silently taking one side.
+        self.assertEqual(sorted(conflicts), [b"file1.txt", b"file2.txt"])
 
     def test_recursive_merge_with_file_addition(self):
         """Test recursive merge where bases add different files."""
@@ -960,6 +945,40 @@ class RecursiveMergeTests(unittest.TestCase):
         self.assertEqual(len(conflicts), 0)
         # Merged tree should be empty
         self.assertEqual(len(list(merged_tree.items())), 0)
+
+    def test_recursive_merge_criss_cross_bases_disagree(self):
+        """Criss-cross history where the two merge bases disagree on a file.
+
+        Regression test for a bug where the virtual merge base kept one side's
+        blob verbatim instead of merging with conflict markers, so the final
+        three-way merge silently took the other side's content and reported no
+        conflict.
+        """
+        _blob, tree_id = self._create_blob_and_tree(b"O\n", b"value.txt")
+        origin = self._create_commit(tree_id, [], b"O")
+
+        _blob, tree_id = self._create_blob_and_tree(b"A1\n", b"value.txt")
+        a1 = self._create_commit(tree_id, [origin.id], b"A1")
+
+        _blob, tree_id = self._create_blob_and_tree(b"B1\n", b"value.txt")
+        b1 = self._create_commit(tree_id, [origin.id], b"B1")
+
+        _blob, tree_id = self._create_blob_and_tree(b"A1\n", b"value.txt")
+        a2 = self._create_commit(tree_id, [a1.id, b1.id], b"A2")
+
+        _blob, tree_id = self._create_blob_and_tree(b"B1\n", b"value.txt")
+        b2 = self._create_commit(tree_id, [b1.id, a1.id], b"B2")
+
+        merged_tree, conflicts = recursive_merge(
+            self.repo.object_store, [a1.id, b1.id], a2, b2
+        )
+
+        self.assertEqual(conflicts, [b"value.txt"])
+        _mode, sha = merged_tree[b"value.txt"]
+        merged = self.repo.object_store[sha].data
+        self.assertIn(b"<<<<<<< ours", merged)
+        self.assertIn(b"=======", merged)
+        self.assertIn(b">>>>>>> theirs", merged)
 
 
 class OctopusMergeTests(unittest.TestCase):

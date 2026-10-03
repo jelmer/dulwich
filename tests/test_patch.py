@@ -1754,17 +1754,16 @@ class ApplyBinaryPatchesTests(TestCase):
             {
                 b"big.bin": BIG_OLD,
                 b"mv.bin": MV_OLD,
-                b'q"uote.txt': b"hello\n",
                 b"t\xc3\xa9st.bin": b"q\0r",
             }
         )
-        apply_patches(r, parse_unified_diff(QUOTED_DELTA_DIFF), strip=1)
+        patches = parse_unified_diff(QUOTED_DELTA_DIFF)
+        apply_patches(r, [patches[0], patches[1], patches[3]], strip=1)
         self._assert_files(
             r,
             {
                 b"big.bin": BIG_NEW,
                 b"moved.bin": MV_NEW,
-                b'q"uote.txt': b"world\n",
                 b"t\xc3\xa9st.bin": b"q\0s",
             },
         )
@@ -1776,6 +1775,13 @@ class ApplyBinaryPatchesTests(TestCase):
         self.assertEqual(
             b"7bc0b17cddb93157835768510813377e01ab7543", index.get_sha1(b"moved.bin")
         )
+
+    @skipIf(sys.platform == "win32", 'Windows does not allow " in file names')
+    def test_apply_escaped_quote(self) -> None:
+        r = self._make_repo({b'q"uote.txt': b"hello\n"})
+        patches = parse_unified_diff(QUOTED_DELTA_DIFF)
+        apply_patches(r, patches[2:3], strip=1)
+        self._assert_files(r, {b'q"uote.txt': b"world\n"})
 
     def test_apply_reverse(self) -> None:
         r = self._make_repo({b"big.bin": BIG_NEW, b"t\xc3\xa9st.bin": b"q\0s"})

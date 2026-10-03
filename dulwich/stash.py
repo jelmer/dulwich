@@ -39,12 +39,12 @@ from .index import (
     build_file_from_blob,
     commit_tree,
     get_path_element_validator,
+    get_symlink_fn,
     index_entry_from_stat,
     iter_fresh_objects,
-    symlink,
     update_working_tree,
     validate_path,
-    verify_leading_dirs,
+    verify_tree_path,
 )
 from .object_store import iter_tree_contents
 from .objects import S_IFGITLINK, Blob, Commit, ObjectID, TreeEntry
@@ -162,20 +162,7 @@ class Stash:
         honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
         validate_path_element = get_path_element_validator(config)
 
-        if config.get_boolean(b"core", b"symlinks", True):
-            symlink_fn = symlink
-        else:
-
-            def symlink_fn(  # type: ignore[misc,unused-ignore]
-                src: str | bytes,
-                dst: str | bytes,
-                target_is_directory: bool = False,
-                *,
-                dir_fd: int | None = None,
-            ) -> None:
-                mode = "w" + ("b" if isinstance(src, bytes) else "")
-                with open(dst, mode) as f:
-                    f.write(src)
+        symlink_fn = get_symlink_fn(config)
 
         # Get blob normalizer for line ending conversion
         blob_normalizer = self._repo.get_blob_normalizer(config=config)
@@ -230,13 +217,11 @@ class Stash:
                 and tree_entry2.mode is not None
                 and tree_entry2.sha is not None
             )
-            if not validate_path(tree_entry2.path, validate_path_element):
-                raise InvalidPathError(tree_entry2.path)
-
-            # Refuse writes whose leading path goes through a symlink left
-            # in the worktree (e.g. ``link`` -> ``.git/hooks``); the cache
-            # keeps the total cost to one ``lstat`` per unique directory.
-            verify_leading_dirs(tree_entry2.path, safe_prefix, repo_path)
+            # Also refuses writes whose leading path goes through a symlink
+            # left in the worktree (e.g. ``link`` -> ``.git/hooks``).
+            verify_tree_path(
+                tree_entry2.path, validate_path_element, safe_prefix, repo_path
+            )
 
             full_path = _tree_to_fs_path(repo_path, tree_entry2.path)
 

@@ -372,8 +372,8 @@ from ..index import (
     blob_from_path_and_stat,
     build_file_from_blob,
     get_path_element_validator,
+    get_symlink_fn,
     get_unstaged_changes,
-    symlink,
     update_working_tree,
 )
 from ..object_store import BaseObjectStore, tree_lookup_path
@@ -5937,26 +5937,7 @@ def _get_worktree_update_config(
     # apply together, so defer to the shared selector rather than picking one.
     validate_path_element = get_path_element_validator(config)
 
-    if config.get_boolean(b"core", b"symlinks", True):
-
-        def symlink_wrapper(
-            source: str | bytes | os.PathLike[str],
-            target: str | bytes | os.PathLike[str],
-        ) -> None:
-            symlink(source, target)  # type: ignore[arg-type,unused-ignore]
-
-        symlink_fn = symlink_wrapper
-    else:
-
-        def symlink_fallback(
-            source: str | bytes | os.PathLike[str],
-            target: str | bytes | os.PathLike[str],
-        ) -> None:
-            mode = "w" + ("b" if isinstance(source, bytes) else "")
-            with open(target, mode) as f:
-                f.write(source)
-
-        symlink_fn = symlink_fallback
+    symlink_fn = get_symlink_fn(config)
 
     return honor_filemode, validate_path_element, symlink_fn
 

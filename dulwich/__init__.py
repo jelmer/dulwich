@@ -33,6 +33,49 @@ P = ParamSpec("P")
 R = TypeVar("R")
 F = TypeVar("F", bound=Callable[..., Any])
 
+
+def _deprecated_aliases(
+    module_name: str, aliases: dict[str, str]
+) -> Callable[[str], object]:
+    """Create a module ``__getattr__`` that serves deprecated aliases.
+
+    Use it for names that have moved to another module but should remain
+    importable from their old location for a while::
+
+        __getattr__ = _deprecated_aliases(
+            __name__, {"SHA1Writer": "dulwich.pack.SHA1Writer"}
+        )
+
+    Args:
+      module_name: Name of the module the aliases live in
+      aliases: Maps each old attribute name to the fully qualified name of
+        its new location; the target is only imported on first access
+
+    Returns:
+      A function suitable for use as a module level ``__getattr__``
+    """
+
+    def __getattr__(name: str) -> object:
+        try:
+            target = aliases[name]
+        except KeyError:
+            raise AttributeError(
+                f"module {module_name!r} has no attribute {name!r}"
+            ) from None
+        import importlib
+        import warnings
+
+        warnings.warn(
+            f"{module_name}.{name} is deprecated; use {target} instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        target_module, _, target_name = target.rpartition(".")
+        return getattr(importlib.import_module(target_module), target_name)
+
+    return __getattr__
+
+
 if TYPE_CHECKING:
     # For type checking, always use our typed signature
     def replace_me(

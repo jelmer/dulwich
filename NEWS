@@ -1,3 +1,9 @@
+1.2.17	UNRELEASED
+
+ * Restore ``dulwich.index.SHA1Reader`` and ``dulwich.index.SHA1Writer``,
+   which were dropped in 1.2.16, as deprecated aliases for the classes in
+   ``dulwich.pack``. (Jelmer Vernooĳ)
+
 1.2.16	2026-10-03
 
  * Add ``PackIndex.object_sha_at_position`` to look up an object by its

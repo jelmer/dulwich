@@ -141,6 +141,23 @@ from .pack import ObjectContainer
 
 logger = logging.getLogger(__name__)
 
+
+def __getattr__(name: str) -> object:
+    # SHA1Reader and SHA1Writer used to be importable from here.
+    if name in ("SHA1Reader", "SHA1Writer"):
+        import warnings
+
+        from . import pack
+
+        warnings.warn(
+            f"dulwich.index.{name} is deprecated; use dulwich.pack.{name} instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return getattr(pack, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 # Type alias for recursive tree structure used in commit_tree
 TreeDict = dict[bytes, "TreeDict | tuple[int, ObjectID]"]
 

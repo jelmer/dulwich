@@ -23,6 +23,10 @@
    ``apply_patch`` could install a hook. (Jelmer Vernooĳ, reported by
    @manus-pi)
 
+ * Honour ``\ No newline at end of file`` markers when applying patches,
+   which previously made patches to files without a trailing newline fail.
+   (Jelmer Vernooĳ)
+
  * Ignore a ``multi-pack-index`` entry whose pack has been removed when
    answering whether an object is present. After a prune the stale index
    made ``sha in repo.object_store`` disagree with ``repo.object_store[sha]``.

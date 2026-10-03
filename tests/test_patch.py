@@ -1867,6 +1867,83 @@ class ApplyPatchesPathTests(TestCase):
             os.path.exists(os.path.join(r.path, ".git", "hooks", "pre-commit"))
         )
 
+    def _assert_refused_through_symlink(self, patches: list[FilePatch]) -> None:
+        # A tracked symlink ``trap`` pointing into .git stays within the work
+        # tree, so writing a patch target of that name must not follow it.
+        r = self._make_repo()
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        os.symlink(".git/hooks/pre-commit", os.path.join(r.path, "trap"))
+        self.assertRaises(ValueError, apply_patches, r, patches, strip=1)
+        self.assertFalse(os.path.exists(hook))
+        self.assertTrue(os.path.islink(os.path.join(r.path, "trap")))
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_symlinked_target_text(self) -> None:
+        self._assert_refused_through_symlink(
+            parse_unified_diff(
+                b"diff --git a/trap b/trap\n"
+                b"new file mode 100755\n"
+                b"--- /dev/null\n"
+                b"+++ b/trap\n"
+                b"@@ -0,0 +1 @@\n"
+                b"+#!/bin/sh\n"
+            )
+        )
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_symlinked_target_binary(self) -> None:
+        self._assert_refused_through_symlink(
+            [
+                FilePatch(
+                    old_path=None,
+                    new_path=b"b/trap",
+                    old_mode=None,
+                    new_mode=0o100755,
+                    hunks=[],
+                    binary=True,
+                    binary_new=b"ScmY#Z)KALH(=X28VgLXU0|LPS\n",
+                )
+            ]
+        )
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_symlinked_copy_destination(self) -> None:
+        r = self._make_repo()
+        with open(os.path.join(r.path, "src"), "wb") as f:
+            f.write(b"#!/bin/sh\n")
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        os.symlink(".git/hooks/pre-commit", os.path.join(r.path, "trap"))
+        diff = (
+            b"diff --git a/src b/trap\n"
+            b"similarity index 100%\n"
+            b"copy from src\n"
+            b"copy to trap\n"
+        )
+        self.assertRaises(
+            ValueError, apply_patches, r, parse_unified_diff(diff), strip=1
+        )
+        self.assertFalse(os.path.exists(hook))
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_deletes_symlink_target(self) -> None:
+        # Deleting a symlink removes the link itself, so it stays allowed.
+        r = self._make_repo()
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        with open(hook, "wb") as f:
+            f.write(b"#!/bin/sh\n")
+        os.symlink(".git/hooks/pre-commit", os.path.join(r.path, "trap"))
+        diff = (
+            b"diff --git a/trap b/trap\n"
+            b"deleted file mode 120000\n"
+            b"--- a/trap\n"
+            b"+++ /dev/null\n"
+            b"@@ -1 +0,0 @@\n"
+            b"-#!/bin/sh\n"
+        )
+        apply_patches(r, parse_unified_diff(diff), strip=1)
+        self.assertFalse(os.path.lexists(os.path.join(r.path, "trap")))
+        self.assertTrue(os.path.exists(hook))
+
     def test_allows_in_tree_path(self) -> None:
         r = self._make_repo()
         diff = (

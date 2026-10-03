@@ -17,6 +17,12 @@
    longer write files outside the work tree via ``..`` entries or symlinks.
    (Jelmer Vernooĳ, reported by Choudhry Shehryar)
 
+ * SECURITY: Refuse to apply patches through a symlinked target in
+   ``apply_patches``. A tracked symlink such as ``trap ->
+   .git/hooks/pre-commit`` was followed when writing, so ``porcelain.am``/
+   ``apply_patch`` could install a hook. (Jelmer Vernooĳ, reported by
+   @manus-pi)
+
  * Ignore a ``multi-pack-index`` entry whose pack has been removed when
    answering whether an object is present. After a prune the stale index
    made ``sha in repo.object_store`` disagree with ``repo.object_store[sha]``.

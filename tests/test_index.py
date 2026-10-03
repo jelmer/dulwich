@@ -65,6 +65,7 @@ from dulwich.index import (
     _is_reserved_windows_device_name,
     _tree_to_fs_path,
     apply_stat_refresh,
+    build_file_from_blob,
     build_index_from_tree,
     cleanup_mode,
     commit_tree,
@@ -603,6 +604,38 @@ class IndexEntryFromStatTests(TestCase):
                 0,
             ),
         )
+
+
+@skipIf(sys.platform == "win32", "Requires POSIX file modes")
+class BuildFileFromBlobTests(TestCase):
+    def _write(self, content: bytes, perms: int) -> bytes:
+        path = os.path.join(os.fsencode(self.mkdtemp()), b"f")
+        with open(path, "wb") as f:
+            f.write(content)
+        os.chmod(path, perms)
+        return path
+
+    def mkdtemp(self) -> str:
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path)
+        return path
+
+    def test_mode_change_with_unchanged_content(self) -> None:
+        path = self._write(b"x\n", 0o644)
+        st = build_file_from_blob(Blob.from_string(b"x\n"), 0o100755, path)
+        self.assertEqual(0o755, stat.S_IMODE(os.lstat(path).st_mode))
+        self.assertEqual(0o755, stat.S_IMODE(st.st_mode))
+
+        st = build_file_from_blob(Blob.from_string(b"x\n"), 0o100644, path)
+        self.assertEqual(0o644, stat.S_IMODE(os.lstat(path).st_mode))
+        self.assertEqual(0o644, stat.S_IMODE(st.st_mode))
+
+    def test_mode_ignored_without_honor_filemode(self) -> None:
+        path = self._write(b"x\n", 0o644)
+        build_file_from_blob(
+            Blob.from_string(b"x\n"), 0o100755, path, honor_filemode=False
+        )
+        self.assertEqual(0o644, stat.S_IMODE(os.lstat(path).st_mode))
 
 
 class BuildIndexTests(TestCase):

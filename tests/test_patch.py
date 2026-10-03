@@ -30,6 +30,7 @@ import zlib
 from io import BytesIO, StringIO
 from typing import NoReturn
 
+from dulwich.index import index_entry_from_stat
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, Commit, Tree
 from dulwich.patch import (
@@ -1248,6 +1249,60 @@ Binary files a/image.png and b/image.png differ
 
 
 class ApplyPatchTests(TestCase):
+    def _apply_diff(self, diff: bytes, original: list[bytes]) -> list[bytes] | None:
+        return apply_patch_hunks(parse_unified_diff(diff)[0], original)
+
+    def test_no_newline_at_end_of_file(self) -> None:
+        # Produced by git diff after changing b"one\ntwo" to b"one\nthree".
+        diff = (
+            b"diff --git a/f b/f\n"
+            b"index 9ed40b4..7279b45 100644\n"
+            b"--- a/f\n"
+            b"+++ b/f\n"
+            b"@@ -1,2 +1,2 @@\n"
+            b" one\n"
+            b"-two\n"
+            b"\\ No newline at end of file\n"
+            b"+three\n"
+            b"\\ No newline at end of file\n"
+        )
+        self.assertEqual(
+            [b"one\n", b"three"], self._apply_diff(diff, [b"one\n", b"two"])
+        )
+        self.assertIsNone(self._apply_diff(diff, [b"one\n", b"two\n"]))
+
+    def test_add_newline_at_end_of_file(self) -> None:
+        # Produced by git diff after changing b"one\ntwo" to b"one\nthree\n".
+        diff = (
+            b"diff --git a/f b/f\n"
+            b"index 9ed40b4..4c7442b 100644\n"
+            b"--- a/f\n"
+            b"+++ b/f\n"
+            b"@@ -1,2 +1,2 @@\n"
+            b" one\n"
+            b"-two\n"
+            b"\\ No newline at end of file\n"
+            b"+three\n"
+        )
+        self.assertEqual(
+            [b"one\n", b"three\n"], self._apply_diff(diff, [b"one\n", b"two"])
+        )
+
+    def test_no_newline_on_context_line(self) -> None:
+        diff = (
+            b"--- a/f\n"
+            b"+++ b/f\n"
+            b"@@ -1,2 +1,2 @@\n"
+            b"-one\n"
+            b"+uno\n"
+            b" two\n"
+            b"\\ No newline at end of file\n"
+        )
+        self.assertEqual(
+            [b"uno\n", b"two"],
+            self._apply_diff(b"diff --git a/f b/f\n" + diff, [b"one\n", b"two"]),
+        )
+
     def test_simple_modification(self) -> None:
         """Test applying a simple modification patch."""
         original = [b"line 1\n", b"line 2\n", b"line 3\n"]
@@ -1495,6 +1550,29 @@ class GitBase85DecodeTests(TestCase):
 
 class ParseUnifiedDiffRenameTests(TestCase):
     """Tests for parse_unified_diff with rename/copy headers."""
+
+    def test_parse_pure_rename_followed_by_patch(self) -> None:
+        # A rename without content changes has no ---/+++ lines; the next
+        # diff --git line must start a new patch rather than be swallowed.
+        patches = parse_unified_diff(
+            b"diff --git a/old b/new\n"
+            b"similarity index 100%\n"
+            b"rename from old\n"
+            b"rename to new\n"
+            b"diff --git a/x b/x\n"
+            b"--- a/x\n"
+            b"+++ b/x\n"
+            b"@@ -1 +1 @@\n"
+            b"-a\n"
+            b"+b\n"
+        )
+        self.assertEqual(
+            [(None, None, b"old", b"new", 0), (b"a/x", b"b/x", None, None, 1)],
+            [
+                (p.old_path, p.new_path, p.rename_from, p.rename_to, len(p.hunks))
+                for p in patches
+            ],
+        )
 
     def test_parse_rename(self):
         diff = b"""diff --git a/old.txt b/new.txt
@@ -1867,6 +1945,120 @@ class ApplyPatchesPathTests(TestCase):
             os.path.exists(os.path.join(r.path, ".git", "hooks", "pre-commit"))
         )
 
+    def _assert_refused_through_symlink(self, patches: list[FilePatch]) -> None:
+        # A tracked symlink ``trap`` pointing into .git stays within the work
+        # tree, so writing a patch target of that name must not follow it.
+        r = self._make_repo()
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        os.symlink(".git/hooks/pre-commit", os.path.join(r.path, "trap"))
+        self.assertRaises(ValueError, apply_patches, r, patches, strip=1)
+        self.assertFalse(os.path.exists(hook))
+        self.assertTrue(os.path.islink(os.path.join(r.path, "trap")))
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_symlinked_target_text(self) -> None:
+        self._assert_refused_through_symlink(
+            parse_unified_diff(
+                b"diff --git a/trap b/trap\n"
+                b"new file mode 100755\n"
+                b"--- /dev/null\n"
+                b"+++ b/trap\n"
+                b"@@ -0,0 +1 @@\n"
+                b"+#!/bin/sh\n"
+            )
+        )
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_symlinked_target_binary(self) -> None:
+        self._assert_refused_through_symlink(
+            [
+                FilePatch(
+                    old_path=None,
+                    new_path=b"b/trap",
+                    old_mode=None,
+                    new_mode=0o100755,
+                    hunks=[],
+                    binary=True,
+                    binary_new=b"ScmY#Z)KALH(=X28VgLXU0|LPS\n",
+                )
+            ]
+        )
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_symlinked_copy_destination(self) -> None:
+        r = self._make_repo()
+        with open(os.path.join(r.path, "src"), "wb") as f:
+            f.write(b"#!/bin/sh\n")
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        os.symlink(".git/hooks/pre-commit", os.path.join(r.path, "trap"))
+        diff = (
+            b"diff --git a/src b/trap\n"
+            b"similarity index 100%\n"
+            b"copy from src\n"
+            b"copy to trap\n"
+        )
+        self.assertRaises(
+            ValueError, apply_patches, r, parse_unified_diff(diff), strip=1
+        )
+        self.assertFalse(os.path.exists(hook))
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_deletes_symlink_target(self) -> None:
+        # Deleting a symlink removes the link itself, so it stays allowed.
+        r = self._make_repo()
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        with open(hook, "wb") as f:
+            f.write(b"#!/bin/sh\n")
+        os.symlink(".git/hooks/pre-commit", os.path.join(r.path, "trap"))
+        diff = (
+            b"diff --git a/trap b/trap\n"
+            b"deleted file mode 120000\n"
+            b"--- a/trap\n"
+            b"+++ /dev/null\n"
+            b"@@ -1 +0,0 @@\n"
+            b"-.git/hooks/pre-commit\n"
+            b"\\ No newline at end of file\n"
+        )
+        apply_patches(r, parse_unified_diff(diff), strip=1)
+        self.assertFalse(os.path.lexists(os.path.join(r.path, "trap")))
+        self.assertTrue(os.path.exists(hook))
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_regular_file_patch_to_symlink(self) -> None:
+        # The index line says trap is a regular file, but it is a symlink in
+        # the work tree. git refuses this with "wrong type".
+        self._assert_refused_through_symlink(
+            parse_unified_diff(
+                b"diff --git a/trap b/trap\n"
+                b"index 1234567..89abcde 100755\n"
+                b"--- a/trap\n"
+                b"+++ b/trap\n"
+                b"@@ -0,0 +1 @@\n"
+                b"+#!/bin/sh\n"
+            )
+        )
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_patch_without_mode_updates_symlink(self) -> None:
+        # Without mode information the work tree decides the type, so the
+        # patch applies to the link target rather than through the link.
+        r = self._make_repo()
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        trap = os.path.join(r.path, "trap")
+        os.symlink(".git/hooks/pre-commit", trap)
+        diff = (
+            b"--- a/trap\n"
+            b"+++ b/trap\n"
+            b"@@ -1 +1 @@\n"
+            b"-.git/hooks/pre-commit\n"
+            b"\\ No newline at end of file\n"
+            b"+elsewhere\n"
+            b"\\ No newline at end of file\n"
+        )
+        apply_patches(r, parse_unified_diff(b"diff --git a/trap b/trap\n" + diff))
+        self.assertFalse(os.path.exists(hook))
+        self.assertEqual("elsewhere", os.readlink(trap))
+
     def test_allows_in_tree_path(self) -> None:
         r = self._make_repo()
         diff = (
@@ -1900,3 +2092,174 @@ class ApplyPatchesPathTests(TestCase):
         self.assertEqual(stat.S_IMODE(mode), 0o755)
         self.assertFalse(mode & stat.S_ISUID)
         self.assertFalse(mode & stat.S_IWOTH)
+
+
+# Produced by git diff --cached -M after retargeting mod, deleting del,
+# adding added, renaming mvsrc to mvdst and turning the regular file tc into
+# a symlink.
+SYMLINK_DIFF = b"""\
+diff --git a/added b/added
+new file mode 120000
+index 0000000..12a8d8a
+--- /dev/null
++++ b/added
+@@ -0,0 +1 @@
++target1
+\\ No newline at end of file
+diff --git a/del b/del
+deleted file mode 120000
+index bc99ab0..0000000
+--- a/del
++++ /dev/null
+@@ -1 +0,0 @@
+-gone
+\\ No newline at end of file
+diff --git a/mod b/mod
+index 3defea2..f63c08c 120000
+--- a/mod
++++ b/mod
+@@ -1 +1 @@
+-old-target
+\\ No newline at end of file
++new-target
+\\ No newline at end of file
+diff --git a/mvsrc b/mvdst
+similarity index 100%
+rename from mvsrc
+rename to mvdst
+diff --git a/tc b/tc
+deleted file mode 100644
+index d95f3ad..0000000
+--- a/tc
++++ /dev/null
+@@ -1 +0,0 @@
+-content
+diff --git a/tc b/tc
+new file mode 120000
+index 0000000..12a8d8a
+--- /dev/null
++++ b/tc
+@@ -0,0 +1 @@
++target1
+\\ No newline at end of file
+"""
+
+
+@skipIf(sys.platform == "win32", "Requires symlink support")
+class ApplySymlinkPatchesTests(TestCase):
+    def _make_repo(self) -> Repo:
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        r = Repo.init(path)
+        self.addCleanup(r.close)
+        return r
+
+    def test_apply(self) -> None:
+        r = self._make_repo()
+        with open(os.path.join(r.path, "target1"), "wb") as f:
+            f.write(b"hi\n")
+        with open(os.path.join(r.path, "tc"), "wb") as f:
+            f.write(b"content\n")
+        for name, target in [
+            ("mod", "old-target"),
+            ("del", "gone"),
+            ("mvsrc", "moving"),
+        ]:
+            os.symlink(target, os.path.join(r.path, name))
+        r.get_worktree().stage([b"target1", b"tc", b"mod", b"del", b"mvsrc"])
+
+        apply_patches(r, parse_unified_diff(SYMLINK_DIFF), strip=1)
+
+        links = {
+            "added": "target1",
+            "mod": "new-target",
+            "mvdst": "moving",
+            "tc": "target1",
+        }
+        self.assertEqual(
+            sorted(["target1", *links]),
+            sorted(n for n in os.listdir(r.path) if n != ".git"),
+        )
+        for name, target in links.items():
+            self.assertEqual(target, os.readlink(os.path.join(r.path, name)))
+        self.assertEqual(
+            sorted(
+                [(b"target1", Blob.from_string(b"hi\n").id, 0o100644)]
+                + [
+                    (name.encode(), Blob.from_string(target.encode()).id, 0o120000)
+                    for name, target in links.items()
+                ]
+            ),
+            sorted(r.open_index().iterobjects()),
+        )
+
+    def test_apply_without_symlink_support(self) -> None:
+        # With core.symlinks=false the link is checked out as a plain file
+        # holding the target, and stays a plain file after patching.
+        r = self._make_repo()
+        config = r.get_config()
+        config.set((b"core",), b"symlinks", False)
+        config.write_to_path()
+        mod = os.path.join(r.path, "mod")
+        with open(mod, "wb") as f:
+            f.write(b"old-target")
+        index = r.open_index()
+        index[b"mod"] = index_entry_from_stat(
+            os.lstat(mod), Blob.from_string(b"old-target").id, mode=0o120000
+        )
+        index.write()
+
+        apply_patches(r, parse_unified_diff(SYMLINK_DIFF)[2:3], strip=1)
+
+        self.assertFalse(os.path.islink(mod))
+        with open(mod, "rb") as f:
+            self.assertEqual(b"new-target", f.read())
+        self.assertEqual(
+            [(b"mod", Blob.from_string(b"new-target").id, 0o120000)],
+            list(r.open_index().iterobjects()),
+        )
+
+    def test_rejects_addition_over_existing_path(self) -> None:
+        r = self._make_repo()
+        with open(os.path.join(r.path, "added"), "wb") as f:
+            f.write(b"untracked\n")
+        self.assertRaises(
+            ValueError,
+            apply_patches,
+            r,
+            parse_unified_diff(SYMLINK_DIFF)[:1],
+            strip=1,
+        )
+        with open(os.path.join(r.path, "added"), "rb") as f:
+            self.assertEqual(b"untracked\n", f.read())
+
+
+class ApplyModeChangeTests(TestCase):
+    @skipIf(sys.platform == "win32", "Requires POSIX file modes")
+    def test_mode_only_change(self) -> None:
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        r = Repo.init(path)
+        self.addCleanup(r.close)
+        script = os.path.join(path, "script")
+        with open(script, "wb") as f:
+            f.write(b"#!/bin/sh\n")
+        os.chmod(script, 0o644)
+        r.get_worktree().stage([b"script"])
+        apply_patches(
+            r,
+            [
+                FilePatch(
+                    old_path=b"a/script",
+                    new_path=b"b/script",
+                    old_mode=0o100644,
+                    new_mode=0o100755,
+                    hunks=[],
+                )
+            ],
+        )
+        self.assertEqual(0o755, stat.S_IMODE(os.lstat(script).st_mode))
+        self.assertEqual(
+            [(b"script", Blob.from_string(b"#!/bin/sh\n").id, 0o100755)],
+            list(r.open_index().iterobjects()),
+        )

@@ -2232,3 +2232,34 @@ class ApplySymlinkPatchesTests(TestCase):
         )
         with open(os.path.join(r.path, "added"), "rb") as f:
             self.assertEqual(b"untracked\n", f.read())
+
+
+class ApplyModeChangeTests(TestCase):
+    @skipIf(sys.platform == "win32", "Requires POSIX file modes")
+    def test_mode_only_change(self) -> None:
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        r = Repo.init(path)
+        self.addCleanup(r.close)
+        script = os.path.join(path, "script")
+        with open(script, "wb") as f:
+            f.write(b"#!/bin/sh\n")
+        os.chmod(script, 0o644)
+        r.get_worktree().stage([b"script"])
+        apply_patches(
+            r,
+            [
+                FilePatch(
+                    old_path=b"a/script",
+                    new_path=b"b/script",
+                    old_mode=0o100644,
+                    new_mode=0o100755,
+                    hunks=[],
+                )
+            ],
+        )
+        self.assertEqual(0o755, stat.S_IMODE(os.lstat(script).st_mode))
+        self.assertEqual(
+            [(b"script", Blob.from_string(b"#!/bin/sh\n").id, 0o100755)],
+            list(r.open_index().iterobjects()),
+        )

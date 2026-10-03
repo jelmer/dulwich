@@ -1556,22 +1556,12 @@ def _write_patch_target(
     Returns:
       The ``lstat`` result of the written path
     """
-    from .index import build_file_from_blob, cleanup_mode, get_symlink_fn
+    from .index import build_file_from_blob, get_symlink_fn
 
     os.makedirs(os.path.dirname(fs_path), exist_ok=True)
-    if stat.S_ISLNK(mode):
-        return build_file_from_blob(
-            Blob.from_string(content),
-            mode,
-            fs_path,
-            symlink_fn=get_symlink_fn(config),
-        )
-    if os.path.islink(fs_path):
-        os.unlink(fs_path)
-    with open(fs_path, "wb") as f:
-        f.write(content)
-    os.chmod(fs_path, cleanup_mode(mode))
-    return os.lstat(fs_path)
+    return build_file_from_blob(
+        Blob.from_string(content), mode, fs_path, symlink_fn=get_symlink_fn(config)
+    )
 
 
 def _refuse_existing_target(fs_path: bytes, tree_path: bytes) -> None:

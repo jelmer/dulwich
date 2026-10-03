@@ -26,9 +26,11 @@ import shutil
 import stat
 import sys
 import tempfile
+import zlib
 from io import BytesIO, StringIO
 from typing import NoReturn
 
+from dulwich.index import index_entry_from_stat
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, Commit, Tree
 from dulwich.patch import (
@@ -1247,6 +1249,60 @@ Binary files a/image.png and b/image.png differ
 
 
 class ApplyPatchTests(TestCase):
+    def _apply_diff(self, diff: bytes, original: list[bytes]) -> list[bytes] | None:
+        return apply_patch_hunks(parse_unified_diff(diff)[0], original)
+
+    def test_no_newline_at_end_of_file(self) -> None:
+        # Produced by git diff after changing b"one\ntwo" to b"one\nthree".
+        diff = (
+            b"diff --git a/f b/f\n"
+            b"index 9ed40b4..7279b45 100644\n"
+            b"--- a/f\n"
+            b"+++ b/f\n"
+            b"@@ -1,2 +1,2 @@\n"
+            b" one\n"
+            b"-two\n"
+            b"\\ No newline at end of file\n"
+            b"+three\n"
+            b"\\ No newline at end of file\n"
+        )
+        self.assertEqual(
+            [b"one\n", b"three"], self._apply_diff(diff, [b"one\n", b"two"])
+        )
+        self.assertIsNone(self._apply_diff(diff, [b"one\n", b"two\n"]))
+
+    def test_add_newline_at_end_of_file(self) -> None:
+        # Produced by git diff after changing b"one\ntwo" to b"one\nthree\n".
+        diff = (
+            b"diff --git a/f b/f\n"
+            b"index 9ed40b4..4c7442b 100644\n"
+            b"--- a/f\n"
+            b"+++ b/f\n"
+            b"@@ -1,2 +1,2 @@\n"
+            b" one\n"
+            b"-two\n"
+            b"\\ No newline at end of file\n"
+            b"+three\n"
+        )
+        self.assertEqual(
+            [b"one\n", b"three\n"], self._apply_diff(diff, [b"one\n", b"two"])
+        )
+
+    def test_no_newline_on_context_line(self) -> None:
+        diff = (
+            b"--- a/f\n"
+            b"+++ b/f\n"
+            b"@@ -1,2 +1,2 @@\n"
+            b"-one\n"
+            b"+uno\n"
+            b" two\n"
+            b"\\ No newline at end of file\n"
+        )
+        self.assertEqual(
+            [b"uno\n", b"two"],
+            self._apply_diff(b"diff --git a/f b/f\n" + diff, [b"one\n", b"two"]),
+        )
+
     def test_simple_modification(self) -> None:
         """Test applying a simple modification patch."""
         original = [b"line 1\n", b"line 2\n", b"line 3\n"]
@@ -1456,11 +1512,35 @@ index 1234567..abcdefg 100644
 class GitBase85DecodeTests(TestCase):
     """Tests for git_base85_decode function."""
 
-    def test_decode_returns_bytes(self):
-        # Test that decoding returns bytes
-        encoded = b"A0"
-        result = git_base85_decode(encoded)
-        self.assertIsInstance(result, bytes)
+    def test_decode_line_lengths(self) -> None:
+        # The first byte of each line is the decoded length: A-Z for 1-26,
+        # a-z for 27-52. Lengths that aren't a multiple of 4 must not leak
+        # the padding bytes of the last group.
+        decoded = git_base85_decode(b"McmYdfNM=X@00VacDF6Tf")
+        self.assertEqual(13, len(decoded))
+        self.assertEqual(b"a\0c\0d", zlib.decompress(decoded))
+        decoded = git_base85_decode(b"Kcmb<ms0083<N)#j\n")
+        self.assertEqual(11, len(decoded))
+        self.assertEqual(b"x\0y", zlib.decompress(decoded))
+
+    def test_decode_multiple_lines(self) -> None:
+        data = bytes(range(256)) * 2
+        # Produced by git diff --binary.
+        encoded = (
+            b"zcmZQzWMXDvWn<^y<l^Sx<>MC+6cQE@6%&_`l#-T_m6KOcR8m$^Ra4i{)Y8_`)zddH\n"
+            b"zG%_|ZH8Z!cw6eCbwX=6{baHlab#wRd^z!!c_45x13<?ej4GWKmjEatljf+o6OiE5k\n"
+            b"zO-s+n%*xKm&C4$+EGjN3Ei136tg5c5t*dWnY-(<4ZENr7?CS36?dzW~anj@|Q>RUz\n"
+            b"zF>}`JIdkXDU$Ah|;w4L$Enl&6)#^2C*R9{Mant54TeofBv2)k%J$v`<KXCBS;Uh<n\n"
+            b"z9Y1mM)af&4&z-+;@zUihSFc^aar4&gJ9qEhfAH|p<0ns_J%91?)$2EJ-@X6v@zduo\n"
+            b"VU%!3-@$=X3KY#!IXBgrB2LR)2{{a91\n"
+        )
+        self.assertEqual(data, zlib.decompress(git_base85_decode(encoded)))
+
+    def test_invalid_length_byte(self) -> None:
+        self.assertRaises(ValueError, git_base85_decode, b"0cmYdf\n")
+
+    def test_truncated_line(self) -> None:
+        self.assertRaises(ValueError, git_base85_decode, b"McmYdfNM=X@00Vac\n")
 
     def test_empty_decode(self):
         # Test empty input
@@ -1470,6 +1550,29 @@ class GitBase85DecodeTests(TestCase):
 
 class ParseUnifiedDiffRenameTests(TestCase):
     """Tests for parse_unified_diff with rename/copy headers."""
+
+    def test_parse_pure_rename_followed_by_patch(self) -> None:
+        # A rename without content changes has no ---/+++ lines; the next
+        # diff --git line must start a new patch rather than be swallowed.
+        patches = parse_unified_diff(
+            b"diff --git a/old b/new\n"
+            b"similarity index 100%\n"
+            b"rename from old\n"
+            b"rename to new\n"
+            b"diff --git a/x b/x\n"
+            b"--- a/x\n"
+            b"+++ b/x\n"
+            b"@@ -1 +1 @@\n"
+            b"-a\n"
+            b"+b\n"
+        )
+        self.assertEqual(
+            [(None, None, b"old", b"new", 0), (b"a/x", b"b/x", None, None, 1)],
+            [
+                (p.old_path, p.new_path, p.rename_from, p.rename_to, len(p.hunks))
+                for p in patches
+            ],
+        )
 
     def test_parse_rename(self):
         diff = b"""diff --git a/old.txt b/new.txt
@@ -1537,6 +1640,239 @@ Binary files a/test.bin and b/test.bin differ
         self.assertEqual(len(patches), 1)
         self.assertEqual(patches[0].binary, True)
         self.assertIsNone(patches[0].binary_new)  # No patch data
+        self.assertEqual(b"a/test.bin", patches[0].old_path)
+        self.assertEqual(b"b/test.bin", patches[0].new_path)
+
+    def test_parse_binary_paths(self) -> None:
+        # Binary patches carry no ---/+++ lines, so the paths come from the
+        # diff --git header.
+        patches = parse_unified_diff(BINARY_DIFF)
+        self.assertEqual(
+            [
+                (b"a/del.bin", None),
+                (b"a/mod.bin", b"b/mod.bin"),
+                (None, b"b/new.bin"),
+            ],
+            [(p.old_path, p.new_path) for p in patches],
+        )
+        self.assertEqual(
+            [b"HcmV?d00001\n", b"McmYdfNM=X@00VacDF6Tf\n", b"Lcmc~xEoT4#1K9yf\n"],
+            [p.binary_new for p in patches],
+        )
+        self.assertEqual(
+            [b"Kcmb<ms0083<N)#j\n", b"KcmYdfNCE%>hycU@\n", b"HcmV?d00001\n"],
+            [p.binary_old for p in patches],
+        )
+
+    def test_parse_binary_delta(self) -> None:
+        patch = parse_unified_diff(QUOTED_DELTA_DIFF)[0]
+        self.assertEqual(
+            (
+                b"YcmbQuJDYcdI5Ufnr=RO)Y32rI04(nWn*aa+\n",
+                True,
+                b"YcmbQuJDYcdI5SI5W?t%MY32rI05Gow8vp<R\n",
+                True,
+            ),
+            (
+                patch.binary_new,
+                patch.binary_new_delta,
+                patch.binary_old,
+                patch.binary_old_delta,
+            ),
+        )
+
+    def test_parse_quoted_paths(self) -> None:
+        patches = parse_unified_diff(QUOTED_DELTA_DIFF)
+        self.assertEqual(
+            [
+                (b"a/big.bin", b"b/big.bin"),
+                (None, None),
+                (b'a/q"uote.txt', b'b/q"uote.txt'),
+                (b"a/t\xc3\xa9st.bin", b"b/t\xc3\xa9st.bin"),
+            ],
+            [(p.old_path, p.new_path) for p in patches],
+        )
+
+    def test_parse_quoted_rename(self) -> None:
+        patch = parse_unified_diff(
+            b'diff --git "a/\\tx" "b/\\303\\251"\n'
+            b"similarity index 100%\n"
+            b'rename from "\\tx"\n'
+            b'rename to "\\303\\251"\n'
+        )[0]
+        self.assertEqual((b"\tx", b"\xc3\xa9"), (patch.rename_from, patch.rename_to))
+
+    def test_parse_unterminated_quoted_path(self) -> None:
+        self.assertRaises(
+            ValueError,
+            parse_unified_diff,
+            b'diff --git "a/x b/x\n--- "a/x\n+++ "b/x\n@@ -1 +1 @@\n-a\n+b\n',
+        )
+
+
+# Produced by git diff --cached --binary after deleting del.bin, changing
+# mod.bin from b"a\0b" to b"a\0c\0d" and adding new.bin as b"new\0".
+BINARY_DIFF = b"""\
+diff --git a/del.bin b/del.bin
+deleted file mode 100644
+index d5d0b8b4c4c9e936890870f6799cfbb5ba984470..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 3
+Kcmb<ms0083<N)#j
+
+diff --git a/mod.bin b/mod.bin
+index 20b5be91886d0b6f26dc98a225c0dac05fe2c86e..57e6c150e8aebdd17192d6375e3b2d2b210191fc 100644
+GIT binary patch
+literal 5
+McmYdfNM=X@00VacDF6Tf
+
+literal 3
+KcmYdfNCE%>hycU@
+
+diff --git a/new.bin b/new.bin
+new file mode 100644
+index 0000000000000000000000000000000000000000..c984a0442d5fba744241e9c2dd75d27f612d6cb2
+GIT binary patch
+literal 4
+Lcmc~xEoT4#1K9yf
+
+literal 0
+HcmV?d00001
+
+"""
+
+
+# Produced by git diff --cached --binary -M after changing one line of
+# big.bin, renaming mv.bin to moved.bin while changing one line, and
+# changing q"uote.txt and t\xc3\xa9st.bin.
+QUOTED_DELTA_DIFF = b"""\
+diff --git a/big.bin b/big.bin
+index 545f69f6be9b35797266c4d45678eec252f53b4e..0355e27919340457dd4994851d2abfb248510928 100644
+GIT binary patch
+delta 17
+YcmbQuJDYcdI5Ufnr=RO)Y32rI04(nWn*aa+
+
+delta 17
+YcmbQuJDYcdI5SI5W?t%MY32rI05Gow8vp<R
+
+diff --git a/mv.bin b/moved.bin
+similarity index 98%
+rename from mv.bin
+rename to moved.bin
+index cfa570a71ea5217b14a8cacdf3ca8cbc0efe982d..7bc0b17cddb93157835768510813377e01ab7543 100644
+GIT binary patch
+delta 16
+XcmdnYx|wxDC?j)_fB5DI#%M+WE&c@B
+
+delta 16
+XcmdnYx|wxDC?j)Ge);AI#%M+WFrEcE
+
+diff --git "a/q\\"uote.txt" "b/q\\"uote.txt"
+index ce01362..cc628cc 100644
+--- "a/q\\"uote.txt"
++++ "b/q\\"uote.txt"
+@@ -1 +1 @@
+-hello
++world
+diff --git "a/t\\303\\251st.bin" "b/t\\303\\251st.bin"
+index 2f2e261d9ec59b91a348276980246106e50c117c..a6d0698394b7e0069a7eeff0dc3e8da3963aae74 100644
+GIT binary patch
+literal 3
+KcmXS9C<Xul$pGa5
+
+literal 3
+KcmXS9C;|Wh$N=O3
+
+"""
+
+BIG_OLD = b"\0" + b"".join(b"line %d\n" % i for i in range(200))
+BIG_NEW = BIG_OLD.replace(b"line 100\n", b"LINE 100\n")
+MV_OLD = b"\0" + b"".join(b"row %d\n" % i for i in range(100))
+MV_NEW = MV_OLD.replace(b"row 50\n", b"ROW 50\n")
+
+
+class ApplyBinaryPatchesTests(TestCase):
+    def _make_repo(self, files: dict[bytes, bytes]) -> Repo:
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        r = Repo.init(path)
+        self.addCleanup(r.close)
+        for name, content in files.items():
+            with open(os.path.join(os.fsencode(path), name), "wb") as f:
+                f.write(content)
+        r.get_worktree().stage(list(files))
+        return r
+
+    def _assert_files(self, r: Repo, files: dict[bytes, bytes]) -> None:
+        path = os.fsencode(r.path)
+        contents = {}
+        for name in os.listdir(path):
+            if name != b".git":
+                with open(os.path.join(path, name), "rb") as f:
+                    contents[name] = f.read()
+        self.assertEqual(files, contents)
+        self.assertEqual(
+            sorted(
+                (name, Blob.from_string(content).id, 0o100644)
+                for name, content in files.items()
+            ),
+            sorted(r.open_index().iterobjects()),
+        )
+
+    def test_apply(self) -> None:
+        r = self._make_repo({b"mod.bin": b"a\0b", b"del.bin": b"x\0y"})
+        apply_patches(r, parse_unified_diff(BINARY_DIFF), strip=1)
+        self._assert_files(r, {b"mod.bin": b"a\0c\0d", b"new.bin": b"new\0"})
+
+    def test_apply_delta_rename_and_quoted(self) -> None:
+        r = self._make_repo(
+            {
+                b"big.bin": BIG_OLD,
+                b"mv.bin": MV_OLD,
+                b"t\xc3\xa9st.bin": b"q\0r",
+            }
+        )
+        patches = parse_unified_diff(QUOTED_DELTA_DIFF)
+        apply_patches(r, [patches[0], patches[1], patches[3]], strip=1)
+        self._assert_files(
+            r,
+            {
+                b"big.bin": BIG_NEW,
+                b"moved.bin": MV_NEW,
+                b"t\xc3\xa9st.bin": b"q\0s",
+            },
+        )
+        # Check the results against the blob ids git recorded.
+        index = r.open_index()
+        self.assertEqual(
+            b"0355e27919340457dd4994851d2abfb248510928", index.get_sha1(b"big.bin")
+        )
+        self.assertEqual(
+            b"7bc0b17cddb93157835768510813377e01ab7543", index.get_sha1(b"moved.bin")
+        )
+
+    @skipIf(sys.platform == "win32", 'Windows does not allow " in file names')
+    def test_apply_escaped_quote(self) -> None:
+        r = self._make_repo({b'q"uote.txt': b"hello\n"})
+        patches = parse_unified_diff(QUOTED_DELTA_DIFF)
+        apply_patches(r, patches[2:3], strip=1)
+        self._assert_files(r, {b'q"uote.txt': b"world\n"})
+
+    def test_apply_reverse(self) -> None:
+        r = self._make_repo({b"big.bin": BIG_NEW, b"t\xc3\xa9st.bin": b"q\0s"})
+        patches = parse_unified_diff(QUOTED_DELTA_DIFF)
+        apply_patches(r, [patches[0], patches[3]], strip=1, reverse=True)
+        self._assert_files(r, {b"big.bin": BIG_OLD, b"t\xc3\xa9st.bin": b"q\0r"})
+
+    def test_delta_against_wrong_base(self) -> None:
+        r = self._make_repo({b"big.bin": b"something else"})
+        patches = parse_unified_diff(QUOTED_DELTA_DIFF)
+        self.assertRaises(ValueError, apply_patches, r, patches[:1], strip=1)
+        with open(os.path.join(r.path, "big.bin"), "rb") as f:
+            self.assertEqual(b"something else", f.read())
 
 
 class ApplyPatchesPathTests(TestCase):
@@ -1609,6 +1945,120 @@ class ApplyPatchesPathTests(TestCase):
             os.path.exists(os.path.join(r.path, ".git", "hooks", "pre-commit"))
         )
 
+    def _assert_refused_through_symlink(self, patches: list[FilePatch]) -> None:
+        # A tracked symlink ``trap`` pointing into .git stays within the work
+        # tree, so writing a patch target of that name must not follow it.
+        r = self._make_repo()
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        os.symlink(".git/hooks/pre-commit", os.path.join(r.path, "trap"))
+        self.assertRaises(ValueError, apply_patches, r, patches, strip=1)
+        self.assertFalse(os.path.exists(hook))
+        self.assertTrue(os.path.islink(os.path.join(r.path, "trap")))
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_symlinked_target_text(self) -> None:
+        self._assert_refused_through_symlink(
+            parse_unified_diff(
+                b"diff --git a/trap b/trap\n"
+                b"new file mode 100755\n"
+                b"--- /dev/null\n"
+                b"+++ b/trap\n"
+                b"@@ -0,0 +1 @@\n"
+                b"+#!/bin/sh\n"
+            )
+        )
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_symlinked_target_binary(self) -> None:
+        self._assert_refused_through_symlink(
+            [
+                FilePatch(
+                    old_path=None,
+                    new_path=b"b/trap",
+                    old_mode=None,
+                    new_mode=0o100755,
+                    hunks=[],
+                    binary=True,
+                    binary_new=b"ScmY#Z)KALH(=X28VgLXU0|LPS\n",
+                )
+            ]
+        )
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_symlinked_copy_destination(self) -> None:
+        r = self._make_repo()
+        with open(os.path.join(r.path, "src"), "wb") as f:
+            f.write(b"#!/bin/sh\n")
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        os.symlink(".git/hooks/pre-commit", os.path.join(r.path, "trap"))
+        diff = (
+            b"diff --git a/src b/trap\n"
+            b"similarity index 100%\n"
+            b"copy from src\n"
+            b"copy to trap\n"
+        )
+        self.assertRaises(
+            ValueError, apply_patches, r, parse_unified_diff(diff), strip=1
+        )
+        self.assertFalse(os.path.exists(hook))
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_deletes_symlink_target(self) -> None:
+        # Deleting a symlink removes the link itself, so it stays allowed.
+        r = self._make_repo()
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        with open(hook, "wb") as f:
+            f.write(b"#!/bin/sh\n")
+        os.symlink(".git/hooks/pre-commit", os.path.join(r.path, "trap"))
+        diff = (
+            b"diff --git a/trap b/trap\n"
+            b"deleted file mode 120000\n"
+            b"--- a/trap\n"
+            b"+++ /dev/null\n"
+            b"@@ -1 +0,0 @@\n"
+            b"-.git/hooks/pre-commit\n"
+            b"\\ No newline at end of file\n"
+        )
+        apply_patches(r, parse_unified_diff(diff), strip=1)
+        self.assertFalse(os.path.lexists(os.path.join(r.path, "trap")))
+        self.assertTrue(os.path.exists(hook))
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_rejects_regular_file_patch_to_symlink(self) -> None:
+        # The index line says trap is a regular file, but it is a symlink in
+        # the work tree. git refuses this with "wrong type".
+        self._assert_refused_through_symlink(
+            parse_unified_diff(
+                b"diff --git a/trap b/trap\n"
+                b"index 1234567..89abcde 100755\n"
+                b"--- a/trap\n"
+                b"+++ b/trap\n"
+                b"@@ -0,0 +1 @@\n"
+                b"+#!/bin/sh\n"
+            )
+        )
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_patch_without_mode_updates_symlink(self) -> None:
+        # Without mode information the work tree decides the type, so the
+        # patch applies to the link target rather than through the link.
+        r = self._make_repo()
+        hook = os.path.join(r.path, ".git", "hooks", "pre-commit")
+        trap = os.path.join(r.path, "trap")
+        os.symlink(".git/hooks/pre-commit", trap)
+        diff = (
+            b"--- a/trap\n"
+            b"+++ b/trap\n"
+            b"@@ -1 +1 @@\n"
+            b"-.git/hooks/pre-commit\n"
+            b"\\ No newline at end of file\n"
+            b"+elsewhere\n"
+            b"\\ No newline at end of file\n"
+        )
+        apply_patches(r, parse_unified_diff(b"diff --git a/trap b/trap\n" + diff))
+        self.assertFalse(os.path.exists(hook))
+        self.assertEqual("elsewhere", os.readlink(trap))
+
     def test_allows_in_tree_path(self) -> None:
         r = self._make_repo()
         diff = (
@@ -1642,3 +2092,211 @@ class ApplyPatchesPathTests(TestCase):
         self.assertEqual(stat.S_IMODE(mode), 0o755)
         self.assertFalse(mode & stat.S_ISUID)
         self.assertFalse(mode & stat.S_IWOTH)
+
+
+# Produced by git diff --cached -M after retargeting mod, deleting del,
+# adding added, renaming mvsrc to mvdst and turning the regular file tc into
+# a symlink.
+SYMLINK_DIFF = b"""\
+diff --git a/added b/added
+new file mode 120000
+index 0000000..12a8d8a
+--- /dev/null
++++ b/added
+@@ -0,0 +1 @@
++target1
+\\ No newline at end of file
+diff --git a/del b/del
+deleted file mode 120000
+index bc99ab0..0000000
+--- a/del
++++ /dev/null
+@@ -1 +0,0 @@
+-gone
+\\ No newline at end of file
+diff --git a/mod b/mod
+index 3defea2..f63c08c 120000
+--- a/mod
++++ b/mod
+@@ -1 +1 @@
+-old-target
+\\ No newline at end of file
++new-target
+\\ No newline at end of file
+diff --git a/mvsrc b/mvdst
+similarity index 100%
+rename from mvsrc
+rename to mvdst
+diff --git a/tc b/tc
+deleted file mode 100644
+index d95f3ad..0000000
+--- a/tc
++++ /dev/null
+@@ -1 +0,0 @@
+-content
+diff --git a/tc b/tc
+new file mode 120000
+index 0000000..12a8d8a
+--- /dev/null
++++ b/tc
+@@ -0,0 +1 @@
++target1
+\\ No newline at end of file
+"""
+
+
+@skipIf(sys.platform == "win32", "Requires symlink support")
+class ApplySymlinkPatchesTests(TestCase):
+    def _make_repo(self) -> Repo:
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        r = Repo.init(path)
+        self.addCleanup(r.close)
+        return r
+
+    def test_apply(self) -> None:
+        r = self._make_repo()
+        with open(os.path.join(r.path, "target1"), "wb") as f:
+            f.write(b"hi\n")
+        with open(os.path.join(r.path, "tc"), "wb") as f:
+            f.write(b"content\n")
+        for name, target in [
+            ("mod", "old-target"),
+            ("del", "gone"),
+            ("mvsrc", "moving"),
+        ]:
+            os.symlink(target, os.path.join(r.path, name))
+        r.get_worktree().stage([b"target1", b"tc", b"mod", b"del", b"mvsrc"])
+
+        apply_patches(r, parse_unified_diff(SYMLINK_DIFF), strip=1)
+
+        links = {
+            "added": "target1",
+            "mod": "new-target",
+            "mvdst": "moving",
+            "tc": "target1",
+        }
+        self.assertEqual(
+            sorted(["target1", *links]),
+            sorted(n for n in os.listdir(r.path) if n != ".git"),
+        )
+        for name, target in links.items():
+            self.assertEqual(target, os.readlink(os.path.join(r.path, name)))
+        self.assertEqual(
+            sorted(
+                [(b"target1", Blob.from_string(b"hi\n").id, 0o100644)]
+                + [
+                    (name.encode(), Blob.from_string(target.encode()).id, 0o120000)
+                    for name, target in links.items()
+                ]
+            ),
+            sorted(r.open_index().iterobjects()),
+        )
+
+    def test_apply_without_symlink_support(self) -> None:
+        # With core.symlinks=false the link is checked out as a plain file
+        # holding the target, and stays a plain file after patching.
+        r = self._make_repo()
+        config = r.get_config()
+        config.set((b"core",), b"symlinks", False)
+        config.write_to_path()
+        mod = os.path.join(r.path, "mod")
+        with open(mod, "wb") as f:
+            f.write(b"old-target")
+        index = r.open_index()
+        index[b"mod"] = index_entry_from_stat(
+            os.lstat(mod), Blob.from_string(b"old-target").id, mode=0o120000
+        )
+        index.write()
+
+        apply_patches(r, parse_unified_diff(SYMLINK_DIFF)[2:3], strip=1)
+
+        self.assertFalse(os.path.islink(mod))
+        with open(mod, "rb") as f:
+            self.assertEqual(b"new-target", f.read())
+        self.assertEqual(
+            [(b"mod", Blob.from_string(b"new-target").id, 0o120000)],
+            list(r.open_index().iterobjects()),
+        )
+
+    def test_rejects_addition_over_existing_path(self) -> None:
+        r = self._make_repo()
+        with open(os.path.join(r.path, "added"), "wb") as f:
+            f.write(b"untracked\n")
+        self.assertRaises(
+            ValueError,
+            apply_patches,
+            r,
+            parse_unified_diff(SYMLINK_DIFF)[:1],
+            strip=1,
+        )
+        with open(os.path.join(r.path, "added"), "rb") as f:
+            self.assertEqual(b"untracked\n", f.read())
+
+
+# Produced by git diff --cached --no-renames after adding the empty file
+# new-empty, deleting the empty file old-empty and making script executable.
+NO_HUNKS_DIFF = b"""\
+diff --git a/new-empty b/new-empty
+new file mode 100644
+index 0000000..e69de29
+diff --git a/old-empty b/old-empty
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/script b/script
+old mode 100644
+new mode 100755
+"""
+
+
+class ApplyPatchesWithoutHunksTests(TestCase):
+    def _make_repo(self) -> Repo:
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        r = Repo.init(path)
+        self.addCleanup(r.close)
+        return r
+
+    def test_parse_paths(self) -> None:
+        # These patches have no ---/+++ lines, so the paths come from the
+        # diff --git header.
+        self.assertEqual(
+            [
+                (None, b"b/new-empty", None, 0o100644),
+                (b"a/old-empty", None, 0o100644, None),
+                (b"a/script", b"b/script", 0o100644, 0o100755),
+            ],
+            [
+                (p.old_path, p.new_path, p.old_mode, p.new_mode)
+                for p in parse_unified_diff(NO_HUNKS_DIFF)
+            ],
+        )
+
+    def test_empty_files(self) -> None:
+        r = self._make_repo()
+        with open(os.path.join(r.path, "old-empty"), "wb"):
+            pass
+        r.get_worktree().stage([b"old-empty"])
+        apply_patches(r, parse_unified_diff(NO_HUNKS_DIFF)[:2])
+        self.assertEqual(["new-empty"], [n for n in os.listdir(r.path) if n != ".git"])
+        with open(os.path.join(r.path, "new-empty"), "rb") as f:
+            self.assertEqual(b"", f.read())
+        self.assertEqual(
+            [(b"new-empty", Blob.from_string(b"").id, 0o100644)],
+            list(r.open_index().iterobjects()),
+        )
+
+    @skipIf(sys.platform == "win32", "Requires POSIX file modes")
+    def test_mode_only_change(self) -> None:
+        r = self._make_repo()
+        script = os.path.join(r.path, "script")
+        with open(script, "wb") as f:
+            f.write(b"#!/bin/sh\n")
+        os.chmod(script, 0o644)
+        r.get_worktree().stage([b"script"])
+        apply_patches(r, parse_unified_diff(NO_HUNKS_DIFF)[2:])
+        self.assertEqual(0o755, stat.S_IMODE(os.lstat(script).st_mode))
+        self.assertEqual(
+            [(b"script", Blob.from_string(b"#!/bin/sh\n").id, 0o100755)],
+            list(r.open_index().iterobjects()),
+        )

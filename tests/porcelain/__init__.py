@@ -405,6 +405,59 @@ class UpdateServerInfoTests(PorcelainTestCase):
         )
 
 
+class GetFixupMessageTests(TestCase):
+    def test_subject(self) -> None:
+        for original, expected in (
+            (b"Subject\n\nBody\n", "fixup! Subject\n"),
+            (b"First line\nsecond line  \t\n\nBody", "fixup! First line second line\n"),
+            (b"\n \t\n  heading\n \t\nbody", "fixup!   heading\n"),
+            (
+                b"\t leading\t\n continued\tline \r\n\nbody",
+                "fixup! \t leading  continued\tline\n",
+            ),
+            (b"Subject: keep / punctuation!", "fixup! Subject: keep / punctuation!\n"),
+            (b"x" * 100, "fixup! " + "x" * 100 + "\n"),
+            ("Subject\u00a0".encode(), "fixup! Subject\u00a0\n"),
+            (b"", "fixup!\n"),
+        ):
+            with self.subTest(original=original):
+                commit = Commit()
+                commit.message = original
+                self.assertEqual(porcelain.get_fixup_message(commit), expected)
+                self.assertEqual(commit.message, original)
+
+    def test_encoding(self) -> None:
+        commit = Commit()
+        commit.message = b"Caf\xe9 changes\ncontinued \xa3\n\nBody"
+        commit.encoding = b"ISO-8859-1"
+        self.assertEqual(
+            porcelain.get_fixup_message(commit),
+            "fixup! Caf\u00e9 changes continued \u00a3\n",
+        )
+
+    def test_messages(self) -> None:
+        commit = Commit()
+        commit.message = b"Target\n\nOriginal body"
+        self.assertEqual(
+            porcelain.get_fixup_message(
+                commit,
+                [
+                    "",
+                    "Explanation  \n\n\n  indented line\t",
+                    "# Keep this comment\nMore detail",
+                ],
+            ),
+            "fixup! Target\n\nExplanation\n\n  indented line\n\n# Keep this comment\nMore detail\n",
+        )
+
+    def test_empty_messages(self) -> None:
+        commit = Commit()
+        commit.message = b"Target"
+        self.assertEqual(
+            porcelain.get_fixup_message(commit, ["", ""]), "fixup! Target\n"
+        )
+
+
 class CommitTests(PorcelainTestCase):
     def test_custom_author(self) -> None:
         _c1, _c2, c3 = build_commit_graph(

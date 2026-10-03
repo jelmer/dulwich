@@ -121,6 +121,15 @@ dulwich package. This will ensure that the deprecation is handled correctly:
 * Users can use `dissolve migrate` to automatically replace deprecated
   functionality in their code
 
+When moving a class or function to another module, keep it importable from
+its old location for a while by adding a deprecated alias::
+
+    from . import _deprecated_aliases
+
+    __getattr__ = _deprecated_aliases(
+        __name__, {"SHA1Writer": "dulwich.pack.SHA1Writer"}
+    )
+
 Tests
 ~~~~~
 

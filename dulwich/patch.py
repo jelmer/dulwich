@@ -1488,6 +1488,20 @@ def _validate_patch_target(r: "Repo", repo_path: bytes, tree_path: bytes) -> byt
     return fs_path
 
 
+def _refuse_symlink_target(fs_path: bytes, tree_path: bytes) -> None:
+    """Refuse to read or write a patch target that is itself a symlink.
+
+    ``verify_leading_dirs`` only checks the leading directories. A tracked
+    symlink such as ``trap -> .git/hooks/pre-commit`` resolves inside the work
+    tree, so without this check ``open()`` would follow it and write the patch
+    content into the control directory.
+    """
+    # TODO(jelmer): Apply patches to symlinks (mode 120000) by updating the
+    # link target, like git does, rather than refusing them.
+    if os.path.islink(fs_path):
+        raise ValueError(f"refusing to write through symlink: {tree_path!r}")
+
+
 def _apply_rename_or_copy(
     r: "Repo",
     src_path: bytes,
@@ -1538,6 +1552,8 @@ def _apply_rename_or_copy(
     repo_path_bytes = r.path.encode("utf-8") if isinstance(r.path, str) else r.path
     src_fs_path = _validate_patch_target(r, repo_path_bytes, src_stripped)
     dst_fs_path = _validate_patch_target(r, repo_path_bytes, dst_stripped)
+    _refuse_symlink_target(src_fs_path, src_stripped)
+    _refuse_symlink_target(dst_fs_path, dst_stripped)
 
     # Read content from source file
     op_name = "rename" if is_rename else "copy"
@@ -1735,6 +1751,9 @@ def apply_patches(
         tree_path = file_path
         repo_path_bytes = r.path.encode("utf-8") if isinstance(r.path, str) else r.path
         fs_path = _validate_patch_target(r, repo_path_bytes, file_path)
+        if new_path is not None:
+            # Deleting a symlink removes the link itself, which is safe.
+            _refuse_symlink_target(fs_path, file_path)
 
         # Handle renames and copies
         original_lines: list[bytes] | None = None

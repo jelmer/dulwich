@@ -45,6 +45,7 @@ __all__ = [
     "BaseRepo",
     "DefaultIdentityNotFound",
     "InvalidUserIdentity",
+    "InvalidWorktreeConfiguration",
     "MemoryRepo",
     "ParentsProvider",
     "Repo",

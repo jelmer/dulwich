@@ -1,5 +1,8 @@
 1.2.17	UNRELEASED
 
+ * Define ``__all__`` in all modules, listing the public names each module
+   defines. (Jelmer Vernooĳ)
+
  * Deprecate importing ``LOCAL_TAG_PREFIX``, ``SYMREF``,
    ``check_ref_format``, ``read_packed_refs``,
    ``read_packed_refs_with_peeled`` and ``write_packed_refs`` from

@@ -20,3 +20,5 @@
 #
 
 """aiohttp support for Dulwich."""
+
+__all__ = []

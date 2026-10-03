@@ -42,21 +42,25 @@ Known capabilities that are not supported:
 __all__ = [
     "COMMON_CAPABILITIES",
     "DEFAULT_GIT_CREDENTIALS_PATHS",
+    "DEFAULT_POST_BUFFER_SIZE",
     "DEFAULT_REF_PREFIX",
     "MAX_IN_VAIN",
     "RECEIVE_CAPABILITIES",
     "UPLOAD_CAPABILITIES",
     "AbstractHttpGitClient",
+    "AuthCallbackPoolManager",
     "BundleClient",
     "BundleURIError",
     "FetchPackResult",
     "GitClient",
     "HTTPProxyUnauthorized",
     "HTTPUnauthorized",
+    "HttpGitClient",
     "InvalidWants",
     "LocalGitClient",
     "LsRemoteResult",
     "PLinkSSHVendor",
+    "PackDataProgressWrapper",
     "ReportStatusParser",
     "SSHGitClient",
     "SSHVendor",
@@ -69,13 +73,18 @@ __all__ = [
     "TraditionalGitClient",
     "Urllib3HttpGitClient",
     "apply_bundle_uri",
+    "build_fetch_request_v2",
+    "build_ls_refs_request_v2",
     "check_for_proxy_bypass",
     "check_wants",
+    "default_local_git_client_cls",
     "default_urllib3_manager",
     "default_user_agent_string",
+    "extract_object_format_from_capabilities",
     "find_capability",
     "find_git_command",
     "get_credentials_from_store",
+    "get_ssh_vendor",
     "get_transport_and_path",
     "get_transport_and_path_from_url",
     "negotiate_protocol_version",
@@ -1092,6 +1101,7 @@ class PackDataProgressWrapper:
         report_interval: float = 0.5,
         report_byte_threshold: int = 1024 * 1024,
     ) -> None:
+        """Initialize PackDataProgressWrapper."""
         self.file_write = file_write
         self.progress = progress
         self.report_interval = report_interval
@@ -4179,13 +4189,21 @@ class AuthCallbackPoolManager:
         proxy_auth_callback: Callable[[str, str, int], dict[str, str] | None]
         | None = None,
     ) -> None:
+        """Initialize AuthCallbackPoolManager.
+
+        Args:
+          pool_manager: Pool manager to wrap
+          auth_callback: Called with (url, www_authenticate, attempt) on a
+            401 response; returns credentials or None
+          proxy_auth_callback: Like auth_callback, for 407 responses
+        """
         self._pool_manager = pool_manager
         self._auth_callback = auth_callback
         self._proxy_auth_callback = proxy_auth_callback
         self._auth_attempts: dict[str, int] = {}
 
     def __getattr__(self, name: str):  # type: ignore[no-untyped-def]
-        # Delegate all other attributes to the wrapped pool manager
+        """Delegate all other attributes to the wrapped pool manager."""
         return getattr(self._pool_manager, name)
 
     def request(self, method: str, url: str, *args, **kwargs):  # type: ignore[no-untyped-def]

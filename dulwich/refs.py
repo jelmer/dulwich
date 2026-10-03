@@ -23,6 +23,7 @@
 """Ref handling."""
 
 __all__ = [
+    "BAD_REF_CHARS",
     "HEADREF",
     "LOCAL_BRANCH_PREFIX",
     "LOCAL_NOTES_PREFIX",
@@ -45,6 +46,7 @@ __all__ = [
     "local_branch_name",
     "local_replace_name",
     "local_tag_name",
+    "locked_ref",
     "parse_remote_ref",
     "parse_symref_value",
     "read_info_refs",

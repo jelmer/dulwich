@@ -22,6 +22,7 @@
 """Git subtree implementation."""
 
 __all__ = [
+    "SubtreeMetadata",
     "add_subtree_metadata",
     "create_tree_with_subtree",
     "extract_subtree",

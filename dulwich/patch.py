@@ -1307,8 +1307,9 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
                     # hunk parser below.
                     break
 
-            if binary and old_path is None and new_path is None:
-                # Binary patches have no ---/+++ lines.
+            if old_path is None and new_path is None:
+                # Binary patches and those without content changes (mode
+                # changes, empty files) have no ---/+++ lines.
                 old_path = header_old_path
                 new_path = header_new_path
 

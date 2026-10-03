@@ -2234,30 +2234,67 @@ class ApplySymlinkPatchesTests(TestCase):
             self.assertEqual(b"untracked\n", f.read())
 
 
-class ApplyModeChangeTests(TestCase):
-    @skipIf(sys.platform == "win32", "Requires POSIX file modes")
-    def test_mode_only_change(self) -> None:
+# Produced by git diff --cached --no-renames after adding the empty file
+# new-empty, deleting the empty file old-empty and making script executable.
+NO_HUNKS_DIFF = b"""\
+diff --git a/new-empty b/new-empty
+new file mode 100644
+index 0000000..e69de29
+diff --git a/old-empty b/old-empty
+deleted file mode 100644
+index e69de29..0000000
+diff --git a/script b/script
+old mode 100644
+new mode 100755
+"""
+
+
+class ApplyPatchesWithoutHunksTests(TestCase):
+    def _make_repo(self) -> Repo:
         path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, path, ignore_errors=True)
         r = Repo.init(path)
         self.addCleanup(r.close)
-        script = os.path.join(path, "script")
+        return r
+
+    def test_parse_paths(self) -> None:
+        # These patches have no ---/+++ lines, so the paths come from the
+        # diff --git header.
+        self.assertEqual(
+            [
+                (None, b"b/new-empty", None, 0o100644),
+                (b"a/old-empty", None, 0o100644, None),
+                (b"a/script", b"b/script", 0o100644, 0o100755),
+            ],
+            [
+                (p.old_path, p.new_path, p.old_mode, p.new_mode)
+                for p in parse_unified_diff(NO_HUNKS_DIFF)
+            ],
+        )
+
+    def test_empty_files(self) -> None:
+        r = self._make_repo()
+        with open(os.path.join(r.path, "old-empty"), "wb"):
+            pass
+        r.get_worktree().stage([b"old-empty"])
+        apply_patches(r, parse_unified_diff(NO_HUNKS_DIFF)[:2])
+        self.assertEqual(["new-empty"], [n for n in os.listdir(r.path) if n != ".git"])
+        with open(os.path.join(r.path, "new-empty"), "rb") as f:
+            self.assertEqual(b"", f.read())
+        self.assertEqual(
+            [(b"new-empty", Blob.from_string(b"").id, 0o100644)],
+            list(r.open_index().iterobjects()),
+        )
+
+    @skipIf(sys.platform == "win32", "Requires POSIX file modes")
+    def test_mode_only_change(self) -> None:
+        r = self._make_repo()
+        script = os.path.join(r.path, "script")
         with open(script, "wb") as f:
             f.write(b"#!/bin/sh\n")
         os.chmod(script, 0o644)
         r.get_worktree().stage([b"script"])
-        apply_patches(
-            r,
-            [
-                FilePatch(
-                    old_path=b"a/script",
-                    new_path=b"b/script",
-                    old_mode=0o100644,
-                    new_mode=0o100755,
-                    hunks=[],
-                )
-            ],
-        )
+        apply_patches(r, parse_unified_diff(NO_HUNKS_DIFF)[2:])
         self.assertEqual(0o755, stat.S_IMODE(os.lstat(script).st_mode))
         self.assertEqual(
             [(b"script", Blob.from_string(b"#!/bin/sh\n").id, 0o100755)],

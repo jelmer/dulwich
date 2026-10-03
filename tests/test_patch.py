@@ -1550,6 +1550,29 @@ class GitBase85DecodeTests(TestCase):
 class ParseUnifiedDiffRenameTests(TestCase):
     """Tests for parse_unified_diff with rename/copy headers."""
 
+    def test_parse_pure_rename_followed_by_patch(self) -> None:
+        # A rename without content changes has no ---/+++ lines; the next
+        # diff --git line must start a new patch rather than be swallowed.
+        patches = parse_unified_diff(
+            b"diff --git a/old b/new\n"
+            b"similarity index 100%\n"
+            b"rename from old\n"
+            b"rename to new\n"
+            b"diff --git a/x b/x\n"
+            b"--- a/x\n"
+            b"+++ b/x\n"
+            b"@@ -1 +1 @@\n"
+            b"-a\n"
+            b"+b\n"
+        )
+        self.assertEqual(
+            [(None, None, b"old", b"new", 0), (b"a/x", b"b/x", None, None, 1)],
+            [
+                (p.old_path, p.new_path, p.rename_from, p.rename_to, len(p.hunks))
+                for p in patches
+            ],
+        )
+
     def test_parse_rename(self):
         diff = b"""diff --git a/old.txt b/new.txt
 similarity index 100%

@@ -23,6 +23,9 @@
    ``apply_patch`` could install a hook. (Jelmer Vernooĳ, reported by
    @manus-pi)
 
+ * Fix parsing of a rename or copy without content changes followed by
+   another patch, which swallowed the next patch. (Jelmer Vernooĳ)
+
  * Honour ``\ No newline at end of file`` markers when applying patches,
    which previously made patches to files without a trailing newline fail.
    (Jelmer Vernooĳ)

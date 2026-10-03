@@ -1293,7 +1293,8 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
                         binary_old_delta, binary_old = blocks[1]
                     break
                 else:
-                    i += 1
+                    # Leave the line (e.g. the next "diff --git") to the
+                    # hunk parser below.
                     break
 
             if binary and old_path is None and new_path is None:

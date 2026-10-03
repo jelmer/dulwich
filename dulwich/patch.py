@@ -52,12 +52,14 @@ __all__ = [
     "write_tree_diff",
 ]
 
+import base64
 import email.message
 import email.parser
 import email.utils
 import os
 import re
 import time
+import zlib
 from collections.abc import Generator, Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -981,8 +983,10 @@ def _find_scissors_line(lines: list[bytes]) -> int | None:
 def git_base85_decode(data: bytes) -> bytes:
     """Decode Git's base85-encoded binary data.
 
-    Git uses a custom base85 encoding with its own alphabet and line format.
-    Each line starts with a length byte followed by base85-encoded data.
+    Each line starts with a byte giving the decoded length of that line
+    (``A``-``Z`` for 1-26, ``a``-``z`` for 27-52), followed by groups of five
+    base85 characters that each encode four bytes. Git's alphabet is the
+    RFC 1924 one used by ``base64.b85decode``.
 
     Args:
         data: Base85-encoded data as bytes (may contain multiple lines)
@@ -993,55 +997,24 @@ def git_base85_decode(data: bytes) -> bytes:
     Raises:
         ValueError: If the data is invalid
     """
-    # Git's base85 alphabet (different from RFC 1924)
-    alphabet = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~"
-
-    # Create decode table
-    decode_table = {}
-    for i, c in enumerate(alphabet):
-        decode_table[c] = i
-
     result = bytearray()
-    lines = data.strip().split(b"\n")
-
-    for line in lines:
+    for line in data.splitlines():
         if not line:
             continue
-
-        # First character encodes the length of decoded data for this line
-        if line[0] not in decode_table:
-            continue
-
-        encoded_len = decode_table[line[0]]
-        if encoded_len == 0:
-            continue
-
-        # Decode the rest of the line
-        encoded_data = line[1:]
-
-        # Process in groups of 5 characters (which encode 4 bytes)
-        i = 0
-        decoded_this_line = 0
-        while i < len(encoded_data) and decoded_this_line < encoded_len:
-            # Get up to 5 characters
-            group = encoded_data[i : i + 5]
-            if len(group) == 0:
-                break
-
-            # Decode 5 base85 digits to a 32-bit value
-            value = 0
-            for c in group:
-                if c not in decode_table:
-                    raise ValueError(f"Invalid base85 character: {chr(c)}")
-                value = value * 85 + decode_table[c]
-
-            # Convert to 4 bytes (big-endian)
-            bytes_to_add = min(4, encoded_len - decoded_this_line)
-            decoded_bytes = value.to_bytes(4, byteorder="big")
-            result.extend(decoded_bytes[:bytes_to_add])
-            decoded_this_line += bytes_to_add
-            i += 5
-
+        length_byte = line[0]
+        if ord("A") <= length_byte <= ord("Z"):
+            length = length_byte - ord("A") + 1
+        elif ord("a") <= length_byte <= ord("z"):
+            length = length_byte - ord("a") + 27
+        else:
+            raise ValueError(f"Invalid base85 line length byte: {line[:1]!r}")
+        encoded = line[1:]
+        if len(encoded) != (length + 3) // 4 * 5:
+            raise ValueError(
+                f"Base85 line has {len(encoded)} characters, "
+                f"expected {(length + 3) // 4 * 5} for {length} bytes"
+            )
+        result.extend(base64.b85decode(encoded)[:length])
     return bytes(result)
 
 
@@ -1097,6 +1070,26 @@ class FilePatch:
     binary_new: bytes | None = None
 
 
+def _parse_git_diff_header_paths(line: bytes) -> tuple[bytes | None, bytes | None]:
+    """Extract the old and new paths from a ``diff --git`` line.
+
+    The two names are only separable when they are the same apart from their
+    prefixes (as for anything but a rename or copy), in which case the line is
+    split in the middle. Returns ``(None, None)`` otherwise.
+    """
+    names = line[len(b"diff --git ") :]
+    # TODO(jelmer): Support C-style quoted names.
+    if names.startswith(b'"'):
+        return None, None
+    half = len(names) // 2
+    if len(names) % 2 != 1 or names[half : half + 1] != b" ":
+        return None, None
+    old, new = names[:half], names[half + 1 :]
+    if old.partition(b"/")[2] != new.partition(b"/")[2]:
+        return None, None
+    return old, new
+
+
 def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
     """Parse a unified diff into FilePatch objects.
 
@@ -1128,6 +1121,7 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
             copy_to = None
             binary_old = None
             binary_new = None
+            header_old_path, header_new_path = _parse_git_diff_header_paths(line)
 
             # Parse extended headers
             i += 1
@@ -1139,9 +1133,11 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
                     i += 1
                 elif line.startswith(b"new file mode "):
                     new_mode = int(line.split()[-1], 8)
+                    header_old_path = None
                     i += 1
                 elif line.startswith(b"deleted file mode "):
                     old_mode = int(line.split()[-1], 8)
+                    header_new_path = None
                     i += 1
                 elif line.startswith(b"new mode "):
                     new_mode = int(line.split()[-1], 8)
@@ -1228,6 +1224,11 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
                 else:
                     i += 1
                     break
+
+            if binary and old_path is None and new_path is None:
+                # Binary patches have no ---/+++ lines.
+                old_path = header_old_path
+                new_path = header_new_path
 
             # Parse hunks
             if not binary:
@@ -1656,12 +1657,16 @@ def apply_patches(
                 continue
 
         # Handle binary patches
-        if patch.binary:
+        # Deletions don't need the binary data, so fall through for those.
+        if patch.binary and new_path is not None:
             if patch.binary_new is not None:
-                # Decode binary patch
+                # TODO(jelmer): Support "delta" binary patches; only "literal"
+                # data ends up in binary_new.
                 try:
-                    binary_content = git_base85_decode(patch.binary_new)
-                except (ValueError, KeyError) as e:
+                    binary_content = zlib.decompress(
+                        git_base85_decode(patch.binary_new)
+                    )
+                except (ValueError, zlib.error) as e:
                     raise ValueError(f"Failed to decode binary patch: {e}")
 
                 if check:

@@ -1,4 +1,4 @@
-1.2.16	UNRELEASED
+1.2.16	2026-10-03
 
  * Add ``PackIndex.object_sha_at_position`` to look up an object by its
    position in the sorted index, and use it when loading a ``.bitmap`` instead

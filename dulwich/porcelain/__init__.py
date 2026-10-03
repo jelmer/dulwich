@@ -4479,10 +4479,11 @@ def web_daemon(
       address: Optional address to listen on (defaults to ::)
       port: Optional port to listen on (defaults to 80)
     """
+    from wsgiref.simple_server import make_server
+
     from ..web import (
         WSGIRequestHandlerLogger,
         WSGIServerLogger,
-        make_server,
         make_wsgi_chain,
     )
 

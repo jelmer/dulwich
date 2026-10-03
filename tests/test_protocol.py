@@ -24,7 +24,7 @@
 import time
 from io import BytesIO
 
-from dulwich.errors import HangupException
+from dulwich.errors import GitProtocolError, HangupException
 from dulwich.protocol import (
     CAPABILITY_FILTER,
     KNOWN_UPLOAD_CAPABILITIES,
@@ -32,7 +32,6 @@ from dulwich.protocol import (
     MULTI_ACK_DETAILED,
     SINGLE_ACK,
     BufferedPktLineWriter,
-    GitProtocolError,
     PktLineParser,
     Protocol,
     ReceivableProtocol,

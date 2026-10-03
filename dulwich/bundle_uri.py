@@ -29,11 +29,14 @@ download pre-computed bundles to speed up clones and fetches.
 """
 
 __all__ = [
+    "CAPABILITY_BUNDLE_URI",
     "BundleList",
     "BundleListEntry",
     "BundleURIError",
+    "apply_bundle_uri",
     "fetch_bundle_uri",
     "parse_bundle_list",
+    "parse_bundle_uri_advertisement",
 ]
 
 from collections.abc import Callable

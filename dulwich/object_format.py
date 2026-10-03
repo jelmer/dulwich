@@ -25,6 +25,17 @@ This module provides an abstraction layer for different object formats
 used in Git repositories (SHA-1 and SHA-256).
 """
 
+__all__ = [
+    "DEFAULT_OBJECT_FORMAT",
+    "OBJECT_FORMATS",
+    "OBJECT_FORMAT_TYPE_NUMS",
+    "SHA1",
+    "SHA256",
+    "ObjectFormat",
+    "get_object_format",
+    "verify_same_object_format",
+]
+
 from collections.abc import Callable
 from hashlib import sha1, sha256
 from typing import TYPE_CHECKING

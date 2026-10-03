@@ -21,6 +21,15 @@
 
 """Tests for the object store interface."""
 
+__all__ = [
+    "CommitTestHelper",
+    "FindShallowTests",
+    "IterCommitContentsTests",
+    "ObjectStoreTests",
+    "PackBasedObjectStoreTests",
+    "testobject",
+]
+
 from collections.abc import Callable, Iterator, Sequence
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from unittest import TestCase

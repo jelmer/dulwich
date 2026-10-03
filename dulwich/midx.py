@@ -60,9 +60,11 @@ __all__ = [
     "MIDX_SIGNATURE",
     "MIDX_VERSION",
     "MultiPackIndex",
+    "has_mmap",
     "load_midx",
     "load_midx_file",
     "write_midx",
+    "write_midx_file",
 ]
 
 import mmap

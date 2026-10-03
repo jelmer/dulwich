@@ -26,6 +26,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import zlib
 from io import BytesIO, StringIO
 from typing import NoReturn
 
@@ -1456,11 +1457,35 @@ index 1234567..abcdefg 100644
 class GitBase85DecodeTests(TestCase):
     """Tests for git_base85_decode function."""
 
-    def test_decode_returns_bytes(self):
-        # Test that decoding returns bytes
-        encoded = b"A0"
-        result = git_base85_decode(encoded)
-        self.assertIsInstance(result, bytes)
+    def test_decode_line_lengths(self) -> None:
+        # The first byte of each line is the decoded length: A-Z for 1-26,
+        # a-z for 27-52. Lengths that aren't a multiple of 4 must not leak
+        # the padding bytes of the last group.
+        decoded = git_base85_decode(b"McmYdfNM=X@00VacDF6Tf")
+        self.assertEqual(13, len(decoded))
+        self.assertEqual(b"a\0c\0d", zlib.decompress(decoded))
+        decoded = git_base85_decode(b"Kcmb<ms0083<N)#j\n")
+        self.assertEqual(11, len(decoded))
+        self.assertEqual(b"x\0y", zlib.decompress(decoded))
+
+    def test_decode_multiple_lines(self) -> None:
+        data = bytes(range(256)) * 2
+        # Produced by git diff --binary.
+        encoded = (
+            b"zcmZQzWMXDvWn<^y<l^Sx<>MC+6cQE@6%&_`l#-T_m6KOcR8m$^Ra4i{)Y8_`)zddH\n"
+            b"zG%_|ZH8Z!cw6eCbwX=6{baHlab#wRd^z!!c_45x13<?ej4GWKmjEatljf+o6OiE5k\n"
+            b"zO-s+n%*xKm&C4$+EGjN3Ei136tg5c5t*dWnY-(<4ZENr7?CS36?dzW~anj@|Q>RUz\n"
+            b"zF>}`JIdkXDU$Ah|;w4L$Enl&6)#^2C*R9{Mant54TeofBv2)k%J$v`<KXCBS;Uh<n\n"
+            b"z9Y1mM)af&4&z-+;@zUihSFc^aar4&gJ9qEhfAH|p<0ns_J%91?)$2EJ-@X6v@zduo\n"
+            b"VU%!3-@$=X3KY#!IXBgrB2LR)2{{a91\n"
+        )
+        self.assertEqual(data, zlib.decompress(git_base85_decode(encoded)))
+
+    def test_invalid_length_byte(self) -> None:
+        self.assertRaises(ValueError, git_base85_decode, b"0cmYdf\n")
+
+    def test_truncated_line(self) -> None:
+        self.assertRaises(ValueError, git_base85_decode, b"McmYdfNM=X@00Vac\n")
 
     def test_empty_decode(self):
         # Test empty input
@@ -1537,6 +1562,90 @@ Binary files a/test.bin and b/test.bin differ
         self.assertEqual(len(patches), 1)
         self.assertEqual(patches[0].binary, True)
         self.assertIsNone(patches[0].binary_new)  # No patch data
+        self.assertEqual(b"a/test.bin", patches[0].old_path)
+        self.assertEqual(b"b/test.bin", patches[0].new_path)
+
+    def test_parse_binary_paths(self) -> None:
+        # Binary patches carry no ---/+++ lines, so the paths come from the
+        # diff --git header.
+        patches = parse_unified_diff(BINARY_DIFF)
+        self.assertEqual(
+            [
+                (b"a/del.bin", None),
+                (b"a/mod.bin", b"b/mod.bin"),
+                (None, b"b/new.bin"),
+            ],
+            [(p.old_path, p.new_path) for p in patches],
+        )
+        self.assertEqual(
+            [b"HcmV?d00001\n", b"McmYdfNM=X@00VacDF6Tf\n", b"Lcmc~xEoT4#1K9yf\n"],
+            [p.binary_new for p in patches],
+        )
+
+
+# Produced by git diff --cached --binary after deleting del.bin, changing
+# mod.bin from b"a\0b" to b"a\0c\0d" and adding new.bin as b"new\0".
+BINARY_DIFF = b"""\
+diff --git a/del.bin b/del.bin
+deleted file mode 100644
+index d5d0b8b4c4c9e936890870f6799cfbb5ba984470..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+HcmV?d00001
+
+literal 3
+Kcmb<ms0083<N)#j
+
+diff --git a/mod.bin b/mod.bin
+index 20b5be91886d0b6f26dc98a225c0dac05fe2c86e..57e6c150e8aebdd17192d6375e3b2d2b210191fc 100644
+GIT binary patch
+literal 5
+McmYdfNM=X@00VacDF6Tf
+
+literal 3
+KcmYdfNCE%>hycU@
+
+diff --git a/new.bin b/new.bin
+new file mode 100644
+index 0000000000000000000000000000000000000000..c984a0442d5fba744241e9c2dd75d27f612d6cb2
+GIT binary patch
+literal 4
+Lcmc~xEoT4#1K9yf
+
+literal 0
+HcmV?d00001
+
+"""
+
+
+class ApplyBinaryPatchesTests(TestCase):
+    def test_apply(self) -> None:
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path, ignore_errors=True)
+        r = Repo.init(path)
+        self.addCleanup(r.close)
+        for name, content in [("mod.bin", b"a\0b"), ("del.bin", b"x\0y")]:
+            with open(os.path.join(path, name), "wb") as f:
+                f.write(content)
+        r.get_worktree().stage([b"mod.bin", b"del.bin"])
+
+        apply_patches(r, parse_unified_diff(BINARY_DIFF), strip=1)
+
+        self.assertEqual(
+            ["mod.bin", "new.bin"],
+            sorted(n for n in os.listdir(path) if n != ".git"),
+        )
+        for name, content in [("mod.bin", b"a\0c\0d"), ("new.bin", b"new\0")]:
+            with open(os.path.join(path, name), "rb") as f:
+                self.assertEqual(content, f.read())
+        index = r.open_index()
+        self.assertEqual(
+            [
+                (b"mod.bin", b"57e6c150e8aebdd17192d6375e3b2d2b210191fc", 0o100644),
+                (b"new.bin", b"c984a0442d5fba744241e9c2dd75d27f612d6cb2", 0o100644),
+            ],
+            sorted(index.iterobjects()),
+        )
 
 
 class ApplyPatchesPathTests(TestCase):

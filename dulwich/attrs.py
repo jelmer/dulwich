@@ -33,6 +33,7 @@ __all__ = [
     "read_gitattributes",
 ]
 
+import errno
 import logging
 import os
 import re
@@ -251,9 +252,8 @@ def read_gitattributes(
 ) -> list[tuple[Pattern, Mapping[bytes, AttributeValue]]]:
     """Read .gitattributes from a directory.
 
-    A ``.gitattributes`` that is a symlink is ignored rather than followed, so
-    a tree cannot name a file outside the work tree and have its contents read
-    as attributes. git refuses the same way.
+    A ``.gitattributes`` that is a symlink is skipped with a warning rather
+    than followed, as git does.
 
     Args:
         path: Directory path to check for .gitattributes
@@ -265,8 +265,14 @@ def read_gitattributes(
         path = path.decode("utf-8")
 
     gitattributes_path = os.path.join(path, ".gitattributes")
-    f = open_nofollow_read(gitattributes_path)
-    if f is None:
+    try:
+        f = open_nofollow_read(gitattributes_path)
+    except FileNotFoundError:
+        return []
+    except OSError as e:
+        if e.errno not in (errno.ELOOP, errno.EMLINK):
+            raise
+        logger.warning("Ignoring %s: it is a symbolic link", gitattributes_path)
         return []
     with f:
         return compile_gitattributes_patterns(

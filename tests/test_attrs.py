@@ -456,9 +456,15 @@ class FileOperationsTests(TestCase):
                 f.write(b"*.py diff=python\n")
             workdir = os.path.join(tmpdir, "work")
             os.mkdir(workdir)
-            os.symlink(outside, os.path.join(workdir, ".gitattributes"))
+            link = os.path.join(workdir, ".gitattributes")
+            os.symlink(outside, link)
 
-            self.assertEqual([], read_gitattributes(workdir))
+            with self.assertLogs("dulwich.attrs", "WARNING") as cm:
+                self.assertEqual([], read_gitattributes(workdir))
+            self.assertEqual(
+                [f"WARNING:dulwich.attrs:Ignoring {link}: it is a symbolic link"],
+                cm.output,
+            )
 
 
 class GitAttributesTests(TestCase):

@@ -502,10 +502,16 @@ class IgnoreFilterManagerTests(TestCase):
             f.write(b"/secret\n")
         repo = Repo.init(os.path.join(tmp_dir, "repo"), mkdir=True)
         self.addCleanup(repo.close)
-        os.symlink(outside, os.path.join(repo.path, ".gitignore"))
+        link = os.path.join(repo.path, ".gitignore")
+        os.symlink(outside, link)
 
         m = IgnoreFilterManager.from_repo(repo)
-        self.assertIs(None, m.is_ignored("secret"))
+        with self.assertLogs("dulwich.ignore", "WARNING") as cm:
+            self.assertIs(None, m.is_ignored("secret"))
+        self.assertEqual(
+            [f"WARNING:dulwich.ignore:Ignoring {link}: it is a symbolic link"],
+            cm.output,
+        )
 
     def test_trailing_double_asterisk_slash_is_directory_only(self) -> None:
         # "foo/**/" is a directory pattern: Git ignores the directories below

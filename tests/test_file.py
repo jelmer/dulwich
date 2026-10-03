@@ -19,6 +19,7 @@
 # License, Version 2.0.
 #
 
+import errno
 import io
 import os
 import shutil
@@ -49,13 +50,13 @@ class OpenNofollowReadTests(TestCase):
         path = os.path.join(self.tempdir, "f")
         with open(path, "wb") as f:
             f.write(b"contents")
-        f = open_nofollow_read(path)
-        self.assertIsNotNone(f)
-        with f:
+        with open_nofollow_read(path) as f:
             self.assertEqual(b"contents", f.read())
 
     def test_missing(self) -> None:
-        self.assertIs(None, open_nofollow_read(os.path.join(self.tempdir, "nope")))
+        self.assertRaises(
+            FileNotFoundError, open_nofollow_read, os.path.join(self.tempdir, "nope")
+        )
 
     @skipIf(sys.platform == "win32", "requires symlink support")
     def test_symlink(self) -> None:
@@ -64,7 +65,9 @@ class OpenNofollowReadTests(TestCase):
             f.write(b"outside")
         path = os.path.join(self.tempdir, "link")
         os.symlink(target, path)
-        self.assertIs(None, open_nofollow_read(path))
+        with self.assertRaises(OSError) as cm:
+            open_nofollow_read(path)
+        self.assertIn(cm.exception.errno, (errno.ELOOP, errno.EMLINK))
 
 
 class FancyRenameTests(TestCase):

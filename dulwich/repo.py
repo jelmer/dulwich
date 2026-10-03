@@ -59,6 +59,7 @@ __all__ = [
     "serialize_graftpoints",
 ]
 
+import errno
 import logging
 import os
 import stat
@@ -2600,43 +2601,50 @@ class Repo(BaseRepo):
     def _read_gitattributes(self) -> dict[bytes, dict[bytes, bytes]]:
         """Read .gitattributes file from working tree.
 
-        A ``.gitattributes`` that is a symlink is ignored rather than
-        followed, as git does.
+        A ``.gitattributes`` that is a symlink is skipped with a warning
+        rather than followed, as git does.
 
         Returns:
             Dictionary mapping file patterns to attributes
         """
-        gitattributes = {}
+        gitattributes: dict[bytes, dict[bytes, bytes]] = {}
         gitattributes_path = os.path.join(self.path, ".gitattributes")
 
-        f = open_nofollow_read(gitattributes_path)
-        if f is not None:
-            with f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith(b"#"):
-                        continue
+        try:
+            f = open_nofollow_read(gitattributes_path)
+        except FileNotFoundError:
+            return gitattributes
+        except OSError as e:
+            if e.errno not in (errno.ELOOP, errno.EMLINK):
+                raise
+            logger.warning("Ignoring %s: it is a symbolic link", gitattributes_path)
+            return gitattributes
+        with f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith(b"#"):
+                    continue
 
-                    parts = line.split()
-                    if len(parts) < 2:
-                        continue
+                parts = line.split()
+                if len(parts) < 2:
+                    continue
 
-                    pattern = parts[0]
-                    attrs = {}
+                pattern = parts[0]
+                attrs = {}
 
-                    for attr in parts[1:]:
-                        if attr.startswith(b"-"):
-                            # Unset attribute
-                            attrs[attr[1:]] = b"false"
-                        elif b"=" in attr:
-                            # Set to value
-                            key, value = attr.split(b"=", 1)
-                            attrs[key] = value
-                        else:
-                            # Set attribute
-                            attrs[attr] = b"true"
+                for attr in parts[1:]:
+                    if attr.startswith(b"-"):
+                        # Unset attribute
+                        attrs[attr[1:]] = b"false"
+                    elif b"=" in attr:
+                        # Set to value
+                        key, value = attr.split(b"=", 1)
+                        attrs[key] = value
+                    else:
+                        # Set attribute
+                        attrs[attr] = b"true"
 
-                    gitattributes[pattern] = attrs
+                gitattributes[pattern] = attrs
 
         return gitattributes
 
@@ -2734,12 +2742,18 @@ class Repo(BaseRepo):
                     )
                 )
 
-        # Read .gitattributes from working directory (if it exists). The name
-        # comes from the tree, so a symlink there would read attributes from a
-        # file outside the work tree; git refuses the same way.
+        # Read .gitattributes from working directory (if it exists). Like git,
+        # don't follow a symlink there.
         working_attrs_path = os.path.join(self.path, ".gitattributes")
-        working_attrs_file = open_nofollow_read(working_attrs_path)
-        if working_attrs_file is not None:
+        try:
+            working_attrs_file = open_nofollow_read(working_attrs_path)
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            if e.errno not in (errno.ELOOP, errno.EMLINK):
+                raise
+            logger.warning("Ignoring %s: it is a symbolic link", working_attrs_path)
+        else:
             with working_attrs_file as f:
                 patterns.extend(
                     compile_gitattributes_patterns(

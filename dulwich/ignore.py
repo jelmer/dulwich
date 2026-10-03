@@ -37,6 +37,7 @@ __all__ = [
     "translate",
 ]
 
+import errno
 import logging
 import os.path
 import re
@@ -585,18 +586,20 @@ class IgnoreFilterManager:
             pass
 
         p = os.path.join(self._top_path, path, ".gitignore")
-        # The name comes from the tree, so a symlink here would read patterns
-        # from a file outside the work tree. git refuses the same way.
         try:
             f = open_nofollow_read(p)
+        except (FileNotFoundError, NotADirectoryError):
+            self._path_filters[path] = None
         except OSError as e:
+            if e.errno in (errno.ELOOP, errno.EMLINK):
+                logger.warning("Ignoring %s: it is a symbolic link", p)
+                self._path_filters[path] = None
             # On Windows, opening a path that contains a symlink can fail with
             # errno 22 (Invalid argument) when the symlink points outside the repo
-            if e.errno != 22:
+            elif e.errno == 22:
+                self._path_filters[path] = None
+            else:
                 raise
-            f = None
-        if f is None:
-            self._path_filters[path] = None
         else:
             with f:
                 self._path_filters[path] = IgnoreFilter(

@@ -414,9 +414,15 @@ class RepositoryRootTests(TestCase):
             f.write(b"*.txt text\n")
         r = Repo.init(os.path.join(tmp_dir, "repo"), mkdir=True)
         self.addCleanup(r.close)
-        os.symlink(outside, os.path.join(r.path, ".gitattributes"))
+        link = os.path.join(r.path, ".gitattributes")
+        os.symlink(outside, link)
 
-        self.assertEqual({}, r.get_gitattributes().match_path(b"file.txt"))
+        with self.assertLogs("dulwich.repo", "WARNING") as cm:
+            self.assertEqual({}, r.get_gitattributes().match_path(b"file.txt"))
+        self.assertEqual(
+            [f"WARNING:dulwich.repo:Ignoring {link}: it is a symbolic link"],
+            cm.output,
+        )
 
     def test_contains_missing(self) -> None:
         r = self.open_repo("a.git")

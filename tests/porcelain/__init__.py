@@ -50,6 +50,7 @@ from dulwich.errors import CommitError, WorkingTreeModifiedError
 from dulwich.index import (
     Index,
     IndexEntry,
+    InvalidPathError,
     validate_path_element_default,
     validate_path_element_ntfs,
 )
@@ -4542,6 +4543,27 @@ class ResetTests(PorcelainTestCase):
         self.assertEqual([b"Foo.py", b"foo.py"], sorted(index))
         self.assertEqual(blob_upper.id, index[b"Foo.py"].sha)
         self.assertEqual(blob_lower.id, index[b"foo.py"].sha)
+
+    def test_mixed_reset_rejects_dotdot_path(self) -> None:
+        blob = Blob.from_string(b"pwned\n")
+        inner = Tree()
+        inner.add(b"escaped.txt", 0o100644, blob.id)
+        tree = Tree()
+        tree.add(b"..", 0o040000, inner.id)
+        commit = Commit()
+        commit.tree = tree.id
+        commit.author = commit.committer = b"Test <test@example.com>"
+        commit.author_time = commit.commit_time = 0
+        commit.author_timezone = commit.commit_timezone = 0
+        commit.message = b"escape"
+        for obj in (blob, inner, tree, commit):
+            self.repo.object_store.add_object(obj)
+
+        with self.assertRaises(InvalidPathError) as cm:
+            porcelain.reset(self.repo, "mixed", commit.id)
+        self.assertEqual(b"../escaped.txt", cm.exception.path)
+        self.assertEqual([], list(self.repo.open_index()))
+        self.assertRaises(KeyError, self.repo.head)
 
     def test_soft_reset(self) -> None:
         # Create initial commit

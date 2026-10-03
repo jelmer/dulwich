@@ -5,6 +5,13 @@
    inflated, base85 line lengths are decoded correctly and binary deletions
    remove the file. (Jelmer Vernooĳ)
 
+ * Support ``delta`` binary patches, binary changes combined with a rename
+   or copy and reverse application of binary patches in ``apply_patches``.
+   (Jelmer Vernooĳ)
+
+ * Unquote C-style quoted file names (as git emits for names with special
+   or non-ASCII characters) when parsing patches. (Jelmer Vernooĳ)
+
  * SECURITY: Validate index paths in sparse checkout, mixed reset,
    ``lfs_pull`` and ``lfs_migrate``, so that a malicious repository can no
    longer write files outside the work tree via ``..`` entries or symlinks.

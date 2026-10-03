@@ -4,6 +4,9 @@
    which were dropped in 1.2.16, as deprecated aliases for the classes in
    ``dulwich.pack``. (Jelmer Vernooĳ)
 
+ * Refuse to write a loose ref through a symref whose target escapes the
+   ref store. (Kartik Kenchi, Jelmer Vernooĳ)
+
 1.2.16	2026-10-03
 
  * Add ``PackIndex.object_sha_at_position`` to look up an object by its

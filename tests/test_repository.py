@@ -68,6 +68,24 @@ def get_unstaged_changes(repo):
     return list(_get_unstaged_changes(index, repo.path, filter_callback, False))
 
 
+class DeprecatedReexportTests(TestCase):
+    def test_refs_aliases(self) -> None:
+        from dulwich import refs, repo
+
+        for name in (
+            "LOCAL_TAG_PREFIX",
+            "SYMREF",
+            "check_ref_format",
+            "read_packed_refs",
+            "read_packed_refs_with_peeled",
+            "write_packed_refs",
+        ):
+            with self.subTest(name):
+                with self.assertWarns(DeprecationWarning):
+                    obj = getattr(repo, name)
+                self.assertIs(getattr(refs, name), obj)
+
+
 class CreateRepositoryTests(TestCase):
     def assertFileContentsEqual(self, expected, repo, path) -> None:
         f = repo.get_named_file(path)

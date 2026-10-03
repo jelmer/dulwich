@@ -48,7 +48,6 @@ __all__ = [
     "UPLOAD_CAPABILITIES",
     "AbstractHttpGitClient",
     "BundleClient",
-    "BundleList",
     "BundleURIError",
     "FetchPackResult",
     "GitClient",
@@ -74,14 +73,12 @@ __all__ = [
     "check_wants",
     "default_urllib3_manager",
     "default_user_agent_string",
-    "fetch_bundle_uri",
     "find_capability",
     "find_git_command",
     "get_credentials_from_store",
     "get_transport_and_path",
     "get_transport_and_path_from_url",
     "negotiate_protocol_version",
-    "parse_bundle_list",
     "parse_rsync_url",
     "read_pkt_refs_v1",
     "read_pkt_refs_v2",
@@ -164,14 +161,9 @@ if TYPE_CHECKING:
             ...
 
 
+from . import _deprecated_aliases
 from .bundle import Bundle
-from .bundle_uri import (
-    BundleList,
-    BundleURIError,
-    apply_bundle_uri,
-    fetch_bundle_uri,
-    parse_bundle_list,
-)
+from .bundle_uri import BundleURIError, apply_bundle_uri
 from .config import (
     Config,
     apply_instead_of,
@@ -265,6 +257,16 @@ MAX_IN_VAIN = 256
 
 
 logger = logging.getLogger(__name__)
+
+
+__getattr__ = _deprecated_aliases(
+    __name__,
+    {
+        "BundleList": "dulwich.bundle_uri.BundleList",
+        "fetch_bundle_uri": "dulwich.bundle_uri.fetch_bundle_uri",
+        "parse_bundle_list": "dulwich.bundle_uri.parse_bundle_list",
+    },
+)
 
 
 class InvalidWants(Exception):

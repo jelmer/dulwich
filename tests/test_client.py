@@ -100,6 +100,17 @@ from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 from . import TestCase, skipIf
 
 
+class DeprecatedReexportTests(TestCase):
+    def test_bundle_uri_aliases(self) -> None:
+        from dulwich import bundle_uri
+
+        for name in ("BundleList", "fetch_bundle_uri", "parse_bundle_list"):
+            with self.subTest(name):
+                with self.assertWarns(DeprecationWarning):
+                    obj = getattr(client, name)
+                self.assertIs(getattr(bundle_uri, name), obj)
+
+
 class DummyClient(TraditionalGitClient):
     def __init__(self, can_read, read, write) -> None:
         self.can_read = can_read

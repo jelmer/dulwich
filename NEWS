@@ -1,5 +1,13 @@
 1.2.17	UNRELEASED
 
+ * Deprecate importing ``LOCAL_TAG_PREFIX``, ``SYMREF``,
+   ``check_ref_format``, ``read_packed_refs``,
+   ``read_packed_refs_with_peeled`` and ``write_packed_refs`` from
+   ``dulwich.repo``; import them from ``dulwich.refs`` instead. Likewise
+   ``BundleList``, ``fetch_bundle_uri`` and ``parse_bundle_list`` should be
+   imported from ``dulwich.bundle_uri`` rather than ``dulwich.client``.
+   (Jelmer Vernooĳ)
+
  * Restore ``dulwich.index.SHA1Reader`` and ``dulwich.index.SHA1Writer``,
    which were dropped in 1.2.16, as deprecated aliases for the classes in
    ``dulwich.pack``. (Jelmer Vernooĳ)

@@ -47,10 +47,12 @@ from dulwich.refs import (
     local_branch_name,
     local_replace_name,
     local_tag_name,
+    locked_ref,
     parse_remote_ref,
     parse_symref_value,
     read_packed_refs,
     read_packed_refs_with_peeled,
+    refname_is_safe,
     shorten_ref_name,
     write_packed_refs,
 )
@@ -92,6 +94,40 @@ class CheckRefFormatTests(TestCase):
         self.assertFalse(check_ref_format(b"refs/a.lock/a"))
         self.assertFalse(check_ref_format(b"refs/heads/a.lock/a"))
         self.assertFalse(check_ref_format(b"@"))
+
+
+class RefnameIsSafeTests(TestCase):
+    """Tests for the refname_is_safe function.
+
+    These mirror the cases covered by git's refname_is_safe().
+    """
+
+    def test_safe(self) -> None:
+        self.assertTrue(refname_is_safe(b"refs/heads/master"))
+        self.assertTrue(refname_is_safe(b"refs/stash"))
+        self.assertTrue(refname_is_safe(b"refs/heads/foo..bar"))
+        self.assertTrue(refname_is_safe(b"HEAD"))
+        self.assertTrue(refname_is_safe(b"MERGE_HEAD"))
+
+    def test_repeated_slashes(self) -> None:
+        # _check_refname only deprecates these, so they stay accepted here;
+        # they cannot escape the ref store.
+        self.assertTrue(refname_is_safe(b"refs//heads/master"))
+        self.assertTrue(refname_is_safe(b"refs/remotes//HEAD"))
+
+    def test_unsafe(self) -> None:
+        self.assertFalse(refname_is_safe(b"refs/"))
+        self.assertFalse(refname_is_safe(b"refs/heads/master/"))
+        self.assertFalse(refname_is_safe(b"refs/../escape"))
+        self.assertFalse(refname_is_safe(b"refs/heads/../../escape"))
+        self.assertFalse(refname_is_safe(b"refs/heads/./master"))
+        self.assertFalse(refname_is_safe(b"refs/heads/..\\..\\escape"))
+        self.assertFalse(refname_is_safe(b"../escape"))
+        self.assertFalse(refname_is_safe(b"/etc/passwd"))
+        self.assertFalse(refname_is_safe(b"head"))
+        self.assertFalse(refname_is_safe(b"HEAD\n"))
+        self.assertFalse(refname_is_safe("H\u00c9AD".encode()))
+        self.assertFalse(refname_is_safe(b""))
 
 
 ONES = b"1" * 40
@@ -614,6 +650,72 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertEqual(None, self._refs.read_loose_ref(b"../secret"))
         self.assertRaises(KeyError, lambda: self._refs[b"../secret"])
         self.assertEqual(None, self._refs.read_loose_ref(b"/etc/passwd"))
+
+    def _write_evil_symref(self, target: bytes) -> None:
+        path = os.path.join(self._refs.path, b"refs", b"heads", b"evil")
+        with open(path, "wb") as f:
+            f.write(b"ref: " + target + b"\n")
+
+    def test_set_if_equals_symref_target_escape(self) -> None:
+        # refs.git is bare, so "../escape" resolves next to the repository.
+        outside = os.path.join(os.path.dirname(self._repo.path), "escape")
+        self._write_evil_symref(b"../escape")
+        self.assertRaises(
+            errors.RefFormatError,
+            self._refs.set_if_equals,
+            b"refs/heads/evil",
+            None,
+            b"1" * 40,
+        )
+        self.assertFalse(os.path.exists(outside))
+
+    def test_add_if_new_symref_target_escape(self) -> None:
+        outside = os.path.join(os.path.dirname(self._repo.path), "escape")
+        self._write_evil_symref(b"../escape")
+        self.assertRaises(
+            errors.RefFormatError,
+            self._refs.add_if_new,
+            b"refs/heads/evil",
+            b"1" * 40,
+        )
+        self.assertFalse(os.path.exists(outside))
+
+    def test_locked_ref_symref_target_escape(self) -> None:
+        outside = os.path.join(os.path.dirname(self._repo.path), "escape")
+        self._write_evil_symref(b"../escape")
+
+        def acquire() -> None:
+            with locked_ref(self._refs, b"refs/heads/evil"):
+                pass
+
+        self.assertRaises(errors.RefFormatError, acquire)
+        self.assertFalse(os.path.exists(outside))
+
+    def test_set_if_equals_symref_target_bad_name(self) -> None:
+        # Like git, a symref target that fails check_ref_format but is safe
+        # can still be written and compared-and-swapped through the symref.
+        target_path = os.path.join(self._refs.path, b"refs", b"heads", b"foo..bar")
+        self._write_evil_symref(b"refs/heads/foo..bar")
+        self.assertTrue(self._refs.set_if_equals(b"refs/heads/evil", None, ONES))
+        self.assertFalse(self._refs.set_if_equals(b"refs/heads/evil", TWOS, THREES))
+        self.assertTrue(self._refs.set_if_equals(b"refs/heads/evil", ONES, TWOS))
+        with open(target_path, "rb") as f:
+            self.assertEqual(TWOS + b"\n", f.read())
+
+    def test_add_if_new_symref_target_bad_name(self) -> None:
+        target_path = os.path.join(self._refs.path, b"refs", b"heads", b"foo..bar")
+        self._write_evil_symref(b"refs/heads/foo..bar")
+        self.assertTrue(self._refs.add_if_new(b"refs/heads/evil", ONES))
+        with open(target_path, "rb") as f:
+            self.assertEqual(ONES + b"\n", f.read())
+
+    def test_locked_ref_symref_target_bad_name(self) -> None:
+        self._write_evil_symref(b"refs/heads/foo..bar")
+        with locked_ref(self._refs, b"refs/heads/evil") as ref:
+            self.assertEqual(None, ref.get())
+            ref.set(ONES)
+        with locked_ref(self._refs, b"refs/heads/evil") as ref:
+            self.assertEqual(ONES, ref.get())
 
     def test_delete_refs_container(self) -> None:
         # We shouldn't delete the refs directory

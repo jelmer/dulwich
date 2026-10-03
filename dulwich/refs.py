@@ -50,6 +50,7 @@ __all__ = [
     "read_info_refs",
     "read_packed_refs",
     "read_packed_refs_with_peeled",
+    "refname_is_safe",
     "set_ref_from_raw",
     "shorten_ref_name",
     "write_packed_refs",
@@ -158,6 +159,43 @@ def check_ref_format(refname: Ref) -> bool:
 def _collapse_slashes(refname: bytes) -> bytes:
     """Collapse runs of consecutive slashes in a ref name into a single slash."""
     return b"/".join(component for component in refname.split(b"/") if component)
+
+
+# git's isupper() is ASCII-only, so non-ASCII (e.g. UTF-8) bytes never match.
+_PSEUDOREF_CHARS = frozenset(b"ABCDEFGHIJKLMNOPQRSTUVWXYZ_")
+
+
+def refname_is_safe(refname: Ref) -> bool:
+    """Check if a refname is safe to use as a path within the ref store.
+
+    This is the equivalent of git's ``refname_is_safe()``: a weaker check than
+    :func:`check_ref_format`, meant for refnames that have already been
+    resolved (such as the target of a symref read from disk) and only
+    establishes that turning the name into a path cannot escape the ref store.
+
+    A name under ``refs/`` must already be normalized, so that neither
+    ``refs/../x`` nor ``refs/heads/../../x`` is accepted. Any other name must
+    be a pseudoref, i.e. consist only of uppercase letters and underscores
+    (e.g. ``HEAD`` or ``MERGE_HEAD``).
+
+    Args:
+      refname: The refname to check
+    Returns: True if the refname is safe, False otherwise
+    """
+    if refname.startswith(b"refs/"):
+        rest = refname[len(b"refs/") :]
+        # rest must not be empty or end with "/"
+        if not rest or rest.endswith(b"/"):
+            return False
+        # refpath() maps "/" onto os.sep, so on Windows a backslash would act
+        # as a second separator; check_ref_format rejects it as well.
+        if b"\\" in rest:
+            return False
+        # Unlike git, repeated slashes are tolerated here rather than treated
+        # as a denormalized name, because _check_refname still only deprecates
+        # them; only "." and ".." components make a name unsafe.
+        return not any(c in (b".", b"..") for c in rest.split(b"/"))
+    return bool(refname) and set(refname) <= _PSEUDOREF_CHARS
 
 
 def parse_remote_ref(ref: bytes) -> tuple[bytes, bytes]:
@@ -1126,6 +1164,13 @@ class DiskRefsContainer(RefsContainer):
             self._check_refname(name)
         except RefFormatError:
             return None
+        return self._read_loose_ref_file(name)
+
+    def _read_loose_ref_file(self, name: Ref) -> bytes | None:
+        """Read a reference file without validating its name.
+
+        Callers must have checked the name with :func:`refname_is_safe`.
+        """
         filename = self.refpath(name)
         try:
             with GitFile(filename, "rb") as f:
@@ -1246,6 +1291,9 @@ class DiskRefsContainer(RefsContainer):
             realname = realnames[-1]
         except (KeyError, IndexError, SymrefLoop):
             realname = name
+        # The resolved symref target may escape the ref store.
+        if not refname_is_safe(realname):
+            raise RefFormatError(realname)
         filename = self.refpath(realname)
 
         # make sure none of the ancestor folders is in packed refs
@@ -1261,7 +1309,7 @@ class DiskRefsContainer(RefsContainer):
             if old_ref is not None:
                 try:
                     # read again while holding the lock to handle race conditions
-                    orig_ref = self.read_loose_ref(realname)
+                    orig_ref = self._read_loose_ref_file(realname)
                     if orig_ref is None:
                         orig_ref = self.get_packed_refs().get(realname, ZERO_SHA)
                     if orig_ref != old_ref:
@@ -1273,7 +1321,7 @@ class DiskRefsContainer(RefsContainer):
 
             # Check if ref already has the desired value while holding the lock
             # This avoids fsync when ref is unchanged but still detects lock conflicts
-            current_ref = self.read_loose_ref(realname)
+            current_ref = self._read_loose_ref_file(realname)
             if current_ref is None:
                 current_ref = packed_refs.get(realname, None)
 
@@ -1321,6 +1369,7 @@ class DiskRefsContainer(RefsContainer):
           message: Optional message for reflog
         Returns: True if the add was successful, False otherwise.
         """
+        self._check_refname(name)
         self._check_ref_value(ref)
         try:
             realnames, contents = self.follow(name)
@@ -1329,7 +1378,8 @@ class DiskRefsContainer(RefsContainer):
             realname = realnames[-1]
         except (KeyError, IndexError):
             realname = name
-        self._check_refname(realname)
+        if not refname_is_safe(realname):
+            raise RefFormatError(realname)
         filename = self.refpath(realname)
         ensure_dir_exists(os.path.dirname(filename))
         with GitFile(filename, "wb") as f:
@@ -1881,6 +1931,9 @@ class locked_ref:
         except (KeyError, IndexError, SymrefLoop):
             self._realname = self._refname
 
+        # The resolved symref target may escape the ref store.
+        if not refname_is_safe(self._realname):
+            raise RefFormatError(self._realname)
         filename = self._refs_container.refpath(self._realname)
         ensure_dir_exists(os.path.dirname(filename))
         f = GitFile(filename, "wb")
@@ -1912,7 +1965,7 @@ class locked_ref:
             raise RuntimeError("locked_ref not in context")
 
         assert self._realname is not None
-        current_ref = self._refs_container.read_loose_ref(self._realname)
+        current_ref = self._refs_container._read_loose_ref_file(self._realname)
         if current_ref is None:
             current_ref = self._refs_container.get_packed_refs().get(
                 self._realname, None

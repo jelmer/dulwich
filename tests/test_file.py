@@ -19,12 +19,14 @@
 # License, Version 2.0.
 #
 
+import errno
 import io
 import os
 import shutil
 import stat
 import sys
 import tempfile
+from unittest import skipIf
 
 from dulwich.file import (
     PERM_EVERYBODY,
@@ -32,9 +34,40 @@ from dulwich.file import (
     FileLocked,
     GitFile,
     _fancy_rename,
+    open_nofollow_read,
 )
 
 from . import SkipTest, TestCase
+
+
+class OpenNofollowReadTests(TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir)
+
+    def test_regular_file(self) -> None:
+        path = os.path.join(self.tempdir, "f")
+        with open(path, "wb") as f:
+            f.write(b"contents")
+        with open_nofollow_read(path) as f:
+            self.assertEqual(b"contents", f.read())
+
+    def test_missing(self) -> None:
+        self.assertRaises(
+            FileNotFoundError, open_nofollow_read, os.path.join(self.tempdir, "nope")
+        )
+
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_symlink(self) -> None:
+        target = os.path.join(self.tempdir, "target")
+        with open(target, "wb") as f:
+            f.write(b"outside")
+        path = os.path.join(self.tempdir, "link")
+        os.symlink(target, path)
+        with self.assertRaises(OSError) as cm:
+            open_nofollow_read(path)
+        self.assertIn(cm.exception.errno, (errno.ELOOP, errno.EMLINK))
 
 
 class FancyRenameTests(TestCase):

@@ -33,12 +33,14 @@ __all__ = [
     "read_gitattributes",
 ]
 
+import errno
 import logging
 import os
 import re
 from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
 from typing import IO
 
+from .file import open_nofollow_read
 from .wildmatch import MalformedPattern
 from .wildmatch import translate as translate_wildmatch
 
@@ -250,6 +252,9 @@ def read_gitattributes(
 ) -> list[tuple[Pattern, Mapping[bytes, AttributeValue]]]:
     """Read .gitattributes from a directory.
 
+    A ``.gitattributes`` that is a symlink is skipped with a warning rather
+    than followed, as git does.
+
     Args:
         path: Directory path to check for .gitattributes
 
@@ -260,10 +265,19 @@ def read_gitattributes(
         path = path.decode("utf-8")
 
     gitattributes_path = os.path.join(path, ".gitattributes")
-    if os.path.exists(gitattributes_path):
-        return parse_gitattributes_file(gitattributes_path)
-
-    return []
+    try:
+        f = open_nofollow_read(gitattributes_path)
+    except FileNotFoundError:
+        return []
+    except OSError as e:
+        if e.errno not in (errno.ELOOP, errno.EMLINK):
+            raise
+        logger.warning("Ignoring %s: it is a symbolic link", gitattributes_path)
+        return []
+    with f:
+        return compile_gitattributes_patterns(
+            parse_git_attributes(f), gitattributes_path.encode("utf-8")
+        )
 
 
 class GitAttributes:

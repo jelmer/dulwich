@@ -58,6 +58,7 @@ import email.parser
 import email.utils
 import os
 import re
+import stat
 import time
 import zlib
 from collections.abc import Generator, Sequence
@@ -1244,6 +1245,15 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
                     # Just skip dissimilarity index for now
                     i += 1
                 elif line.startswith(b"index "):
+                    # "index <old>..<new> <mode>" gives the mode when the
+                    # patch doesn't change it.
+                    fields = line.split()
+                    if len(fields) == 3:
+                        mode = int(fields[2], 8)
+                        if old_mode is None:
+                            old_mode = mode
+                        if new_mode is None:
+                            new_mode = mode
                     i += 1
                 elif line.startswith(b"--- "):
                     # Parse old file path
@@ -1293,7 +1303,8 @@ def parse_unified_diff(diff_text: bytes) -> list[FilePatch]:
                         binary_old_delta, binary_old = blocks[1]
                     break
                 else:
-                    i += 1
+                    # Leave the line (e.g. the next "diff --git") to the
+                    # hunk parser below.
                     break
 
             if binary and old_path is None and new_path is None:
@@ -1397,11 +1408,17 @@ def apply_patch_hunks(
         old_content: list[bytes] = []
         new_content: list[bytes] = []
 
+        previous = b""
         for line in hunk.lines:
             if line.startswith(b"\\"):
-                # Skip "\ No newline at end of file" markers
+                # "\ No newline at end of file" applies to the line before it
+                if previous in (b" ", b"-"):
+                    old_content[-1] = old_content[-1].removesuffix(b"\n")
+                if previous in (b" ", b"+"):
+                    new_content[-1] = new_content[-1].removesuffix(b"\n")
                 continue
-            elif line.startswith(b" "):
+            previous = line[:1]
+            if line.startswith(b" "):
                 # Context line - add newline if not present
                 content = line[1:]
                 if not content.endswith(b"\n"):
@@ -1488,6 +1505,119 @@ def _validate_patch_target(r: "Repo", repo_path: bytes, tree_path: bytes) -> byt
     return fs_path
 
 
+def _read_patch_target(fs_path: bytes) -> tuple[bytes, int] | None:
+    """Read the content and mode of a patch target in the work tree.
+
+    A symlink is read with ``readlink`` rather than followed, since its
+    content in git is the link target.
+
+    Returns:
+      Tuple with content and mode, or None if the path does not exist
+    """
+    from .index import cleanup_mode
+
+    try:
+        st = os.lstat(fs_path)
+    except FileNotFoundError:
+        return None
+    if stat.S_ISLNK(st.st_mode):
+        return os.readlink(fs_path), stat.S_IFLNK
+    with open(fs_path, "rb") as f:
+        return f.read(), cleanup_mode(st.st_mode)
+
+
+def _check_patch_target_type(
+    tree_path: bytes, disk_mode: int, expected_mode: int, config: "Config"
+) -> None:
+    """Refuse to apply a patch for a symlink to a file or vice versa.
+
+    ``verify_leading_dirs`` only checks the leading directories. A tracked
+    symlink such as ``trap -> .git/hooks/pre-commit`` resolves inside the work
+    tree, so writing a regular file patch to it would follow the link and land
+    in the control directory. git refuses such patches with "wrong type".
+    """
+    if stat.S_ISLNK(disk_mode) == stat.S_ISLNK(expected_mode):
+        return
+    if (
+        stat.S_ISLNK(expected_mode)
+        and not stat.S_ISLNK(disk_mode)
+        and not config.get_boolean(b"core", b"symlinks", True)
+    ):
+        # With core.symlinks=false links are checked out as plain files.
+        return
+    raise ValueError(f"wrong type for patch target: {tree_path!r}")
+
+
+def _write_patch_target(
+    fs_path: bytes, content: bytes, mode: int, config: "Config"
+) -> os.stat_result:
+    """Write a patch result to the work tree without following symlinks.
+
+    Returns:
+      The ``lstat`` result of the written path
+    """
+    from .index import build_file_from_blob, get_symlink_fn
+
+    os.makedirs(os.path.dirname(fs_path), exist_ok=True)
+    return build_file_from_blob(
+        Blob.from_string(content), mode, fs_path, symlink_fn=get_symlink_fn(config)
+    )
+
+
+def _refuse_existing_target(fs_path: bytes, tree_path: bytes) -> None:
+    """Refuse to create a file over an existing path, like git does."""
+    if os.path.lexists(fs_path):
+        raise ValueError(f"{tree_path!r} already exists in working directory")
+
+
+def _load_patch_target(
+    r: "Repo",
+    fs_path: bytes,
+    tree_path: bytes,
+    expected_mode: int | None,
+    config: "Config",
+) -> tuple[bytes, int] | None:
+    """Load the current content and mode of an existing patch target.
+
+    Reads the work tree, falling back to the index if the path is missing
+    there. The mode from the patch, if any, must match the type on disk.
+
+    Returns:
+      Tuple with content and mode, or None if the path can't be found
+    """
+    from .index import ConflictedIndexEntry, IndexEntry
+
+    def index_entry() -> IndexEntry | None:
+        try:
+            entry = r.open_index(config=config)[tree_path]
+        except (FileNotFoundError, KeyError):
+            return None
+        if isinstance(entry, ConflictedIndexEntry):
+            return None
+        return entry
+
+    current = _read_patch_target(fs_path)
+    if current is None:
+        entry = index_entry()
+        if entry is None:
+            return None
+        obj = r.object_store[entry.sha]
+        if not isinstance(obj, Blob):
+            return None
+        return obj.data, entry.mode
+    content, mode = current
+    if expected_mode is not None:
+        _check_patch_target_type(tree_path, mode, expected_mode, config)
+        return content, expected_mode
+    if not stat.S_ISLNK(mode) and not config.get_boolean(b"core", b"symlinks", True):
+        # A link checked out as a plain file is only recognizable as such
+        # from the index.
+        entry = index_entry()
+        if entry is not None and stat.S_ISLNK(entry.mode):
+            return content, entry.mode
+    return content, mode
+
+
 def _apply_rename_or_copy(
     r: "Repo",
     src_path: bytes,
@@ -1497,8 +1627,8 @@ def _apply_rename_or_copy(
     is_rename: bool,
     cached: bool,
     check: bool,
-    config: "Config | None",
-) -> tuple[list[bytes] | None, bool]:
+    config: "Config",
+) -> tuple[list[bytes] | None, int, bool]:
     """Apply a rename or copy operation.
 
     Args:
@@ -1513,16 +1643,12 @@ def _apply_rename_or_copy(
         config: Repository configuration
 
     Returns:
-        A tuple of (``original_lines``, ``should_continue``) where:
+        A tuple of (``original_lines``, ``old_mode``, ``should_continue``) where:
         - ``original_lines``: Content lines if hunks need to be applied, None otherwise
+        - ``old_mode``: Mode of the source
         - ``should_continue``: True to skip to next patch, False to continue processing
     """
-    from .index import (
-        ConflictedIndexEntry,
-        IndexEntry,
-        cleanup_mode,
-        index_entry_from_stat,
-    )
+    from .index import IndexEntry, index_entry_from_stat
 
     # Strip path components
     src_stripped = src_path
@@ -1538,65 +1664,41 @@ def _apply_rename_or_copy(
     repo_path_bytes = r.path.encode("utf-8") if isinstance(r.path, str) else r.path
     src_fs_path = _validate_patch_target(r, repo_path_bytes, src_stripped)
     dst_fs_path = _validate_patch_target(r, repo_path_bytes, dst_stripped)
+    if not cached:
+        _refuse_existing_target(dst_fs_path, dst_stripped)
 
     # Read content from source file
     op_name = "rename" if is_rename else "copy"
-    if os.path.exists(src_fs_path):
-        with open(src_fs_path, "rb") as f:
-            content = f.read()
-    else:
-        # Try to read from index
-        index = r.open_index(config=config)
-        if src_stripped in index:
-            entry = index[src_stripped]
-            if not isinstance(entry, ConflictedIndexEntry):
-                obj = r.object_store[entry.sha]
-                if isinstance(obj, Blob):
-                    content = obj.data
-                else:
-                    raise ValueError(
-                        f"Cannot {op_name}: source {src_stripped.decode('utf-8', errors='replace')} not found"
-                    )
-            else:
-                raise ValueError(
-                    f"Cannot {op_name}: source {src_stripped.decode('utf-8', errors='replace')} is conflicted"
-                )
-        else:
-            raise ValueError(
-                f"Cannot {op_name}: source {src_stripped.decode('utf-8', errors='replace')} not found"
-            )
+    current = _load_patch_target(r, src_fs_path, src_stripped, patch.old_mode, config)
+    if current is None:
+        raise ValueError(
+            f"Cannot {op_name}: source {src_stripped.decode('utf-8', errors='replace')} not found"
+        )
+    content, old_mode = current
 
     # If the content changes too, return it for further processing
     if patch.hunks or patch.binary:
-        return content.splitlines(keepends=True), False
+        return content.splitlines(keepends=True), old_mode, False
 
     # No hunks - pure rename/copy
     if check:
-        return None, True
+        return None, old_mode, True
 
-    # Write to destination
-    if not cached:
-        os.makedirs(os.path.dirname(dst_fs_path), exist_ok=True)
-        with open(dst_fs_path, "wb") as f:
-            f.write(content)
-        if patch.new_mode is not None:
-            os.chmod(dst_fs_path, cleanup_mode(patch.new_mode))
-
-    # Update index
+    new_mode = patch.new_mode or old_mode
     index = r.open_index(config=config)
     blob = Blob.from_string(content)
     r.object_store.add_object(blob)
 
-    if not cached and os.path.exists(dst_fs_path):
-        st = os.stat(dst_fs_path)
-        entry = index_entry_from_stat(st, blob.id)
+    if not cached:
+        st = _write_patch_target(dst_fs_path, content, new_mode, config)
+        entry = index_entry_from_stat(st, blob.id, mode=new_mode)
     else:
         entry = IndexEntry(
             ctime=(0, 0),
             mtime=(0, 0),
             dev=0,
             ino=0,
-            mode=patch.new_mode or 0o100644,
+            mode=new_mode,
             uid=0,
             gid=0,
             size=len(content),
@@ -1608,13 +1710,13 @@ def _apply_rename_or_copy(
 
     # For renames, remove the old file
     if is_rename:
-        if not cached and os.path.exists(src_fs_path):
+        if not cached and os.path.lexists(src_fs_path):
             os.remove(src_fs_path)
         if src_stripped in index:
             del index[src_stripped]
 
     index.write()
-    return None, True
+    return None, old_mode, True
 
 
 def _apply_binary_patch(patch: FilePatch, original: bytes, reverse: bool) -> bytes:
@@ -1683,9 +1785,7 @@ def apply_patches(
         ValueError: If patch cannot be applied
     """
     from .index import (
-        ConflictedIndexEntry,
         IndexEntry,
-        cleanup_mode,
         index_entry_from_stat,
     )
 
@@ -1738,8 +1838,9 @@ def apply_patches(
 
         # Handle renames and copies
         original_lines: list[bytes] | None = None
+        old_mode: int | None = None
         if patch.rename_from is not None and patch.rename_to is not None:
-            original_lines, should_continue = _apply_rename_or_copy(
+            original_lines, old_mode, should_continue = _apply_rename_or_copy(
                 r,
                 patch.rename_from,
                 patch.rename_to,
@@ -1753,7 +1854,7 @@ def apply_patches(
             if should_continue:
                 continue
         elif patch.copy_from is not None and patch.copy_to is not None:
-            original_lines, should_continue = _apply_rename_or_copy(
+            original_lines, old_mode, should_continue = _apply_rename_or_copy(
                 r,
                 patch.copy_from,
                 patch.copy_to,
@@ -1771,32 +1872,19 @@ def apply_patches(
         if original_lines is None:
             if old_path is None:
                 # New file
+                if not cached:
+                    _refuse_existing_target(fs_path, tree_path)
                 original_lines = []
             else:
-                if os.path.exists(fs_path):
-                    with open(fs_path, "rb") as f:
-                        content = f.read()
-                    original_lines = content.splitlines(keepends=True)
+                current = _load_patch_target(
+                    r, fs_path, tree_path, patch.old_mode, config
+                )
+                if current is None:
+                    original_lines = []
                 else:
-                    # File doesn't exist - check if it's in the index
-                    try:
-                        index = r.open_index(config=config)
-                        if tree_path in index:
-                            index_entry: IndexEntry | ConflictedIndexEntry = index[
-                                tree_path
-                            ]
-                            if not isinstance(index_entry, ConflictedIndexEntry):
-                                obj = r.object_store[index_entry.sha]
-                                if isinstance(obj, Blob):
-                                    original_lines = obj.data.splitlines(keepends=True)
-                                else:
-                                    original_lines = []
-                            else:
-                                original_lines = []
-                        else:
-                            original_lines = []
-                    except (KeyError, FileNotFoundError):
-                        original_lines = []
+                    content, old_mode = current
+                    original_lines = content.splitlines(keepends=True)
+        new_mode = patch.new_mode or old_mode or patch.old_mode or 0o100644
 
         # Reverse patch if requested
         if reverse:
@@ -1892,7 +1980,7 @@ def apply_patches(
 
         if new_path is None:
             # File deletion
-            if not cached and os.path.exists(fs_path):
+            if not cached and os.path.lexists(fs_path):
                 os.remove(fs_path)
             # Remove from index
             index = r.open_index(config=config)
@@ -1901,25 +1989,13 @@ def apply_patches(
                 index.write()
         else:
             # File addition or modification
-            if not cached:
-                # Write to working tree
-                os.makedirs(os.path.dirname(fs_path), exist_ok=True)
-                with open(fs_path, "wb") as f:
-                    f.write(result_content)
-
-                # Update file mode if specified
-                if patch.new_mode is not None:
-                    os.chmod(fs_path, cleanup_mode(patch.new_mode))
-
-            # Update index
             index = r.open_index(config=config)
             blob = Blob.from_string(result_content)
             r.object_store.add_object(blob)
 
-            # Get file stat for index entry
-            if not cached and os.path.exists(fs_path):
-                st = os.stat(fs_path)
-                entry = index_entry_from_stat(st, blob.id)
+            if not cached:
+                st = _write_patch_target(fs_path, result_content, new_mode, config)
+                entry = index_entry_from_stat(st, blob.id, mode=new_mode)
             else:
                 # Create a minimal index entry for cached-only changes
                 entry = IndexEntry(
@@ -1927,7 +2003,7 @@ def apply_patches(
                     mtime=(0, 0),
                     dev=0,
                     ino=0,
-                    mode=patch.new_mode or 0o100644,
+                    mode=new_mode,
                     uid=0,
                     gid=0,
                     size=len(result_content),
@@ -1951,7 +2027,7 @@ def apply_patches(
                     old_rename_path,
                 )
 
-                if not cached and os.path.exists(old_fs_path):
+                if not cached and os.path.lexists(old_fs_path):
                     os.remove(old_fs_path)
                 if old_rename_path in index:
                     del index[old_rename_path]

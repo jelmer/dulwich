@@ -2145,8 +2145,14 @@ def build_file_from_blob(
             oldstat = None
         if oldstat is not None and oldstat.st_size == len(contents):
             with open(target_path, "rb") as f:
-                if f.read() == contents:
+                unchanged = f.read() == contents
+            if unchanged:
+                if not honor_filemode or bool(oldstat.st_mode & stat.S_IXUSR) == bool(
+                    mode & stat.S_IXUSR
+                ):
                     return oldstat
+                os.chmod(target_path, cleanup_mode(mode))
+                return os.lstat(target_path)
 
         with open(target_path, "wb") as f:
             # Write out file

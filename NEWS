@@ -17,6 +17,23 @@
    longer write files outside the work tree via ``..`` entries or symlinks.
    (Jelmer Vernooĳ, reported by Choudhry Shehryar)
 
+ * SECURITY: Don't write through symlinks in ``apply_patches``. A tracked
+   symlink such as ``trap -> .git/hooks/pre-commit`` was followed when
+   writing, so ``porcelain.am``/``apply_patch`` could install a hook.
+   Symlinks are now patched as links, like git does, and a patch whose mode
+   doesn't match the type in the work tree or that adds a file over an
+   existing path is refused. (Jelmer Vernooĳ, reported by @manus-pi)
+
+ * Apply a mode change in ``build_file_from_blob`` when the content is
+   unchanged. (Jelmer Vernooĳ)
+
+ * Fix parsing of a rename or copy without content changes followed by
+   another patch, which swallowed the next patch. (Jelmer Vernooĳ)
+
+ * Honour ``\ No newline at end of file`` markers when applying patches,
+   which previously made patches to files without a trailing newline fail.
+   (Jelmer Vernooĳ)
+
  * Ignore a ``multi-pack-index`` entry whose pack has been removed when
    answering whether an object is present. After a prune the stale index
    made ``sha in repo.object_store`` disagree with ``repo.object_store[sha]``.

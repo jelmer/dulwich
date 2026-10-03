@@ -62,6 +62,7 @@ __all__ = [
     "detect_case_only_renames",
     "get_path_element_normalizer",
     "get_path_element_validator",
+    "get_symlink_fn",
     "get_unstaged_changes",
     "index_entry_from_stat",
     "index_entry_from_tree_entry",
@@ -80,6 +81,7 @@ __all__ = [
     "validate_path_element_default",
     "validate_path_element_hfs",
     "validate_path_element_ntfs",
+    "verify_tree_path",
     "write_cache_entry",
     "write_cache_time",
     "write_index",
@@ -2059,6 +2061,41 @@ else:
     symlink = os.symlink
 
 
+def get_symlink_fn(
+    config: "Config",
+) -> Callable[[str | bytes | os.PathLike[str], str | bytes | os.PathLike[str]], None]:
+    """Get the function to use for creating symlinks in the working tree.
+
+    With ``core.symlinks`` set to false, symlinks are checked out as plain
+    files containing the link target, like git does.
+
+    Args:
+      config: Repository configuration
+
+    Returns:
+      Function taking the link target and the path to create
+    """
+    if config.get_boolean(b"core", b"symlinks", True):
+
+        def create_symlink(
+            source: str | bytes | os.PathLike[str],
+            target: str | bytes | os.PathLike[str],
+        ) -> None:
+            symlink(source, target)  # type: ignore[arg-type,unused-ignore]
+
+        return create_symlink
+
+    def write_link_as_file(
+        source: str | bytes | os.PathLike[str],
+        target: str | bytes | os.PathLike[str],
+    ) -> None:
+        mode = "w" + ("b" if isinstance(source, bytes) else "")
+        with open(target, mode) as f:
+            f.write(source)
+
+    return write_link_as_file
+
+
 def build_file_from_blob(
     blob: Blob,
     mode: int,
@@ -2462,6 +2499,32 @@ def verify_leading_dirs(
         safe_prefix.append(part)
 
 
+def verify_tree_path(
+    tree_path: bytes,
+    validate_path_element: Callable[[bytes], bool],
+    safe_prefix: list[bytes],
+    root_path: bytes,
+) -> None:
+    """Reject a tree path that is unsafe to write below ``root_path``.
+
+    Combines ``validate_path`` and ``verify_leading_dirs``.
+
+    Args:
+      tree_path: Tree-form path (``/``-separated) about to be written.
+      validate_path_element: Function to validate a single path element.
+      safe_prefix: Mutable cache shared across calls, see
+        ``verify_leading_dirs``.
+      root_path: Filesystem path to the work-tree root.
+
+    Raises:
+      InvalidPathError: If the path has a component rejected by
+        ``validate_path_element`` or a leading component is a symlink.
+    """
+    if not validate_path(tree_path, validate_path_element):
+        raise InvalidPathError(tree_path)
+    verify_leading_dirs(tree_path, safe_prefix, root_path)
+
+
 def build_index_from_tree(
     root_path: str | bytes,
     index_path: str | bytes,
@@ -2509,14 +2572,10 @@ def build_index_from_tree(
         assert (
             entry.path is not None and entry.mode is not None and entry.sha is not None
         )
-        # Validate as we go and abort on the first invalid path,
-        # leaving any files already written in place.
-        if not validate_path(entry.path, validate_path_element):
-            raise InvalidPathError(entry.path)
-        # Refuse to write an entry whose leading path resolves through a
-        # symlink materialized by an earlier entry; open(..., "wb") would
-        # otherwise follow it and write outside the work tree.
-        verify_leading_dirs(entry.path, safe_prefix, root_path)
+        # Validate as we go and abort on the first invalid path, leaving any
+        # files already written in place. This also refuses a leading path
+        # that resolves through a symlink materialized by an earlier entry.
+        verify_tree_path(entry.path, validate_path_element, safe_prefix, root_path)
         full_path = _tree_to_fs_path(root_path, entry.path, tree_encoding)
 
         if not os.path.exists(os.path.dirname(full_path)):
@@ -3327,11 +3386,7 @@ def update_working_tree(
             path = change.new.path
             # Validate as we go and abort on the first invalid path,
             # leaving any changes already applied in place.
-            if not validate_path(path, validate_path_element):
-                raise InvalidPathError(path)
-            # Refuse to write through a symlinked leading directory that
-            # would let open(..., "wb") escape the work tree.
-            verify_leading_dirs(path, [], repo_path)
+            verify_tree_path(path, validate_path_element, [], repo_path)
             full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
             try:
                 modify_stat: os.stat_result | None = os.lstat(full_path)

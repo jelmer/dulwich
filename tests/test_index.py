@@ -115,6 +115,26 @@ def can_symlink() -> bool:
     return True
 
 
+class DeprecatedReexportTests(TestCase):
+    def test_sha1writer(self) -> None:
+        from dulwich.pack import SHA1Writer
+
+        with self.assertWarns(DeprecationWarning):
+            from dulwich.index import SHA1Writer as IndexSHA1Writer
+        self.assertIs(SHA1Writer, IndexSHA1Writer)
+
+    def test_sha1reader(self) -> None:
+        from dulwich.pack import SHA1Reader
+
+        with self.assertWarns(DeprecationWarning):
+            from dulwich.index import SHA1Reader as IndexSHA1Reader
+        self.assertIs(SHA1Reader, IndexSHA1Reader)
+
+    def test_unknown(self) -> None:
+        with self.assertRaises(AttributeError):
+            dulwich.index.NoSuchThing
+
+
 class IndexTestCase(TestCase):
     datadir = os.path.join(os.path.dirname(__file__), "../testdata/indexes")
 

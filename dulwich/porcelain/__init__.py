@@ -301,7 +301,6 @@ import re
 import stat
 import sys
 import time
-import warnings
 from collections import namedtuple
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections.abc import Set as AbstractSet
@@ -329,6 +328,7 @@ if sys.version_info >= (3, 12):
 else:
     from typing_extensions import override
 
+from .. import _deprecated_aliases
 from .._typing import Buffer
 
 if TYPE_CHECKING:
@@ -10215,15 +10215,6 @@ def am_quit(repo: RepoPath | None = None) -> None:
         am_quit_impl(r)
 
 
-def __getattr__(name: str) -> object:
-    if name == "get_user_identity":
-        warnings.warn(
-            "dulwich.porcelain.get_user_identity is deprecated; "
-            "use dulwich.repo.get_user_identity instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        from ..repo import get_user_identity
-
-        return get_user_identity
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+__getattr__ = _deprecated_aliases(
+    __name__, {"get_user_identity": "dulwich.repo.get_user_identity"}
+)

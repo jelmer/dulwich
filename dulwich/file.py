@@ -31,6 +31,7 @@ __all__ = [
     "calc_shared_perm",
     "ensure_dir_exists",
     "open_nofollow",
+    "open_nofollow_read",
 ]
 
 import errno
@@ -41,7 +42,7 @@ import warnings
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from types import TracebackType
-from typing import IO, Any, ClassVar, Literal, overload
+from typing import IO, Any, BinaryIO, ClassVar, Literal, overload
 
 from ._typing import Buffer
 
@@ -166,6 +167,35 @@ def open_nofollow(
         raise OSError(errno.ELOOP, os.strerror(errno.ELOOP), os.fspath(path))
 
     return os.fdopen(os.open(path, flags, mode), "wb")
+
+
+def open_nofollow_read(
+    path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+) -> BinaryIO:
+    """Open a path for reading, refusing to follow a symlink at the final name.
+
+    ``.gitignore`` and ``.gitattributes`` are read from the work tree at names
+    the tree supplies; git opens both with ``open_nofollow()`` and skips them
+    with a warning if they are symlinks.
+
+    Args:
+      path: File to read
+
+    Returns:
+      A binary file object open for reading
+
+    Raises:
+      OSError: If the path is a symlink, with errno ELOOP (EMLINK on some BSDs)
+    """
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    elif os.path.islink(path):
+        # Windows has no O_NOFOLLOW; this check races, but creating symlinks
+        # there requires privileges.
+        raise OSError(errno.ELOOP, os.strerror(errno.ELOOP), os.fspath(path))
+
+    return os.fdopen(os.open(path, flags), "rb")
 
 
 def _fancy_rename(oldname: str | bytes, newname: str | bytes) -> None:

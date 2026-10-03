@@ -37,6 +37,7 @@ __all__ = [
     "translate",
 ]
 
+import errno
 import logging
 import os.path
 import re
@@ -48,6 +49,7 @@ if TYPE_CHECKING:
     from .repo import Repo
 
 from .config import Config, get_xdg_config_home_path
+from .file import open_nofollow_read
 from .wildmatch import MalformedPattern
 from .wildmatch import translate as translate_wildmatch
 
@@ -585,16 +587,24 @@ class IgnoreFilterManager:
 
         p = os.path.join(self._top_path, path, ".gitignore")
         try:
-            self._path_filters[path] = IgnoreFilter.from_path(p, self._ignorecase)
+            f = open_nofollow_read(p)
         except (FileNotFoundError, NotADirectoryError):
             self._path_filters[path] = None
         except OSError as e:
+            if e.errno in (errno.ELOOP, errno.EMLINK):
+                logger.warning("Ignoring %s: it is a symbolic link", p)
+                self._path_filters[path] = None
             # On Windows, opening a path that contains a symlink can fail with
             # errno 22 (Invalid argument) when the symlink points outside the repo
-            if e.errno == 22:
+            elif e.errno == 22:
                 self._path_filters[path] = None
             else:
                 raise
+        else:
+            with f:
+                self._path_filters[path] = IgnoreFilter(
+                    read_ignore_patterns(f), self._ignorecase, path=p
+                )
         return self._path_filters[path]
 
     def find_matching(self, path: str) -> Iterable[Pattern]:

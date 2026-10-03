@@ -1,5 +1,10 @@
 1.2.16	UNRELEASED
 
+ * Add ``PackIndex.object_sha_at_position`` to look up an object by its
+   position in the sorted index, and use it when loading a ``.bitmap`` instead
+   of re-scanning the index for every entry, which made loading quadratic in
+   the pack size, unlike git. (Kartik Kenchi)
+
  * Fix applying patches without content changes, such as mode changes and
    added or deleted empty files. They have no ``---``/``+++`` lines and
    failed with "Patch has no file path". (Jelmer Vernooĳ)

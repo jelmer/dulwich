@@ -46,12 +46,14 @@ from dulwich.bitmap import (
 )
 from dulwich.config import ConfigFile
 from dulwich.errors import ChecksumMismatch
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.object_store import (
     BitmapReachability,
     DiskObjectStore,
     GraphTraversalReachability,
 )
 from dulwich.objects import Blob, Commit, Tree
+from dulwich.pack import MemoryPackIndex
 
 
 class EWAHCompressionTests(unittest.TestCase):
@@ -489,6 +491,42 @@ class BitmapFileTests(unittest.TestCase):
         self.assertIn(1, bitmap2.tree_bitmap)
         self.assertIn(2, bitmap2.blob_bitmap)
         self.assertIn(3, bitmap2.tag_bitmap)
+
+    def test_resolve_object_positions_with_pack_index(self):
+        """Entry object positions resolve against the sorted pack index.
+
+        Positions index the pack index directly; an out-of-range position
+        (as from a corrupt bitmap) is skipped rather than resolved.
+        """
+        shas = sorted(bytes([i]) + b"\x00" * 19 for i in range(5))
+        entries = [(shas[i], i * 100, i) for i in range(len(shas))]
+        pack_index = MemoryPackIndex(entries, DEFAULT_OBJECT_FORMAT)
+
+        bitmap = PackBitmap()
+        # Reference positions out of order, plus one past the end of the index.
+        for object_pos in (3, 0, len(shas)):
+            ewah = EWAHBitmap()
+            ewah.add(object_pos)
+            entry = BitmapEntry(
+                object_pos=object_pos,
+                xor_offset=0,
+                flags=0,
+                bitmap=ewah,
+            )
+            key = object_pos.to_bytes(4, byteorder="big")
+            bitmap.entries[key] = entry
+            bitmap.entries_list.append((key, entry))
+
+        f = BytesIO()
+        write_bitmap_file(f, bitmap)
+        f.seek(0)
+        bitmap2 = read_bitmap_file(f, pack_index=pack_index)
+
+        # The two in-range positions resolve to the sha at that index position;
+        # the out-of-range one is dropped.
+        self.assertEqual({shas[3], shas[0]}, set(bitmap2.entries))
+        self.assertEqual(shas[3], bitmap2.entries_list[0][0])
+        self.assertEqual(shas[0], bitmap2.entries_list[1][0])
 
     def test_pack_checksum_match(self):
         """A matching pack_checksum loads the bitmap normally."""

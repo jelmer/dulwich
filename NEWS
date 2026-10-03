@@ -23,6 +23,11 @@
    ``apply_patch`` could install a hook. (Jelmer Vernooĳ, reported by
    @manus-pi)
 
+ * Apply patches to symlinks like git does: the link target is read with
+   ``readlink`` and the link replaced, a patch whose mode doesn't match the
+   type in the work tree is refused, and so is a new file over an existing
+   path. (Jelmer Vernooĳ)
+
  * Fix parsing of a rename or copy without content changes followed by
    another patch, which swallowed the next patch. (Jelmer Vernooĳ)
 

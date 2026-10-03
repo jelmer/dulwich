@@ -38,14 +38,20 @@ __all__ = [
     "SIGNATURE_FORMAT_SSH",
     "SIGNATURE_FORMAT_X509",
     "BadSignature",
+    "GPGCliSignatureVendor",
+    "GPGSignatureVendor",
+    "SSHCliSignatureVendor",
+    "SSHSigSignatureVendor",
     "SignatureSigner",
     "SignatureVerificationError",
     "SignatureVerifier",
     "UntrustedSignature",
+    "X509SignatureVendor",
     "detect_signature_format",
     "get_available_vendors",
     "get_signature_vendor",
     "get_signature_vendor_for_signature",
+    "gpg_vendor",
 ]
 
 

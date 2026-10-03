@@ -21,6 +21,13 @@
 
 """Porcelain functions for working with submodules."""
 
+__all__ = [
+    "submodule_add",
+    "submodule_init",
+    "submodule_list",
+    "submodule_update",
+]
+
 import os
 from collections.abc import Callable, Iterator, Sequence
 from typing import TYPE_CHECKING, BinaryIO

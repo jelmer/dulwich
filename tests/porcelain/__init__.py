@@ -40,13 +40,14 @@ import warnings
 from io import BytesIO, StringIO
 from pathlib import Path
 from unittest import skipIf
+from wsgiref.simple_server import make_server
 
 from dulwich import porcelain
 from dulwich.am import AmConflict
 from dulwich.client import SendPackResult
 from dulwich.commit_graph import read_commit_graph
 from dulwich.diff_tree import TreeChange, tree_changes
-from dulwich.errors import CommitError, WorkingTreeModifiedError
+from dulwich.errors import CommitError, NoIndexPresent, WorkingTreeModifiedError
 from dulwich.index import (
     Index,
     IndexEntry,
@@ -79,7 +80,7 @@ from dulwich.porcelain import (
     print_name_status,
 )
 from dulwich.porcelain.submodule import _check_submodule_path
-from dulwich.repo import NoIndexPresent, Repo
+from dulwich.repo import Repo
 from dulwich.server import DictBackend
 from dulwich.signature import (
     BadSignature,
@@ -87,7 +88,7 @@ from dulwich.signature import (
     get_signature_vendor_for_signature,
 )
 from dulwich.tests.utils import build_commit_graph, make_commit, make_object
-from dulwich.web import make_server, make_wsgi_chain
+from dulwich.web import make_wsgi_chain
 
 from .. import DependencyMissing, TestCase
 

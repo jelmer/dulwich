@@ -21,11 +21,29 @@
 
 """Tests for dulwich __init__ module."""
 
+import importlib
+import pkgutil
 import sys
 import warnings
 from unittest import mock
 
+import dulwich
+
 from . import TestCase
+
+
+class AllTests(TestCase):
+    """Tests for the __all__ declarations of the dulwich modules."""
+
+    def test_all_defined(self) -> None:
+        for info in pkgutil.walk_packages(dulwich.__path__, "dulwich."):
+            with self.subTest(info.name):
+                try:
+                    mod = importlib.import_module(info.name)
+                except ImportError as e:
+                    self.skipTest(f"unable to import {info.name}: {e}")
+                missing = [name for name in mod.__all__ if name not in vars(mod)]
+                self.assertEqual([], missing)
 
 
 class ReplaceMeDecoratorTests(TestCase):

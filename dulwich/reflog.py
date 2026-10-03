@@ -22,6 +22,7 @@
 """Utilities for reading and generating reflogs."""
 
 __all__ = [
+    "Entry",
     "drop_reflog_entry",
     "expire_reflog",
     "format_reflog_line",

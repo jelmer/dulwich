@@ -45,6 +45,7 @@ __all__ = [
     "BaseRepo",
     "DefaultIdentityNotFound",
     "InvalidUserIdentity",
+    "InvalidWorktreeConfiguration",
     "MemoryRepo",
     "ParentsProvider",
     "Repo",
@@ -98,7 +99,7 @@ if TYPE_CHECKING:
     from .walk import Walker
     from .worktree import WorkTree
 
-from . import reflog
+from . import _deprecated_aliases, reflog
 from .errors import (
     NoIndexPresent,
     NotBlobError,
@@ -148,8 +149,6 @@ from .objects import (
 from .pack import generate_unpacked_objects
 from .refs import (
     HEADREF,
-    LOCAL_TAG_PREFIX,  # noqa: F401
-    SYMREF,  # noqa: F401
     DictRefsContainer,
     DiskRefsContainer,
     Ref,
@@ -158,16 +157,26 @@ from .refs import (
     _set_default_branch,
     _set_head,
     _set_origin_head,
-    check_ref_format,  # noqa: F401
     extract_branch_name,
     is_per_worktree_ref,
     local_branch_name,
-    read_packed_refs,  # noqa: F401
-    read_packed_refs_with_peeled,  # noqa: F401
-    write_packed_refs,  # noqa: F401
 )
 
 logger = logging.getLogger(__name__)
+
+
+__getattr__ = _deprecated_aliases(
+    __name__,
+    {
+        "LOCAL_TAG_PREFIX": "dulwich.refs.LOCAL_TAG_PREFIX",
+        "SYMREF": "dulwich.refs.SYMREF",
+        "check_ref_format": "dulwich.refs.check_ref_format",
+        "read_packed_refs": "dulwich.refs.read_packed_refs",
+        "read_packed_refs_with_peeled": "dulwich.refs.read_packed_refs_with_peeled",
+        "write_packed_refs": "dulwich.refs.write_packed_refs",
+    },
+)
+
 
 CONTROLDIR = ".git"
 OBJECTDIR = "objects"

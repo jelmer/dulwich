@@ -26,6 +26,7 @@ and maintaining Git repositories.
 """
 
 __all__ = [
+    "MAINTENANCE_TASKS",
     "CommitGraphTask",
     "GcTask",
     "IncrementalRepackTask",

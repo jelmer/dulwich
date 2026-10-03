@@ -21,6 +21,13 @@
 
 """Porcelain-like interface for Git notes."""
 
+__all__ = [
+    "notes_add",
+    "notes_list",
+    "notes_remove",
+    "notes_show",
+]
+
 from typing import TYPE_CHECKING
 
 from dulwich.objects import ObjectID

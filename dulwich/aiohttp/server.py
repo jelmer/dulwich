@@ -21,6 +21,24 @@
 
 """aiohttp client/server support."""
 
+__all__ = [
+    "DUMB_KEY",
+    "HANDLERS_KEY",
+    "REPO_KEY",
+    "create_repo_app",
+    "get_index_file",
+    "get_info_packs",
+    "get_info_refs",
+    "get_loose_object",
+    "get_pack_file",
+    "get_text_file",
+    "handle_service_request",
+    "main",
+    "refs_request",
+    "send_file",
+    "service_request",
+]
+
 import asyncio
 import sys
 from io import BytesIO

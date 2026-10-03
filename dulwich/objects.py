@@ -25,6 +25,7 @@
 __all__ = [
     "BEGIN_PGP_SIGNATURE",
     "BEGIN_SSH_SIGNATURE",
+    "DEFAULT_LOOSE_OBJECT_SIZE_LIMIT",
     "MAX_TIME",
     "OBJECT_CLASSES",
     "SIGNATURE_PGP",
@@ -61,6 +62,10 @@ __all__ = [
     "object_class",
     "object_header",
     "parse_commit_broken",
+    "parse_time_entry",
+    "parse_time_entry_broken",
+    "parse_timezone",
+    "parse_timezone_broken",
     "parse_tree",
     "pretty_format_tree_entry",
     "serializable_property",

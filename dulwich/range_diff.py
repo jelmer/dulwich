@@ -36,6 +36,15 @@ that changed.
 
 from __future__ import annotations
 
+__all__ = [
+    "DEFAULT_CREATION_FACTOR",
+    "RangeDiffEntry",
+    "commit_patch",
+    "format_range_diff",
+    "range_diff",
+    "range_diff_commits",
+]
+
 import re
 from dataclasses import dataclass
 from io import BytesIO

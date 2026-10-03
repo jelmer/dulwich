@@ -1,5 +1,9 @@
 1.2.16	UNRELEASED
 
+ * Fix applying patches without content changes, such as mode changes and
+   added or deleted empty files. They have no ``---``/``+++`` lines and
+   failed with "Patch has no file path". (Jelmer Vernooĳ)
+
  * Fix applying binary patches produced by ``git diff --binary``. Their
    paths are now taken from the ``diff --git`` line, ``literal`` data is
    inflated, base85 line lengths are decoded correctly and binary deletions

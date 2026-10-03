@@ -45,15 +45,12 @@ from dulwich.client import (
     AuthCallbackPoolManager,
     BundleClient,
     FetchPackResult,
-    GitProtocolError,
-    HangupException,
     HttpGitClient,
     InvalidWants,
     LocalGitClient,
     PackDataProgressWrapper,
     PLinkSSHVendor,
     ReportStatusParser,
-    SendPackError,
     SSHGitClient,
     StrangeHostname,
     SubprocessSSHVendor,
@@ -79,6 +76,7 @@ from dulwich.client import (
     parse_rsync_url,
 )
 from dulwich.config import ConfigDict, ConfigFile
+from dulwich.errors import GitProtocolError, HangupException, SendPackError
 from dulwich.index import InvalidPathError
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.objects import ZERO_SHA, Blob, Commit, Tree

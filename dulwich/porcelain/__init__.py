@@ -366,7 +366,7 @@ from ..ignore import IgnoreFilterManager
 from ..index import (
     ConflictedIndexEntry,
     Index,
-    IndexEntry,
+    InvalidPathError,
     _fs_to_tree_path,
     apply_stat_refresh,
     blob_from_path_and_stat,
@@ -374,7 +374,9 @@ from ..index import (
     get_path_element_validator,
     get_symlink_fn,
     get_unstaged_changes,
+    index_entry_from_tree_entry,
     update_working_tree,
+    validate_path,
 )
 from ..object_store import BaseObjectStore, tree_lookup_path
 from ..objects import (
@@ -3225,75 +3227,38 @@ def reset(
         else:
             target_commit = parse_commit(r, treeish)
 
-        # Update HEAD to point to the target commit
-        if target_commit is not None:
-            # Get the current HEAD value for set_if_equals
-            try:
-                old_head = r.refs[HEADREF]
-            except KeyError:
-                old_head = None
-
-            # Create reflog message
-            treeish_str = (
-                treeish.decode("utf-8")
-                if isinstance(treeish, bytes)
-                else str(treeish)
-                if not isinstance(treeish, Commit | Tree | Tag)
-                else target_commit.id.hex()
-            )
-            default_message = f"reset: moving to {treeish_str}".encode()
-            reflog_message = _get_reflog_message(default_message, env=env)
-
-            # Pass committer explicitly: Repo._write_reflog would otherwise
-            # resolve it via get_user_identity(), which reads os.environ.
-            r.refs.set_if_equals(
-                HEADREF,
-                old_head,
-                target_commit.id,
-                committer=_get_user_identity(
-                    _config_stack(r, env=env), kind="COMMITTER", env=env
-                ),
-                message=reflog_message,
-            )
-
         if mode == "soft":
             # Soft reset: only update HEAD, leave index and working tree unchanged
-            return
+            pass
 
         elif mode == "mixed":
             # Mixed reset: update HEAD and index, but leave working tree unchanged
             from ..object_store import iter_tree_contents
 
             # Open the index
-            index = r.open_index(config=r.get_config_stack())
+            config = r.get_config_stack()
+            index = r.open_index(config=config)
+            validate_path_element = get_path_element_validator(config)
 
             # Clear the current index
             index.clear()
 
             # Populate index from the target tree
             for entry in iter_tree_contents(r.object_store, tree.id):
-                # Create an IndexEntry from the tree entry
-                # Use zeros for filesystem-specific fields since we're not touching the working tree
                 assert (
                     entry.mode is not None
                     and entry.sha is not None
                     and entry.path is not None
                 )
-                index_entry = IndexEntry(
-                    ctime=(0, 0),
-                    mtime=(0, 0),
-                    dev=0,
-                    ino=0,
-                    mode=entry.mode,
-                    uid=0,
-                    gid=0,
-                    size=0,  # Size will be 0 since we're not reading from disk
-                    sha=entry.sha,
-                    flags=0,
-                )
+                # Like git, refuse paths that a later checkout would write
+                # outside the work tree.
+                if not validate_path(entry.path, validate_path_element):
+                    raise InvalidPathError(entry.path)
                 # Use set_verbatim so case-differing tree entries aren't
                 # folded together under core.ignorecase.
-                index.set_verbatim(entry.path, index_entry)
+                index.set_verbatim(
+                    entry.path, index_entry_from_tree_entry(entry.mode, entry.sha)
+                )
 
             # Write the updated index
             index.write()
@@ -3331,6 +3296,38 @@ def reset(
             )
         else:
             raise Error(f"Invalid reset mode: {mode}")
+
+        # Only move HEAD once the index and working tree were updated, so
+        # that a rejected tree leaves the repository as it was.
+        if target_commit is not None:
+            # Get the current HEAD value for set_if_equals
+            try:
+                old_head = r.refs[HEADREF]
+            except KeyError:
+                old_head = None
+
+            # Create reflog message
+            treeish_str = (
+                treeish.decode("utf-8")
+                if isinstance(treeish, bytes)
+                else str(treeish)
+                if not isinstance(treeish, Commit | Tree | Tag)
+                else target_commit.id.hex()
+            )
+            default_message = f"reset: moving to {treeish_str}".encode()
+            reflog_message = _get_reflog_message(default_message, env=env)
+
+            # Pass committer explicitly: Repo._write_reflog would otherwise
+            # resolve it via get_user_identity(), which reads os.environ.
+            r.refs.set_if_equals(
+                HEADREF,
+                old_head,
+                target_commit.id,
+                committer=_get_user_identity(
+                    _config_stack(r, env=env), kind="COMMITTER", env=env
+                ),
+                message=reflog_message,
+            )
 
 
 def get_remote_repo(

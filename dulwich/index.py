@@ -122,6 +122,7 @@ if TYPE_CHECKING:
     from .object_store import BaseObjectStore
     from .repo import Repo
 
+from . import _deprecated_aliases
 from .errors import ChecksumMismatch
 from .file import GitFile, SharedPerm
 from .object_format import DEFAULT_OBJECT_FORMAT, ObjectFormat
@@ -140,6 +141,16 @@ from .objects import (
 from .pack import ObjectContainer
 
 logger = logging.getLogger(__name__)
+
+
+__getattr__ = _deprecated_aliases(
+    __name__,
+    {
+        "SHA1Reader": "dulwich.pack.SHA1Reader",
+        "SHA1Writer": "dulwich.pack.SHA1Writer",
+    },
+)
+
 
 # Type alias for recursive tree structure used in commit_tree
 TreeDict = dict[bytes, "TreeDict | tuple[int, ObjectID]"]

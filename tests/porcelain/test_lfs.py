@@ -23,6 +23,7 @@
 
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 
@@ -208,6 +209,40 @@ class LFSPorcelainTestCase(TestCase):
                 content = f.read()
             pointer = LFSPointer.from_bytes(content)
             self.assertIsNotNone(pointer)
+
+    @unittest.skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_lfs_migrate_does_not_follow_symlink(self):
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside)
+        target = os.path.join(outside, "secret.bin")
+        with open(target, "wb") as f:
+            f.write(b"secret")
+        os.symlink(target, os.path.join(self.repo.path, "link.bin"))
+        porcelain.add(self.repo, paths=["link.bin"])
+
+        count = porcelain.lfs_migrate(self.repo, include=["*.bin"])
+
+        self.assertEqual(0, count)
+        with open(target, "rb") as f:
+            self.assertEqual(b"secret", f.read())
+
+    @unittest.skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_lfs_migrate_rejects_symlinked_leading_dir(self):
+        os.mkdir(os.path.join(self.repo.path, "sub"))
+        with open(os.path.join(self.repo.path, "sub", "big.bin"), "wb") as f:
+            f.write(b"X" * 100)
+        porcelain.add(self.repo, paths=["sub/big.bin"])
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside)
+        with open(os.path.join(outside, "big.bin"), "wb") as f:
+            f.write(b"secret")
+        shutil.rmtree(os.path.join(self.repo.path, "sub"))
+        os.symlink(outside, os.path.join(self.repo.path, "sub"))
+
+        with self.assertRaises(porcelain.Error):
+            porcelain.lfs_migrate(self.repo, include=["*.bin"])
+        with open(os.path.join(outside, "big.bin"), "rb") as f:
+            self.assertEqual(b"secret", f.read())
 
     def test_lfs_pointer_check(self):
         """Test checking if files are LFS pointers."""

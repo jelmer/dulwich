@@ -1,5 +1,10 @@
 1.2.16	UNRELEASED
 
+ * SECURITY: Validate index paths in sparse checkout, mixed reset,
+   ``lfs_pull`` and ``lfs_migrate``, so that a malicious repository can no
+   longer write files outside the work tree via ``..`` entries or symlinks.
+   (Jelmer Vernooĳ, reported by Choudhry Shehryar)
+
  * Ignore a ``multi-pack-index`` entry whose pack has been removed when
    answering whether an object is present. After a prune the stale index
    made ``sha in repo.object_store`` disagree with ``repo.object_store[sha]``.

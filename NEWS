@@ -17,16 +17,12 @@
    longer write files outside the work tree via ``..`` entries or symlinks.
    (Jelmer Vernooĳ, reported by Choudhry Shehryar)
 
- * SECURITY: Refuse to apply patches through a symlinked target in
-   ``apply_patches``. A tracked symlink such as ``trap ->
-   .git/hooks/pre-commit`` was followed when writing, so ``porcelain.am``/
-   ``apply_patch`` could install a hook. (Jelmer Vernooĳ, reported by
-   @manus-pi)
-
- * Apply patches to symlinks like git does: the link target is read with
-   ``readlink`` and the link replaced, a patch whose mode doesn't match the
-   type in the work tree is refused, and so is a new file over an existing
-   path. (Jelmer Vernooĳ)
+ * SECURITY: Don't write through symlinks in ``apply_patches``. A tracked
+   symlink such as ``trap -> .git/hooks/pre-commit`` was followed when
+   writing, so ``porcelain.am``/``apply_patch`` could install a hook.
+   Symlinks are now patched as links, like git does, and a patch whose mode
+   doesn't match the type in the work tree or that adds a file over an
+   existing path is refused. (Jelmer Vernooĳ, reported by @manus-pi)
 
  * Fix parsing of a rename or copy without content changes followed by
    another patch, which swallowed the next patch. (Jelmer Vernooĳ)

@@ -27,8 +27,9 @@ import shutil
 import sys
 import tempfile
 import time
+from unittest import skipIf
 
-from dulwich.index import IndexEntry
+from dulwich.index import IndexEntry, InvalidPathError, index_entry_from_tree_entry
 from dulwich.objects import Blob
 from dulwich.repo import Repo
 from dulwich.sparse_patterns import (
@@ -446,6 +447,92 @@ class ApplyIncludedPathsTests(TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.temp_dir, "restored.txt")))
         with open(os.path.join(self.temp_dir, "restored.txt"), "rb") as f:
             self.assertEqual(f.read(), b"some content")
+
+    def _stage_untrusted(self, path, content=b"pwned\n", mode=0o100644):
+        """Add an index entry directly, as a mixed reset of a hostile tree would."""
+        blob = Blob.from_string(content)
+        self.repo.object_store.add_object(blob)
+        index = self.repo.open_index()
+        index[path] = index_entry_from_tree_entry(mode, blob.id)
+        index.write()
+
+    def test_dotdot_path_rejected(self):
+        """An index path containing .. must not be written outside the repo."""
+        # Nest the repository so that an escaping write lands in a directory
+        # this test owns.
+        repo_dir = os.path.join(self.temp_dir, "nested")
+        self.repo = Repo.init(repo_dir, mkdir=True)
+        self.addCleanup(self.repo.close)
+        self._stage_untrusted(b"../escaped.txt")
+
+        with self.assertRaises(InvalidPathError) as cm:
+            apply_included_paths(
+                self.repo, included_paths={"../escaped.txt"}, force=False
+            )
+        self.assertEqual(b"../escaped.txt", cm.exception.path)
+        self.assertEqual([".git", "nested"], sorted(os.listdir(self.temp_dir)))
+        # The index is left untouched.
+        self.assertFalse(self.repo.open_index()[b"../escaped.txt"].skip_worktree)
+
+    def test_dotgit_path_rejected(self):
+        """An index path inside .git must not be written."""
+        self._stage_untrusted(b".git/hooks/post-checkout")
+
+        with self.assertRaises(InvalidPathError):
+            apply_included_paths(
+                self.repo, included_paths={".git/hooks/post-checkout"}, force=False
+            )
+        self.assertFalse(
+            os.path.exists(
+                os.path.join(self.repo.controldir(), "hooks", "post-checkout")
+            )
+        )
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_symlinked_leading_dir_rejected(self):
+        """A path whose leading directory is a symlink must not be written."""
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside)
+        os.symlink(outside, os.path.join(self.temp_dir, "sub"))
+        self._stage_untrusted(b"sub/escaped.txt")
+
+        with self.assertRaises(InvalidPathError):
+            apply_included_paths(
+                self.repo, included_paths={"sub/escaped.txt"}, force=False
+            )
+        self.assertEqual([], os.listdir(outside))
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_dangling_symlink_not_followed(self):
+        """A dangling symlink at an included path is replaced, not written through."""
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside)
+        target = os.path.join(outside, "escaped.txt")
+        full_path = os.path.join(self.temp_dir, "foo.txt")
+        os.symlink(target, full_path)
+        self._stage_untrusted(b"foo.txt")
+
+        apply_included_paths(self.repo, included_paths={"foo.txt"}, force=False)
+
+        self.assertFalse(os.path.exists(target))
+        self.assertFalse(os.path.islink(full_path))
+        with open(full_path, "rb") as f:
+            self.assertEqual(b"pwned\n", f.read())
+
+    @skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_path_through_checked_out_symlink_rejected(self):
+        """A path below a symlink entry checked out earlier must not be written."""
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside)
+        self._stage_untrusted(b"link", content=outside.encode(), mode=0o120000)
+        self._stage_untrusted(b"link/escaped.txt")
+
+        with self.assertRaises(InvalidPathError):
+            apply_included_paths(
+                self.repo, included_paths={"link", "link/escaped.txt"}, force=False
+            )
+        self.assertEqual(outside, os.readlink(os.path.join(self.temp_dir, "link")))
+        self.assertEqual([], os.listdir(outside))
 
     def test_blob_not_found_raises(self):
         """If the object store is missing the blob for an included path, raise BlobNotFoundError."""

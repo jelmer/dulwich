@@ -38,7 +38,15 @@ from fnmatch import fnmatch
 from typing import TYPE_CHECKING
 
 from .file import ensure_dir_exists
-from .index import Index, IndexEntry
+from .index import (
+    Index,
+    IndexEntry,
+    build_file_from_blob,
+    get_path_element_validator,
+    get_symlink_fn,
+    verify_leading_dirs,
+    verify_tree_path,
+)
 from .objects import Blob
 from .repo import Repo
 
@@ -175,11 +183,19 @@ def apply_included_paths(
 
     Returns:
       None
+
+    Raises:
+      InvalidPathError: If an index path is unsafe to write, e.g. because it
+        contains ``..`` or a leading directory is a symlink.
     """
     if config is None:
         config = repo.get_config_stack()
     index = repo.open_index(config=config)
     normalizer = repo.get_blob_normalizer(config=config)
+    honor_filemode = config.get_boolean(b"core", b"filemode", os.name != "nt")
+    validate_path_element = get_path_element_validator(config)
+    symlink_fn = get_symlink_fn(config)
+    repo_path = os.fsencode(repo.path)
 
     def local_modifications_exist(full_path: str, index_entry: IndexEntry) -> bool:
         if not os.path.exists(full_path):
@@ -199,7 +215,11 @@ def apply_included_paths(
 
     # 1) Update skip-worktree bits
 
+    # The index may have been populated from an untrusted tree, so check
+    # every path before changing anything.
+    safe_prefix: list[bytes] = []
     for path_bytes, entry in list(index.items()):
+        verify_tree_path(path_bytes, validate_path_element, safe_prefix, repo_path)
         if not isinstance(entry, IndexEntry):
             continue  # Skip conflicted entries
         path_str = path_bytes.decode("utf-8")
@@ -211,9 +231,13 @@ def apply_included_paths(
     index.write()
 
     # 2) Reflect changes in the working tree
+    safe_prefix = []
     for path_bytes, entry in list(index.items()):
         if not isinstance(entry, IndexEntry):
             continue  # Skip conflicted entries
+        # Check again, as an earlier entry may have been checked out as a
+        # symlink.
+        verify_leading_dirs(path_bytes, safe_prefix, repo_path)
         full_path = os.path.join(repo.path, path_bytes.decode("utf-8"))
 
         if entry.skip_worktree:
@@ -247,9 +271,14 @@ def apply_included_paths(
                 if normalizer and isinstance(blob, Blob):
                     blob = normalizer.checkout_normalize(blob, path_bytes)
 
-                with open(full_path, "wb") as f:
-                    if isinstance(blob, Blob):
-                        f.write(blob.data)
+                if isinstance(blob, Blob):
+                    build_file_from_blob(
+                        blob,
+                        entry.mode,
+                        os.fsencode(full_path),
+                        honor_filemode=honor_filemode,
+                        symlink_fn=symlink_fn,
+                    )
 
 
 def parse_sparse_patterns(lines: Sequence[str]) -> list[tuple[str, bool, bool, bool]]:

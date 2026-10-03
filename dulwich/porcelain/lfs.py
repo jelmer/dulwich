@@ -21,6 +21,21 @@
 
 """Porcelain functions for Git LFS support."""
 
+__all__ = [
+    "lfs_clean",
+    "lfs_fetch",
+    "lfs_init",
+    "lfs_ls_files",
+    "lfs_migrate",
+    "lfs_pointer_check",
+    "lfs_pull",
+    "lfs_push",
+    "lfs_smudge",
+    "lfs_status",
+    "lfs_track",
+    "lfs_untrack",
+]
+
 import fnmatch
 import logging
 import os

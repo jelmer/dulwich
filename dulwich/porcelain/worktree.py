@@ -21,6 +21,17 @@
 
 """Porcelain-like interface for Git worktrees."""
 
+__all__ = [
+    "worktree_add",
+    "worktree_list",
+    "worktree_lock",
+    "worktree_move",
+    "worktree_prune",
+    "worktree_remove",
+    "worktree_repair",
+    "worktree_unlock",
+]
+
 import os
 from typing import TYPE_CHECKING
 

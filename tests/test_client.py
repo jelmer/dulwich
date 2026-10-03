@@ -45,15 +45,12 @@ from dulwich.client import (
     AuthCallbackPoolManager,
     BundleClient,
     FetchPackResult,
-    GitProtocolError,
-    HangupException,
     HttpGitClient,
     InvalidWants,
     LocalGitClient,
     PackDataProgressWrapper,
     PLinkSSHVendor,
     ReportStatusParser,
-    SendPackError,
     SSHGitClient,
     StrangeHostname,
     SubprocessSSHVendor,
@@ -79,6 +76,7 @@ from dulwich.client import (
     parse_rsync_url,
 )
 from dulwich.config import ConfigDict, ConfigFile
+from dulwich.errors import GitProtocolError, HangupException, SendPackError
 from dulwich.index import InvalidPathError
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.objects import ZERO_SHA, Blob, Commit, Tree
@@ -100,6 +98,17 @@ from dulwich.repo import MemoryRepo, Repo
 from dulwich.tests.utils import open_repo, setup_warning_catcher, tear_down_repo
 
 from . import TestCase, skipIf
+
+
+class DeprecatedReexportTests(TestCase):
+    def test_bundle_uri_aliases(self) -> None:
+        from dulwich import bundle_uri
+
+        for name in ("BundleList", "fetch_bundle_uri", "parse_bundle_list"):
+            with self.subTest(name):
+                with self.assertWarns(DeprecationWarning):
+                    obj = getattr(client, name)
+                self.assertIs(getattr(bundle_uri, name), obj)
 
 
 class DummyClient(TraditionalGitClient):

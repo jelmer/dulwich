@@ -20,3 +20,5 @@
 #
 
 """Tests for Dulwich."""
+
+__all__ = []

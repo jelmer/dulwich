@@ -21,6 +21,20 @@
 
 """Utility functions common to Dulwich tests."""
 
+__all__ = [
+    "F",
+    "build_commit_graph",
+    "build_pack",
+    "ext_functest_builder",
+    "functest_builder",
+    "make_commit",
+    "make_object",
+    "make_tag",
+    "open_repo",
+    "setup_warning_catcher",
+    "tear_down_repo",
+]
+
 # ruff: noqa: ANN401
 
 import datetime

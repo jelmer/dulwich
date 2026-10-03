@@ -21,6 +21,13 @@
 
 """Porcelain-like tag functions for Dulwich."""
 
+__all__ = [
+    "tag_create",
+    "tag_delete",
+    "tag_list",
+    "verify_tag",
+]
+
 import sys
 import time
 from collections.abc import Mapping

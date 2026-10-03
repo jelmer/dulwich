@@ -1248,6 +1248,60 @@ Binary files a/image.png and b/image.png differ
 
 
 class ApplyPatchTests(TestCase):
+    def _apply_diff(self, diff: bytes, original: list[bytes]) -> list[bytes] | None:
+        return apply_patch_hunks(parse_unified_diff(diff)[0], original)
+
+    def test_no_newline_at_end_of_file(self) -> None:
+        # Produced by git diff after changing b"one\ntwo" to b"one\nthree".
+        diff = (
+            b"diff --git a/f b/f\n"
+            b"index 9ed40b4..7279b45 100644\n"
+            b"--- a/f\n"
+            b"+++ b/f\n"
+            b"@@ -1,2 +1,2 @@\n"
+            b" one\n"
+            b"-two\n"
+            b"\\ No newline at end of file\n"
+            b"+three\n"
+            b"\\ No newline at end of file\n"
+        )
+        self.assertEqual(
+            [b"one\n", b"three"], self._apply_diff(diff, [b"one\n", b"two"])
+        )
+        self.assertIsNone(self._apply_diff(diff, [b"one\n", b"two\n"]))
+
+    def test_add_newline_at_end_of_file(self) -> None:
+        # Produced by git diff after changing b"one\ntwo" to b"one\nthree\n".
+        diff = (
+            b"diff --git a/f b/f\n"
+            b"index 9ed40b4..4c7442b 100644\n"
+            b"--- a/f\n"
+            b"+++ b/f\n"
+            b"@@ -1,2 +1,2 @@\n"
+            b" one\n"
+            b"-two\n"
+            b"\\ No newline at end of file\n"
+            b"+three\n"
+        )
+        self.assertEqual(
+            [b"one\n", b"three\n"], self._apply_diff(diff, [b"one\n", b"two"])
+        )
+
+    def test_no_newline_on_context_line(self) -> None:
+        diff = (
+            b"--- a/f\n"
+            b"+++ b/f\n"
+            b"@@ -1,2 +1,2 @@\n"
+            b"-one\n"
+            b"+uno\n"
+            b" two\n"
+            b"\\ No newline at end of file\n"
+        )
+        self.assertEqual(
+            [b"uno\n", b"two"],
+            self._apply_diff(b"diff --git a/f b/f\n" + diff, [b"one\n", b"two"]),
+        )
+
     def test_simple_modification(self) -> None:
         """Test applying a simple modification patch."""
         original = [b"line 1\n", b"line 2\n", b"line 3\n"]

@@ -1397,11 +1397,17 @@ def apply_patch_hunks(
         old_content: list[bytes] = []
         new_content: list[bytes] = []
 
+        previous = b""
         for line in hunk.lines:
             if line.startswith(b"\\"):
-                # Skip "\ No newline at end of file" markers
+                # "\ No newline at end of file" applies to the line before it
+                if previous in (b" ", b"-"):
+                    old_content[-1] = old_content[-1].removesuffix(b"\n")
+                if previous in (b" ", b"+"):
+                    new_content[-1] = new_content[-1].removesuffix(b"\n")
                 continue
-            elif line.startswith(b" "):
+            previous = line[:1]
+            if line.startswith(b" "):
                 # Context line - add newline if not present
                 content = line[1:]
                 if not content.endswith(b"\n"):

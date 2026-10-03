@@ -24,6 +24,9 @@
    doesn't match the type in the work tree or that adds a file over an
    existing path is refused. (Jelmer Vernooĳ, reported by @manus-pi)
 
+ * Apply a mode change in ``build_file_from_blob`` when the content is
+   unchanged. (Jelmer Vernooĳ)
+
  * Fix parsing of a rename or copy without content changes followed by
    another patch, which swallowed the next patch. (Jelmer Vernooĳ)
 

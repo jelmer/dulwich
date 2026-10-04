@@ -1,3 +1,9 @@
+1.2.18	UNRELEASED
+
+ * Reject transfer URLs in LFS batch responses that are not ``http://`` or
+   ``https://`` URLs. Previously a server could point uploads at e.g.
+   ``file://`` URLs. (Yusufbek Anvarov, Jelmer Vernooĳ)
+
 1.2.17	2026-10-03
 
  * Define ``__all__`` in all modules, listing the public names each module

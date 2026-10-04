@@ -711,7 +711,10 @@ class HTTPLFSClient(LFSClient):
             response_data = json.loads(response)
         except json.JSONDecodeError as e:
             raise LFSError(f"Invalid response from LFS server: {e}") from e
-        return self._parse_batch_response(response_data)
+        try:
+            return self._parse_batch_response(response_data)
+        except (KeyError, TypeError, AttributeError) as e:
+            raise LFSError(f"Malformed batch response from LFS server: {e!r}") from e
 
     def _parse_batch_response(self, data: Mapping[str, Any]) -> LFSBatchResponse:
         """Parse JSON response into LFSBatchResponse dataclass."""

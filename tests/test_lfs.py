@@ -1135,6 +1135,19 @@ class LFSClientTests(TestCase):
             str(cm.exception),
         )
 
+    def test_download_failure(self) -> None:
+        """Test that a failing download action is reported."""
+        oid = "0" * 64
+        response = self._batch_response(
+            oid, 5, {"download": {"href": f"{self.server_url}/objects/{oid}"}}
+        )
+        with mock.patch.object(self.client, "_make_request", return_value=response):
+            with self.assertRaises(LFSError) as cm:
+                self.client.download(oid, 5)
+        self.assertEqual(
+            "Download failed with status 404: Object not found", str(cm.exception)
+        )
+
     def test_upload_verify_failure(self) -> None:
         """Test that a failing verify action is reported."""
         content = b"hello"

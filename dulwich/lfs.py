@@ -396,6 +396,23 @@ def _is_valid_lfs_url(url: str) -> bool:
     return False
 
 
+def _check_action_href(href: str) -> None:
+    """Check that a transfer URL from a batch response is an HTTP(S) URL.
+
+    The basic transfer adapter only speaks HTTP, so the server has no
+    business pointing us at e.g. file:// URLs.
+
+    Args:
+        href: Transfer URL to check
+
+    Raises:
+        LFSError: If the URL is not an absolute http:// or https:// URL
+    """
+    parsed = urlparse(href)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise LFSError(f"Invalid href in LFS batch response: {href!r}")
+
+
 class LFSClient:
     """Base class for LFS client operations."""
 
@@ -642,6 +659,7 @@ class HTTPLFSClient(LFSClient):
             if "actions" in obj_data:
                 actions = {}
                 for action_name, action_data in obj_data["actions"].items():
+                    _check_action_href(action_data["href"])
                     actions[action_name] = LFSAction(
                         href=action_data["href"],
                         header=action_data.get("header"),

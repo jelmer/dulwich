@@ -16,13 +16,16 @@
  * Fix ``porcelain.lfs_fetch``, ``porcelain.lfs_pull`` and
    ``porcelain.lfs_push``, which failed with ``KeyError`` or
    ``NotImplementedError`` rather than talking to the LFS server.
-   ``lfs_push`` without explicit refs now pushes the objects for ``HEAD``
-   rather than nothing. ``LFSClient.from_config`` takes an optional
-   ``remote`` argument. (Jelmer Vernooĳ)
+   ``LFSClient.from_config`` takes an optional ``remote`` argument.
+   (Jelmer Vernooĳ)
 
- * ``porcelain.lfs_fetch`` and ``porcelain.lfs_push`` now raise ``KeyError``
-   for refs that can not be resolved rather than skipping them, and peel
-   annotated tags rather than failing an assertion. (Jelmer Vernooĳ)
+ * Make ``porcelain.lfs_fetch`` and ``porcelain.lfs_push`` select objects
+   the way git-lfs does. ``lfs_fetch`` fetches for ``HEAD`` by default.
+   ``lfs_push`` requires refs, and pushes the objects in their history that
+   the remote-tracking branches do not yet refer to. Both take an ``all``
+   argument (``--all`` on the command line), accept refs that point at
+   tags or trees, and raise ``KeyError`` for refs that can not be resolved.
+   (Jelmer Vernooĳ)
 
  * Fix ``objectspec.parse_object`` raising ``AssertionError`` rather than
    ``KeyError`` for unknown names in on-disk repositories.

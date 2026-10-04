@@ -4,6 +4,12 @@
    ``https://`` URLs. Previously a server could point uploads at e.g.
    ``file://`` URLs. (Yusufbek Anvarov, Jelmer Vernooĳ)
 
+ * Send LFS uploads through the urllib3 pool manager, like downloads, so
+   that ``http.proxy``, ``http.sslVerify`` and ``http.sslCAInfo`` are
+   honoured. ``HTTPLFSClient.upload`` now raises ``LFSError`` rather than
+   ``urllib.error.HTTPError`` when the server rejects an upload.
+   (Jelmer Vernooĳ)
+
 1.2.17	2026-10-03
 
  * Define ``__all__`` in all modules, listing the public names each module

@@ -118,6 +118,13 @@ class LFSTests(TestCase):
         self.assertTrue(os.path.isdir(os.path.join(lfs_dir, "tmp")))
         self.assertTrue(os.path.isdir(os.path.join(lfs_dir, "objects")))
 
+    def test_write_object_creates_store(self) -> None:
+        """Test writing to a store whose directory does not exist yet."""
+        store = LFSStore(os.path.join(self.test_dir, "new-store"))
+        sha = store.write_object([b"a test object"])
+        with store.open_object(sha) as f:
+            self.assertEqual(b"a test object", f.read())
+
 
 class LFSPointerTests(TestCase):
     def test_from_bytes_valid(self) -> None:

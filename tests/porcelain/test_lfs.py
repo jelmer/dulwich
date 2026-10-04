@@ -604,6 +604,14 @@ class LFSTransferTests(TestCase):
         # Already present locally, so nothing left to fetch
         self.assertEqual(0, porcelain.lfs_fetch(self.repo))
 
+    def test_fetch_creates_store(self) -> None:
+        self._set_config((b"lfs",), b"url", self.server_url)
+        oid = self._commit_pointer(b"content", self.server.lfs_store)
+        shutil.rmtree(self.local_store.path)
+
+        self.assertEqual(1, porcelain.lfs_fetch(self.repo))
+        self.assertEqual([oid], self._stored(self.local_store, [oid]))
+
     def test_fetch_ref(self) -> None:
         self._set_config((b"lfs",), b"url", self.server_url)
         old = self._commit_pointer(b"old content", self.server.lfs_store)

@@ -59,6 +59,11 @@
  * ``porcelain.lfs_pull`` now refreshes the stat information in the index
    for the files it writes, like git-lfs. (Jelmer Vernooĳ)
 
+ * Support ``GIT_LFS_SKIP_SMUDGE``. When it is set, the built-in LFS
+   smudge filter, ``porcelain.lfs_smudge`` and ``dulwich lfs smudge``
+   leave pointers alone, like git-lfs; ``porcelain.lfs_pull`` still
+   replaces them. Add ``dulwich.lfs.skip_smudge``. (Jelmer Vernooĳ)
+
  * ``dulwich.lfs_server`` no longer asks clients to upload objects it
    already has. (Jelmer Vernooĳ)
 

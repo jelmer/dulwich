@@ -44,6 +44,7 @@ __all__ = [
     "LFSFilterDriver",
     "LFSPointer",
     "LFSStore",
+    "skip_smudge",
 ]
 
 import hashlib
@@ -293,6 +294,9 @@ class LFSFilterDriver:
         if not pointer.is_valid_oid():
             return data
 
+        if skip_smudge():
+            return data
+
         try:
             return self.get_content(pointer)
         except LFSError as e:
@@ -383,6 +387,16 @@ def _get_lfs_user_agent(config: "Config | None") -> str:
 
     version_str = ".".join([str(x) for x in __version__])
     return f"git-lfs/dulwich/{version_str}"
+
+
+def skip_smudge() -> bool:
+    """Check whether smudging is disabled with ``GIT_LFS_SKIP_SMUDGE``.
+
+    Like git-lfs, pointers are then left in the working tree, even if the
+    objects are available locally. ``lfs_pull`` replaces them later.
+    """
+    value = os.environ.get("GIT_LFS_SKIP_SMUDGE", "")
+    return value.lower() in ("true", "1", "on", "yes", "t")
 
 
 def _is_valid_lfs_url(url: str) -> bool:

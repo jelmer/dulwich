@@ -56,6 +56,9 @@
    ``AttributeError`` for LFS batch responses that are valid JSON but do
    not have the expected structure. (Jelmer Vernooĳ)
 
+ * ``porcelain.lfs_pull`` now refreshes the stat information in the index
+   for the files it writes, like git-lfs. (Jelmer Vernooĳ)
+
  * ``dulwich.lfs_server`` no longer asks clients to upload objects it
    already has. (Jelmer Vernooĳ)
 

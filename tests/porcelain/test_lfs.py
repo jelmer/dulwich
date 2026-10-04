@@ -29,6 +29,7 @@ import threading
 import unittest
 
 from dulwich import porcelain
+from dulwich.index import index_entry_from_stat
 from dulwich.lfs import LFSError, LFSPointer, LFSStore
 from dulwich.lfs_server import run_lfs_server
 from dulwich.objects import Blob, Tree
@@ -762,6 +763,25 @@ class LFSTransferTests(TestCase):
         # Nothing left to do
         self.assertEqual(0, porcelain.lfs_pull(self.repo))
         self.assertEqual(b"tracked content", self._read("tracked.bin"))
+
+    def test_pull_updates_index(self) -> None:
+        self._set_config((b"lfs",), b"url", self.server_url)
+        self._track_bin()
+        content = b"tracked content"
+        self._commit_pointer(content, self.server.lfs_store, "tracked.bin")
+        pointer_blob = self.repo.open_index()[b"tracked.bin"].sha
+
+        self.assertEqual(1, porcelain.lfs_pull(self.repo))
+
+        # The index still refers to the pointer, but its stat information
+        # matches the file that was written
+        st = os.lstat(os.path.join(self.test_dir, "tracked.bin"))
+        self.assertEqual(len(content), st.st_size)
+        self.assertEqual(
+            index_entry_from_stat(st, pointer_blob),
+            self.repo.open_index()[b"tracked.bin"],
+        )
+        self.assertEqual([], porcelain.status(self.repo).unstaged)
 
     def test_pull_checks_out_local_objects(self) -> None:
         self._set_config((b"lfs",), b"url", self.server_url)

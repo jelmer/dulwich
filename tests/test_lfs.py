@@ -569,6 +569,21 @@ class LFSFilterDriverTests(TestCase):
         result = self.filter_driver.smudge(pointer_data)
         self.assertEqual(result, pointer_data)
 
+    def test_smudge_skip(self) -> None:
+        """Test that GIT_LFS_SKIP_SMUDGE leaves pointers alone."""
+        content = b"This is the actual file content"
+        sha = self.lfs_store.write_object([content])
+        pointer_data = LFSPointer(sha, len(content)).to_bytes()
+
+        # Even objects that are in the local store are not smudged
+        for value in ("1", "true", "TRUE", "yes", "on", "t"):
+            self.overrideEnv("GIT_LFS_SKIP_SMUDGE", value)
+            self.assertEqual(pointer_data, self.filter_driver.smudge(pointer_data))
+
+        for value in ("0", "false", "no", "off", "y", "2", ""):
+            self.overrideEnv("GIT_LFS_SKIP_SMUDGE", value)
+            self.assertEqual(content, self.filter_driver.smudge(pointer_data))
+
     def test_smudge_non_pointer(self) -> None:
         """Test smudge filter on non-pointer content."""
         content = b"This is not an LFS pointer"
@@ -697,6 +712,17 @@ class LFSFilterDriverDownloadTests(TestCase):
         with self.assertLogs("dulwich.lfs", level="WARNING"):
             result = self.filter_driver.smudge(self.pointer.to_bytes())
         self.assertEqual(self.pointer.to_bytes(), result)
+
+    def test_smudge_skip(self) -> None:
+        content = b"content on the server"
+        oid = self.server.lfs_store.write_object([content])
+        pointer_data = LFSPointer(oid, len(content)).to_bytes()
+        self.overrideEnv("GIT_LFS_SKIP_SMUDGE", "1")
+
+        self.assertEqual(pointer_data, self.filter_driver.smudge(pointer_data))
+        # Nothing is downloaded
+        with self.assertRaises(KeyError):
+            self.lfs_store.open_object(oid)
 
     def test_smudge_missing_object_required(self) -> None:
         self.config.set((b"filter", b"lfs"), b"required", b"true")

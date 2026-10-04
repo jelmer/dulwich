@@ -231,13 +231,13 @@ def lfs_smudge(
 
     Returns:
       Actual file content as bytes, or ``pointer_content`` if it is not an
-      LFS pointer
+      LFS pointer or ``GIT_LFS_SKIP_SMUDGE`` is set
 
     Raises:
       LFSError: If the object is not in the LFS store and can not be
         downloaded
     """
-    from ..lfs import LFSFilterDriver, LFSPointer, LFSStore
+    from ..lfs import LFSFilterDriver, LFSPointer, LFSStore, skip_smudge
     from . import open_repo_closing
 
     with open_repo_closing(repo) as r:
@@ -245,7 +245,7 @@ def lfs_smudge(
             raise ValueError("Pointer content must be specified")
 
         pointer = LFSPointer.from_bytes(pointer_content)
-        if pointer is None or not pointer.is_valid_oid():
+        if pointer is None or not pointer.is_valid_oid() or skip_smudge():
             return pointer_content
 
         # Get LFS store

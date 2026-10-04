@@ -164,6 +164,18 @@ class LFSPorcelainTestCase(TestCase):
             "No LFS client available from configuration", str(cm.exception)
         )
 
+    def test_lfs_smudge_skip(self):
+        """Test that GIT_LFS_SKIP_SMUDGE leaves the pointer alone."""
+        porcelain.lfs_init(self.repo)
+        test_content = b"This is test content for smudging"
+        oid = LFSStore.from_repo(self.repo).write_object([test_content])
+        pointer_content = LFSPointer(oid, len(test_content)).to_bytes()
+        self.overrideEnv("GIT_LFS_SKIP_SMUDGE", "1")
+
+        self.assertEqual(
+            pointer_content, porcelain.lfs_smudge(self.repo, pointer_content)
+        )
+
     def test_lfs_smudge_non_pointer(self):
         """Test that content that is not a pointer is passed through."""
         porcelain.lfs_init(self.repo)
@@ -782,6 +794,15 @@ class LFSTransferTests(TestCase):
             self.repo.open_index()[b"tracked.bin"],
         )
         self.assertEqual([], porcelain.status(self.repo).unstaged)
+
+    def test_pull_ignores_skip_smudge(self) -> None:
+        self._set_config((b"lfs",), b"url", self.server_url)
+        self._track_bin()
+        self._commit_pointer(b"tracked content", self.server.lfs_store, "tracked.bin")
+        self.overrideEnv("GIT_LFS_SKIP_SMUDGE", "1")
+
+        self.assertEqual(1, porcelain.lfs_pull(self.repo))
+        self.assertEqual(b"tracked content", self._read("tracked.bin"))
 
     def test_pull_checks_out_local_objects(self) -> None:
         self._set_config((b"lfs",), b"url", self.server_url)

@@ -1069,6 +1069,15 @@ class LFSClientTests(TestCase):
         self.assertIsNotNone(result.objects[0].actions)
         self.assertIn("download", result.objects[0].actions)
 
+    def test_batch_upload_existing_object(self) -> None:
+        """Test that no upload is requested for an object the server has."""
+        content = b"existing content"
+        oid = self.server.lfs_store.write_object([content])
+
+        result = self.client.batch("upload", [{"oid": oid, "size": len(content)}])
+        self.assertEqual([oid], [obj.oid for obj in result.objects])
+        self.assertIsNone(result.objects[0].actions)
+
     def test_download_with_verification(self) -> None:
         """Test download with size and hash verification."""
         test_content = b"test content for download"

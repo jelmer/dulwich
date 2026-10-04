@@ -27,6 +27,9 @@
    tags or trees, and raise ``KeyError`` for refs that can not be resolved.
    (Jelmer Vernooĳ)
 
+ * ``dulwich.lfs_server`` no longer asks clients to upload objects it
+   already has. (Jelmer Vernooĳ)
+
  * Fix ``objectspec.parse_object`` raising ``AssertionError`` rather than
    ``KeyError`` for unknown names in on-disk repositories.
    (Jelmer Vernooĳ)

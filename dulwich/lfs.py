@@ -56,7 +56,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO
 from urllib.parse import urljoin, urlparse
-from urllib.request import Request, url2pathname, urlopen
+from urllib.request import url2pathname
 
 logger = logging.getLogger(__name__)
 
@@ -396,6 +396,23 @@ def _is_valid_lfs_url(url: str) -> bool:
     return False
 
 
+def _check_action_href(href: str) -> None:
+    """Check that a transfer URL from a batch response is an HTTP(S) URL.
+
+    The basic transfer adapter only speaks HTTP, so the server has no
+    business pointing us at e.g. file:// URLs.
+
+    Args:
+        href: Transfer URL to check
+
+    Raises:
+        LFSError: If the URL is not an absolute http:// or https:// URL
+    """
+    parsed = urlparse(href)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise LFSError(f"Invalid href in LFS batch response: {href!r}")
+
+
 class LFSClient:
     """Base class for LFS client operations."""
 
@@ -470,11 +487,19 @@ class LFSClient:
             raise ValueError(f"Unsupported LFS URL scheme: {parsed.scheme}")
 
     @classmethod
-    def from_config(cls, config: "Config") -> "LFSClient | None":
+    def from_config(
+        cls, config: "Config", remote: str = "origin"
+    ) -> "LFSClient | None":
         """Create LFS client from git config.
 
-        Returns the appropriate subclass (HTTPLFSClient or FileLFSClient)
-        based on the URL scheme.
+        Args:
+            config: Git config to read ``lfs.url`` and the remote URL from
+            remote: Name of the remote to derive the LFS URL from if
+                ``lfs.url`` is not set
+
+        Returns:
+            The appropriate subclass (HTTPLFSClient or FileLFSClient) based
+            on the URL scheme, or None if no URL is configured.
         """
         # Try to get LFS URL from config first
         try:
@@ -491,7 +516,7 @@ class LFSClient:
 
         # Fall back to deriving from remote URL (same as git-lfs)
         try:
-            remote_url = config.get((b"remote", b"origin"), b"url").decode()
+            remote_url = config.get((b"remote", remote.encode()), b"url").decode()
         except KeyError:
             pass
         else:
@@ -642,6 +667,7 @@ class HTTPLFSClient(LFSClient):
             if "actions" in obj_data:
                 actions = {}
                 for action_name, action_data in obj_data["actions"].items():
+                    _check_action_href(action_data["href"])
                     actions[action_name] = LFSAction(
                         href=action_data["href"],
                         header=action_data.get("header"),
@@ -669,6 +695,31 @@ class HTTPLFSClient(LFSClient):
             hash_algo=data.get("hash_algo"),
         )
 
+    def _action_request(
+        self,
+        method: str,
+        action: LFSAction,
+        headers: dict[str, str] | None = None,
+        body: bytes | None = None,
+    ) -> "urllib3.BaseHTTPResponse":
+        """Send the request described by an action from a batch response.
+
+        Headers supplied by the server in the action take precedence over
+        ``headers``.
+        """
+        req_headers = {"User-Agent": _get_lfs_user_agent(self.config)}
+        if headers:
+            req_headers.update(headers)
+        if action.header:
+            req_headers.update(action.header)
+
+        pool_manager = self._get_pool_manager()
+        response = pool_manager.request(
+            method, action.href, headers=req_headers, body=body
+        )
+        assert response is not None
+        return response
+
     def download(self, oid: str, size: int, ref: str | None = None) -> bytes:
         """Download an LFS object.
 
@@ -693,17 +744,11 @@ class HTTPLFSClient(LFSClient):
         if not obj.actions or "download" not in obj.actions:
             raise LFSError(f"No download actions for {oid}")
 
-        download_action = obj.actions["download"]
-        download_url = download_action.href
-
-        # Download the object using urllib3 with git config
-        download_headers = {"User-Agent": _get_lfs_user_agent(self.config)}
-        if download_action.header:
-            download_headers.update(download_action.header)
-
-        pool_manager = self._get_pool_manager()
-        response = pool_manager.request("GET", download_url, headers=download_headers)
-        assert response is not None
+        response = self._action_request("GET", obj.actions["download"])
+        if response.status >= 400:
+            raise LFSError(
+                f"Download failed with status {response.status}: {response.reason}"
+            )
         content = response.data
 
         # Verify size
@@ -745,33 +790,30 @@ class HTTPLFSClient(LFSClient):
         if "upload" not in obj.actions:
             raise LFSError(f"No upload action for {oid}")
 
-        upload_action = obj.actions["upload"]
-        upload_url = upload_action.href
-
-        # Upload the object
-        req = Request(upload_url, data=content, method="PUT")
-        if upload_action.header:
-            for name, value in upload_action.header.items():
-                req.add_header(name, value)
-
-        with urlopen(req) as response:
-            if response.status >= 400:
-                raise LFSError(f"Upload failed with status {response.status}")
+        response = self._action_request(
+            "PUT",
+            obj.actions["upload"],
+            headers={"Content-Type": "application/octet-stream"},
+            body=content,
+        )
+        if response.status >= 400:
+            raise LFSError(
+                f"Upload failed with status {response.status}: {response.reason}"
+            )
 
         # Verify if needed
-        if obj.actions and "verify" in obj.actions:
-            verify_action = obj.actions["verify"]
-            verify_data = json.dumps({"oid": oid, "size": size}).encode("utf-8")
-
-            req = Request(verify_action.href, data=verify_data, method="POST")
-            req.add_header("Content-Type", "application/vnd.git-lfs+json")
-            if verify_action.header:
-                for name, value in verify_action.header.items():
-                    req.add_header(name, value)
-
-            with urlopen(req) as response:
-                if response.status >= 400:
-                    raise LFSError(f"Verification failed with status {response.status}")
+        if "verify" in obj.actions:
+            response = self._action_request(
+                "POST",
+                obj.actions["verify"],
+                headers={"Content-Type": "application/vnd.git-lfs+json"},
+                body=json.dumps({"oid": oid, "size": size}).encode("utf-8"),
+            )
+            if response.status >= 400:
+                raise LFSError(
+                    f"Verification failed with status {response.status}: "
+                    f"{response.reason}"
+                )
 
 
 class FileLFSClient(LFSClient):

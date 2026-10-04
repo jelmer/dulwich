@@ -1,3 +1,36 @@
+1.2.18	UNRELEASED
+
+ * Reject transfer URLs in LFS batch responses that are not ``http://`` or
+   ``https://`` URLs. Previously a server could point uploads at e.g.
+   ``file://`` URLs. (Yusufbek Anvarov, Jelmer Vernooĳ)
+
+ * Send LFS uploads through the urllib3 pool manager, like downloads, so
+   that ``http.proxy``, ``http.sslVerify`` and ``http.sslCAInfo`` are
+   honoured. ``HTTPLFSClient.upload`` now raises ``LFSError`` rather than
+   ``urllib.error.HTTPError`` when the server rejects an upload.
+   (Jelmer Vernooĳ)
+
+ * Report the HTTP status when a LFS download fails, rather than a size
+   mismatch on the error page. (Jelmer Vernooĳ)
+
+ * Fix ``porcelain.lfs_fetch``, ``porcelain.lfs_pull`` and
+   ``porcelain.lfs_push``, which failed with ``KeyError`` or
+   ``NotImplementedError`` rather than talking to the LFS server.
+   ``LFSClient.from_config`` takes an optional ``remote`` argument.
+   (Jelmer Vernooĳ)
+
+ * Make ``porcelain.lfs_fetch`` and ``porcelain.lfs_push`` select objects
+   the way git-lfs does. ``lfs_fetch`` fetches for ``HEAD`` by default.
+   ``lfs_push`` requires refs, and pushes the objects in their history that
+   the remote-tracking branches do not yet refer to. Both take an ``all``
+   argument (``--all`` on the command line), accept refs that point at
+   tags or trees, and raise ``KeyError`` for refs that can not be resolved.
+   (Jelmer Vernooĳ)
+
+ * Fix ``objectspec.parse_object`` raising ``AssertionError`` rather than
+   ``KeyError`` for unknown names in on-disk repositories.
+   (Jelmer Vernooĳ)
+
 1.2.17	2026-10-03
 
  * Define ``__all__`` in all modules, listing the public names each module

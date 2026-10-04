@@ -745,6 +745,10 @@ class HTTPLFSClient(LFSClient):
             raise LFSError(f"No download actions for {oid}")
 
         response = self._action_request("GET", obj.actions["download"])
+        if response.status >= 400:
+            raise LFSError(
+                f"Download failed with status {response.status}: {response.reason}"
+            )
         content = response.data
 
         # Verify size

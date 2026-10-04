@@ -1251,6 +1251,27 @@ class LFSClientTests(TestCase):
             str(cm.exception),
         )
 
+    def test_batch_malformed_response(self) -> None:
+        """Test that a batch response with the wrong structure raises LFSError."""
+        pool_manager = self.client._get_pool_manager()
+        for data, error in (
+            (b'{"objects": [{"size": 5}]}', "KeyError('oid')"),
+            (
+                b'{"objects": [{"oid": "abc", "size": 5, "actions": {"download": {}}}]}',
+                "KeyError('href')",
+            ),
+            (b'{"objects": 5}', "TypeError(\"'int' object is not iterable\")"),
+            (b"[]", "AttributeError(\"'list' object has no attribute 'get'\")"),
+        ):
+            response = mock.Mock(status=200, data=data)
+            with mock.patch.object(pool_manager, "request", return_value=response):
+                with self.assertRaises(LFSError) as cm:
+                    self.client.batch("download", [{"oid": "0" * 64, "size": 5}])
+            self.assertEqual(
+                f"Malformed batch response from LFS server: {error}",
+                str(cm.exception),
+            )
+
     def test_batch_connection_error(self) -> None:
         """Test that a failure to reach the batch endpoint raises LFSError."""
         pool_manager = self.client._get_pool_manager()

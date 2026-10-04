@@ -52,6 +52,10 @@
    missing files and leaves local modifications alone, rather than
    replacing any pointer file in the working tree. (Jelmer Vernooĳ)
 
+ * Raise ``LFSError`` rather than ``KeyError``, ``TypeError`` or
+   ``AttributeError`` for LFS batch responses that are valid JSON but do
+   not have the expected structure. (Jelmer Vernooĳ)
+
  * ``dulwich.lfs_server`` no longer asks clients to upload objects it
    already has. (Jelmer Vernooĳ)
 

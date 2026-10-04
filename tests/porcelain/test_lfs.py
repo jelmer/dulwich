@@ -708,14 +708,84 @@ class LFSTransferTests(TestCase):
             porcelain.lfs_fetch(self.repo)
         self.assertEqual("No LFS URL configured for remote origin", str(cm.exception))
 
+    def _track_bin(self) -> None:
+        """Track *.bin files with LFS."""
+        with open(os.path.join(self.test_dir, ".gitattributes"), "wb") as f:
+            f.write(b"*.bin filter=lfs diff=lfs merge=lfs -text\n")
+        porcelain.add(self.repo, paths=[".gitattributes"])
+        porcelain.commit(self.repo, message=b"Track *.bin")
+
+    def _read(self, name: str) -> bytes:
+        with open(os.path.join(self.test_dir, name), "rb") as f:
+            return f.read()
+
     def test_pull(self) -> None:
         self._set_config((b"lfs",), b"url", self.server_url)
-        content = b"content on the server"
-        self._commit_pointer(content, self.server.lfs_store)
+        self._track_bin()
+        server_store = self.server.lfs_store
+        tracked = self._commit_pointer(b"tracked content", server_store, "tracked.bin")
+        deleted = self._commit_pointer(b"deleted content", server_store, "deleted.bin")
+        modified = self._commit_pointer(
+            b"modified content", server_store, "modified.bin"
+        )
+        noattr = self._commit_pointer(b"noattr content", server_store, "noattr.dat")
+        # A pointer that is in the index but not in HEAD
+        staged, staged_pointer = self._pointer(b"staged content", server_store)
+        with open(os.path.join(self.test_dir, "staged.bin"), "wb") as f:
+            f.write(staged_pointer)
+        porcelain.add(self.repo, paths=["staged.bin"])
+        os.unlink(os.path.join(self.test_dir, "deleted.bin"))
+        with open(os.path.join(self.test_dir, "modified.bin"), "wb") as f:
+            f.write(b"local edit")
 
+        self.assertEqual(4, porcelain.lfs_pull(self.repo))
+
+        # Objects are fetched for the files in the index that LFS tracks
+        self.assertEqual(
+            [tracked, deleted, modified, staged],
+            self._stored(
+                self.local_store, [tracked, deleted, modified, noattr, staged]
+            ),
+        )
+        self.assertEqual(b"tracked content", self._read("tracked.bin"))
+        self.assertEqual(b"staged content", self._read("staged.bin"))
+        # Missing files are restored
+        self.assertEqual(b"deleted content", self._read("deleted.bin"))
+        # Local modifications are left alone
+        self.assertEqual(b"local edit", self._read("modified.bin"))
+        # Pointers in files that LFS does not track are left alone
+        self.assertEqual(
+            LFSPointer(noattr, len(b"noattr content")).to_bytes(),
+            self._read("noattr.dat"),
+        )
+
+        # Nothing left to do
+        self.assertEqual(0, porcelain.lfs_pull(self.repo))
+        self.assertEqual(b"tracked content", self._read("tracked.bin"))
+
+    def test_pull_checks_out_local_objects(self) -> None:
+        self._set_config((b"lfs",), b"url", self.server_url)
+        self._track_bin()
+        self._commit_pointer(b"local content", self.local_store, "local.bin")
+
+        # Nothing to fetch, but the pointer is still replaced
+        self.assertEqual(0, porcelain.lfs_pull(self.repo))
+        self.assertEqual(b"local content", self._read("local.bin"))
+
+    @unittest.skipIf(sys.platform == "win32", "Requires symlink support")
+    def test_pull_symlink(self) -> None:
+        self._set_config((b"lfs",), b"url", self.server_url)
+        self._track_bin()
+        self._commit_pointer(b"content", self.server.lfs_store, "link.bin")
+        target = os.path.join(self.test_dir, "target")
+        with open(target, "wb") as f:
+            f.write(b"target content")
+        os.unlink(os.path.join(self.test_dir, "link.bin"))
+        os.symlink(target, os.path.join(self.test_dir, "link.bin"))
+
+        # Never write through a symlink
         self.assertEqual(1, porcelain.lfs_pull(self.repo))
-        with open(os.path.join(self.test_dir, "large.bin"), "rb") as f:
-            self.assertEqual(content, f.read())
+        self.assertEqual(b"target content", self._read("target"))
 
     def test_pull_unborn_head(self) -> None:
         self._set_config((b"lfs",), b"url", self.server_url)

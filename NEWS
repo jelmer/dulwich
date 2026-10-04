@@ -47,6 +47,11 @@
  * Fix storing LFS objects in repositories that do not have an LFS store
    yet, e.g. when fetching into a fresh clone. (Jelmer Vernooĳ)
 
+ * ``porcelain.lfs_pull`` now works like ``git lfs pull``: it fetches
+   the objects for the files in the index that are tracked by LFS, restores
+   missing files and leaves local modifications alone, rather than
+   replacing any pointer file in the working tree. (Jelmer Vernooĳ)
+
  * ``dulwich.lfs_server`` no longer asks clients to upload objects it
    already has. (Jelmer Vernooĳ)
 

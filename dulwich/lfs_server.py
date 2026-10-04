@@ -146,7 +146,8 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
                     }
                 else:
                     response_obj["error"] = {"code": 404, "message": "Object not found"}
-            else:  # upload
+            elif not self._object_exists(oid):
+                # No actions are needed for objects the server already has
                 response_obj["actions"] = {
                     "upload": {
                         "href": f"http://{self.headers['Host']}/objects/{oid}",

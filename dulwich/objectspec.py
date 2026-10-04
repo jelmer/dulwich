@@ -71,14 +71,10 @@ def _resolve_object(
         return repo[ref]
     except KeyError:
         try:
-            ref_sha = parse_ref(repo, ref)
-            return repo[ref_sha]
+            return repo[parse_ref(repo, ref)]
         except KeyError:
-            try:
-                return repo.object_store[ref]  # type: ignore[index]
-            except (KeyError, ValueError):
-                # Re-raise original KeyError for consistency
-                raise KeyError(ref)
+            # Re-raise original KeyError for consistency
+            raise KeyError(ref)
 
 
 def _parse_number_suffix(suffix: bytes) -> tuple[int, bytes]:

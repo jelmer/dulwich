@@ -33,8 +33,11 @@ from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+import urllib3
+
 from dulwich.client import LocalGitClient
 from dulwich.config import ConfigFile
+from dulwich.filters import FilterError
 from dulwich.lfs import (
     FileLFSClient,
     HTTPLFSClient,
@@ -639,6 +642,73 @@ class LFSFilterDriverTests(TestCase):
             self.assertEqual(f.read(), content)
 
 
+class LFSFilterDriverDownloadTests(TestCase):
+    """Tests for the LFS filter driver fetching objects from a server."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.lfs_store = LFSStore.create(self.test_dir)
+
+        self.server_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.server_dir)
+        self.server, self.server_url = run_lfs_server(port=0, lfs_dir=self.server_dir)
+        self.server_thread = threading.Thread(target=self.server.serve_forever)
+        self.server_thread.daemon = True
+        self.server_thread.start()
+
+        def cleanup_server() -> None:
+            self.server.shutdown()
+            self.server.server_close()
+            self.server_thread.join(timeout=1.0)
+
+        self.addCleanup(cleanup_server)
+
+        self.config = ConfigFile()
+        self.config.set((b"lfs",), b"url", self.server_url.encode())
+        self.filter_driver = LFSFilterDriver(self.lfs_store, config=self.config)
+        self.pointer = LFSPointer("0" * 64, 5)
+
+    def test_smudge_downloads_object(self) -> None:
+        content = b"content on the server"
+        oid = self.server.lfs_store.write_object([content])
+
+        result = self.filter_driver.smudge(LFSPointer(oid, len(content)).to_bytes())
+        self.assertEqual(content, result)
+        with self.lfs_store.open_object(oid) as f:
+            self.assertEqual(content, f.read())
+
+    def test_smudge_missing_object(self) -> None:
+        # The pointer is passed through, as the filter is not required
+        with self.assertLogs("dulwich.lfs", level="WARNING"):
+            result = self.filter_driver.smudge(self.pointer.to_bytes())
+        self.assertEqual(self.pointer.to_bytes(), result)
+
+    def test_smudge_batch_error(self) -> None:
+        self.config.set((b"lfs",), b"url", f"{self.server_url}/nonexistent".encode())
+        with self.assertLogs("dulwich.lfs", level="WARNING"):
+            result = self.filter_driver.smudge(self.pointer.to_bytes())
+        self.assertEqual(self.pointer.to_bytes(), result)
+
+    def test_smudge_missing_object_required(self) -> None:
+        self.config.set((b"filter", b"lfs"), b"required", b"true")
+        with self.assertRaises(FilterError) as cm:
+            self.filter_driver.smudge(self.pointer.to_bytes())
+        self.assertEqual(
+            f"Required LFS smudge filter failed: Server error for {'0' * 64}: "
+            "Object not found",
+            str(cm.exception),
+        )
+
+    def test_get_content_missing_object(self) -> None:
+        with self.assertRaises(LFSError) as cm:
+            self.filter_driver.get_content(self.pointer)
+        self.assertEqual(
+            f"Server error for {'0' * 64}: Object not found", str(cm.exception)
+        )
+
+
 class LFSStoreEdgeCaseTests(TestCase):
     """Edge case tests for LFS store."""
 
@@ -1150,6 +1220,57 @@ class LFSClientTests(TestCase):
             "Upload failed with status 400: OID mismatch: "
             f"expected {'0' * 64}, got {hashlib.sha256(b'hello').hexdigest()}",
             str(cm.exception),
+        )
+
+    def test_batch_http_error(self) -> None:
+        """Test that a HTTP error from the batch endpoint raises LFSError."""
+        pool_manager = self.client._get_pool_manager()
+        response = mock.Mock(status=500, data=b"boom")
+        with mock.patch.object(pool_manager, "request", return_value=response):
+            with self.assertRaises(LFSError) as cm:
+                self.client.batch("download", [{"oid": "0" * 64, "size": 5}])
+        self.assertEqual("HTTP 500: boom", str(cm.exception))
+
+    def test_batch_invalid_response(self) -> None:
+        """Test that a batch response that is not JSON raises LFSError."""
+        pool_manager = self.client._get_pool_manager()
+        response = mock.Mock(status=200, data=b"not json")
+        with mock.patch.object(pool_manager, "request", return_value=response):
+            with self.assertRaises(LFSError) as cm:
+                self.client.batch("download", [{"oid": "0" * 64, "size": 5}])
+        self.assertEqual(
+            "Invalid response from LFS server: "
+            "Expecting value: line 1 column 1 (char 0)",
+            str(cm.exception),
+        )
+
+    def test_batch_connection_error(self) -> None:
+        """Test that a failure to reach the batch endpoint raises LFSError."""
+        pool_manager = self.client._get_pool_manager()
+        error = urllib3.exceptions.ProtocolError("connection lost")
+        with mock.patch.object(pool_manager, "request", side_effect=error):
+            with self.assertRaises(LFSError) as cm:
+                self.client.batch("download", [{"oid": "0" * 64, "size": 5}])
+        self.assertEqual(
+            f"Request to {self.server_url}/objects/batch failed: connection lost",
+            str(cm.exception),
+        )
+
+    def test_download_connection_error(self) -> None:
+        """Test that a failure to reach the transfer URL raises LFSError."""
+        oid = "0" * 64
+        href = f"{self.server_url}/objects/{oid}"
+        response = self._batch_response(oid, 5, {"download": {"href": href}})
+        pool_manager = self.client._get_pool_manager()
+        error = urllib3.exceptions.ProtocolError("connection lost")
+        with (
+            mock.patch.object(self.client, "_make_request", return_value=response),
+            mock.patch.object(pool_manager, "request", side_effect=error),
+        ):
+            with self.assertRaises(LFSError) as cm:
+                self.client.download(oid, 5)
+        self.assertEqual(
+            f"Request to {href} failed: connection lost", str(cm.exception)
         )
 
     def test_download_failure(self) -> None:

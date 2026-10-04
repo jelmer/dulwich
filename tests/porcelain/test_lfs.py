@@ -152,6 +152,22 @@ class LFSPorcelainTestCase(TestCase):
 
         self.assertEqual(smudged_content, test_content)
 
+    def test_lfs_smudge_missing_object(self):
+        """Test smudging a pointer to an object that can not be found."""
+        porcelain.lfs_init(self.repo)
+        pointer_content = LFSPointer("0" * 64, 5).to_bytes()
+
+        with self.assertRaises(LFSError) as cm:
+            porcelain.lfs_smudge(self.repo, pointer_content)
+        self.assertEqual(
+            "No LFS client available from configuration", str(cm.exception)
+        )
+
+    def test_lfs_smudge_non_pointer(self):
+        """Test that content that is not a pointer is passed through."""
+        porcelain.lfs_init(self.repo)
+        self.assertEqual(b"content", porcelain.lfs_smudge(self.repo, b"content"))
+
     def test_lfs_ls_files(self):
         """Test listing LFS files."""
         # Initialize repo with some LFS files

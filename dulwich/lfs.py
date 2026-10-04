@@ -58,6 +58,8 @@ from typing import TYPE_CHECKING, Any, BinaryIO
 from urllib.parse import urljoin, urlparse
 from urllib.request import url2pathname
 
+from .filters import FilterError
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -291,20 +293,38 @@ class LFSFilterDriver:
             return data
 
         try:
+            return self.get_content(pointer)
+        except LFSError as e:
+            # Like git, only fail if the filter is marked as required
+            if self.config is not None and self.config.get_boolean(
+                (b"filter", b"lfs"), b"required", False
+            ):
+                raise FilterError(f"Required LFS smudge filter failed: {e}") from e
+            logger.warning("LFS object download failed for %s: %s", pointer.oid, e)
+
+            # Return pointer as-is when object is missing and download failed
+            return data
+
+    def get_content(self, pointer: LFSPointer) -> bytes:
+        """Get the content an LFS pointer refers to.
+
+        Args:
+            pointer: LFS pointer containing OID and size
+
+        Returns:
+            Content from the LFS store, downloaded first if necessary
+
+        Raises:
+            LFSError: If the object is not in the store and can not be
+                downloaded
+        """
+        try:
             # Read the actual content from LFS store
             with self.lfs_store.open_object(pointer.oid) as f:
                 return f.read()
         except KeyError:
             # Object not found in LFS store, try to download it
-            try:
-                content = self._download_object(pointer)
-                return content
-            except LFSError as e:
-                # Download failed, fall back to returning pointer
-                logger.warning("LFS object download failed for %s: %s", pointer.oid, e)
-
-                # Return pointer as-is when object is missing and download failed
-                return data
+            return self._download_object(pointer)
 
     def _download_object(self, pointer: LFSPointer) -> bytes:
         """Download an LFS object from the server.
@@ -608,6 +628,29 @@ class HTTPLFSClient(LFSClient):
             self._pool_manager = default_urllib3_manager(self.config)
         return self._pool_manager
 
+    def _request(
+        self,
+        method: str,
+        url: str,
+        headers: dict[str, str],
+        body: bytes | None = None,
+    ) -> "urllib3.BaseHTTPResponse":
+        """Send a request through the urllib3 pool manager.
+
+        Raises:
+            LFSError: If the server can not be reached
+        """
+        import urllib3.exceptions
+
+        # Use urllib3 pool manager with git config applied
+        pool_manager = self._get_pool_manager()
+        try:
+            response = pool_manager.request(method, url, headers=headers, body=body)
+        except urllib3.exceptions.HTTPError as e:
+            raise LFSError(f"Request to {url} failed: {e}") from e
+        assert response is not None
+        return response
+
     def _make_request(
         self,
         method: str,
@@ -625,12 +668,9 @@ class HTTPLFSClient(LFSClient):
         if headers:
             req_headers.update(headers)
 
-        # Use urllib3 pool manager with git config applied
-        pool_manager = self._get_pool_manager()
-        response = pool_manager.request(method, url, headers=req_headers, body=data)
-        assert response is not None
+        response = self._request(method, url, req_headers, data)
         if response.status >= 400:
-            raise ValueError(
+            raise LFSError(
                 f"HTTP {response.status}: {response.data.decode('utf-8', errors='ignore')}"
             )
         return response.data
@@ -665,8 +705,11 @@ class HTTPLFSClient(LFSClient):
             "POST", "objects/batch", json.dumps(data).encode("utf-8")
         )
         if not response:
-            raise ValueError("Empty response from LFS server")
-        response_data = json.loads(response)
+            raise LFSError("Empty response from LFS server")
+        try:
+            response_data = json.loads(response)
+        except json.JSONDecodeError as e:
+            raise LFSError(f"Invalid response from LFS server: {e}") from e
         return self._parse_batch_response(response_data)
 
     def _parse_batch_response(self, data: Mapping[str, Any]) -> LFSBatchResponse:
@@ -723,12 +766,7 @@ class HTTPLFSClient(LFSClient):
         if action.header:
             req_headers.update(action.header)
 
-        pool_manager = self._get_pool_manager()
-        response = pool_manager.request(
-            method, action.href, headers=req_headers, body=body
-        )
-        assert response is not None
-        return response
+        return self._request(method, action.href, req_headers, body)
 
     def download(self, oid: str, size: int, ref: str | None = None) -> bytes:
         """Download an LFS object.

@@ -33,6 +33,17 @@
    push the remaining objects anyway. Add ``LFSClient.has_object``.
    (Jelmer Vernooĳ)
 
+ * Raise ``LFSError`` for all failures to talk to a LFS server, including
+   HTTP errors from the batch endpoint (previously ``ValueError``) and
+   connection errors (previously urllib3 exceptions). These escaped from
+   the LFS smudge filter during checkout. (Jelmer Vernooĳ)
+
+ * The built-in LFS smudge filter now honours ``filter.lfs.required``,
+   raising ``FilterError`` rather than passing the pointer through when
+   an object can not be downloaded. ``porcelain.lfs_smudge`` raises
+   ``LFSError`` in that case, and ``dulwich lfs smudge`` exits with
+   status 2 after writing the pointer, like git-lfs. (Jelmer Vernooĳ)
+
  * ``dulwich.lfs_server`` no longer asks clients to upload objects it
    already has. (Jelmer Vernooĳ)
 

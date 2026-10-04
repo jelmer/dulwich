@@ -229,21 +229,30 @@ def lfs_smudge(
       pointer_content: LFS pointer content as bytes
 
     Returns:
-      Actual file content as bytes
+      Actual file content as bytes, or ``pointer_content`` if it is not an
+      LFS pointer
+
+    Raises:
+      LFSError: If the object is not in the LFS store and can not be
+        downloaded
     """
-    from ..lfs import LFSFilterDriver, LFSStore
+    from ..lfs import LFSFilterDriver, LFSPointer, LFSStore
     from . import open_repo_closing
 
     with open_repo_closing(repo) as r:
         if pointer_content is None:
             raise ValueError("Pointer content must be specified")
 
+        pointer = LFSPointer.from_bytes(pointer_content)
+        if pointer is None or not pointer.is_valid_oid():
+            return pointer_content
+
         # Get LFS store
         lfs_store = LFSStore.from_repo(r)
-        filter_driver = LFSFilterDriver(lfs_store, config=r.get_config())
+        filter_driver = LFSFilterDriver(lfs_store, config=r.get_config_stack())
 
         # Smudge the pointer (retrieve actual content)
-        return filter_driver.smudge(pointer_content)
+        return filter_driver.get_content(pointer)
 
 
 def lfs_ls_files(

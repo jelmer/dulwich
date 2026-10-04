@@ -27,6 +27,12 @@
    tags or trees, and raise ``KeyError`` for refs that can not be resolved.
    (Jelmer Vernooĳ)
 
+ * ``porcelain.lfs_push`` now fails without uploading anything when
+   objects are missing both locally and on the remote, like git-lfs,
+   rather than logging a warning. Set ``lfs.allowincompletepush`` to
+   push the remaining objects anyway. Add ``LFSClient.has_object``.
+   (Jelmer Vernooĳ)
+
  * ``dulwich.lfs_server`` no longer asks clients to upload objects it
    already has. (Jelmer Vernooĳ)
 

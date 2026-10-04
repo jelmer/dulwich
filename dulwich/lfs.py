@@ -457,6 +457,16 @@ class LFSClient:
         """
         raise NotImplementedError
 
+    def has_object(self, oid: str, size: int, ref: str | None = None) -> bool:
+        """Check whether the server already has an LFS object.
+
+        Args:
+            oid: Object ID (SHA256)
+            size: Object size
+            ref: Optional ref name
+        """
+        raise NotImplementedError
+
     @classmethod
     def from_url(cls, url: str, config: "Config | None" = None) -> "LFSClient":
         """Create appropriate LFS client based on URL scheme.
@@ -762,6 +772,35 @@ class HTTPLFSClient(LFSClient):
 
         return content
 
+    def _upload_actions(
+        self, oid: str, size: int, ref: str | None = None
+    ) -> dict[str, LFSAction] | None:
+        """Ask the server what is needed to upload an object.
+
+        Returns:
+            Actions to perform, or None if the server already has the object
+        """
+        batch_resp = self.batch("upload", [{"oid": oid, "size": size}], ref)
+
+        if not batch_resp.objects:
+            raise LFSError(f"No objects returned for {oid}")
+
+        obj = batch_resp.objects[0]
+        if obj.error:
+            raise LFSError(f"Server error for {oid}: {obj.error.message}")
+
+        return obj.actions or None
+
+    def has_object(self, oid: str, size: int, ref: str | None = None) -> bool:
+        """Check whether the server already has an LFS object.
+
+        Args:
+            oid: Object ID (SHA256)
+            size: Object size
+            ref: Optional ref name
+        """
+        return self._upload_actions(oid, size, ref) is None
+
     def upload(
         self, oid: str, size: int, content: bytes, ref: str | None = None
     ) -> None:
@@ -773,26 +812,18 @@ class HTTPLFSClient(LFSClient):
             content: Object content
             ref: Optional ref name
         """
-        # Get upload URL via batch API
-        batch_resp = self.batch("upload", [{"oid": oid, "size": size}], ref)
+        actions = self._upload_actions(oid, size, ref)
 
-        if not batch_resp.objects:
-            raise LFSError(f"No objects returned for {oid}")
-
-        obj = batch_resp.objects[0]
-        if obj.error:
-            raise LFSError(f"Server error for {oid}: {obj.error.message}")
-
-        # If no actions, object already exists
-        if not obj.actions:
+        if actions is None:
+            # Object already exists
             return
 
-        if "upload" not in obj.actions:
+        if "upload" not in actions:
             raise LFSError(f"No upload action for {oid}")
 
         response = self._action_request(
             "PUT",
-            obj.actions["upload"],
+            actions["upload"],
             headers={"Content-Type": "application/octet-stream"},
             body=content,
         )
@@ -802,10 +833,10 @@ class HTTPLFSClient(LFSClient):
             )
 
         # Verify if needed
-        if "verify" in obj.actions:
+        if "verify" in actions:
             response = self._action_request(
                 "POST",
-                obj.actions["verify"],
+                actions["verify"],
                 headers={"Content-Type": "application/vnd.git-lfs+json"},
                 body=json.dumps({"oid": oid, "size": size}).encode("utf-8"),
             )
@@ -869,6 +900,20 @@ class FileLFSClient(LFSClient):
             raise LFSError(f"OID mismatch: expected {oid}, got {actual_oid}")
 
         return content
+
+    def has_object(self, oid: str, size: int, ref: str | None = None) -> bool:
+        """Check whether the store already has an LFS object.
+
+        Args:
+            oid: Object ID (SHA256)
+            size: Object size
+            ref: Optional ref name (ignored for file-based client)
+        """
+        try:
+            with self._local_store.open_object(oid):
+                return True
+        except KeyError:
+            return False
 
     def upload(
         self, oid: str, size: int, content: bytes, ref: str | None = None

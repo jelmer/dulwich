@@ -1078,6 +1078,14 @@ class LFSClientTests(TestCase):
         self.assertEqual([oid], [obj.oid for obj in result.objects])
         self.assertIsNone(result.objects[0].actions)
 
+    def test_has_object(self) -> None:
+        """Test checking whether the server has an object."""
+        content = b"existing content"
+        oid = self.server.lfs_store.write_object([content])
+
+        self.assertTrue(self.client.has_object(oid, len(content)))
+        self.assertFalse(self.client.has_object("0" * 64, 5))
+
     def test_download_with_verification(self) -> None:
         """Test download with size and hash verification."""
         test_content = b"test content for download"
@@ -1365,6 +1373,11 @@ class FileLFSClientTests(TestCase):
         with self.assertRaises(LFSError) as cm:
             self.client.download(self.test_oid, 999)  # Wrong size
         self.assertIn("Size mismatch", str(cm.exception))
+
+    def test_has_object(self) -> None:
+        """Test checking whether the store has an object."""
+        self.assertTrue(self.client.has_object(self.test_oid, len(self.test_content)))
+        self.assertFalse(self.client.has_object("0" * 64, 5))
 
     def test_upload_new_object(self) -> None:
         """Test uploading a new object to file:// URL."""

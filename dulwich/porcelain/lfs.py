@@ -646,15 +646,16 @@ def lfs_push(
     Returns:
       Number of objects pushed
     """
-    from ..lfs import LFSClient, LFSStore
+    from ..lfs import LFSClient, LFSError, LFSStore
     from . import open_repo_closing
 
     if refs is None and not all:
         raise ValueError("At least one ref must be supplied without all")
 
     with open_repo_closing(repo) as r:
+        config = r.get_config_stack()
         # TODO: Support credential helpers and other auth methods
-        client = LFSClient.from_config(r.get_config_stack(), remote)
+        client = LFSClient.from_config(config, remote)
         if client is None:
             raise ValueError(f"No LFS URL configured for remote {remote}")
         store = LFSStore.from_repo(r)
@@ -672,20 +673,33 @@ def lfs_push(
 
         objects_to_push = _lfs_pointers(r, refs, history=True, exclude=exclude)
 
-        # Push objects
-        pushed = 0
+        # Objects that are missing locally are only a problem if the remote
+        # does not have them either
+        available = []
+        missing = []
         for oid, size in objects_to_push:
             try:
-                with store.open_object(oid) as f:
-                    content = f.read()
+                with store.open_object(oid):
+                    available.append((oid, size))
             except KeyError:
-                # Object not in local store
+                if not client.has_object(oid, size):
+                    missing.append(oid)
+        if missing:
+            if not config.get_boolean((b"lfs",), b"allowincompletepush", False):
+                raise LFSError(
+                    "LFS objects are missing locally and on the remote: "
+                    + ", ".join(sorted(missing))
+                )
+            for oid in missing:
                 logger.warning("LFS object %s not found locally", oid)
-            else:
-                client.upload(oid, size, content)
-                pushed += 1
 
-        return pushed
+        # Push objects
+        for oid, size in available:
+            with store.open_object(oid) as f:
+                content = f.read()
+            client.upload(oid, size, content)
+
+        return len(available)
 
 
 def lfs_status(

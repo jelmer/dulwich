@@ -29,7 +29,7 @@ import threading
 import unittest
 
 from dulwich import porcelain
-from dulwich.lfs import LFSPointer, LFSStore
+from dulwich.lfs import LFSError, LFSPointer, LFSStore
 from dulwich.lfs_server import run_lfs_server
 from dulwich.objects import Blob, Tree
 from dulwich.repo import Repo
@@ -536,12 +536,14 @@ class LFSTransferTests(TestCase):
         oid = store.write_object([content])
         return oid, LFSPointer(oid, len(content)).to_bytes()
 
-    def _commit_pointer(self, content: bytes, store: LFSStore) -> str:
-        """Commit a pointer to content as large.bin, returning its oid."""
+    def _commit_pointer(
+        self, content: bytes, store: LFSStore, name: str = "large.bin"
+    ) -> str:
+        """Commit a pointer to content, returning its oid."""
         oid, pointer = self._pointer(content, store)
-        with open(os.path.join(self.test_dir, "large.bin"), "wb") as f:
+        with open(os.path.join(self.test_dir, name), "wb") as f:
             f.write(pointer)
-        porcelain.add(self.repo, paths=["large.bin"])
+        porcelain.add(self.repo, paths=[name])
         porcelain.commit(self.repo, message=b"Add LFS file")
         return oid
 
@@ -748,6 +750,48 @@ class LFSTransferTests(TestCase):
         self.assertEqual(
             [old, tip, tree],
             self._stored(self.server.lfs_store, [old, tip, tree, elsewhere]),
+        )
+
+    def _other_store(self) -> LFSStore:
+        """Create an LFS store that is neither the local nor the remote one."""
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path)
+        return LFSStore.create(path)
+
+    def test_push_missing_object(self) -> None:
+        self._set_config((b"lfs",), b"url", self.server_url)
+        present = self._commit_pointer(b"present", self.local_store, "a.bin")
+        missing = self._commit_pointer(b"missing", self._other_store(), "b.bin")
+
+        with self.assertRaises(LFSError) as cm:
+            porcelain.lfs_push(self.repo, refs=[b"HEAD"])
+        self.assertEqual(
+            f"LFS objects are missing locally and on the remote: {missing}",
+            str(cm.exception),
+        )
+        # Nothing is uploaded
+        self.assertEqual([], self._stored(self.server.lfs_store, [present, missing]))
+
+    def test_push_missing_object_allow_incomplete(self) -> None:
+        self._set_config((b"lfs",), b"url", self.server_url)
+        self._set_config((b"lfs",), b"allowincompletepush", "true")
+        present = self._commit_pointer(b"present", self.local_store, "a.bin")
+        missing = self._commit_pointer(b"missing", self._other_store(), "b.bin")
+
+        self.assertEqual(1, porcelain.lfs_push(self.repo, refs=[b"HEAD"]))
+        self.assertEqual(
+            [present], self._stored(self.server.lfs_store, [present, missing])
+        )
+
+    def test_push_missing_object_on_remote(self) -> None:
+        self._set_config((b"lfs",), b"url", self.server_url)
+        present = self._commit_pointer(b"present", self.local_store, "a.bin")
+        remote = self._commit_pointer(b"remote", self.server.lfs_store, "b.bin")
+
+        # Objects that are missing locally are fine if the remote has them
+        self.assertEqual(1, porcelain.lfs_push(self.repo, refs=[b"HEAD"]))
+        self.assertEqual(
+            [present, remote], self._stored(self.server.lfs_store, [present, remote])
         )
 
     def test_push_unborn_head(self) -> None:

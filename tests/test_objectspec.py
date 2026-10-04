@@ -23,6 +23,7 @@
 
 # TODO: Round-trip parse-serialize-parse and serialize-parse-serialize tests.
 
+import shutil
 import tempfile
 
 from dulwich.index import ConflictedIndexEntry, IndexEntry
@@ -50,6 +51,15 @@ class ParseObjectTests(TestCase):
         r = MemoryRepo()
         self.addCleanup(r.close)
         self.assertRaises(KeyError, parse_object, r, "thisdoesnotexist")
+
+    def test_nonexistent_disk_repo(self) -> None:
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path)
+        r = Repo.init(path)
+        self.addCleanup(r.close)
+        with self.assertRaises(KeyError) as cm:
+            parse_object(r, b"thisdoesnotexist")
+        self.assertEqual((b"thisdoesnotexist",), cm.exception.args)
 
     def test_blob_by_sha(self) -> None:
         r = MemoryRepo()

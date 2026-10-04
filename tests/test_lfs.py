@@ -29,6 +29,7 @@ import shutil
 import tempfile
 import threading
 from pathlib import Path
+from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -1125,10 +1126,121 @@ class LFSClientTests(TestCase):
         self.assertIn("Object not found", str(cm.exception))
 
         # Test uploading with a well-formed OID that does not match the content
-        with self.assertRaises(HTTPError) as cm:
+        with self.assertRaises(LFSError) as cm:
             self.client.upload("0" * 64, 5, b"hello")
         # Server should reject due to OID mismatch
-        self.assertIn("OID mismatch", str(cm.exception))
+        self.assertEqual(
+            "Upload failed with status 400: OID mismatch: "
+            f"expected {'0' * 64}, got {hashlib.sha256(b'hello').hexdigest()}",
+            str(cm.exception),
+        )
+
+    def test_download_failure(self) -> None:
+        """Test that a failing download action is reported."""
+        oid = "0" * 64
+        response = self._batch_response(
+            oid, 5, {"download": {"href": f"{self.server_url}/objects/{oid}"}}
+        )
+        with mock.patch.object(self.client, "_make_request", return_value=response):
+            with self.assertRaises(LFSError) as cm:
+                self.client.download(oid, 5)
+        self.assertEqual(
+            "Download failed with status 404: Object not found", str(cm.exception)
+        )
+
+    def test_upload_verify_failure(self) -> None:
+        """Test that a failing verify action is reported."""
+        content = b"hello"
+        oid = hashlib.sha256(content).hexdigest()
+        response = self._batch_response(
+            oid,
+            len(content),
+            {
+                "upload": {"href": f"{self.server_url}/objects/{oid}"},
+                "verify": {"href": f"{self.server_url}/objects/{'0' * 64}/verify"},
+            },
+        )
+        with mock.patch.object(self.client, "_make_request", return_value=response):
+            with self.assertRaises(LFSError) as cm:
+                self.client.upload(oid, len(content), content)
+        self.assertEqual(
+            "Verification failed with status 404: Object not found", str(cm.exception)
+        )
+
+    def test_upload_uses_pool_manager(self) -> None:
+        """Test that upload and verify go through the urllib3 pool manager."""
+        content = b"hello"
+        oid = hashlib.sha256(content).hexdigest()
+        pool_manager = self.client._get_pool_manager()
+        with mock.patch.object(
+            pool_manager, "request", wraps=pool_manager.request
+        ) as request:
+            self.client.upload(oid, len(content), content)
+        self.assertEqual(
+            [
+                ("POST", f"{self.server_url}/objects/batch"),
+                ("PUT", f"{self.server_url}/objects/{oid}"),
+                ("POST", f"{self.server_url}/objects/{oid}/verify"),
+            ],
+            [call.args for call in request.call_args_list],
+        )
+
+    def _batch_response(
+        self, oid: str, size: int, actions: dict[str, dict[str, str]]
+    ) -> bytes:
+        return json.dumps(
+            {"objects": [{"oid": oid, "size": size, "actions": actions}]}
+        ).encode()
+
+    def test_batch_rejects_non_http_href(self) -> None:
+        """Test that transfer URLs with a non-HTTP scheme are rejected."""
+        oid = "0" * 64
+        for href in (
+            "file:///etc/passwd",
+            "ftp://example.com/object",
+            "data:text/plain,hello",
+            "/objects/relative",
+            "http:///no-host",
+        ):
+            response = self._batch_response(oid, 5, {"download": {"href": href}})
+            with mock.patch.object(self.client, "_make_request", return_value=response):
+                with self.assertRaises(LFSError) as cm:
+                    self.client.batch("download", [{"oid": oid, "size": 5}])
+            self.assertEqual(
+                f"Invalid href in LFS batch response: {href!r}", str(cm.exception)
+            )
+
+    def test_download_rejects_file_href(self) -> None:
+        """Test that download does not follow a file:// transfer URL."""
+        oid = "0" * 64
+        href = "file:///etc/passwd"
+        response = self._batch_response(oid, 5, {"download": {"href": href}})
+        with mock.patch.object(self.client, "_make_request", return_value=response):
+            with self.assertRaises(LFSError) as cm:
+                self.client.download(oid, 5)
+        self.assertEqual(
+            f"Invalid href in LFS batch response: {href!r}", str(cm.exception)
+        )
+
+    def test_upload_rejects_file_href(self) -> None:
+        """Test that upload does not follow a file:// transfer URL."""
+        content = b"hello"
+        oid = hashlib.sha256(content).hexdigest()
+        href = "file:///etc/passwd"
+        for actions in (
+            {"upload": {"href": href}},
+            {
+                "upload": {"href": f"{self.server_url}/objects/{oid}"},
+                "verify": {"href": href},
+            },
+        ):
+            response = self._batch_response(oid, len(content), actions)
+            with mock.patch.object(self.client, "_make_request", return_value=response):
+                with self.assertRaises(LFSError) as cm:
+                    self.client.upload(oid, len(content), content)
+            self.assertEqual(
+                f"Invalid href in LFS batch response: {href!r}", str(cm.exception)
+            )
 
     def test_from_config_validates_lfs_url(self) -> None:
         """Test that from_config validates lfs.url and raises error for invalid URLs."""

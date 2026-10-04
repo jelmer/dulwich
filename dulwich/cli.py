@@ -6747,7 +6747,15 @@ class cmd_lfs(Command):
         parser_fetch.add_argument(
             "--remote", default="origin", help="Remote to fetch from"
         )
-        parser_fetch.add_argument("refs", nargs="*", help="Specific refs to fetch")
+        parser_fetch.add_argument(
+            "--all",
+            action="store_true",
+            help="Fetch the objects for the whole history of the refs, "
+            "or of all refs if none are given",
+        )
+        parser_fetch.add_argument(
+            "refs", nargs="*", help="Refs to fetch (default: HEAD)"
+        )
 
         # lfs pull
         parser_pull = subparsers.add_parser(
@@ -6760,7 +6768,13 @@ class cmd_lfs(Command):
         # lfs push
         parser_push = subparsers.add_parser("push", help="Push LFS objects to remote")
         parser_push.add_argument("--remote", default="origin", help="Remote to push to")
-        parser_push.add_argument("refs", nargs="*", help="Specific refs to push")
+        parser_push.add_argument(
+            "--all",
+            action="store_true",
+            help="Push all objects reachable from the refs, or from all "
+            "local branches and tags if none are given",
+        )
+        parser_push.add_argument("refs", nargs="*", help="Refs to push")
 
         # lfs status
         subparsers.add_parser("status", help="Show status of LFS files")
@@ -6834,7 +6848,7 @@ class cmd_lfs(Command):
 
         elif args.subcommand == "fetch":
             refs = args.refs or None
-            count = porcelain.lfs_fetch(remote=args.remote, refs=refs)
+            count = porcelain.lfs_fetch(remote=args.remote, refs=refs, all=args.all)
             logger.info("Fetched %d LFS object(s).", count)
 
         elif args.subcommand == "pull":
@@ -6843,7 +6857,7 @@ class cmd_lfs(Command):
 
         elif args.subcommand == "push":
             refs = args.refs or None
-            count = porcelain.lfs_push(remote=args.remote, refs=refs)
+            count = porcelain.lfs_push(remote=args.remote, refs=refs, all=args.all)
             logger.info("Pushed %d LFS object(s).", count)
 
         elif args.subcommand == "status":

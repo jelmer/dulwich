@@ -44,6 +44,9 @@
    ``LFSError`` in that case, and ``dulwich lfs smudge`` exits with
    status 2 after writing the pointer, like git-lfs. (Jelmer Vernooĳ)
 
+ * Fix storing LFS objects in repositories that do not have an LFS store
+   yet, e.g. when fetching into a fresh clone. (Jelmer Vernooĳ)
+
  * ``dulwich.lfs_server`` no longer asks clients to upload objects it
    already has. (Jelmer Vernooĳ)
 

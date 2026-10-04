@@ -177,6 +177,7 @@ class LFSStore:
             os.makedirs(os.path.dirname(path))
 
         tmpdir = os.path.join(self.path, "tmp")
+        os.makedirs(tmpdir, exist_ok=True)
         with tempfile.NamedTemporaryFile(dir=tmpdir, mode="wb", delete=False) as f:
             for chunk in data_chunks:
                 f.write(chunk)

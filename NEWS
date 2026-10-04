@@ -24,6 +24,10 @@
    for refs that can not be resolved rather than skipping them, and peel
    annotated tags rather than failing an assertion. (Jelmer Vernooĳ)
 
+ * Fix ``objectspec.parse_object`` raising ``AssertionError`` rather than
+   ``KeyError`` for unknown names in on-disk repositories.
+   (Jelmer Vernooĳ)
+
 1.2.17	2026-10-03
 
  * Define ``__all__`` in all modules, listing the public names each module

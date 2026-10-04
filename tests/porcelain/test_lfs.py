@@ -21,14 +21,17 @@
 
 """Tests for LFS porcelain functions."""
 
+import hashlib
 import os
 import shutil
 import sys
 import tempfile
+import threading
 import unittest
 
 from dulwich import porcelain
 from dulwich.lfs import LFSPointer, LFSStore
+from dulwich.lfs_server import run_lfs_server
 from dulwich.repo import Repo
 from tests import TestCase
 
@@ -496,6 +499,102 @@ class LFSPorcelainTestCase(TestCase):
             content = f.read()
 
         self.assertEqual(content, test_content)
+
+
+class LFSTransferTests(TestCase):
+    """Tests for the LFS porcelain functions that talk to a remote."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.test_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.test_dir, ignore_errors=True)
+        self.repo = Repo.init(self.test_dir)
+        self.addCleanup(self.repo.close)
+        self.local_store = LFSStore.from_repo(self.repo, create=True)
+
+        self.server_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.server_dir)
+        self.server, self.server_url = run_lfs_server(port=0, lfs_dir=self.server_dir)
+        self.server_thread = threading.Thread(target=self.server.serve_forever)
+        self.server_thread.daemon = True
+        self.server_thread.start()
+
+        def cleanup_server() -> None:
+            self.server.shutdown()
+            self.server.server_close()
+            self.server_thread.join(timeout=1.0)
+
+        self.addCleanup(cleanup_server)
+
+    def _set_config(self, section: tuple[bytes, ...], name: bytes, value: str) -> None:
+        config = self.repo.get_config()
+        config.set(section, name, value.encode())
+        config.write_to_path()
+
+    def _commit_pointer(self, content: bytes) -> str:
+        oid = hashlib.sha256(content).hexdigest()
+        with open(os.path.join(self.test_dir, "large.bin"), "wb") as f:
+            f.write(LFSPointer(oid, len(content)).to_bytes())
+        porcelain.add(self.repo, paths=["large.bin"])
+        porcelain.commit(self.repo, message=b"Add LFS file")
+        return oid
+
+    def test_fetch(self) -> None:
+        content = b"content on the server"
+        oid = self._commit_pointer(content)
+        self.server.lfs_store.write_object([content])
+        self._set_config((b"lfs",), b"url", self.server_url)
+
+        self.assertEqual(1, porcelain.lfs_fetch(self.repo))
+        with self.local_store.open_object(oid) as f:
+            self.assertEqual(content, f.read())
+
+        # Already present locally, so nothing left to fetch
+        self.assertEqual(0, porcelain.lfs_fetch(self.repo))
+
+    def test_fetch_from_named_remote(self) -> None:
+        content = b"content in another repository"
+        oid = self._commit_pointer(content)
+        remote_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, remote_dir)
+        with Repo.init(remote_dir) as remote_repo:
+            LFSStore.from_repo(remote_repo, create=True).write_object([content])
+        self._set_config((b"remote", b"upstream"), b"url", remote_dir)
+
+        self.assertEqual(1, porcelain.lfs_fetch(self.repo, remote="upstream"))
+        with self.local_store.open_object(oid) as f:
+            self.assertEqual(content, f.read())
+
+    def test_fetch_no_url(self) -> None:
+        self._commit_pointer(b"content")
+        with self.assertRaises(ValueError) as cm:
+            porcelain.lfs_fetch(self.repo)
+        self.assertEqual("No LFS URL configured for remote origin", str(cm.exception))
+
+    def test_pull(self) -> None:
+        content = b"content on the server"
+        self._commit_pointer(content)
+        self.server.lfs_store.write_object([content])
+        self._set_config((b"lfs",), b"url", self.server_url)
+
+        self.assertEqual(1, porcelain.lfs_pull(self.repo))
+        with open(os.path.join(self.test_dir, "large.bin"), "rb") as f:
+            self.assertEqual(content, f.read())
+
+    def test_push(self) -> None:
+        content = b"content to upload"
+        oid = self._commit_pointer(content)
+        self.local_store.write_object([content])
+        self._set_config((b"lfs",), b"url", self.server_url)
+
+        self.assertEqual(1, porcelain.lfs_push(self.repo))
+        with self.server.lfs_store.open_object(oid) as f:
+            self.assertEqual(content, f.read())
+
+    def test_push_no_url(self) -> None:
+        with self.assertRaises(ValueError) as cm:
+            porcelain.lfs_push(self.repo)
+        self.assertEqual("No LFS URL configured for remote origin", str(cm.exception))
 
 
 if __name__ == "__main__":

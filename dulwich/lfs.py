@@ -487,11 +487,19 @@ class LFSClient:
             raise ValueError(f"Unsupported LFS URL scheme: {parsed.scheme}")
 
     @classmethod
-    def from_config(cls, config: "Config") -> "LFSClient | None":
+    def from_config(
+        cls, config: "Config", remote: str = "origin"
+    ) -> "LFSClient | None":
         """Create LFS client from git config.
 
-        Returns the appropriate subclass (HTTPLFSClient or FileLFSClient)
-        based on the URL scheme.
+        Args:
+            config: Git config to read ``lfs.url`` and the remote URL from
+            remote: Name of the remote to derive the LFS URL from if
+                ``lfs.url`` is not set
+
+        Returns:
+            The appropriate subclass (HTTPLFSClient or FileLFSClient) based
+            on the URL scheme, or None if no URL is configured.
         """
         # Try to get LFS URL from config first
         try:
@@ -508,7 +516,7 @@ class LFSClient:
 
         # Fall back to deriving from remote URL (same as git-lfs)
         try:
-            remote_url = config.get((b"remote", b"origin"), b"url").decode()
+            remote_url = config.get((b"remote", remote.encode()), b"url").decode()
         except KeyError:
             pass
         else:

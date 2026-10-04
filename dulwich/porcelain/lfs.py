@@ -462,33 +462,14 @@ def lfs_fetch(
     from . import open_repo_closing
 
     with open_repo_closing(repo) as r:
-        # Get LFS server URL from config
-        config = r.get_config()
-        lfs_url_bytes = config.get((b"lfs",), b"url")
-        if not lfs_url_bytes:
-            # Try remote URL
-            remote_url = config.get((b"remote", remote.encode()), b"url")
-            if remote_url:
-                # Append /info/lfs to remote URL
-                remote_url_str = remote_url.decode()
-                if remote_url_str.endswith(".git"):
-                    remote_url_str = remote_url_str[:-4]
-                lfs_url = f"{remote_url_str}/info/lfs"
-            else:
-                raise ValueError(f"No LFS URL configured for remote {remote}")
-        else:
-            lfs_url = lfs_url_bytes.decode()
-
-        # Get authentication
-        auth = None
         # TODO: Support credential helpers and other auth methods
-
-        # Create LFS client and store
-        client = LFSClient(lfs_url, auth)
+        client = LFSClient.from_config(r.get_config_stack(), remote)
+        if client is None:
+            raise ValueError(f"No LFS URL configured for remote {remote}")
         store = LFSStore.from_repo(r)
 
         # Find all LFS pointers in the refs
-        pointers_to_fetch = []
+        pointers_to_fetch = set()
 
         if refs is None:
             # Get all refs
@@ -523,7 +504,7 @@ def lfs_fetch(
                                 with store.open_object(pointer.oid):
                                     pass  # Object exists, no need to fetch
                             except KeyError:
-                                pointers_to_fetch.append((pointer.oid, pointer.size))
+                                pointers_to_fetch.add((pointer.oid, pointer.size))
 
         # Fetch missing objects
         fetched = 0
@@ -600,36 +581,16 @@ def lfs_push(
     from . import open_repo_closing
 
     with open_repo_closing(repo) as r:
-        # Get LFS server URL from config
-        config = r.get_config()
-        lfs_url_bytes = config.get((b"lfs",), b"url")
-        if not lfs_url_bytes:
-            # Try remote URL
-            remote_url = config.get((b"remote", remote.encode()), b"url")
-            if remote_url:
-                # Append /info/lfs to remote URL
-                remote_url_str = remote_url.decode()
-                if remote_url_str.endswith(".git"):
-                    remote_url_str = remote_url_str[:-4]
-                lfs_url = f"{remote_url_str}/info/lfs"
-            else:
-                raise ValueError(f"No LFS URL configured for remote {remote}")
-        else:
-            lfs_url = lfs_url_bytes.decode()
-
-        # Get authentication
-        auth = None
         # TODO: Support credential helpers and other auth methods
-
-        # Create LFS client and store
-        client = LFSClient(lfs_url, auth)
+        client = LFSClient.from_config(r.get_config_stack(), remote)
+        if client is None:
+            raise ValueError(f"No LFS URL configured for remote {remote}")
         store = LFSStore.from_repo(r)
 
         # Find all LFS objects to push
         if refs is None:
             # Push current branch
-            head_ref = r.refs.read_ref(HEADREF)
-            refs = [head_ref] if head_ref else []
+            refs = [HEADREF]
 
         objects_to_push = set()
 

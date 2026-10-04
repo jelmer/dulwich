@@ -41,6 +41,7 @@ import logging
 import os
 import stat
 from collections.abc import Iterator, Sequence
+from dataclasses import replace
 from typing import Any
 
 from dulwich.index import (
@@ -622,8 +623,10 @@ def lfs_pull(
         store = LFSStore.from_repo(r)
         gitattributes = r.get_gitattributes()
 
+        index = r.open_index(config=config)
         fetched = 0
-        for path, entry in r.open_index(config=config).items():
+        index_changed = False
+        for path, entry in list(index.items()):
             if isinstance(entry, ConflictedIndexEntry):
                 continue
             if gitattributes.match_path(path).get(b"filter") != b"lfs":
@@ -659,6 +662,18 @@ def lfs_pull(
                         continue
             with open(full_path, "wb") as f:
                 f.write(content)
+
+            # Like git-lfs, refresh the stat information so the file does not
+            # show up as modified
+            index[path] = replace(
+                index_entry_from_stat(os.lstat(full_path), entry.sha, entry.mode),
+                flags=entry.flags,
+                extended_flags=entry.extended_flags,
+            )
+            index_changed = True
+
+        if index_changed:
+            index.write()
 
         return fetched
 

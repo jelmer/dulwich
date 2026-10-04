@@ -20,6 +20,10 @@
    rather than nothing. ``LFSClient.from_config`` takes an optional
    ``remote`` argument. (Jelmer Vernooĳ)
 
+ * ``porcelain.lfs_fetch`` and ``porcelain.lfs_push`` now raise ``KeyError``
+   for refs that can not be resolved rather than skipping them, and peel
+   annotated tags rather than failing an assertion. (Jelmer Vernooĳ)
+
 1.2.17	2026-10-03
 
  * Define ``__all__`` in all modules, listing the public names each module

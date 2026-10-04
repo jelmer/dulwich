@@ -571,6 +571,48 @@ class LFSTransferTests(TestCase):
             porcelain.lfs_fetch(self.repo)
         self.assertEqual("No LFS URL configured for remote origin", str(cm.exception))
 
+    def test_fetch_annotated_tag(self) -> None:
+        content = b"content on the server"
+        oid = self._commit_pointer(content)
+        self.server.lfs_store.write_object([content])
+        self._set_config((b"lfs",), b"url", self.server_url)
+        porcelain.tag_create(
+            self.repo, b"v1", author=b"A <a@example.com>", message=b"v1", annotated=True
+        )
+
+        self.assertEqual(1, porcelain.lfs_fetch(self.repo, refs=[b"refs/tags/v1"]))
+        with self.local_store.open_object(oid) as f:
+            self.assertEqual(content, f.read())
+
+    def test_fetch_all_refs_with_annotated_tag(self) -> None:
+        content = b"content on the server"
+        self._commit_pointer(content)
+        self.server.lfs_store.write_object([content])
+        self._set_config((b"lfs",), b"url", self.server_url)
+        porcelain.tag_create(
+            self.repo, b"v1", author=b"A <a@example.com>", message=b"v1", annotated=True
+        )
+
+        self.assertEqual(1, porcelain.lfs_fetch(self.repo))
+
+    def test_fetch_all_refs_empty_repo(self) -> None:
+        self._set_config((b"lfs",), b"url", self.server_url)
+        self.assertEqual(0, porcelain.lfs_fetch(self.repo))
+
+    def test_fetch_unknown_ref(self) -> None:
+        self._commit_pointer(b"content")
+        self._set_config((b"lfs",), b"url", self.server_url)
+        with self.assertRaises(KeyError) as cm:
+            porcelain.lfs_fetch(self.repo, refs=[b"refs/heads/nonexistent"])
+        self.assertEqual((b"refs/heads/nonexistent",), cm.exception.args)
+
+    def test_push_unknown_ref(self) -> None:
+        self._commit_pointer(b"content")
+        self._set_config((b"lfs",), b"url", self.server_url)
+        with self.assertRaises(KeyError) as cm:
+            porcelain.lfs_push(self.repo, refs=[b"refs/heads/nonexistent"])
+        self.assertEqual((b"refs/heads/nonexistent",), cm.exception.args)
+
     def test_pull(self) -> None:
         content = b"content on the server"
         self._commit_pointer(content)

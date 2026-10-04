@@ -47,8 +47,10 @@ from dulwich.index import (
     ConflictedIndexEntry,
     index_entry_from_stat,
 )
+from dulwich.object_store import peel_sha
 from dulwich.objects import Blob, Commit, Tree
-from dulwich.refs import HEADREF, Ref
+from dulwich.objectspec import parse_commit
+from dulwich.refs import HEADREF
 from dulwich.repo import Repo
 
 logger = logging.getLogger(__name__)
@@ -473,22 +475,17 @@ def lfs_fetch(
 
         if refs is None:
             # Get all refs
-            refs = list(r.refs.keys())
+            commits = []
+            for ref_sha in set(r.refs.as_dict().values()):
+                obj = peel_sha(r.object_store, ref_sha)[1]
+                # TODO: Also scan refs that point at a tree or blob
+                if isinstance(obj, Commit):
+                    commits.append(obj)
+        else:
+            commits = [parse_commit(r, ref) for ref in refs]
 
-        for ref in refs:
-            if isinstance(ref, str):
-                ref_key = Ref(ref.encode())
-            elif isinstance(ref, bytes):
-                ref_key = Ref(ref)
-            else:
-                ref_key = ref
-            try:
-                commit = r[r.refs[ref_key]]
-            except KeyError:
-                continue
-
+        for commit in commits:
             # Walk the commit tree
-            assert isinstance(commit, Commit)
             for path, mode, sha in r.object_store.iter_tree_contents(commit.tree):
                 assert sha is not None
                 try:
@@ -595,20 +592,9 @@ def lfs_push(
         objects_to_push = set()
 
         for ref in refs:
-            if isinstance(ref, str):
-                ref_bytes = ref.encode()
-            else:
-                ref_bytes = ref
-            try:
-                if ref_bytes.startswith(b"refs/"):
-                    commit = r[r.refs[Ref(ref_bytes)]]
-                else:
-                    commit = r[ref_bytes]
-            except KeyError:
-                continue
+            commit = parse_commit(r, ref)
 
             # Walk the commit tree
-            assert isinstance(commit, Commit)
             for path, mode, sha in r.object_store.iter_tree_contents(commit.tree):
                 assert sha is not None
                 try:

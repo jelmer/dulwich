@@ -10,6 +10,13 @@
    ``urllib.error.HTTPError`` when the server rejects an upload.
    (Jelmer Vernooĳ)
 
+ * Fix ``porcelain.lfs_fetch``, ``porcelain.lfs_pull`` and
+   ``porcelain.lfs_push``, which failed with ``KeyError`` or
+   ``NotImplementedError`` rather than talking to the LFS server.
+   ``lfs_push`` without explicit refs now pushes the objects for ``HEAD``
+   rather than nothing. ``LFSClient.from_config`` takes an optional
+   ``remote`` argument. (Jelmer Vernooĳ)
+
 1.2.17	2026-10-03
 
  * Define ``__all__`` in all modules, listing the public names each module

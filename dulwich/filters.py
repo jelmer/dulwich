@@ -777,6 +777,8 @@ class FilterRegistry:
             lfs_dir = tempfile.mkdtemp(prefix="dulwich-lfs-")
             lfs_store = LFSStore.create(lfs_dir)
 
+        # TODO: Pass skip_smudge for GIT_LFS_SKIP_SMUDGE; the environment is
+        # only read in porcelain, which has no way to reach this driver yet.
         return LFSFilterDriver(lfs_store, config=registry.config)
 
     def _create_text_filter(self, registry: "FilterRegistry") -> FilterDriver:

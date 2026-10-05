@@ -40,7 +40,6 @@ OS_ENVIRON_EXCEPTIONS = [
     "dulwich/log_utils.py",  # GIT_TRACE environment variable
     "dulwich/config.py",  # Git configuration environment variables
     "dulwich/gc.py",  # GIT_AUTO_GC environment variable
-    "dulwich/lfs.py",  # GIT_LFS_SKIP_SMUDGE environment variable
     "dulwich/contrib/swift.py",  # DULWICH_SWIFT_CFG environment variable
     "dulwich/hooks.py",  # Git hooks environment setup
 ]

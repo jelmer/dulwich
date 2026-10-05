@@ -67,6 +67,61 @@ class PorcelainFilterTests(TestCase):
         blob = self.repo.object_store[entry.sha]
         self.assertEqual(blob.data, b"line1\nline2\nline3\n")
 
+    def _write(self, name: str, data: bytes) -> None:
+        with open(os.path.join(self.test_dir, name), "wb") as f:
+            f.write(data)
+
+    def _staged(self, name: bytes) -> bytes:
+        return self.repo[self.repo.open_index()[name].sha].data
+
+    def _commit_crlf_file_then_attributes(self, attributes: bytes) -> None:
+        self._write("settings.xml", b"<a>\r\n  <b>1</b>\r\n</a>\r\n")
+        porcelain.add(self.repo, paths=["settings.xml"])
+        porcelain.commit(self.repo, message=b"crlf file")
+        self._write(".gitattributes", attributes)
+        porcelain.add(self.repo, paths=[".gitattributes"])
+        porcelain.commit(self.repo, message=b"attributes")
+
+    def test_add_text_auto_keeps_crlf_in_index(self) -> None:
+        """text=auto does not normalize a file whose index blob has CRLF."""
+        self._commit_crlf_file_then_attributes(b"* text=auto\n")
+        self._write("settings.xml", b"<a>\r\n  <b>2</b>\r\n</a>\r\n")
+        porcelain.add(self.repo, paths=["settings.xml"])
+        self.assertEqual(
+            b"<a>\r\n  <b>2</b>\r\n</a>\r\n", self._staged(b"settings.xml")
+        )
+
+    def test_status_text_auto_crlf_in_index_unchanged(self) -> None:
+        self._commit_crlf_file_then_attributes(b"* text=auto\n")
+        # Rewrite with identical content so the stat cache does not match.
+        self._write("settings.xml", b"<a>\r\n  <b>1</b>\r\n</a>\r\n")
+        os.utime(os.path.join(self.test_dir, "settings.xml"), (0, 0))
+        self.assertEqual([], porcelain.status(self.repo).unstaged)
+
+    def test_add_text_auto_normalizes_new_file(self) -> None:
+        self._commit_crlf_file_then_attributes(b"* text=auto\n")
+        self._write("new.xml", b"<a>\r\n</a>\r\n")
+        porcelain.add(self.repo, paths=["new.xml"])
+        self.assertEqual(b"<a>\n</a>\n", self._staged(b"new.xml"))
+
+    def test_add_text_converts_despite_crlf_in_index(self) -> None:
+        """An explicit text attribute normalizes even if the index has CRLF."""
+        self._commit_crlf_file_then_attributes(b"* text\n")
+        self._write("settings.xml", b"<a>\r\n  <b>2</b>\r\n</a>\r\n")
+        porcelain.add(self.repo, paths=["settings.xml"])
+        self.assertEqual(b"<a>\n  <b>2</b>\n</a>\n", self._staged(b"settings.xml"))
+
+    def test_add_autocrlf_keeps_crlf_in_index(self) -> None:
+        self._commit_crlf_file_then_attributes(b"")
+        config = self.repo.get_config()
+        config.set((b"core",), b"autocrlf", b"input")
+        config.write_to_path()
+        self._write("settings.xml", b"<a>\r\n  <b>2</b>\r\n</a>\r\n")
+        porcelain.add(self.repo, paths=["settings.xml"])
+        self.assertEqual(
+            b"<a>\r\n  <b>2</b>\r\n</a>\r\n", self._staged(b"settings.xml")
+        )
+
     def test_checkout_with_autocrlf(self) -> None:
         """Test checkout with autocrlf enabled."""
         # First, add a file with LF line endings to the repo

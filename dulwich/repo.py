@@ -2681,7 +2681,7 @@ class Repo(BaseRepo):
             self.filter_context.refresh_config(config)
 
         return FilterBlobNormalizer(
-            config, git_attributes, filter_context=self.filter_context
+            config, git_attributes, repo=self, filter_context=self.filter_context
         )
 
     def get_gitattributes(self, tree: bytes | None = None) -> "GitAttributes":
@@ -2932,7 +2932,7 @@ class MemoryRepo(BaseRepo):
             self.filter_context.refresh_config(config)
 
         return FilterBlobNormalizer(
-            config, git_attributes, filter_context=self.filter_context
+            config, git_attributes, repo=self, filter_context=self.filter_context
         )
 
     def get_gitattributes(self, tree: bytes | None = None) -> "GitAttributes":

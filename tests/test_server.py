@@ -37,8 +37,9 @@ from dulwich.errors import (
 )
 from dulwich.object_filters import BlobNoneFilter
 from dulwich.object_store import MemoryObjectStore, find_shallow
-from dulwich.objects import Tree
-from dulwich.protocol import ZERO_SHA, format_capability_line
+from dulwich.objects import Blob, Commit, Tree, sha_to_hex
+from dulwich.pack import REF_DELTA
+from dulwich.protocol import ZERO_SHA, Protocol, format_capability_line, pkt_line
 from dulwich.repo import MemoryRepo, Repo
 from dulwich.server import (
     Backend,
@@ -55,7 +56,7 @@ from dulwich.server import (
     serve_command,
     update_server_info,
 )
-from dulwich.tests.utils import make_commit, make_tag
+from dulwich.tests.utils import build_pack, make_commit, make_tag
 
 from . import TestCase
 
@@ -510,6 +511,261 @@ class ReceivePackHandlerTestCase(TestCase):
         # Verify hook declined the ref
         self.assertIsNotNone(ref_status)
         self.assertIn(b"update hook declined", ref_status)
+
+
+class ReceivePackFsckTests(TestCase):
+    def _new_repo(self, memory):
+        if memory:
+            return MemoryRepo.init_bare([], {})
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path)
+        repo = Repo.init_bare(path)
+        self.addCleanup(repo.close)
+        return repo
+
+    def _set_config(self, repo, section, name, value):
+        config = repo.get_config()
+        config.set((section,), name, value)
+        if isinstance(repo, Repo):
+            config.write_to_path()
+
+    def _apply(self, repo, records, atomic=False, pack_store=None):
+        stream = BytesIO()
+        entries = build_pack(
+            stream,
+            records,
+            store=repo.object_store if pack_store is None else pack_store,
+        )
+        output = BytesIO()
+        handler = ReceivePackHandler(
+            DictBackend({b"/": repo}), [b"/"], Protocol(stream.read, output.write)
+        )
+        caps = [b"delete-refs"]
+        if atomic:
+            caps.append(b"atomic")
+        handler.set_client_capabilities(caps)
+        new_id = sha_to_hex(entries[0][3])
+        refs = [
+            (ONE, new_id, b"refs/heads/master"),
+            (TWO, ZERO_SHA, b"refs/heads/todelete"),
+        ]
+        return list(handler._apply_pack(refs)), new_id
+
+    def test_receive_and_transfer_config_priority(self) -> None:
+        cases = [
+            (None, None, False),
+            (None, False, False),
+            (None, True, True),
+            (False, True, False),
+            (True, False, True),
+            (True, True, True),
+            (False, False, False),
+        ]
+        for memory in (False, True):
+            for receive, transfer, reject in cases:
+                with self.subTest(memory=memory, receive=receive, transfer=transfer):
+                    repo = self._new_repo(memory)
+                    if receive is not None:
+                        self._set_config(repo, b"receive", b"fsckObjects", receive)
+                    if transfer is not None:
+                        self._set_config(repo, b"transfer", b"fsckObjects", transfer)
+                    repo.refs[b"refs/heads/master"] = ONE
+                    repo.refs[b"refs/heads/todelete"] = TWO
+                    status, new_id = self._apply(
+                        repo, [(Tree.type_num, b"100644 .\0" + b"a" * 20)]
+                    )
+                    if reject:
+                        self.assertEqual([(b"unpack", b"invalid name .")], status)
+                        self.assertEqual(ONE, repo.refs[b"refs/heads/master"])
+                        self.assertEqual(TWO, repo.refs[b"refs/heads/todelete"])
+                        self.assertNotIn(new_id, repo.object_store)
+                    else:
+                        self.assertEqual(b"ok", status[0][1])
+                        self.assertEqual(new_id, repo.refs[b"refs/heads/master"])
+                        self.assertNotIn(b"refs/heads/todelete", repo.refs)
+
+    def test_store_override_without_new_keyword_when_disabled(self) -> None:
+        class CustomStore(MemoryObjectStore):
+            def add_thin_pack(
+                self, read_all, read_some, progress=None, *, max_input_size=None
+            ):
+                return super().add_thin_pack(
+                    read_all, read_some, progress, max_input_size=max_input_size
+                )
+
+        repo = self._new_repo(True)
+        repo.object_store = CustomStore()
+        repo.refs[b"refs/heads/master"] = ONE
+        repo.refs[b"refs/heads/todelete"] = TWO
+        status, new_id = self._apply(repo, [(Blob.type_num, b"new blob")])
+        self.assertEqual(b"ok", status[0][1])
+        self.assertEqual(new_id, repo.refs[b"refs/heads/master"])
+
+    def test_late_bad_commit_preserves_all_objects_and_refs(self) -> None:
+        for memory in (False, True):
+            for atomic in (False, True):
+                with self.subTest(memory=memory, atomic=atomic):
+                    repo = self._new_repo(memory)
+                    self._set_config(repo, b"receive", b"fsckObjects", True)
+                    existing = Blob.from_string(b"existing")
+                    repo.object_store.add_object(existing)
+                    repo.refs[b"refs/heads/master"] = existing.id
+                    repo.refs[b"refs/heads/todelete"] = existing.id
+                    refs = repo.get_refs()
+                    status, new_id = self._apply(
+                        repo,
+                        [
+                            (Blob.type_num, b"new blob"),
+                            (Commit.type_num, b"tree " + b"a" * 40 + b"\n\nmessage\n"),
+                        ],
+                        atomic=atomic,
+                    )
+                    self.assertEqual([(b"unpack", b"missing author")], status)
+                    self.assertEqual(refs, repo.get_refs())
+                    self.assertEqual([existing.id], list(repo.object_store))
+                    self.assertNotIn(new_id, repo.object_store)
+
+    def test_unparseable_tree_reports_unpack_failure(self) -> None:
+        for memory in (False, True):
+            for data in (b"100644 missing-terminator", b"no_space"):
+                with self.subTest(memory=memory, data=data):
+                    repo = self._new_repo(memory)
+                    self._set_config(repo, b"receive", b"fsckObjects", True)
+                    repo.refs[b"refs/heads/master"] = ONE
+                    repo.refs[b"refs/heads/todelete"] = TWO
+                    refs = repo.get_refs()
+                    status, _ = self._apply(
+                        repo, [(Blob.type_num, b"new blob"), (Tree.type_num, data)]
+                    )
+                    self.assertEqual(1, len(status))
+                    self.assertEqual(b"unpack", status[0][0])
+                    self.assertNotEqual(b"ok", status[0][1])
+                    self.assertEqual(refs, repo.get_refs())
+                    self.assertEqual([], list(repo.object_store))
+
+    def test_missing_thin_base_reports_unpack_failure(self) -> None:
+        for memory in (False, True):
+            with self.subTest(memory=memory):
+                repo = self._new_repo(memory)
+                self._set_config(repo, b"receive", b"fsckObjects", True)
+                repo.refs[b"refs/heads/master"] = ONE
+                repo.refs[b"refs/heads/todelete"] = TWO
+                refs = repo.get_refs()
+                source = MemoryObjectStore()
+                base = Blob.from_string(b"base data")
+                source.add_object(base)
+                status, _ = self._apply(
+                    repo,
+                    [
+                        (Blob.type_num, b"new blob"),
+                        (REF_DELTA, (base.id, b"changed data")),
+                    ],
+                    pack_store=source,
+                )
+                self.assertEqual(1, len(status))
+                self.assertEqual(b"unpack", status[0][0])
+                self.assertNotEqual(b"ok", status[0][1])
+                self.assertEqual(refs, repo.get_refs())
+                self.assertEqual([], list(repo.object_store))
+
+    def test_invalid_config_fails_closed_and_false_ignores_fallback(self) -> None:
+        for receive, transfer, error in [
+            (b"invalid", b"true", True),
+            (None, b"invalid", True),
+            (b"false", b"invalid", False),
+        ]:
+            with self.subTest(receive=receive, transfer=transfer):
+                repo = self._new_repo(True)
+                if receive is not None:
+                    self._set_config(repo, b"receive", b"fsckObjects", receive)
+                self._set_config(repo, b"transfer", b"fsckObjects", transfer)
+                repo.refs[b"refs/heads/master"] = ONE
+                repo.refs[b"refs/heads/todelete"] = TWO
+                refs = repo.get_refs()
+                status, _ = self._apply(repo, [(Blob.type_num, b"new blob")])
+                if error:
+                    self.assertEqual(1, len(status))
+                    self.assertIn(b"not a valid boolean", status[0][1])
+                    self.assertEqual(refs, repo.get_refs())
+                    self.assertEqual([], list(repo.object_store))
+                else:
+                    self.assertEqual((b"unpack", b"ok"), status[0])
+
+    def test_valid_thin_pack_updates_refs(self) -> None:
+        for memory in (False, True):
+            with self.subTest(memory=memory):
+                repo = self._new_repo(memory)
+                self._set_config(repo, b"receive", b"fsckObjects", True)
+                blob = Blob.from_string(b"base data")
+                repo.object_store.add_object(blob)
+                repo.refs[b"refs/heads/master"] = ONE
+                repo.refs[b"refs/heads/todelete"] = TWO
+                status, new_id = self._apply(
+                    repo, [(REF_DELTA, (blob.id, b"changed data"))]
+                )
+                self.assertEqual(
+                    [
+                        (b"unpack", b"ok"),
+                        (b"refs/heads/master", b"ok"),
+                        (b"refs/heads/todelete", b"ok"),
+                    ],
+                    status,
+                )
+                self.assertEqual(new_id, repo.refs[b"refs/heads/master"])
+                self.assertEqual(b"changed data", repo.object_store[new_id].data)
+
+    def test_receive_size_limit_preserves_refs(self) -> None:
+        for memory in (False, True):
+            with self.subTest(memory=memory):
+                repo = self._new_repo(memory)
+                self._set_config(repo, b"receive", b"fsckObjects", True)
+                self._set_config(repo, b"receive", b"maxInputSize", b"8")
+                repo.refs[b"refs/heads/master"] = ONE
+                repo.refs[b"refs/heads/todelete"] = TWO
+                refs = repo.get_refs()
+                status, _ = self._apply(repo, [(Blob.type_num, b"new blob")])
+                self.assertEqual(1, len(status))
+                self.assertNotEqual(b"ok", status[0][1])
+                self.assertEqual(refs, repo.get_refs())
+                self.assertEqual([], list(repo.object_store))
+
+    def test_report_status_for_rejected_pack(self) -> None:
+        for memory in (False, True):
+            with self.subTest(memory=memory):
+                repo = self._new_repo(memory)
+                post_receive_calls = []
+
+                class PostReceiveHook:
+                    def execute(self, refs):
+                        post_receive_calls.append(refs)
+                        return b""
+
+                repo.hooks["post-receive"] = PostReceiveHook()
+                self._set_config(repo, b"receive", b"fsckObjects", True)
+                repo.refs[b"refs/heads/master"] = ONE
+                pack = BytesIO()
+                entries = build_pack(pack, [(Tree.type_num, b"100644 .\0" + b"a" * 20)])
+                command = ONE + b" " + sha_to_hex(entries[0][3])
+                stream = BytesIO(
+                    pkt_line(command + b" refs/heads/master\0report-status\n")
+                    + pkt_line(None)
+                    + pack.getvalue()
+                )
+                output = BytesIO()
+                handler = ReceivePackHandler(
+                    DictBackend({b"/": repo}),
+                    [b"/"],
+                    Protocol(stream.read, output.write),
+                    stateless_rpc=True,
+                )
+                handler.handle()
+                self.assertEqual(
+                    pkt_line(b"unpack invalid name .\n") + pkt_line(None),
+                    output.getvalue(),
+                )
+                self.assertEqual(ONE, repo.refs[b"refs/heads/master"])
+                self.assertEqual([], list(repo.object_store))
+                self.assertEqual([], post_receive_calls)
 
 
 class ProtocolGraphWalkerEmptyTestCase(TestCase):

@@ -39,7 +39,7 @@ from dulwich.file import GitFile
 from dulwich.gc import garbage_collect
 from dulwich.index import commit_tree
 from dulwich.midx import write_midx_file
-from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT, SHA256
 from dulwich.object_store import (
     DEFAULT_TEMPFILE_GRACE_PERIOD,
     DiskObjectStore,
@@ -59,7 +59,9 @@ from dulwich.objects import (
     Blob,
     Commit,
     EmptyFileException,
+    ShaFile,
     SubmoduleEncountered,
+    Tag,
     Tree,
     TreeEntry,
     hex_to_sha,
@@ -67,6 +69,7 @@ from dulwich.objects import (
 )
 from dulwich.pack import (
     DEFAULT_DELTA_BASE_CACHE_LIMIT,
+    OFS_DELTA,
     REF_DELTA,
     Pack,
     load_pack_index,
@@ -74,7 +77,7 @@ from dulwich.pack import (
 )
 from dulwich.repo import Repo
 from dulwich.tests.test_object_store import ObjectStoreTests, PackBasedObjectStoreTests
-from dulwich.tests.utils import build_pack, make_object, make_tag
+from dulwich.tests.utils import build_pack, make_commit, make_object, make_tag
 
 from . import TestCase
 
@@ -208,6 +211,329 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         packed_blob_sha = sha_to_hex(entries[0][3])
         self.assertIn(packed_blob_sha, o2)
         self.assertEqual((Blob.type_num, b"more data"), o2.get_raw(packed_blob_sha))
+
+
+class IncomingPackValidationTests(TestCase):
+    def _new_store(self, memory, object_format=DEFAULT_OBJECT_FORMAT):
+        if memory:
+            return MemoryObjectStore(object_format=object_format)
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path)
+        store = DiskObjectStore.init(path, object_format=object_format)
+        self.addCleanup(store.close)
+        return store
+
+    def _files(self, store):
+        if isinstance(store, MemoryObjectStore):
+            return []
+        return sorted(
+            os.path.relpath(os.path.join(root, name), store.path)
+            for root, _, names in os.walk(store.path)
+            for name in names
+        )
+
+    def test_semantic_failure_rejects_entire_pack(self) -> None:
+        bad_objects = [
+            (Tree.type_num, b"100644 .\0" + b"a" * 20),
+            (Commit.type_num, b"tree " + b"a" * 40 + b"\n\nmessage\n"),
+            (Tag.type_num, b"object " + b"a" * 40 + b"\ntype blob\n\nmessage\n"),
+        ]
+        for memory in (False, True):
+            for bad in bad_objects:
+                with self.subTest(memory=memory, type=bad[0]):
+                    store = self._new_store(memory)
+                    store.add_object(testobject)
+                    files = self._files(store)
+                    stream = BytesIO()
+                    build_pack(stream, [(Blob.type_num, b"new blob"), bad])
+                    with self.assertRaises(ObjectFormatException):
+                        store.add_thin_pack(stream.read, None, check_objects=True)
+                    self.assertEqual([testobject.id], list(store))
+                    self.assertEqual(files, self._files(store))
+
+    def test_semantic_checks_disabled_by_default(self) -> None:
+        for memory in (False, True):
+            with self.subTest(memory=memory):
+                store = self._new_store(memory)
+                stream = BytesIO()
+                entries = build_pack(
+                    stream, [(Tree.type_num, b"100644 .\0" + b"a" * 20)]
+                )
+                store.add_thin_pack(stream.read, None)
+                self.assertIn(sha_to_hex(entries[0][3]), store)
+
+    def test_late_parse_failure_is_atomic_without_semantic_checks(self) -> None:
+        for memory in (False, True):
+            with self.subTest(memory=memory):
+                store = self._new_store(memory)
+                store.add_object(testobject)
+                files = self._files(store)
+                stream = BytesIO()
+                build_pack(
+                    stream,
+                    [(Blob.type_num, b"new blob"), (Tree.type_num, b"bad tree")],
+                )
+                with self.assertRaises(ObjectFormatException):
+                    store.add_thin_pack(stream.read, None)
+                self.assertEqual([testobject.id], list(store))
+                self.assertEqual(files, self._files(store))
+
+    def test_add_pack_late_failure_is_atomic(self) -> None:
+        for memory in (False, True):
+            with self.subTest(memory=memory):
+                store = self._new_store(memory)
+                store.add_object(testobject)
+                files = self._files(store)
+                f, commit, abort = store.add_pack()
+                build_pack(
+                    f, [(Blob.type_num, b"new blob"), (Tree.type_num, b"bad tree")]
+                )
+                f.seek(0, os.SEEK_END)
+                with self.assertRaises(ObjectFormatException):
+                    commit()
+                self.assertTrue(f.closed)
+                abort()
+                self.assertEqual([testobject.id], list(store))
+                self.assertEqual(files, self._files(store))
+
+    def test_memory_bad_pack_header_closes_spool(self) -> None:
+        store = self._new_store(True)
+        f, commit, abort = store.add_pack()
+        self.addCleanup(abort)
+        f.write(b"not a pack")
+        f.rollover()
+        with self.assertRaises(AssertionError):
+            commit()
+        self.assertTrue(f.closed)
+        self.assertEqual([], list(store))
+
+    def test_valid_objects_and_thin_pack(self) -> None:
+        for memory in (False, True):
+            with self.subTest(memory=memory):
+                store = self._new_store(memory)
+                blob = Blob.from_string(b"base data")
+                store.add_object(blob)
+                tree = Tree()
+                tree[b"file"] = (0o100644, blob.id)
+                commit = make_commit(tree=tree.id)
+                tag = make_tag(commit, name=b"v1")
+                stream = BytesIO()
+                build_pack(
+                    stream,
+                    [(obj.type_num, obj.as_raw_string()) for obj in (tree, commit, tag)]
+                    + [(REF_DELTA, (blob.id, b"changed data"))],
+                    store=store,
+                )
+                store.add_thin_pack(stream.read, None, check_objects=True)
+                for obj in (blob, tree, commit, tag, Blob.from_string(b"changed data")):
+                    self.assertEqual(obj.as_raw_string(), store[obj.id].as_raw_string())
+
+    def test_invalid_delta_result_rejects_pack(self) -> None:
+        for memory in (False, True):
+            with self.subTest(memory=memory):
+                store = self._new_store(memory)
+                base = Tree()
+                base[b"file"] = (0o100644, testobject.id)
+                store.add_object(base)
+                files = self._files(store)
+                stream = BytesIO()
+                build_pack(
+                    stream,
+                    [
+                        (Blob.type_num, b"new blob"),
+                        (REF_DELTA, (base.id, b"100644 .\0" + b"a" * 20)),
+                    ],
+                    store=store,
+                )
+                with self.assertRaises(ObjectFormatException):
+                    store.add_thin_pack(stream.read, None, check_objects=True)
+                self.assertEqual([base.id], list(store))
+                self.assertEqual(files, self._files(store))
+
+    def test_existing_delta_base_is_not_semantically_checked(self) -> None:
+        for memory in (False, True):
+            with self.subTest(memory=memory):
+                store = self._new_store(memory)
+                store.add_object(testobject)
+                base = Tree.from_string(b"100644 .\0" + hex_to_sha(testobject.id))
+                store.add_object(base)
+                fixed = b"100644 file\0" + hex_to_sha(testobject.id)
+                stream = BytesIO()
+                entries = build_pack(
+                    stream, [(REF_DELTA, (base.id, fixed))], store=store
+                )
+                store.add_thin_pack(stream.read, None, check_objects=True)
+                received = store[sha_to_hex(entries[0][3])]
+                received.check()
+                self.assertEqual(fixed, received.as_raw_string())
+                self.assertIn(base.id, store)
+
+    def test_delta_ordering_and_late_invalid_result(self) -> None:
+        base = b"100644 base\0" + hex_to_sha(testobject.id)
+        middle = b"100644 middle\0" + hex_to_sha(testobject.id)
+        for memory in (False, True):
+            for forward_ref in (False, True):
+                for valid in (False, True):
+                    with self.subTest(
+                        memory=memory, forward_ref=forward_ref, valid=valid
+                    ):
+                        store = self._new_store(memory)
+                        store.add_object(testobject)
+                        files = self._files(store)
+                        result = b"100644 " + (b"final" if valid else b".")
+                        result += b"\0" + hex_to_sha(testobject.id)
+                        records = (
+                            [(REF_DELTA, (1, result)), (Tree.type_num, base)]
+                            if forward_ref
+                            else [
+                                (Tree.type_num, base),
+                                (OFS_DELTA, (0, middle)),
+                                (OFS_DELTA, (1, result)),
+                            ]
+                        )
+                        stream = BytesIO()
+                        entries = build_pack(stream, records, store=store)
+                        if valid:
+                            store.add_thin_pack(stream.read, None, check_objects=True)
+                            for entry in entries:
+                                self.assertIn(sha_to_hex(entry[3]), store)
+                        else:
+                            with self.assertRaises(ObjectFormatException):
+                                store.add_thin_pack(
+                                    stream.read, None, check_objects=True
+                                )
+                            self.assertEqual([testobject.id], list(store))
+                            self.assertEqual(files, self._files(store))
+
+    def test_thin_pack_wire_limit_and_fragmented_reads(self) -> None:
+        for memory in (False, True):
+            for limit_kind in ("unlimited", "exact", "short"):
+                with self.subTest(memory=memory, limit_kind=limit_kind):
+                    store = self._new_store(memory)
+                    base = Blob.from_string(b"prefix " * 100)
+                    store.add_object(base)
+                    files = self._files(store)
+                    stream = BytesIO()
+                    entries = build_pack(
+                        stream,
+                        [(REF_DELTA, (base.id, b"prefix " * 99 + b"suffix"))],
+                        store=store,
+                    )
+                    size = len(stream.getvalue())
+                    limit = 0 if limit_kind == "unlimited" else size
+                    if limit_kind == "short":
+                        limit -= 1
+
+                    def read_some(count):
+                        return stream.read(min(count, 3))
+
+                    if limit_kind == "short":
+                        with self.assertRaises(PackInputTooLarge):
+                            store.add_thin_pack(
+                                stream.read,
+                                read_some,
+                                check_objects=True,
+                                max_input_size=limit,
+                            )
+                        self.assertEqual([base.id], list(store))
+                        self.assertEqual(files, self._files(store))
+                    else:
+                        store.add_thin_pack(
+                            stream.read,
+                            read_some,
+                            check_objects=True,
+                            max_input_size=limit,
+                        )
+                        self.assertIn(sha_to_hex(entries[0][3]), store)
+
+    def test_wire_errors_leave_no_temporary_pack(self) -> None:
+        for memory in (False, True):
+            for error in ("checksum", "size"):
+                with self.subTest(memory=memory, error=error):
+                    store = self._new_store(memory)
+                    files = self._files(store)
+                    stream = BytesIO()
+                    build_pack(stream, [(Blob.type_num, b"new blob")])
+                    if error == "checksum":
+                        data = stream.getvalue()
+                        stream = BytesIO(data[:-1] + bytes([data[-1] ^ 1]))
+                        expected = ChecksumMismatch
+                        limit = None
+                    else:
+                        expected = PackInputTooLarge
+                        limit = 8
+                    with self.assertRaises(expected):
+                        store.add_thin_pack(
+                            stream.read, None, check_objects=True, max_input_size=limit
+                        )
+                    self.assertEqual([], list(store))
+                    self.assertEqual(files, self._files(store))
+
+    def test_sha256_semantic_checks(self) -> None:
+        for name in (b"file", b"."):
+            with self.subTest(name=name):
+                store = self._new_store(False, SHA256)
+                stream = BytesIO()
+                tree = ShaFile.from_raw_string(
+                    Tree.type_num,
+                    b"100644 " + name + b"\0" + b"a" * 32,
+                    object_format=SHA256,
+                )
+                write_pack_objects(stream.write, [(tree, None)], object_format=SHA256)
+                stream.seek(0)
+                if name == b".":
+                    with self.assertRaises(ObjectFormatException):
+                        store.add_thin_pack(stream.read, None, check_objects=True)
+                    self.assertEqual([], list(store))
+                else:
+                    store.add_thin_pack(stream.read, None, check_objects=True)
+                    self.assertIn(tree.get_id(SHA256), store)
+
+    def test_memory_add_pack_override_without_new_keyword(self) -> None:
+        class CustomStore(MemoryObjectStore):
+            def add_pack(self):
+                return super().add_pack()
+
+        store = CustomStore()
+        stream = BytesIO()
+        build_pack(stream, [(Blob.type_num, b"new blob")])
+        store.add_thin_pack(stream.read, None)
+        self.assertIn(Blob.from_string(b"new blob").id, store)
+
+    def test_memory_add_object_override_preserved(self) -> None:
+        class CustomStore(MemoryObjectStore):
+            def add_object(self, obj):
+                published.append(obj.id)
+                super().add_object(obj)
+
+        for check_objects in (False, True):
+            with self.subTest(check_objects=check_objects):
+                published = []
+                store = CustomStore()
+                stream = BytesIO()
+                build_pack(stream, [(Blob.type_num, b"new blob")] * 2)
+                store.add_thin_pack(stream.read, None, check_objects=check_objects)
+                self.assertEqual([Blob.from_string(b"new blob").id] * 2, published)
+
+    def test_memory_publication_hooks_wait_for_all_objects(self) -> None:
+        class CustomStore(MemoryObjectStore):
+            def add_object(self, obj):
+                published.append(obj.id)
+                super().add_object(obj)
+
+        for check_objects in (False, True):
+            with self.subTest(check_objects=check_objects):
+                published = []
+                store = CustomStore()
+                stream = BytesIO()
+                tree_data = b"100644 .\0" + b"a" * 20 if check_objects else b"bad tree"
+                build_pack(
+                    stream, [(Blob.type_num, b"new blob"), (Tree.type_num, tree_data)]
+                )
+                with self.assertRaises(ObjectFormatException):
+                    store.add_thin_pack(stream.read, None, check_objects=check_objects)
+                self.assertEqual([], published)
+                self.assertEqual([], list(store))
 
 
 class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):

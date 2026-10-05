@@ -1,5 +1,9 @@
 1.2.18	UNRELEASED
 
+ * Honour ``receive.fsckObjects`` with ``transfer.fsckObjects`` as fallback,
+   using Dulwich's object checks before accepting an incoming pack.
+   Invalid packs leave objects and refs unchanged. (Part of #2445)
+
  * Reject transfer URLs in LFS batch responses that are not ``http://`` or
    ``https://`` URLs. Previously a server could point uploads at e.g.
    ``file://`` URLs. (Yusufbek Anvarov, Jelmer Vernooĳ)

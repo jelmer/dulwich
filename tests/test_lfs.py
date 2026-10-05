@@ -570,19 +570,14 @@ class LFSFilterDriverTests(TestCase):
         self.assertEqual(result, pointer_data)
 
     def test_smudge_skip(self) -> None:
-        """Test that GIT_LFS_SKIP_SMUDGE leaves pointers alone."""
+        """Test that pointers are left alone when smudging is skipped."""
         content = b"This is the actual file content"
         sha = self.lfs_store.write_object([content])
         pointer_data = LFSPointer(sha, len(content)).to_bytes()
 
         # Even objects that are in the local store are not smudged
-        for value in ("1", "true", "TRUE", "yes", "on", "t"):
-            self.overrideEnv("GIT_LFS_SKIP_SMUDGE", value)
-            self.assertEqual(pointer_data, self.filter_driver.smudge(pointer_data))
-
-        for value in ("0", "false", "no", "off", "y", "2", ""):
-            self.overrideEnv("GIT_LFS_SKIP_SMUDGE", value)
-            self.assertEqual(content, self.filter_driver.smudge(pointer_data))
+        filter_driver = LFSFilterDriver(self.lfs_store, skip_smudge=True)
+        self.assertEqual(pointer_data, filter_driver.smudge(pointer_data))
 
     def test_smudge_non_pointer(self) -> None:
         """Test smudge filter on non-pointer content."""
@@ -717,9 +712,11 @@ class LFSFilterDriverDownloadTests(TestCase):
         content = b"content on the server"
         oid = self.server.lfs_store.write_object([content])
         pointer_data = LFSPointer(oid, len(content)).to_bytes()
-        self.overrideEnv("GIT_LFS_SKIP_SMUDGE", "1")
+        filter_driver = LFSFilterDriver(
+            self.lfs_store, config=self.config, skip_smudge=True
+        )
 
-        self.assertEqual(pointer_data, self.filter_driver.smudge(pointer_data))
+        self.assertEqual(pointer_data, filter_driver.smudge(pointer_data))
         # Nothing is downloaded
         with self.assertRaises(KeyError):
             self.lfs_store.open_object(oid)

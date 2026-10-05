@@ -170,6 +170,30 @@ class LFSPorcelainTestCase(TestCase):
         test_content = b"This is test content for smudging"
         oid = LFSStore.from_repo(self.repo).write_object([test_content])
         pointer_content = LFSPointer(oid, len(test_content)).to_bytes()
+
+        # Even objects that are in the local store are not smudged
+        for value in ("1", "true", "TRUE", "yes", "on", "t"):
+            self.assertEqual(
+                pointer_content,
+                porcelain.lfs_smudge(
+                    self.repo, pointer_content, env={"GIT_LFS_SKIP_SMUDGE": value}
+                ),
+            )
+
+        for value in ("0", "false", "no", "off", "y", "2", ""):
+            self.assertEqual(
+                test_content,
+                porcelain.lfs_smudge(
+                    self.repo, pointer_content, env={"GIT_LFS_SKIP_SMUDGE": value}
+                ),
+            )
+
+    def test_lfs_smudge_skip_os_environ(self):
+        """Test that GIT_LFS_SKIP_SMUDGE is read from os.environ by default."""
+        porcelain.lfs_init(self.repo)
+        test_content = b"This is test content for smudging"
+        oid = LFSStore.from_repo(self.repo).write_object([test_content])
+        pointer_content = LFSPointer(oid, len(test_content)).to_bytes()
         self.overrideEnv("GIT_LFS_SKIP_SMUDGE", "1")
 
         self.assertEqual(

@@ -40,7 +40,7 @@ import fnmatch
 import logging
 import os
 import stat
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import replace
 from typing import Any
 
@@ -219,15 +219,29 @@ def lfs_clean(
         return filter_driver.clean(content)
 
 
+def _skip_smudge_from_env(env: Mapping[str, str] | None = None) -> bool:
+    """Check whether ``GIT_LFS_SKIP_SMUDGE`` asks for pointers to be left alone.
+
+    This uses the values git-lfs accepts, which differ from git's own
+    boolean environment variables.
+    """
+    if env is None:
+        env = os.environ
+    value = env.get("GIT_LFS_SKIP_SMUDGE", "")
+    return value.lower() in ("true", "1", "on", "yes", "t")
+
+
 def lfs_smudge(
     repo: str | os.PathLike[str] | Repo | None = None,
     pointer_content: bytes | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> bytes:
     """Smudge an LFS pointer by retrieving the actual content.
 
     Args:
       repo: Path to repository
       pointer_content: LFS pointer content as bytes
+      env: Environment to read variables from (defaults to os.environ)
 
     Returns:
       Actual file content as bytes, or ``pointer_content`` if it is not an
@@ -237,7 +251,7 @@ def lfs_smudge(
       LFSError: If the object is not in the LFS store and can not be
         downloaded
     """
-    from ..lfs import LFSFilterDriver, LFSPointer, LFSStore, skip_smudge
+    from ..lfs import LFSFilterDriver, LFSPointer, LFSStore
     from . import open_repo_closing
 
     with open_repo_closing(repo) as r:
@@ -245,7 +259,7 @@ def lfs_smudge(
             raise ValueError("Pointer content must be specified")
 
         pointer = LFSPointer.from_bytes(pointer_content)
-        if pointer is None or not pointer.is_valid_oid() or skip_smudge():
+        if pointer is None or not pointer.is_valid_oid() or _skip_smudge_from_env(env):
             return pointer_content
 
         # Get LFS store

@@ -35,17 +35,22 @@ __all__ = [
 import logging
 import os
 import shlex
+import stat
 import subprocess
 import threading
 from collections.abc import Callable
+from functools import cached_property, partial
 from typing import TYPE_CHECKING
 from typing import Protocol as TypingProtocol
 
 from .attrs import GitAttributes
+from .errors import NoIndexPresent
 from .objects import Blob
+from .patch import is_binary
 
 if TYPE_CHECKING:
     from .config import Config
+    from .index import Index
     from .protocol import Protocol
     from .repo import BaseRepo
 
@@ -795,6 +800,7 @@ def get_filter_for_path(
     gitattributes: "GitAttributes",
     filter_registry: FilterRegistry | None = None,
     filter_context: FilterContext | None = None,
+    index_has_crlf: Callable[[bytes], bool] | None = None,
 ) -> FilterDriver | None:
     """Get the appropriate filter driver for a given path.
 
@@ -803,6 +809,9 @@ def get_filter_for_path(
         gitattributes: GitAttributes object with parsed patterns
         filter_registry: Registry of filter drivers (deprecated, use filter_context)
         filter_context: Context for managing filter state
+        index_has_crlf: Callback reporting whether the index holds a CRLF
+            text blob for a path; used to keep such files unconverted on
+            checkin for ``text=auto`` and ``core.autocrlf``
 
     Returns:
         FilterDriver instance or None
@@ -833,7 +842,11 @@ def get_filter_for_path(
     # so it cannot come from a single registry-wide driver.
     core_eol, autocrlf, safecrlf = registry.get_eol_config()
     line_ending_filter = line_ending_filter_for_action(
-        resolve_crlf_action(attributes, core_eol, autocrlf), safecrlf=safecrlf
+        resolve_crlf_action(attributes, core_eol, autocrlf),
+        safecrlf=safecrlf,
+        index_has_crlf=(
+            partial(index_has_crlf, path) if index_has_crlf is not None else None
+        ),
     )
     if line_ending_filter is not None:
         filters.append(line_ending_filter)
@@ -888,11 +901,13 @@ class FilterBlobNormalizer:
           config_stack: Git configuration
           gitattributes: GitAttributes instance
           filter_registry: Optional filter registry to use (deprecated, use filter_context)
-          repo: Optional repository instance
+          repo: Optional repository instance; its index is consulted to keep
+            files that were committed with CRLF unconverted on checkin
           filter_context: Optional filter context to use for managing filter state
         """
         self.config_stack = config_stack
         self.gitattributes = gitattributes
+        self.repo = repo
         self._owns_context = False  # Track if we created our own context
 
         # Support both old and new API
@@ -916,11 +931,46 @@ class FilterBlobNormalizer:
             self.filter_context = FilterContext(self.filter_registry)
             self._owns_context = True  # We created our own context
 
+    @cached_property
+    def _index(self) -> "Index | None":
+        if self.repo is None:
+            return None
+        try:
+            return self.repo.open_index()
+        except NoIndexPresent:
+            return None
+
+    def _index_has_crlf(self, path: bytes) -> bool:
+        """Check whether the index holds a text blob with CRLF for path.
+
+        This mirrors ``has_crlf_in_index`` in git's convert.c.
+        """
+        from .index import ConflictedIndexEntry
+
+        if self.repo is None or self._index is None:
+            return False
+        try:
+            entry = self._index[path]
+        except KeyError:
+            return False
+        if isinstance(entry, ConflictedIndexEntry):
+            # Like git, use our side of a conflict.
+            if entry.this is None:
+                return False
+            entry = entry.this
+        if not stat.S_ISREG(entry.mode):
+            return False
+        data = self.repo.object_store[entry.sha].as_raw_string()
+        return b"\r\n" in data and not is_binary(data)
+
     def checkin_normalize(self, blob: Blob, path: bytes) -> Blob:
         """Apply clean filter during checkin (working tree -> repository)."""
         # Get filter for this path
         filter_driver = get_filter_for_path(
-            path, self.gitattributes, filter_context=self.filter_context
+            path,
+            self.gitattributes,
+            filter_context=self.filter_context,
+            index_has_crlf=self._index_has_crlf,
         )
         if filter_driver is None:
             return blob

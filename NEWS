@@ -1,5 +1,10 @@
 1.2.18	UNRELEASED
 
+ * Don't normalize line endings on checkin for ``text=auto`` and
+   ``core.autocrlf`` when the blob in the index already has CRLF line endings,
+   matching git. Since 1.2.16, editing such a file rewrote every line.
+   (Jelmer Vernooĳ, #2462)
+
  * Reject transfer URLs in LFS batch responses that are not ``http://`` or
    ``https://`` URLs. Previously a server could point uploads at e.g.
    ``file://`` URLs. (Yusufbek Anvarov, Jelmer Vernooĳ)

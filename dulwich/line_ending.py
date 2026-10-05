@@ -329,13 +329,17 @@ def resolve_crlf_action(
 
 
 def line_ending_filter_for_action(
-    action: CRLFAction, safecrlf: bytes = b"false"
+    action: CRLFAction,
+    safecrlf: bytes = b"false",
+    index_has_crlf: Callable[[], bool] | None = None,
 ) -> "LineEndingFilter | None":
     """Build the filter implementing a resolved :class:`CRLFAction`.
 
     Args:
       action: Action as returned by :func:`resolve_crlf_action`
       safecrlf: Value of ``core.safecrlf``
+      index_has_crlf: Callback reporting whether the index already holds a
+        CRLF text blob for the path; only consulted for the "auto" actions
 
     Returns: A filter, or None if the action converts nothing
     """
@@ -355,6 +359,7 @@ def line_ending_filter_for_action(
         # Only the "auto" family leaves files with existing CRs alone; an
         # explicit "text" attribute means the user has already decided.
         require_lf_only=action in _AUTO_ACTIONS,
+        index_has_crlf=index_has_crlf if action in _AUTO_ACTIONS else None,
     )
 
 
@@ -373,6 +378,7 @@ class LineEndingFilter:
         binary_detection: bool = True,
         safecrlf: bytes = b"false",
         require_lf_only: bool = False,
+        index_has_crlf: Callable[[], bool] | None = None,
     ):
         """Initialize LineEndingFilter.
 
@@ -383,12 +389,16 @@ class LineEndingFilter:
           safecrlf: Value of ``core.safecrlf``
           require_lf_only: Only smudge content whose line endings are all LF,
             as git does for ``text=auto`` and ``core.autocrlf``
+          index_has_crlf: Callback reporting whether the index already holds
+            a CRLF text blob for the path, in which case clean leaves CRLF
+            alone, as git does for ``text=auto`` and ``core.autocrlf``
         """
         self.clean_conversion = clean_conversion
         self.smudge_conversion = smudge_conversion
         self.binary_detection = binary_detection
         self.safecrlf = safecrlf
         self.require_lf_only = require_lf_only
+        self.index_has_crlf = index_has_crlf
 
     @classmethod
     def from_config(
@@ -442,6 +452,11 @@ class LineEndingFilter:
 
         # Skip binary files if detection is enabled
         if self.binary_detection and is_binary(data):
+            return data
+
+        # Keep files that were committed with CRLF stable rather than
+        # rewriting every line on the next edit.
+        if self.index_has_crlf is not None and CRLF in data and self.index_has_crlf():
             return data
 
         converted = self.clean_conversion(data)

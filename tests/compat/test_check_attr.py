@@ -284,3 +284,46 @@ class CheckAttrCompatTestCase(CompatTestCase):
             self._git_check_attr("text", paths),
         )
         self._assert_attr_match("text", paths)
+
+    def test_nested_gitattributes(self) -> None:
+        self._write_gitattributes("*.txt text eol=cr\n/top.c text\n")
+        nested = {
+            "sub/.gitattributes": "*.txt eol=crlf\n/a.c text\nx/b.c -text\n",
+            "sub/deep/.gitattributes": "a.txt eol=lf\n*.c !text\n",
+            "other/.gitattributes": "*.txt -text\n",
+        }
+        for path, content in nested.items():
+            self._create_file(path)
+            with open(os.path.join(self.test_dir, path), "w") as f:
+                f.write(content)
+        os.makedirs(os.path.join(self.test_dir, ".git", "info"), exist_ok=True)
+        with open(os.path.join(self.test_dir, ".git", "info", "attributes"), "w") as f:
+            f.write("sub/deep/b.txt eol=crlf\n")
+        paths = [
+            "a.txt",
+            "top.c",
+            "sub/top.c",
+            "sub/a.txt",
+            "sub/a.c",
+            "sub/x/a.c",
+            "sub/x/b.c",
+            "sub/y/x/b.c",
+            "sub/deep/a.txt",
+            "sub/deep/b.txt",
+            "sub/deep/a.c",
+            "sub/deep/more/a.txt",
+            "other/a.txt",
+            "subother/a.txt",
+        ]
+        for path in paths:
+            self._create_file(path)
+        attrs = self.repo.get_gitattributes()
+        for attr in ("text", "eol"):
+            expected = self._git_check_attr(attr, paths)
+            name = attr.encode()
+            actual = {}
+            for path in paths:
+                matched = attrs.match_path(path.encode())
+                if matched.get(name) is not None:
+                    actual[path] = matched[name]
+            self.assertEqual(expected, actual, f"attr {attr!r}")

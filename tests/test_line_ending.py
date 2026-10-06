@@ -833,6 +833,27 @@ class LineEndingFilterForAttrsTests(TestCase):
         self.assertEqual(b"a\r\nb\n", filter.smudge(b"a\r\nb\n"))
         self.assertEqual(b"a\r\nb\r\n", filter.smudge(b"a\nb\n"))
 
+    def test_auto_clean_keeps_crlf_when_index_has_crlf(self) -> None:
+        filter = line_ending_filter_for_action(
+            CRLFAction.AUTO_INPUT, index_has_crlf=lambda: True
+        )
+        assert filter is not None
+        self.assertEqual(b"a\r\nb\r\n", filter.clean(b"a\r\nb\r\n"))
+
+    def test_auto_clean_converts_when_index_has_no_crlf(self) -> None:
+        filter = line_ending_filter_for_action(
+            CRLFAction.AUTO_INPUT, index_has_crlf=lambda: False
+        )
+        assert filter is not None
+        self.assertEqual(b"a\nb\n", filter.clean(b"a\r\nb\r\n"))
+
+    def test_text_clean_ignores_index_crlf(self) -> None:
+        filter = line_ending_filter_for_action(
+            CRLFAction.TEXT_INPUT, index_has_crlf=lambda: True
+        )
+        assert filter is not None
+        self.assertEqual(b"a\nb\n", filter.clean(b"a\r\nb\r\n"))
+
     def test_explicit_text_converts_mixed_content(self) -> None:
         """An explicit eol attribute converts even mixed content."""
         filter = _filter_for({b"text": True, b"eol": b"crlf"})

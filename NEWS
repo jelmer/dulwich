@@ -1,5 +1,10 @@
 1.2.18	UNRELEASED
 
+ * Don't normalize line endings on checkin for ``text=auto`` and
+   ``core.autocrlf`` when the blob in the index already has CRLF line endings,
+   matching git. Since 1.2.16, editing such a file rewrote every line.
+   (Jelmer Vernooĳ, #2462)
+
  * Honour ``receive.fsckObjects`` with ``transfer.fsckObjects`` as fallback,
    using Dulwich's object checks before accepting an incoming pack.
    Invalid packs leave objects and refs unchanged. (Part of #2445)

@@ -1,5 +1,10 @@
 1.2.18	UNRELEASED
 
+ * Apply the blob normalizer to files written by ``porcelain.merge``,
+   so fast-forward and three-way merges honour ``.gitattributes`` and
+   ``core.autocrlf`` like ``checkout`` and ``reset --hard`` do.
+   (Jelmer Vernooĳ, #2467)
+
  * Don't normalize line endings on checkin for ``text=auto`` and
    ``core.autocrlf`` when the blob in the index already has CRLF line endings,
    matching git. Since 1.2.16, editing such a file rewrote every line.

@@ -231,6 +231,7 @@ from .hooks import (
     UpdateShellHook,
 )
 from .index import Index, InvalidPathError
+from .lfs import LFSError
 from .log_utils import _configure_logging_from_trace
 from .objects import Commit, ObjectID, RawObjectID, sha_to_hex, valid_hexsha
 from .objectspec import parse_commit, parse_commit_range
@@ -6684,7 +6685,7 @@ class cmd_lfs(Command):
 
     """Git LFS management commands."""
 
-    def run(self, argv: Sequence[str]) -> None:
+    def run(self, argv: Sequence[str]) -> int | None:
         """Execute the lfs command.
 
         Args:
@@ -6840,7 +6841,13 @@ class cmd_lfs(Command):
         elif args.subcommand == "smudge":
             if args.stdin:
                 pointer_content = sys.stdin.buffer.read()
-                content = porcelain.lfs_smudge(pointer_content=pointer_content)
+                try:
+                    content = porcelain.lfs_smudge(pointer_content=pointer_content)
+                except LFSError as e:
+                    # Like git-lfs, pass the pointer through but fail
+                    sys.stdout.buffer.write(pointer_content)
+                    logger.error("Error downloading object: %s", e)
+                    return 2
                 sys.stdout.buffer.write(content)
             else:
                 logger.error("--stdin required for smudge command")
@@ -6882,6 +6889,8 @@ class cmd_lfs(Command):
         else:
             parser.print_help()
             sys.exit(1)
+
+        return None
 
 
 class cmd_help(Command):

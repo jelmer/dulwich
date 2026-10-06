@@ -1,5 +1,11 @@
 1.2.18	UNRELEASED
 
+ * Raise ``MemoryError`` rather than aborting the process when a delta
+   declares a result size that can not be allocated, and raise
+   ``ApplyDeltaError`` when a delta size header overflows. Make the
+   pure-Python ``apply_delta`` stop as soon as the output exceeds the
+   declared result size, like git. (Jelmer Vernooĳ)
+
  * Don't normalize line endings on checkin for ``text=auto`` and
    ``core.autocrlf`` when the blob in the index already has CRLF line endings,
    matching git. Since 1.2.16, editing such a file rewrote every line.

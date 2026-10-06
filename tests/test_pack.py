@@ -53,6 +53,7 @@ from dulwich.pack import (
     PackStreamReader,
     UnpackedObject,
     UnresolvedDeltas,
+    _apply_delta_py,
     _create_delta_py,
     _delta_encode_size,
     _encode_copy_operation,
@@ -80,8 +81,10 @@ from dulwich.tests.utils import (
 )
 
 try:
+    from dulwich._pack import apply_delta as _apply_delta_rs
     from dulwich._pack import create_delta as _create_delta_rs
 except ImportError:
+    _apply_delta_rs = None
     _create_delta_rs = None
 
 from . import TestCase
@@ -307,6 +310,78 @@ class TestPackDeltas(TestCase):
         # \x00 src_size=0, \x00 dest_size=0, \x81 copy op that expects one
         # offset byte which is missing.
         self.assertRaises(ApplyDeltaError, apply_delta, b"", b"\x00\x00\x81")
+
+    def _do_test_apply_delta_copy_beyond_dest_size(self, apply_delta_func):
+        # Each copy fits in dest_size, but together they exceed it. This
+        # must be rejected at the second copy, not after producing them all.
+        base = b"a" * 0x20000
+        delta = b"\x80\x80\x08\x80\x80\x04" + b"\x80" * 100
+        with self.assertRaisesRegex(ApplyDeltaError, "^delta not empty"):
+            apply_delta_func(base, delta)
+
+    test_apply_delta_copy_beyond_dest_size_py = functest_builder(
+        _do_test_apply_delta_copy_beyond_dest_size, _apply_delta_py
+    )
+    test_apply_delta_copy_beyond_dest_size_extension = ext_functest_builder(
+        _do_test_apply_delta_copy_beyond_dest_size, _apply_delta_rs
+    )
+
+    def _do_test_apply_delta_insert_beyond_dest_size(self, apply_delta_func):
+        with self.assertRaises(ApplyDeltaError) as cm:
+            apply_delta_func(b"", b"\x00\x01\x01a\x01b")
+        self.assertEqual("Not enough space to copy", str(cm.exception))
+
+    test_apply_delta_insert_beyond_dest_size_py = functest_builder(
+        _do_test_apply_delta_insert_beyond_dest_size, _apply_delta_py
+    )
+    test_apply_delta_insert_beyond_dest_size_extension = ext_functest_builder(
+        _do_test_apply_delta_insert_beyond_dest_size, _apply_delta_rs
+    )
+
+    def _do_test_apply_delta_header_overflow(self, apply_delta_func):
+        # A dest size with bits beyond 64 bits.
+        delta = b"\x00" + b"\x80" * 10 + b"\x01"
+        self.assertRaises(ApplyDeltaError, apply_delta_func, b"", delta)
+
+    test_apply_delta_header_overflow_py = functest_builder(
+        _do_test_apply_delta_header_overflow, _apply_delta_py
+    )
+    test_apply_delta_header_overflow_extension = ext_functest_builder(
+        _do_test_apply_delta_header_overflow, _apply_delta_rs
+    )
+
+    def _do_test_apply_delta_header_zero_padding(self, apply_delta_func):
+        # Zero-valued continuation bytes past 64 bits don't change the size.
+        delta = b"\x00" + b"\x80" * 10 + b"\x00"
+        self.assertEqual(b"", b"".join(apply_delta_func(b"", delta)))
+
+    test_apply_delta_header_zero_padding_py = functest_builder(
+        _do_test_apply_delta_header_zero_padding, _apply_delta_py
+    )
+    test_apply_delta_header_zero_padding_extension = ext_functest_builder(
+        _do_test_apply_delta_header_zero_padding, _apply_delta_rs
+    )
+
+    # dest_size of 2**63 + 5, more than can ever be allocated.
+    unallocatable_dest_size_delta = b"\x00\x85\x80\x80\x80\x80\x80\x80\x80\x80\x01"
+
+    def test_apply_delta_unallocatable_dest_size_py(self) -> None:
+        self.assertRaises(
+            ApplyDeltaError,
+            _apply_delta_py,
+            b"",
+            self.unallocatable_dest_size_delta,
+        )
+
+    def test_apply_delta_unallocatable_dest_size_extension(self) -> None:
+        if _apply_delta_rs is None:
+            self.skipTest("Rust extension not available")
+        self.assertRaises(
+            MemoryError,
+            _apply_delta_rs,
+            b"",
+            self.unallocatable_dest_size_delta,
+        )
 
     def test_create_delta_insert_only(self) -> None:
         """Test create_delta when only insertions are required."""

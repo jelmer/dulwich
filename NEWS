@@ -1,5 +1,12 @@
 1.2.18	UNRELEASED
 
+ * Read ``.gitattributes`` files in subdirectories, not just the one at the
+   top of the tree. As in git, deeper files take precedence over shallower
+   ones and ``.git/info/attributes`` over all of them, and each directory's
+   file is read from the working tree, falling back to HEAD. Previously the
+   top-level working tree file also overrode ``.git/info/attributes``.
+   (Jelmer Vernooĳ, #2475)
+
  * Apply the blob normalizer to files written by ``porcelain.merge``,
    so fast-forward and three-way merges honour ``.gitattributes`` and
    ``core.autocrlf`` like ``checkout`` and ``reset --hard`` do.

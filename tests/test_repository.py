@@ -40,6 +40,7 @@ from dulwich.client import LocalGitClient
 from dulwich.config import Config
 from dulwich.errors import NotGitRepository, ObjectFormatException
 from dulwich.file import PERM_EVERYBODY, PERM_GROUP, SharedPerm, calc_shared_perm
+from dulwich.index import commit_tree
 from dulwich.index import get_unstaged_changes as _get_unstaged_changes
 from dulwich.object_store import tree_lookup_path
 from dulwich.repo import (
@@ -437,6 +438,117 @@ class RepositoryRootTests(TestCase):
 
         with self.assertLogs("dulwich.repo", "WARNING") as cm:
             self.assertEqual({}, r.get_gitattributes().match_path(b"file.txt"))
+        self.assertEqual(
+            [f"WARNING:dulwich.repo:Ignoring {link}: it is a symbolic link"],
+            cm.output,
+        )
+
+    def _init_gitattributes_repo(
+        self, tree_files: dict[bytes, bytes] | None = None
+    ) -> Repo:
+        tmp_dir = self.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        r = Repo.init(tmp_dir)
+        self.addCleanup(r.close)
+        if tree_files:
+            blobs = []
+            for path, data in tree_files.items():
+                blob = objects.Blob.from_string(data)
+                r.object_store.add_object(blob)
+                blobs.append((path, blob.id, 0o100644))
+            r.get_worktree().commit(
+                message=b"attrs",
+                committer=b"Test <test@example.com>",
+                tree=commit_tree(r.object_store, blobs),
+            )
+        return r
+
+    def _write_worktree_file(self, r: Repo, path: str, data: bytes) -> None:
+        full_path = os.path.join(r.path, path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "wb") as f:
+            f.write(data)
+
+    def test_get_gitattributes_nested_worktree(self) -> None:
+        r = self._init_gitattributes_repo()
+        self._write_worktree_file(r, ".gitattributes", b"*.txt text\n")
+        self._write_worktree_file(r, "sub/.gitattributes", b"*.txt eol=crlf\n")
+        self._write_worktree_file(r, "sub/deeper/.gitattributes", b"/a.txt eol=lf\n")
+        attrs = r.get_gitattributes()
+        self.assertEqual({b"text": True}, attrs.match_path(b"a.txt"))
+        self.assertEqual({b"text": True}, attrs.match_path(b"other/a.txt"))
+        self.assertEqual(
+            {b"text": True, b"eol": b"crlf"}, attrs.match_path(b"sub/a.txt")
+        )
+        self.assertEqual(
+            {b"text": True, b"eol": b"lf"}, attrs.match_path(b"sub/deeper/a.txt")
+        )
+        self.assertEqual(
+            {b"text": True, b"eol": b"crlf"},
+            attrs.match_path(b"sub/deeper/more/a.txt"),
+        )
+
+    def test_get_gitattributes_nested_tree(self) -> None:
+        r = self._init_gitattributes_repo({b"sub/.gitattributes": b"*.txt -text\n"})
+        self.assertEqual(
+            {b"text": False}, r.get_gitattributes().match_path(b"sub/a.txt")
+        )
+
+    def test_get_gitattributes_worktree_replaces_tree(self) -> None:
+        # Like git, a directory's work tree file is used instead of the
+        # committed one, not in addition to it.
+        r = self._init_gitattributes_repo(
+            {b"sub/.gitattributes": b"*.txt -text diff\n"}
+        )
+        self._write_worktree_file(r, "sub/.gitattributes", b"*.txt eol=crlf\n")
+        self.assertEqual(
+            {b"eol": b"crlf"}, r.get_gitattributes().match_path(b"sub/a.txt")
+        )
+
+    def test_get_gitattributes_explicit_tree(self) -> None:
+        r = self._init_gitattributes_repo({b"sub/.gitattributes": b"*.txt -text\n"})
+        self._write_worktree_file(r, "sub/.gitattributes", b"*.txt eol=crlf\n")
+        tree = r[r.head()].tree
+        self.assertEqual(
+            {b"text": False}, r.get_gitattributes(tree).match_path(b"sub/a.txt")
+        )
+
+    def test_get_gitattributes_info_overrides_nested(self) -> None:
+        r = self._init_gitattributes_repo()
+        self._write_worktree_file(r, "sub/.gitattributes", b"*.txt eol=crlf\n")
+        self._write_worktree_file(
+            r, os.path.join(".git", "info", "attributes"), b"*.txt eol=lf\n"
+        )
+        self._write_worktree_file(r, ".gitattributes", b"*.txt eol=cr\n")
+        attrs = r.get_gitattributes()
+        self.assertEqual({b"eol": b"lf"}, attrs.match_path(b"a.txt"))
+        self.assertEqual({b"eol": b"lf"}, attrs.match_path(b"sub/a.txt"))
+
+    def test_get_gitattributes_below_submodule(self) -> None:
+        r = self._init_gitattributes_repo({b".gitattributes": b"*.txt text\n"})
+        tree = r[r[r.head()].tree]
+        tree.add(b"mod", 0o160000, b"a" * 40)
+        r.object_store.add_object(tree)
+        self.assertEqual(
+            {b"text": True},
+            r.get_gitattributes(tree.id).match_path(b"mod/inner.txt"),
+        )
+
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_get_gitattributes_nested_worktree_symlink(self) -> None:
+        # A symlinked work tree file is skipped, falling back to the tree.
+        r = self._init_gitattributes_repo({b"sub/.gitattributes": b"*.txt -text\n"})
+        outside = os.path.join(self.mkdtemp(), "outside")
+        self.addCleanup(shutil.rmtree, os.path.dirname(outside))
+        with open(outside, "wb") as f:
+            f.write(b"*.txt eol=crlf\n")
+        os.makedirs(os.path.join(r.path, "sub"))
+        link = os.path.join(r.path, "sub", ".gitattributes")
+        os.symlink(outside, link)
+        with self.assertLogs("dulwich.repo", "WARNING") as cm:
+            self.assertEqual(
+                {b"text": False}, r.get_gitattributes().match_path(b"sub/a.txt")
+            )
         self.assertEqual(
             [f"WARNING:dulwich.repo:Ignoring {link}: it is a symbolic link"],
             cm.output,

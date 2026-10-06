@@ -4173,7 +4173,7 @@ def _create_delta_py(
 create_delta = _create_delta_py
 
 
-def apply_delta(
+def _apply_delta_py(
     src_buf: bytes | list[bytes], delta: bytes | list[bytes]
 ) -> list[bytes]:
     """Based on the similar function in git's patch-delta.c.
@@ -4225,6 +4225,7 @@ def apply_delta(
         raise ApplyDeltaError(
             f"Unexpected source buffer size: {src_size} vs {len(src_buf)}"
         )
+    remaining = dest_size
     while index < delta_length:
         cmd = ord(delta[index : index + 1])
         index += 1
@@ -4245,15 +4246,19 @@ def apply_delta(
             if (
                 cp_off + cp_size < cp_size
                 or cp_off + cp_size > src_size
-                or cp_size > dest_size
+                or cp_size > remaining
             ):
                 break
             out.append(src_buf[cp_off : cp_off + cp_size])
+            remaining -= cp_size
         elif cmd != 0:
+            if cmd > remaining:
+                raise ApplyDeltaError("Not enough space to copy")
             if index + cmd > delta_length:
                 raise ApplyDeltaError("delta truncated in insert op")
             out.append(delta[index : index + cmd])
             index += cmd
+            remaining -= cmd
         else:
             raise ApplyDeltaError("Invalid opcode 0")
 
@@ -4264,6 +4269,9 @@ def apply_delta(
         raise ApplyDeltaError("dest size incorrect")
 
     return out
+
+
+apply_delta = _apply_delta_py
 
 
 def write_pack_index_v2(

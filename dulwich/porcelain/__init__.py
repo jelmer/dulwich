@@ -7302,13 +7302,16 @@ def _do_merge(
         # Fast-forward merge
         r.refs[HEADREF] = merge_commit_id
         # Update the working directory
+        config_stack = r.get_config_stack()
+        blob_normalizer = r.get_blob_normalizer(config=config_stack)
         changes = tree_changes(r.object_store, head_commit.tree, merge_commit.tree)
         update_working_tree(
             r,
             head_commit.tree,
             merge_commit.tree,
             change_iterator=changes,
-            config=r.get_config_stack(),
+            blob_normalizer=blob_normalizer,
+            config=config_stack,
         )
         return (merge_commit_id, [])
 
@@ -7334,13 +7337,16 @@ def _do_merge(
     r.object_store.add_object(merged_tree)
 
     # Update index and working directory
+    config_stack = r.get_config_stack()
+    blob_normalizer = r.get_blob_normalizer(config=config_stack)
     changes = tree_changes(r.object_store, head_commit.tree, merged_tree.id)
     update_working_tree(
         r,
         head_commit.tree,
         merged_tree.id,
         change_iterator=changes,
-        config=r.get_config_stack(),
+        blob_normalizer=blob_normalizer,
+        config=config_stack,
     )
 
     if conflicts:

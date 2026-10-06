@@ -1,5 +1,10 @@
 1.2.18	UNRELEASED
 
+ * Apply the blob normalizer to files written by ``porcelain.merge``,
+   so fast-forward and three-way merges honour ``.gitattributes`` and
+   ``core.autocrlf`` like ``checkout`` and ``reset --hard`` do.
+   (Jelmer Vernooĳ, #2467)
+
  * Raise ``MemoryError`` rather than aborting the process when a delta
    declares a result size that can not be allocated, and raise
    ``ApplyDeltaError`` when a delta size header overflows. Make the

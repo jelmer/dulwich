@@ -49,6 +49,7 @@ from dulwich.cli import (
     parse_time_to_timestamp,
     write_columns,
 )
+from dulwich.lfs import LFSPointer, LFSStore
 from dulwich.objects import Blob, Commit, Tag, Tree
 from dulwich.porcelain import gc, rev_parse
 from dulwich.repo import Repo
@@ -5601,6 +5602,36 @@ class RepoDiscoveryTest(DulwichCliTestCase):
             outside, "log", env={"GIT_DIR": os.path.join(self.repo_path, ".git")}
         )
         self.assertIn("Initial commit", stdout)
+
+
+class LfsCommandTest(DulwichCliTestCase):
+    """Tests for the lfs command."""
+
+    def _smudge(self, data: bytes):
+        old_stdin = sys.stdin
+        try:
+            sys.stdin = io.TextIOWrapper(io.BytesIO(data))
+            return self._run_cli("lfs", "smudge", "--stdin")
+        finally:
+            sys.stdin = old_stdin
+
+    def test_smudge(self):
+        content = b"content in the local store"
+        oid = LFSStore.from_repo(self.repo, create=True).write_object([content])
+
+        result, stdout, _stderr = self._smudge(LFSPointer(oid, len(content)).to_bytes())
+        self.assertIsNone(result)
+        self.assertEqual(content.decode(), stdout)
+
+    def test_smudge_missing_object(self):
+        # Like git-lfs, pass the pointer through but exit with an error
+        LFSStore.from_repo(self.repo, create=True)
+        pointer = LFSPointer("0" * 64, 5).to_bytes()
+
+        with self.assertLogs("dulwich.cli", level="ERROR"):
+            result, stdout, _stderr = self._smudge(pointer)
+        self.assertEqual(2, result)
+        self.assertEqual(pointer.decode(), stdout)
 
 
 if __name__ == "__main__":

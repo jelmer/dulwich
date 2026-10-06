@@ -58,6 +58,8 @@ from typing import TYPE_CHECKING, Any, BinaryIO
 from urllib.parse import urljoin, urlparse
 from urllib.request import url2pathname
 
+from .filters import FilterError
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -175,6 +177,7 @@ class LFSStore:
             os.makedirs(os.path.dirname(path))
 
         tmpdir = os.path.join(self.path, "tmp")
+        os.makedirs(tmpdir, exist_ok=True)
         with tempfile.NamedTemporaryFile(dir=tmpdir, mode="wb", delete=False) as f:
             for chunk in data_chunks:
                 f.write(chunk)
@@ -259,10 +262,24 @@ class LFSPointer:
 class LFSFilterDriver:
     """LFS filter driver implementation."""
 
-    def __init__(self, lfs_store: "LFSStore", config: "Config | None" = None) -> None:
-        """Initialize LFSFilterDriver."""
+    def __init__(
+        self,
+        lfs_store: "LFSStore",
+        config: "Config | None" = None,
+        skip_smudge: bool = False,
+    ) -> None:
+        """Initialize LFSFilterDriver.
+
+        Args:
+            lfs_store: Store to read and write LFS objects from
+            config: Optional git config, used to find the LFS server
+            skip_smudge: Leave pointers alone when smudging, even if the
+                objects are available locally, like git-lfs does when
+                ``GIT_LFS_SKIP_SMUDGE`` is set
+        """
         self.lfs_store = lfs_store
         self.config = config
+        self.skip_smudge = skip_smudge
 
     def clean(self, data: bytes) -> bytes:
         """Convert file content to LFS pointer (clean filter)."""
@@ -290,21 +307,42 @@ class LFSFilterDriver:
         if not pointer.is_valid_oid():
             return data
 
+        if self.skip_smudge:
+            return data
+
+        try:
+            return self.get_content(pointer)
+        except LFSError as e:
+            # Like git, only fail if the filter is marked as required
+            if self.config is not None and self.config.get_boolean(
+                (b"filter", b"lfs"), b"required", False
+            ):
+                raise FilterError(f"Required LFS smudge filter failed: {e}") from e
+            logger.warning("LFS object download failed for %s: %s", pointer.oid, e)
+
+            # Return pointer as-is when object is missing and download failed
+            return data
+
+    def get_content(self, pointer: LFSPointer) -> bytes:
+        """Get the content an LFS pointer refers to.
+
+        Args:
+            pointer: LFS pointer containing OID and size
+
+        Returns:
+            Content from the LFS store, downloaded first if necessary
+
+        Raises:
+            LFSError: If the object is not in the store and can not be
+                downloaded
+        """
         try:
             # Read the actual content from LFS store
             with self.lfs_store.open_object(pointer.oid) as f:
                 return f.read()
         except KeyError:
             # Object not found in LFS store, try to download it
-            try:
-                content = self._download_object(pointer)
-                return content
-            except LFSError as e:
-                # Download failed, fall back to returning pointer
-                logger.warning("LFS object download failed for %s: %s", pointer.oid, e)
-
-                # Return pointer as-is when object is missing and download failed
-                return data
+            return self._download_object(pointer)
 
     def _download_object(self, pointer: LFSPointer) -> bytes:
         """Download an LFS object from the server.
@@ -457,6 +495,16 @@ class LFSClient:
         """
         raise NotImplementedError
 
+    def has_object(self, oid: str, size: int, ref: str | None = None) -> bool:
+        """Check whether the server already has an LFS object.
+
+        Args:
+            oid: Object ID (SHA256)
+            size: Object size
+            ref: Optional ref name
+        """
+        raise NotImplementedError
+
     @classmethod
     def from_url(cls, url: str, config: "Config | None" = None) -> "LFSClient":
         """Create appropriate LFS client based on URL scheme.
@@ -598,6 +646,29 @@ class HTTPLFSClient(LFSClient):
             self._pool_manager = default_urllib3_manager(self.config)
         return self._pool_manager
 
+    def _request(
+        self,
+        method: str,
+        url: str,
+        headers: dict[str, str],
+        body: bytes | None = None,
+    ) -> "urllib3.BaseHTTPResponse":
+        """Send a request through the urllib3 pool manager.
+
+        Raises:
+            LFSError: If the server can not be reached
+        """
+        import urllib3.exceptions
+
+        # Use urllib3 pool manager with git config applied
+        pool_manager = self._get_pool_manager()
+        try:
+            response = pool_manager.request(method, url, headers=headers, body=body)
+        except urllib3.exceptions.HTTPError as e:
+            raise LFSError(f"Request to {url} failed: {e}") from e
+        assert response is not None
+        return response
+
     def _make_request(
         self,
         method: str,
@@ -615,12 +686,9 @@ class HTTPLFSClient(LFSClient):
         if headers:
             req_headers.update(headers)
 
-        # Use urllib3 pool manager with git config applied
-        pool_manager = self._get_pool_manager()
-        response = pool_manager.request(method, url, headers=req_headers, body=data)
-        assert response is not None
+        response = self._request(method, url, req_headers, data)
         if response.status >= 400:
-            raise ValueError(
+            raise LFSError(
                 f"HTTP {response.status}: {response.data.decode('utf-8', errors='ignore')}"
             )
         return response.data
@@ -655,9 +723,15 @@ class HTTPLFSClient(LFSClient):
             "POST", "objects/batch", json.dumps(data).encode("utf-8")
         )
         if not response:
-            raise ValueError("Empty response from LFS server")
-        response_data = json.loads(response)
-        return self._parse_batch_response(response_data)
+            raise LFSError("Empty response from LFS server")
+        try:
+            response_data = json.loads(response)
+        except json.JSONDecodeError as e:
+            raise LFSError(f"Invalid response from LFS server: {e}") from e
+        try:
+            return self._parse_batch_response(response_data)
+        except (KeyError, TypeError, AttributeError) as e:
+            raise LFSError(f"Malformed batch response from LFS server: {e!r}") from e
 
     def _parse_batch_response(self, data: Mapping[str, Any]) -> LFSBatchResponse:
         """Parse JSON response into LFSBatchResponse dataclass."""
@@ -713,12 +787,7 @@ class HTTPLFSClient(LFSClient):
         if action.header:
             req_headers.update(action.header)
 
-        pool_manager = self._get_pool_manager()
-        response = pool_manager.request(
-            method, action.href, headers=req_headers, body=body
-        )
-        assert response is not None
-        return response
+        return self._request(method, action.href, req_headers, body)
 
     def download(self, oid: str, size: int, ref: str | None = None) -> bytes:
         """Download an LFS object.
@@ -762,6 +831,35 @@ class HTTPLFSClient(LFSClient):
 
         return content
 
+    def _upload_actions(
+        self, oid: str, size: int, ref: str | None = None
+    ) -> dict[str, LFSAction] | None:
+        """Ask the server what is needed to upload an object.
+
+        Returns:
+            Actions to perform, or None if the server already has the object
+        """
+        batch_resp = self.batch("upload", [{"oid": oid, "size": size}], ref)
+
+        if not batch_resp.objects:
+            raise LFSError(f"No objects returned for {oid}")
+
+        obj = batch_resp.objects[0]
+        if obj.error:
+            raise LFSError(f"Server error for {oid}: {obj.error.message}")
+
+        return obj.actions or None
+
+    def has_object(self, oid: str, size: int, ref: str | None = None) -> bool:
+        """Check whether the server already has an LFS object.
+
+        Args:
+            oid: Object ID (SHA256)
+            size: Object size
+            ref: Optional ref name
+        """
+        return self._upload_actions(oid, size, ref) is None
+
     def upload(
         self, oid: str, size: int, content: bytes, ref: str | None = None
     ) -> None:
@@ -773,26 +871,18 @@ class HTTPLFSClient(LFSClient):
             content: Object content
             ref: Optional ref name
         """
-        # Get upload URL via batch API
-        batch_resp = self.batch("upload", [{"oid": oid, "size": size}], ref)
+        actions = self._upload_actions(oid, size, ref)
 
-        if not batch_resp.objects:
-            raise LFSError(f"No objects returned for {oid}")
-
-        obj = batch_resp.objects[0]
-        if obj.error:
-            raise LFSError(f"Server error for {oid}: {obj.error.message}")
-
-        # If no actions, object already exists
-        if not obj.actions:
+        if actions is None:
+            # Object already exists
             return
 
-        if "upload" not in obj.actions:
+        if "upload" not in actions:
             raise LFSError(f"No upload action for {oid}")
 
         response = self._action_request(
             "PUT",
-            obj.actions["upload"],
+            actions["upload"],
             headers={"Content-Type": "application/octet-stream"},
             body=content,
         )
@@ -802,10 +892,10 @@ class HTTPLFSClient(LFSClient):
             )
 
         # Verify if needed
-        if "verify" in obj.actions:
+        if "verify" in actions:
             response = self._action_request(
                 "POST",
-                obj.actions["verify"],
+                actions["verify"],
                 headers={"Content-Type": "application/vnd.git-lfs+json"},
                 body=json.dumps({"oid": oid, "size": size}).encode("utf-8"),
             )
@@ -869,6 +959,20 @@ class FileLFSClient(LFSClient):
             raise LFSError(f"OID mismatch: expected {oid}, got {actual_oid}")
 
         return content
+
+    def has_object(self, oid: str, size: int, ref: str | None = None) -> bool:
+        """Check whether the store already has an LFS object.
+
+        Args:
+            oid: Object ID (SHA256)
+            size: Object size
+            ref: Optional ref name (ignored for file-based client)
+        """
+        try:
+            with self._local_store.open_object(oid):
+                return True
+        except KeyError:
+            return False
 
     def upload(
         self, oid: str, size: int, content: bytes, ref: str | None = None

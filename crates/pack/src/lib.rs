@@ -21,7 +21,7 @@
 // Allow PyO3 macro-generated interior mutable constants
 #![allow(clippy::declare_interior_mutable_const)]
 
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::{PyMemoryError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyList};
 
@@ -102,15 +102,21 @@ fn get_delta_header_size(
     length: usize,
 ) -> Result<usize, &'static str> {
     let mut size: usize = 0;
-    let mut i: usize = 0;
+    let mut i: u32 = 0;
     loop {
         if *index >= length {
             return Err("delta truncated in size header");
         }
         let cmd = delta[*index];
         *index += 1;
-        size |= ((cmd & !0x80) as usize) << i;
-        i += 7;
+        let bits = (cmd & !0x80) as usize;
+        if bits != 0 {
+            if i >= usize::BITS || bits > usize::MAX >> i {
+                return Err("delta size header overflows");
+            }
+            size |= bits << i;
+        }
+        i = i.saturating_add(7);
         if cmd & 0x80 == 0 {
             return Ok(size);
         }
@@ -165,7 +171,13 @@ fn apply_delta(py: Python, py_src_buf: Py<PyAny>, py_delta: Py<PyAny>) -> PyResu
 
     let dest_size = get_delta_header_size(delta.as_ref(), &mut index, delta_len)
         .map_err(ApplyDeltaError::new_err)?;
-    let mut out = vec![0; dest_size];
+    let mut out = Vec::new();
+    out.try_reserve_exact(dest_size).map_err(|_| {
+        PyMemoryError::new_err(format!(
+            "unable to allocate {} bytes for delta result",
+            dest_size
+        ))
+    })?;
     let mut outindex = 0;
 
     while index < delta_len {
@@ -212,7 +224,7 @@ fn apply_delta(py: Python, py_src_buf: Py<PyAny>, py_delta: Py<PyAny>) -> PyResu
                 break;
             }
 
-            out[outindex..outindex + cp_size].copy_from_slice(&src_buf[cp_off..cp_off + cp_size]);
+            out.extend_from_slice(&src_buf[cp_off..cp_off + cp_size]);
             outindex += cp_size;
         } else if cmd != 0 {
             if (cmd as usize) > dest_size {
@@ -227,8 +239,7 @@ fn apply_delta(py: Python, py_src_buf: Py<PyAny>, py_delta: Py<PyAny>) -> PyResu
                 return Err(ApplyDeltaError::new_err("delta not empty"));
             }
 
-            out[outindex..outindex + cmd as usize]
-                .copy_from_slice(&delta[index..index + cmd as usize]);
+            out.extend_from_slice(&delta[index..index + cmd as usize]);
             outindex += cmd as usize;
             index += cmd as usize;
         } else {

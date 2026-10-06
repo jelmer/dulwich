@@ -71,6 +71,7 @@ _GIT_ENV_SCRUB: tuple[str, ...] = (
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
     "GIT_NAMESPACE",
     "GIT_COMMON_DIR",
+    "GIT_LFS_SKIP_SMUDGE",
 )
 
 

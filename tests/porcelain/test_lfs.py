@@ -21,6 +21,7 @@
 
 """Tests for LFS porcelain functions."""
 
+import dataclasses
 import os
 import shutil
 import sys
@@ -813,10 +814,12 @@ class LFSTransferTests(TestCase):
         # matches the file that was written
         st = os.lstat(os.path.join(self.test_dir, "tracked.bin"))
         self.assertEqual(len(content), st.st_size)
-        self.assertEqual(
-            index_entry_from_stat(st, pointer_blob),
-            self.repo.open_index()[b"tracked.bin"],
+        expected = index_entry_from_stat(st, pointer_blob)
+        # The on-disk index only stores the lower 32 bits of dev and ino
+        expected = dataclasses.replace(
+            expected, dev=expected.dev & 0xFFFFFFFF, ino=expected.ino & 0xFFFFFFFF
         )
+        self.assertEqual(expected, self.repo.open_index()[b"tracked.bin"])
         self.assertEqual([], porcelain.status(self.repo).unstaged)
 
     def test_pull_ignores_skip_smudge(self) -> None:

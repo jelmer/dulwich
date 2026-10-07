@@ -86,7 +86,7 @@ if TYPE_CHECKING:
     # There are no circular imports here, but we try to defer imports as long
     # as possible to reduce start-up time for anything that doesn't need
     # these imports.
-    from .attrs import GitAttributes
+    from .attrs import AttributeValue, GitAttributes, Pattern
     from .config import ConditionMatcher, Config, ConfigFile, StackedConfig
     from .diff_tree import RenameDetector
     from .filters import FilterBlobNormalizer, FilterContext
@@ -1477,6 +1477,91 @@ class InvalidWorktreeConfiguration(Exception):
     """core.worktree is set on a bare repository."""
 
 
+class _GitAttributesLoader:
+    """Read the .gitattributes of a directory for GitAttributes.
+
+    The working tree file is used if there is one, otherwise the one in
+    the tree, as git does for checkin.
+    """
+
+    def __init__(
+        self,
+        object_store: "BaseObjectStore",
+        worktree_path: str | None,
+        tree: ObjectID | None,
+    ) -> None:
+        self._object_store = object_store
+        self._worktree_path = worktree_path
+        # Tree id of each directory looked up so far; None if absent.
+        self._trees: dict[bytes, ObjectID | None] = {b"": tree}
+
+    def __call__(
+        self, dirpath: bytes
+    ) -> "list[tuple[Pattern, Mapping[bytes, AttributeValue]]]":
+        from .attrs import compile_gitattributes_patterns, parse_git_attributes
+
+        if self._worktree_path is not None:
+            path = os.path.join(
+                self._worktree_path, *os.fsdecode(dirpath).split("/"), ".gitattributes"
+            )
+            try:
+                f = open_nofollow_read(path)
+            except (FileNotFoundError, NotADirectoryError):
+                pass
+            except OSError as e:
+                if e.errno not in (errno.ELOOP, errno.EMLINK):
+                    raise
+                logger.warning("Ignoring %s: it is a symbolic link", path)
+            else:
+                with f:
+                    return compile_gitattributes_patterns(
+                        parse_git_attributes(f), path, dirpath
+                    )
+
+        tree_id = self._lookup_tree(dirpath)
+        if tree_id is None:
+            return []
+        tree = self._object_store[tree_id]
+        if not isinstance(tree, Tree):
+            raise NotTreeError(tree_id)
+        try:
+            mode, sha = tree[b".gitattributes"]
+        except KeyError:
+            return []
+        if not stat.S_ISREG(mode):
+            return []
+        blob = self._object_store[sha]
+        if not isinstance(blob, Blob):
+            return []
+        source = dirpath + b"/.gitattributes" if dirpath else b".gitattributes"
+        return compile_gitattributes_patterns(
+            parse_git_attributes(BytesIO(blob.data)), source, dirpath
+        )
+
+    def _lookup_tree(self, dirpath: bytes) -> ObjectID | None:
+        try:
+            return self._trees[dirpath]
+        except KeyError:
+            pass
+        parent, _, name = dirpath.rpartition(b"/")
+        parent_id = self._lookup_tree(parent)
+        tree_id = None
+        if parent_id is not None:
+            parent_tree = self._object_store[parent_id]
+            if not isinstance(parent_tree, Tree):
+                raise NotTreeError(parent_id)
+            try:
+                mode, sha = parent_tree[name]
+            except KeyError:
+                pass
+            else:
+                # Like git, don't look inside submodules or non-directories.
+                if stat.S_ISDIR(mode):
+                    tree_id = sha
+        self._trees[dirpath] = tree_id
+        return tree_id
+
+
 class Repo(BaseRepo):
     """A git repository backed by local disk.
 
@@ -2687,27 +2772,27 @@ class Repo(BaseRepo):
     def get_gitattributes(self, tree: bytes | None = None) -> "GitAttributes":
         """Read gitattributes for the repository.
 
+        As in git, the ``.gitattributes`` of every directory applies to the
+        paths below it, with deeper files taking precedence and
+        ``$GIT_DIR/info/attributes`` taking precedence over all of them.
+        Subdirectory files are read when a path below them is first matched.
+
         Args:
-            tree: Tree SHA to read .gitattributes from (defaults to HEAD)
+            tree: Tree SHA to read .gitattributes from. If not given, each
+              ``.gitattributes`` is read from the working tree, falling back
+              to the HEAD tree when the working tree has none.
 
         Returns:
             GitAttributes object that can be used to match paths
         """
-        from .attrs import (
-            GitAttributes,
-            compile_gitattributes_patterns,
-            parse_git_attributes,
-        )
-
-        patterns = []
+        from .attrs import GitAttributes, parse_gitattributes_file
 
         # Read system gitattributes (TODO: implement this)
         # Read global gitattributes (TODO: implement this)
 
-        # Read repository .gitattributes from index/tree
+        read_worktree = tree is None and not self.bare
         if tree is None:
             try:
-                # Try to get from HEAD
                 head = self[b"HEAD"]
                 # Peel tags to get to the underlying commit
                 while isinstance(head, Tag):
@@ -2724,53 +2809,20 @@ class Repo(BaseRepo):
                 # No HEAD, no attributes from tree
                 pass
 
-        if tree is not None:
-            try:
-                tree_obj = self[tree]
-                assert isinstance(tree_obj, Tree)
-                if b".gitattributes" in tree_obj:
-                    _, attrs_sha = tree_obj[b".gitattributes"]
-                    attrs_blob = self[attrs_sha]
-                    if isinstance(attrs_blob, Blob):
-                        attrs_data = BytesIO(attrs_blob.data)
-                        patterns.extend(
-                            compile_gitattributes_patterns(
-                                parse_git_attributes(attrs_data), b".gitattributes"
-                            )
-                        )
-            except (KeyError, NotTreeError):
-                pass
-
-        # Read .git/info/attributes
         info_attrs_path = os.path.join(self.controldir(), "info", "attributes")
-        if os.path.exists(info_attrs_path):
-            with open(info_attrs_path, "rb") as f:
-                patterns.extend(
-                    compile_gitattributes_patterns(
-                        parse_git_attributes(f), info_attrs_path
-                    )
-                )
-
-        # Read .gitattributes from working directory (if it exists). Like git,
-        # don't follow a symlink there.
-        working_attrs_path = os.path.join(self.path, ".gitattributes")
         try:
-            working_attrs_file = open_nofollow_read(working_attrs_path)
+            info_patterns = parse_gitattributes_file(info_attrs_path)
         except FileNotFoundError:
-            pass
-        except OSError as e:
-            if e.errno not in (errno.ELOOP, errno.EMLINK):
-                raise
-            logger.warning("Ignoring %s: it is a symbolic link", working_attrs_path)
-        else:
-            with working_attrs_file as f:
-                patterns.extend(
-                    compile_gitattributes_patterns(
-                        parse_git_attributes(f), working_attrs_path
-                    )
-                )
+            info_patterns = []
 
-        return GitAttributes(patterns)
+        loader = _GitAttributesLoader(
+            self.object_store,
+            self.path if read_worktree else None,
+            None if tree is None else ObjectID(tree),
+        )
+        return GitAttributes(
+            loader(b""), directory_loader=loader, info_patterns=info_patterns
+        )
 
 
 class MemoryRepo(BaseRepo):

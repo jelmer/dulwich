@@ -235,6 +235,25 @@ class PorcelainFilterTests(TestCase):
         bin_blob = self.repo.object_store[bin_entry.sha]
         self.assertEqual(bin_blob.data, b"binary\r\nfile\r\n")
 
+    def test_add_with_nested_gitattributes(self) -> None:
+        os.makedirs(os.path.join(self.test_dir, "sub"))
+        with open(os.path.join(self.test_dir, "sub", ".gitattributes"), "wb") as f:
+            f.write(b"*.txt text\n")
+        with open(os.path.join(self.test_dir, "sub", "a.txt"), "wb") as f:
+            f.write(b"one\r\ntwo\r\n")
+        with open(os.path.join(self.test_dir, "a.txt"), "wb") as f:
+            f.write(b"one\r\ntwo\r\n")
+
+        porcelain.add(self.repo, paths=["sub/.gitattributes", "sub/a.txt", "a.txt"])
+
+        index = self.repo.open_index()
+        self.assertEqual(
+            b"one\ntwo\n", self.repo.object_store[index[b"sub/a.txt"].sha].data
+        )
+        self.assertEqual(
+            b"one\r\ntwo\r\n", self.repo.object_store[index[b"a.txt"].sha].data
+        )
+
     def test_clone_with_filters(self) -> None:
         """Test cloning a repository with filters."""
         # Create a source repository

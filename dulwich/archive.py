@@ -24,6 +24,7 @@
 
 __all__ = ["ChunkedBytesIO", "UnsafeArchivePathError", "tar_stream"]
 
+import logging
 import posixpath
 import stat
 import struct
@@ -35,11 +36,21 @@ from os import SEEK_END
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
+    from .attrs import AttributeValue, Pattern
     from .object_store import BaseObjectStore
     from .objects import TreeEntry
 
+    # Compiled .gitattributes patterns, as returned by
+    # dulwich.attrs.compile_gitattributes_patterns.
+    AttrPatterns = Sequence[tuple[Pattern, Mapping[bytes, AttributeValue]]]
+
+from .attrs import compile_gitattributes_patterns, match_path, parse_git_attributes
 from .index import cleanup_mode
 from .objects import Blob, Tree
+
+logger = logging.getLogger(__name__)
 
 
 class UnsafeArchivePathError(ValueError):
@@ -90,6 +101,57 @@ def _is_unsafe_archive_path(path: bytes) -> bool:
         if normalized in _INVALID_PATH_COMPONENTS:
             return True
     return False
+
+
+def _dir_gitattributes(
+    store: "BaseObjectStore", tree: "Tree", dirpath: bytes
+) -> "AttrPatterns":
+    """Read the ``.gitattributes`` of one directory of the tree being archived.
+
+    git archive takes attributes from the tree it is archiving, unless
+    ``--worktree-attributes`` is given, and reads the ``.gitattributes`` of
+    every directory it walks into. Patterns are relative to the directory
+    holding the file, so ``dirpath`` is passed as their base.
+
+    Args:
+      store: Object store to read the blob from
+      tree: Tree of the directory
+      dirpath: Path of the directory relative to the archive root; empty for
+        the root itself
+
+    Returns:
+      Compiled patterns, empty if the directory has no readable
+      ``.gitattributes``
+    """
+    try:
+        mode, sha = tree[b".gitattributes"]
+    except KeyError:
+        return []
+    source = posixpath.join(dirpath, b".gitattributes")
+    if not stat.S_ISREG(mode):
+        logger.debug("Ignoring %r: not a regular file", source)
+        return []
+    blob = store[sha]
+    if not isinstance(blob, Blob):
+        logger.warning("Ignoring %r: not a blob", source)
+        return []
+    return compile_gitattributes_patterns(
+        parse_git_attributes(BytesIO(blob.data)), source, dirpath
+    )
+
+
+def _is_export_ignored(patterns: "AttrPatterns", path: bytes, is_dir: bool) -> bool:
+    """Return True if ``path`` carries the ``export-ignore`` attribute.
+
+    A directory is matched both with and without a trailing slash, since git
+    checks ``dir/`` (so that a ``dir/`` pattern applies) while a pattern
+    without the slash matches the name itself.
+    """
+    candidates = (path, path + b"/") if is_dir else (path,)
+    return any(
+        match_path(patterns, candidate).get(b"export-ignore") is True
+        for candidate in candidates
+    )
 
 
 class ChunkedBytesIO:
@@ -186,7 +248,7 @@ def tar_stream(
             buf.write(struct.pack("<L", mtime))
             buf.seek(0, SEEK_END)
 
-        for entry_abspath, entry in _walk_tree(store, tree, prefix):
+        for entry_path, entry in _walk_tree(store, tree):
             assert entry.sha is not None
             try:
                 blob = store[entry.sha]
@@ -202,7 +264,9 @@ def tar_stream(
 
             info = tarfile.TarInfo()
             # tarfile only works with ascii.
-            info.name = entry_abspath.decode("utf-8", "surrogateescape")
+            info.name = posixpath.join(prefix, entry_path).decode(
+                "utf-8", "surrogateescape"
+            )
             info.size = blob.raw_length()
             assert entry.mode is not None
             # Canonicalize the tree-supplied mode the same way git's archive
@@ -223,25 +287,46 @@ def tar_stream(
 
 
 def _walk_tree(
-    store: "BaseObjectStore", tree: "Tree", root: bytes = b""
+    store: "BaseObjectStore",
+    tree: "Tree",
+    root: bytes = b"",
+    inherited: "AttrPatterns" = (),
 ) -> Generator[tuple[bytes, "TreeEntry"], None, None]:
-    """Recursively walk a dulwich Tree, yielding tuples of (absolute path, TreeEntry) along the way.
+    """Recursively walk a dulwich Tree, yielding tuples of (tree path, TreeEntry) along the way.
+
+    Entries carrying the ``export-ignore`` attribute are skipped; an ignored
+    directory is not descended into, so its contents are left out too. The
+    ``.gitattributes`` of each directory walked into is added to the patterns
+    inherited from its parents, so that a deeper file overrides a shallower
+    one, as git does.
+
+    Args:
+      store: Object store to read subtrees and blobs from
+      tree: Tree of the directory to walk
+      root: Path of the directory relative to the archive root
+      inherited: Compiled patterns from the directories above this one
 
     Raises:
       UnsafeArchivePathError: if a tree entry's name is unsafe to emit into
         an archive (matches the spirit of git's ``verify_path`` /
         ``error: invalid path``).
     """
+    dir_patterns = _dir_gitattributes(store, tree, root)
+    # Later patterns win, so this directory's own file goes after its parents'.
+    patterns = [*inherited, *dir_patterns] if dir_patterns else inherited
     for entry in tree.iteritems():
         assert entry.path is not None
         if _is_unsafe_archive_path(entry.path):
             raise UnsafeArchivePathError(entry.path)
-        entry_abspath = posixpath.join(root, entry.path)
+        entry_path = posixpath.join(root, entry.path)
         assert entry.mode is not None
-        if stat.S_ISDIR(entry.mode):
+        is_dir = stat.S_ISDIR(entry.mode)
+        if patterns and _is_export_ignored(patterns, entry_path, is_dir):
+            continue
+        if is_dir:
             assert entry.sha is not None
             subtree = store[entry.sha]
             if isinstance(subtree, Tree):
-                yield from _walk_tree(store, subtree, entry_abspath)
+                yield from _walk_tree(store, subtree, entry_path, patterns)
         else:
-            yield (entry_abspath, entry)
+            yield (entry_path, entry)

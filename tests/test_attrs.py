@@ -344,6 +344,31 @@ class PatternTests(TestCase):
         pattern = Pattern(b"**" * 25 + b"x")
         self.assertFalse(pattern.match(b"a" * 80))
 
+    def test_base_without_slash(self):
+        pattern = Pattern(b"*.txt", b"sub")
+        self.assertTrue(pattern.match(b"sub/a.txt"))
+        self.assertTrue(pattern.match(b"sub/deeper/a.txt"))
+        self.assertFalse(pattern.match(b"a.txt"))
+        self.assertFalse(pattern.match(b"other/a.txt"))
+        self.assertFalse(pattern.match(b"subx/a.txt"))
+
+    def test_base_with_slash(self):
+        pattern = Pattern(b"deeper/*.txt", b"sub")
+        self.assertTrue(pattern.match(b"sub/deeper/a.txt"))
+        self.assertFalse(pattern.match(b"deeper/a.txt"))
+        self.assertFalse(pattern.match(b"sub/x/deeper/a.txt"))
+
+    def test_base_leading_slash(self):
+        pattern = Pattern(b"/a.txt", b"sub")
+        self.assertTrue(pattern.match(b"sub/a.txt"))
+        self.assertFalse(pattern.match(b"a.txt"))
+        self.assertFalse(pattern.match(b"sub/deeper/a.txt"))
+
+    def test_base_is_literal(self):
+        pattern = Pattern(b"*.txt", b"s.b")
+        self.assertTrue(pattern.match(b"s.b/a.txt"))
+        self.assertFalse(pattern.match(b"sxb/a.txt"))
+
 
 class MatchPathTests(TestCase):
     """Test the match_path function."""
@@ -498,6 +523,42 @@ class GitAttributesTests(TestCase):
         self.assertEqual(attrs, {})
 
         self.assertEqual(len(ga), 2)
+
+    def test_directory_precedence(self):
+        """Deeper directories override shallower ones; info overrides all."""
+        loaded = []
+
+        def loader(dirpath):
+            loaded.append(dirpath)
+            return {
+                b"sub": [(Pattern(b"*.txt", b"sub"), {b"eol": b"crlf", b"a": True})],
+                b"sub/deeper": [
+                    (Pattern(b"*.txt", b"sub/deeper"), {b"eol": b"lf", b"b": True})
+                ],
+            }.get(dirpath, [])
+
+        ga = GitAttributes(
+            [(Pattern(b"*.txt"), {b"text": True, b"eol": b"cr", b"b": False})],
+            directory_loader=loader,
+            info_patterns=[(Pattern(b"sub/deeper/x.txt"), {b"a": False})],
+        )
+        self.assertEqual(
+            {b"text": True, b"eol": b"cr", b"b": False}, ga.match_path(b"a.txt")
+        )
+        self.assertEqual(
+            {b"text": True, b"eol": b"crlf", b"a": True, b"b": False},
+            ga.match_path(b"sub/a.txt"),
+        )
+        self.assertEqual(
+            {b"text": True, b"eol": b"lf", b"a": False, b"b": True},
+            ga.match_path(b"sub/deeper/x.txt"),
+        )
+        self.assertEqual(
+            {b"text": True, b"eol": b"lf", b"a": True, b"b": True},
+            ga.match_path(b"sub/deeper/y.txt"),
+        )
+        self.assertEqual([b"sub", b"sub/deeper"], loaded)
+        self.assertEqual(2, len(ga))
 
     def test_add_patterns(self):
         """Test adding patterns to GitAttributes."""

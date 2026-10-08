@@ -3710,6 +3710,48 @@ class TestUpdateWorkingTree(TestCase):
         )
         self.assertFalse(os.path.exists(outside_file))
 
+    def test_update_working_tree_leading_symlink_not_followed_on_delete(self):
+        """An entry below an on-disk symlink must not be removed through it."""
+        if sys.platform == "win32":
+            self.skipTest("Symlinks not fully supported on Windows")
+
+        outside_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside_dir)
+        outside_file = os.path.join(outside_dir, "payload")
+        with open(outside_file, "wb") as f:
+            f.write(b"precious")
+
+        tracked = Blob.from_string(b"tracked")
+        self.repo.object_store.add_object(tracked)
+        tree1 = Tree()
+        tree1[b"d/payload"] = (0o100644, tracked.id)
+        self.repo.object_store.add_object(tree1)
+
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
+
+        # The tracked directory is replaced by a symlink pointing outside.
+        shutil.rmtree(os.path.join(self.tempdir, "d"))
+        os.symlink(outside_dir, os.path.join(self.tempdir, "d"))
+
+        keep = Blob.from_string(b"keep")
+        self.repo.object_store.add_object(keep)
+        tree2 = Tree()
+        tree2[b"keep"] = (0o100644, keep.id)
+        self.repo.object_store.add_object(tree2)
+
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(
+            self.repo,
+            tree1.id,
+            tree2.id,
+            change_iterator=changes,
+            allow_overwrite_modified=True,
+        )
+
+        self.assertTrue(os.path.exists(outside_file))
+        self.assertTrue(os.path.islink(os.path.join(self.tempdir, "d")))
+
     def test_update_working_tree_modified_file_to_dir_transition(self):
         """Test that modified files are not removed when they should be directories."""
         # Create tree with file

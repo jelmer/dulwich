@@ -398,6 +398,13 @@ class CommitCommandTest(DulwichCliTestCase):
         head = porcelain.commit(self.repo, message=b"Original")
         for args in (
             ("-m", "new", "-C", "HEAD"),
+            ("-C", "HEAD", "-m", "new"),
+            ("-m", "", "--reuse-message=HEAD"),
+            ("--reuse-message=HEAD", "-m", ""),
+            ("-m", "new", "-c", "HEAD"),
+            ("-c", "HEAD", "-m", "new"),
+            ("-m", "new", "--reedit-message=HEAD"),
+            ("--reedit-message=HEAD", "-m", "new"),
             ("-C", "HEAD", "-c", "HEAD"),
         ):
             with self.subTest(args=args):
@@ -430,6 +437,237 @@ class CommitCommandTest(DulwichCliTestCase):
         self.assertEqual(result, 1)
         self.assertEqual(self.repo.head(), head)
         editor.assert_called_once()
+
+    def test_commit_fixup_subject(self):
+        """Fixup commits use the target's subject without opening an editor."""
+        target = porcelain.commit(self.repo, message=b"First line\nsecond line\n\nBody")
+        with patch("dulwich.cli.launch_editor") as editor:
+            result, _, _ = self._run_cli("commit", "--fixup", target.decode())
+        self.assertIsNone(result)
+        self.assertEqual(
+            self.repo[self.repo.head()].message, b"fixup! First line second line\n"
+        )
+        editor.assert_not_called()
+
+    def test_commit_fixup_encoding(self):
+        """The target's encoding is decoded into the new commit's encoding."""
+        target = porcelain.commit(
+            self.repo,
+            message="Caf\u00e9 changes\ncontinued \u00a3\n\nBody",
+            encoding=b"ISO-8859-1",
+        )
+        for encoding in (None, b"ISO-8859-1"):
+            with self.subTest(encoding=encoding):
+                if encoding is not None:
+                    config = self.repo.get_config()
+                    config.set((b"i18n",), b"commitEncoding", encoding)
+                    config.write_to_path()
+                result, _, _ = self._run_cli("commit", "--fixup", target.decode())
+                self.assertIsNone(result)
+                commit = self.repo[self.repo.head()]
+                self.assertEqual(commit.encoding, encoding)
+                self.assertEqual(
+                    commit.message,
+                    "fixup! Caf\u00e9 changes continued \u00a3\n".encode(
+                        encoding.decode() if encoding else "utf-8"
+                    ),
+                )
+
+    def test_commit_fixup_messages(self):
+        """Additional messages stay ordered and retain indentation and comments."""
+        target = porcelain.commit(self.repo, message=b"Target\n\nOriginal body")
+        result, _, _ = self._run_cli(
+            "commit",
+            "--fixup",
+            target.decode(),
+            "-m",
+            "",
+            "-m",
+            "Explanation  \n\n\n  indented line\t",
+            "-m",
+            "# Keep this comment\nMore detail",
+        )
+        self.assertIsNone(result)
+        self.assertEqual(
+            self.repo[self.repo.head()].message,
+            b"fixup! Target\n\nExplanation\n\n  indented line\n\n# Keep this comment\nMore detail\n",
+        )
+
+    def test_commit_fixup_staged_tree_and_identity(self):
+        """Fixup uses staged changes and current metadata, leaving unstaged files."""
+        self.overrideEnv("GIT_AUTHOR_NAME", "Current Author")
+        self.overrideEnv("GIT_AUTHOR_EMAIL", "author@example.com")
+        self.overrideEnv("GIT_COMMITTER_NAME", "Current Committer")
+        self.overrideEnv("GIT_COMMITTER_EMAIL", "committer@example.com")
+        for name in ("staged.txt", "unstaged.txt"):
+            with open(os.path.join(self.repo_path, name), "wb") as f:
+                f.write(b"initial")
+        self._run_cli("add", "staged.txt", "unstaged.txt")
+        target = porcelain.commit(
+            self.repo,
+            message=b"Target",
+            author=b"Old <old@example.com>",
+            author_timestamp=1234567890,
+        )
+        head = porcelain.commit(self.repo, message=b"Head")
+        with open(os.path.join(self.repo_path, "staged.txt"), "wb") as f:
+            f.write(b"staged")
+        self._run_cli("add", "staged.txt")
+        with open(os.path.join(self.repo_path, "unstaged.txt"), "wb") as f:
+            f.write(b"unstaged")
+        result, _, _ = self._run_cli("commit", "--fixup", target.decode())
+        self.assertIsNone(result)
+        commit = self.repo[self.repo.head()]
+        self.assertEqual(commit.parents, [head])
+        self.assertEqual(commit.author, b"Current Author <author@example.com>")
+        self.assertEqual(commit.committer, b"Current Committer <committer@example.com>")
+        self.assertNotEqual(commit.author_time, 1234567890)
+        tree = self.repo.object_store[commit.tree]
+        self.assertEqual(self.repo.object_store[tree[b"staged.txt"][1]].data, b"staged")
+        self.assertEqual(
+            self.repo.object_store[tree[b"unstaged.txt"][1]].data, b"initial"
+        )
+
+    def test_commit_fixup_amend(self):
+        """Fixup amend replaces HEAD without inheriting the old author's metadata."""
+        self.overrideEnv("GIT_AUTHOR_NAME", None)
+        self.overrideEnv("GIT_AUTHOR_EMAIL", None)
+        config = self.repo.get_config()
+        config.set((b"user",), b"name", b"Current Author")
+        config.set((b"user",), b"email", b"current@example.com")
+        config.write_to_path()
+        for author in (None, "Other <other@example.com>"):
+            with self.subTest(author=author):
+                head = porcelain.commit(
+                    self.repo,
+                    message=b"Target\n\nBody",
+                    author=b"Old <old@example.com>",
+                    author_timestamp=1234567890,
+                )
+                args = ["commit", "--fixup=HEAD", "--amend"]
+                if author is not None:
+                    args.extend(["--author", author])
+                result, _, _ = self._run_cli(*args)
+                self.assertIsNone(result)
+                commit = self.repo[self.repo.head()]
+                self.assertEqual(commit.message, b"fixup! Target\n")
+                self.assertEqual(commit.parents, self.repo[head].parents)
+                self.assertEqual(
+                    commit.author,
+                    author.encode()
+                    if author
+                    else b"Current Author <current@example.com>",
+                )
+                self.assertNotEqual(commit.author_time, 1234567890)
+
+    def test_commit_fixup_amend_inline_config(self):
+        """Fixup amend reads current identity from environment config overrides."""
+        self.overrideEnv("GIT_AUTHOR_NAME", None)
+        self.overrideEnv("GIT_AUTHOR_EMAIL", None)
+        for name, value in (
+            ("GIT_CONFIG_COUNT", "2"),
+            ("GIT_CONFIG_KEY_0", "user.name"),
+            ("GIT_CONFIG_VALUE_0", "Inline Author"),
+            ("GIT_CONFIG_KEY_1", "user.email"),
+            ("GIT_CONFIG_VALUE_1", "inline@example.com"),
+        ):
+            self.overrideEnv(name, value)
+        head = porcelain.commit(
+            self.repo, message=b"Target", author=b"Old <old@example.com>"
+        )
+        result, _, _ = self._run_cli("commit", "--fixup=HEAD", "--amend")
+        self.assertIsNone(result)
+        commit = self.repo[self.repo.head()]
+        self.assertEqual(commit.author, b"Inline Author <inline@example.com>")
+        self.assertEqual(commit.parents, self.repo[head].parents)
+
+    def test_commit_empty_messages_open_editor(self):
+        """Empty messages retain the editor fallback on regular and amended commits."""
+        for amend in (False, True):
+            for messages in (("",), ("", "")):
+                with self.subTest(amend=amend, messages=messages):
+                    porcelain.commit(self.repo, message=b"Original")
+                    args = ["commit"]
+                    if amend:
+                        args.append("--amend")
+                    for message in messages:
+                        args.extend(["-m", message])
+                    with patch(
+                        "dulwich.cli.launch_editor", return_value=b"Edited by control\n"
+                    ) as editor:
+                        result, _, _ = self._run_cli(*args)
+                    self.assertIsNone(result)
+                    editor.assert_called_once()
+                    self.assertEqual(
+                        self.repo[self.repo.head()].message, b"Edited by control\n"
+                    )
+
+    def test_commit_repeated_messages(self):
+        """Repeated messages create ordered paragraphs on regular commits too."""
+        result, _, _ = self._run_cli("commit", "-m", "First", "-m", "Second")
+        self.assertIsNone(result)
+        self.assertEqual(self.repo[self.repo.head()].message, b"First\n\nSecond")
+
+    def test_commit_fixup_tag(self):
+        """An annotated tag can identify the commit to fix up."""
+        target = porcelain.commit(self.repo, message=b"Tagged target")
+        porcelain.tag_create(
+            self.repo,
+            "fixup-target",
+            objectish=target,
+            annotated=True,
+            message=b"Target tag",
+        )
+        result, _, _ = self._run_cli("commit", "--fixup=fixup-target")
+        self.assertIsNone(result)
+        self.assertEqual(self.repo[self.repo.head()].message, b"fixup! Tagged target\n")
+
+    def test_commit_fixup_invalid_arguments(self):
+        """Incompatible reuse options and unsupported fixup modes preserve HEAD."""
+        head = porcelain.commit(self.repo, message=b"Original")
+        for args in (
+            ("--fixup=HEAD", "-C", "HEAD"),
+            ("--fixup=HEAD", "--reuse-message=HEAD"),
+            ("--fixup=HEAD", "-c", "HEAD"),
+            ("--fixup=HEAD", "--reedit-message=HEAD"),
+            ("-C", "HEAD", "--fixup=HEAD"),
+            ("--reuse-message=HEAD", "--fixup=HEAD"),
+            ("-c", "HEAD", "--fixup=HEAD"),
+            ("--reedit-message=HEAD", "--fixup=HEAD"),
+            ("--fixup=amend:HEAD",),
+            ("--fixup=reword:HEAD",),
+        ):
+            with self.subTest(args=args):
+                with self.assertRaises(SystemExit) as error:
+                    self._run_cli("commit", *args)
+                self.assertEqual(error.exception.code, 2)
+                self.assertEqual(self.repo.head(), head)
+
+    def test_commit_fixup_invalid_target(self):
+        """Target resolution fails before automatic staging or HEAD changes."""
+        filename = os.path.join(self.repo_path, "tracked.txt")
+        with open(filename, "wb") as f:
+            f.write(b"initial")
+        self._run_cli("add", "tracked.txt")
+        head = porcelain.commit(self.repo, message=b"Original")
+        with open(filename, "wb") as f:
+            f.write(b"unstaged")
+        index_path = self.repo.index_path()
+        with open(index_path, "rb") as f:
+            index_before = f.read()
+        blob = Blob.from_string(b"not a commit")
+        self.repo.object_store.add_object(blob)
+        for target, error_type in (
+            ("missing", KeyError),
+            ("", KeyError),
+            (blob.id.decode(), ValueError),
+        ):
+            with self.subTest(target=target):
+                with self.assertRaises(error_type):
+                    self._run_cli("commit", "--fixup", target, "-a")
+                self.assertEqual(self.repo.head(), head)
+                with open(index_path, "rb") as f:
+                    self.assertEqual(f.read(), index_before)
 
     def test_commit_all_flag(self):
         # Create initial commit

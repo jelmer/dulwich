@@ -437,8 +437,12 @@ class _GitFile(IO[bytes]):
                     # Windows versions prior to Vista don't support atomic
                     # renames
                     _fancy_rename(self._lockfilename, self._filename)
-        finally:
+        except BaseException:
             self.abort()
+            raise
+        # The rename released the lock, so the lockfile path may already
+        # belong to another writer; don't remove it.
+        self._closed = True
 
     def __del__(self) -> None:
         if not getattr(self, "_closed", True):

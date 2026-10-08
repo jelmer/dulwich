@@ -27,6 +27,7 @@ import stat
 import sys
 import tempfile
 from unittest import skipIf
+from unittest.mock import patch
 
 from dulwich.file import (
     PERM_EVERYBODY,
@@ -249,6 +250,28 @@ class GitFileTests(TestCase):
 
         f.abort()
         self.assertTrue(f._closed)
+
+    def test_close_keeps_lock_taken_after_rename(self) -> None:
+        # Once close() has renamed the lockfile into place, another writer
+        # may take the lock; close() must not remove that writer's lockfile.
+        foo = self.path("foo")
+        foo_lock = f"{foo}.lock"
+        f = GitFile(foo, "wb")
+        f.write(b"new contents")
+        orig_replace = os.replace
+
+        def replace_then_relock(src, dst):
+            orig_replace(src, dst)
+            self.other = GitFile(foo, "wb")
+
+        with patch("os.replace", replace_then_relock):
+            f.close()
+        self.assertTrue(f.closed)
+        self.assertTrue(os.path.exists(foo_lock))
+        self.other.write(b"other contents")
+        self.other.close()
+        with open(foo, "rb") as g:
+            self.assertEqual(b"other contents", g.read())
 
     def test_shared_perm_applied_on_close(self) -> None:
         if sys.platform == "win32":

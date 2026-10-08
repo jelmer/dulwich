@@ -276,6 +276,34 @@ class IndexPathNormalizerTestCase(TestCase):
         self.assertNotIn(b"other.txt", index)
         self.assertRaises(KeyError, lambda: index[b"other.txt"])
 
+    def test_changes_from_tree_uses_exact_paths(self) -> None:
+        for setting, old_name, new_name in [
+            (b"ignorecase", b"Foo.txt", b"foo.txt"),
+            (b"precomposeunicode", "t\u00e4st.txt".encode(), "ta\u0308st.txt".encode()),
+        ]:
+            with self.subTest(setting=setting):
+                config = ConfigDict()
+                config.set((b"core",), setting, True)
+                index = Index(
+                    os.path.join(self.tempdir, "idx"),
+                    read=False,
+                    path_normalizer=make_path_normalizer(config),
+                )
+                entry = self._entry()
+                index[new_name] = entry
+                tree = Tree()
+                tree.add(old_name, entry.mode, entry.sha)
+                store = MemoryObjectStore()
+                store.add_object(tree)
+
+                self.assertCountEqual(
+                    [
+                        ((old_name, None), (entry.mode, None), (entry.sha, None)),
+                        ((None, new_name), (None, entry.mode), (None, entry.sha)),
+                    ],
+                    index.changes_from_tree(store, tree.id),
+                )
+
     def test_setitem_reuses_canonical_key(self) -> None:
         index = Index(
             os.path.join(self.tempdir, "idx"),

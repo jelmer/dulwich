@@ -27,13 +27,38 @@ from unittest import skipIf
 from dulwich import porcelain
 from dulwich.tests.utils import build_commit_graph
 
-from ..porcelain import PorcelainGpgTestCase
+from ..porcelain import PorcelainGpgTestCase, PorcelainTestCase
 from .utils import CompatTestCase, run_git_or_fail
 
 try:
     import gpgme
 except ImportError:
     gpgme = None
+
+
+class StatusCompatTests(PorcelainTestCase, CompatTestCase):
+    def test_staged_case_only_rename(self) -> None:
+        with open(os.path.join(self.repo.path, "Foo.txt"), "wb") as f:
+            f.write(b"content\n")
+        porcelain.add(self.repo, ["Foo.txt"])
+        porcelain.commit(
+            self.repo,
+            message=b"base",
+            author=b"Test <test@example.com>",
+            committer=b"Test <test@example.com>",
+        )
+        run_git_or_fail(["config", "core.ignorecase", "true"], cwd=self.repo.path)
+        run_git_or_fail(["mv", "Foo.txt", "foo.txt"], cwd=self.repo.path)
+
+        git_changes = run_git_or_fail(
+            ["diff-index", "--cached", "--no-renames", "--name-status", "HEAD"],
+            cwd=self.repo.path,
+        )
+        self.assertEqual(b"D\tFoo.txt\nA\tfoo.txt\n", git_changes)
+        self.assertEqual(
+            {"add": [b"foo.txt"], "delete": [b"Foo.txt"], "modify": []},
+            porcelain.status(self.repo).staged,
+        )
 
 
 @skipIf(

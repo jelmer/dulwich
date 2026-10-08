@@ -1603,7 +1603,8 @@ class Index:
         """
 
         def lookup_entry(path: bytes) -> tuple[bytes, int]:
-            entry = self[path]
+            # Tree paths are authoritative, so don't normalize the lookup.
+            entry = self._byname[path]
             if isinstance(entry, IndexEntry):
                 return entry.sha, cleanup_mode(entry.mode)
             else:

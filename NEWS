@@ -1,5 +1,9 @@
 1.2.18	UNRELEASED
 
+ * Report staged case-only renames in ``porcelain.status`` instead of
+   raising ``KeyError`` when ``core.ignorecase`` is enabled.
+   (jovial-liu, #2487)
+
  * Read ``.gitattributes`` files in subdirectories, not just the one at the
    top of the tree. (Jelmer Vernooĳ, #2475)
 

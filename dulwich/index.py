@@ -3390,6 +3390,14 @@ def update_working_tree(
             path = change.old.path
             if not validate_path(path, validate_path_element):
                 continue
+            try:
+                verify_leading_dirs(path, [], repo_path)
+            except InvalidPathError:
+                # Like git's unlink_entry, which leaves the path alone when
+                # check_leading_path reports a leading component that is not a
+                # real directory: removing through the symlink would delete a
+                # path outside the work tree.
+                continue
 
             full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
             try:

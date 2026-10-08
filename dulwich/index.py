@@ -3380,7 +3380,9 @@ def update_working_tree(
                             f"Please commit your changes or stash them before you switch branches."
                         )
 
-    # Apply the changes
+    # Apply deletes before adds so that a directory being replaced by a file
+    # has its contents removed first (and vice versa, a file being replaced by
+    # a directory is removed before its new children are written).
     for change in changes:
         if change.type in (CHANGE_DELETE, CHANGE_RENAME):
             # Remove file/directory
@@ -3401,6 +3403,7 @@ def update_working_tree(
 
             _transition_to_absent(repo, path, full_path, delete_stat, index)
 
+    for change in changes:
         if change.type in (
             CHANGE_ADD,
             CHANGE_MODIFY,

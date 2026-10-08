@@ -3571,6 +3571,46 @@ class TestUpdateWorkingTree(TestCase):
         # Directory should be gone
         self.assertFalse(os.path.exists(file_path))
 
+    def test_update_working_tree_directory_becomes_file(self):
+        """Test switching to a tree where a directory is replaced by a file."""
+        blob_inner = Blob()
+        blob_inner.data = b"inner\n"
+        self.repo.object_store.add_object(blob_inner)
+
+        tree_with_dir = Tree()
+        tree_with_dir[b"plain/inner"] = (0o100644, blob_inner.id)
+        self.repo.object_store.add_object(tree_with_dir)
+
+        changes = tree_changes(self.repo.object_store, None, tree_with_dir.id)
+        update_working_tree(self.repo, None, tree_with_dir.id, change_iterator=changes)
+
+        plain_path = os.path.join(self.tempdir, "plain")
+        inner_path = os.path.join(plain_path, "inner")
+        self.assertTrue(os.path.isdir(plain_path))
+        self.assertTrue(os.path.isfile(inner_path))
+
+        blob_plain = Blob()
+        blob_plain.data = b"plain\n"
+        self.repo.object_store.add_object(blob_plain)
+
+        tree_with_file = Tree()
+        tree_with_file[b"plain"] = (0o100644, blob_plain.id)
+        self.repo.object_store.add_object(tree_with_file)
+
+        changes = tree_changes(
+            self.repo.object_store, tree_with_dir.id, tree_with_file.id
+        )
+        update_working_tree(
+            self.repo,
+            tree_with_dir.id,
+            tree_with_file.id,
+            change_iterator=changes,
+        )
+
+        self.assertTrue(os.path.isfile(plain_path))
+        with open(plain_path, "rb") as f:
+            self.assertEqual(b"plain\n", f.read())
+
     def test_update_working_tree_symlink_transitions(self):
         """Test transitions involving symlinks."""
         # Skip on Windows where symlinks might not be supported

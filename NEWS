@@ -1,5 +1,10 @@
 1.2.18	UNRELEASED
 
+ * Compare the index with a tree by exact path in
+   ``Index.changes_from_tree``, so ``porcelain.status`` no longer raises
+   ``KeyError`` on a staged case-only rename with ``core.ignorecase``
+   set. (Jelmer Vernooĳ, #2487)
+
  * Read ``.gitattributes`` files in subdirectories, not just the one at the
    top of the tree. (Jelmer Vernooĳ, #2475)
 

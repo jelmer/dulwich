@@ -93,7 +93,7 @@ from dulwich.index import (
 )
 from dulwich.line_ending import BlobNormalizer
 from dulwich.object_store import MemoryObjectStore
-from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, Tree, TreeEntry
+from dulwich.objects import S_IFGITLINK, ZERO_SHA, Blob, ObjectID, Tree, TreeEntry
 from dulwich.repo import Repo
 from dulwich.tests.utils import make_commit
 
@@ -226,7 +226,7 @@ class IndexPathNormalizerTestCase(TestCase):
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tempdir)
 
-    def _entry(self) -> IndexEntry:
+    def _entry(self, sha: ObjectID = b"0" * 40) -> IndexEntry:
         return IndexEntry(
             ctime=(0, 0),
             mtime=(0, 0),
@@ -236,7 +236,7 @@ class IndexPathNormalizerTestCase(TestCase):
             uid=0,
             gid=0,
             size=0,
-            sha=b"0" * 40,
+            sha=sha,
         )
 
     def test_no_normalizer_is_case_sensitive(self) -> None:
@@ -324,6 +324,27 @@ class IndexPathNormalizerTestCase(TestCase):
         index = Index(os.path.join(self.tempdir, "idx"), read=False)
         index[b"foo.txt"] = self._entry()
         self.assertEqual(b"Foo.txt", index.canonical_path(b"Foo.txt"))
+
+    def test_changes_from_tree_case_only_rename(self) -> None:
+        store = MemoryObjectStore()
+        blob = Blob.from_string(b"x\n")
+        store.add_object(blob)
+        tree = Tree()
+        tree.add(b"Foo.txt", 0o100644, blob.id)
+        store.add_object(tree)
+        index = Index(
+            os.path.join(self.tempdir, "idx"),
+            read=False,
+            path_normalizer=lambda p: p.lower(),
+        )
+        index[b"foo.txt"] = self._entry(blob.id)
+        self.assertEqual(
+            [
+                ((b"Foo.txt", None), (0o100644, None), (blob.id, None)),
+                ((None, b"foo.txt"), (None, 0o100644), (None, blob.id)),
+            ],
+            list(index.changes_from_tree(store, tree.id)),
+        )
 
     def test_normalized_cache_rebuilds_after_read(self) -> None:
         path = os.path.join(self.tempdir, "idx")

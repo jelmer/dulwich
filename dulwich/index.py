@@ -3038,6 +3038,13 @@ def _transition_to_absent(
     index: Index,
 ) -> None:
     """Remove any type of entry."""
+    # The index entry has to go even if there is nothing on disk, e.g. for
+    # sparse-excluded paths or files deleted without "git rm".
+    try:
+        del index[path]
+    except KeyError:
+        pass
+
     if current_stat is None:
         return
 
@@ -3056,11 +3063,6 @@ def _transition_to_absent(
                     raise
     else:
         _remove_file_with_readonly_handling(full_path)
-
-    try:
-        del index[path]
-    except KeyError:
-        pass
 
     # Try to remove empty parent directories
     _remove_empty_parents(

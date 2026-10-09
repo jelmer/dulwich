@@ -1,5 +1,10 @@
 1.2.18	UNRELEASED
 
+ * Record the tree's mode in the index from ``update_working_tree`` when
+   ``core.filemode`` is false, so ``reset --hard`` no longer stages mode
+   changes for files whose executable bit differs on disk.
+   (Jelmer Vernooĳ, #2474)
+
  * Avoid checking every tracked file for unstaged changes in
    ``porcelain.add`` when only file paths are given.
    (Jelmer Vernooĳ, #2494)

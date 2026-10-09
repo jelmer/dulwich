@@ -3415,6 +3415,41 @@ class TestUpdateWorkingTree(TestCase):
         index = self.repo.open_index()
         self.assertEqual(blob.id, index[b"test.txt"].sha)
 
+    def test_update_working_tree_without_honor_filemode_new_file(self):
+        blob = Blob.from_string(b"echo hi\n")
+        self.repo.object_store.add_object(blob)
+        tree = Tree()
+        tree[b"run.sh"] = (0o100755, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        changes = tree_changes(self.repo.object_store, None, tree.id)
+        update_working_tree(
+            self.repo, None, tree.id, change_iterator=changes, honor_filemode=False
+        )
+
+        index = self.repo.open_index()
+        self.assertEqual(0o100755, index[b"run.sh"].mode)
+
+    def test_update_working_tree_without_honor_filemode_unchanged_file(self):
+        blob = Blob.from_string(b"echo hi\n")
+        self.repo.object_store.add_object(blob)
+        tree = Tree()
+        tree[b"run.sh"] = (0o100755, blob.id)
+        self.repo.object_store.add_object(tree)
+
+        path = os.path.join(self.tempdir, "run.sh")
+        with open(path, "wb") as f:
+            f.write(blob.data)
+        os.chmod(path, 0o644)
+
+        changes = tree_changes(self.repo.object_store, None, tree.id)
+        update_working_tree(
+            self.repo, None, tree.id, change_iterator=changes, honor_filemode=False
+        )
+
+        index = self.repo.open_index()
+        self.assertEqual(0o100755, index[b"run.sh"].mode)
+
     def test_update_working_tree_remove_directory(self):
         """Test that update_working_tree properly removes directories."""
         # Create initial tree with a directory containing files

@@ -41,6 +41,7 @@ from .file import ensure_dir_exists
 from .index import (
     Index,
     IndexEntry,
+    _remove_empty_parents,
     build_file_from_blob,
     get_path_element_validator,
     get_symlink_fn,
@@ -257,6 +258,8 @@ def apply_included_paths(
                 except PermissionError:
                     if not force:
                         raise
+                else:
+                    _remove_empty_parents(os.fsencode(full_path), repo_path)
         else:
             # Included => materialize if missing
             if not os.path.exists(full_path):

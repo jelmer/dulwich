@@ -3415,6 +3415,35 @@ class TestUpdateWorkingTree(TestCase):
         index = self.repo.open_index()
         self.assertEqual(blob.id, index[b"test.txt"].sha)
 
+    def test_update_working_tree_delete_file_missing_from_disk(self):
+        # https://github.com/jelmer/dulwich/issues/2485
+        blob = Blob.from_string(b"x\n")
+        self.repo.object_store.add_object(blob)
+        old_tree = Tree()
+        old_tree[b"x.txt"] = (0o100644, blob.id)
+        self.repo.object_store.add_object(old_tree)
+        new_tree = Tree()
+        self.repo.object_store.add_object(new_tree)
+
+        update_working_tree(
+            self.repo,
+            None,
+            old_tree.id,
+            change_iterator=tree_changes(self.repo.object_store, None, old_tree.id),
+        )
+        os.unlink(os.path.join(self.tempdir, "x.txt"))
+
+        update_working_tree(
+            self.repo,
+            old_tree.id,
+            new_tree.id,
+            change_iterator=tree_changes(
+                self.repo.object_store, old_tree.id, new_tree.id
+            ),
+        )
+
+        self.assertEqual([], list(self.repo.open_index()))
+
     def test_update_working_tree_without_honor_filemode_new_file(self):
         blob = Blob.from_string(b"echo hi\n")
         self.repo.object_store.add_object(blob)

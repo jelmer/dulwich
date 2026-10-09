@@ -1,5 +1,10 @@
 1.2.18	UNRELEASED
 
+ * Remove the index entry of a deleted path in ``update_working_tree``
+   even when the file is missing from disk, so checkouts in a sparse
+   checkout no longer resurrect files the target branch deleted.
+   (Jelmer Vernooĳ, #2485)
+
  * Record the tree's mode in the index from ``update_working_tree`` when
    ``core.filemode`` is false, so ``reset --hard`` no longer stages mode
    changes for files whose executable bit differs on disk.

@@ -14,6 +14,9 @@
    commits or fails when the local branch is only ahead.
    (Jelmer Vernooĳ, #2470, #2469)
 
+ * Remove directories left empty when ``porcelain.sparse_checkout``
+   excludes the files in them, matching git. (Jelmer Vernooĳ, #2483)
+
  * Compare the index with a tree by exact path in
    ``Index.changes_from_tree``, so ``porcelain.status`` no longer raises
    ``KeyError`` on a staged case-only rename with ``core.ignorecase``

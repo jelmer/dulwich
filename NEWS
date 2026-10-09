@@ -4,6 +4,11 @@
    ``porcelain.add`` when only file paths are given.
    (Jelmer Vernooĳ, #2494)
 
+ * Make ``porcelain.pull`` compare the fetched commit with the current
+   branch rather than the refspec destination, so it no longer drops local
+   commits or fails when the local branch is only ahead.
+   (Jelmer Vernooĳ, #2470, #2469)
+
  * Compare the index with a tree by exact path in
    ``Index.changes_from_tree``, so ``porcelain.status`` no longer raises
    ``KeyError`` on a staged case-only rename with ``core.ignorecase``

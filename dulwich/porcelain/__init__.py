@@ -3782,28 +3782,28 @@ def pull(
         selected_refs = []
 
         if refspecs is None:
-            refspecs_normalized: bytes | list[bytes] = [b"HEAD"]
-        elif isinstance(refspecs, str):
-            refspecs_normalized = refspecs.encode()
-        elif isinstance(refspecs, bytes):
-            refspecs_normalized = refspecs
-        else:
-            refspecs_normalized = []
-            for spec in refspecs:
-                if isinstance(spec, str):
-                    refspecs_normalized.append(spec.encode())
-                else:
-                    refspecs_normalized.append(spec)
+            refspecs = [b"HEAD"]
+        elif isinstance(refspecs, (str, bytes)):
+            refspecs = [refspecs]
+        refspecs_normalized = [
+            spec.encode() if isinstance(spec, str) else spec for spec in refspecs
+        ]
 
         def determine_wants(
             remote_refs: dict[Ref, ObjectID], depth: int | None = None
         ) -> list[ObjectID]:
             remote_refs_container = DictRefsContainer(remote_refs)  # type: ignore[arg-type]
-            selected_refs.extend(
+            for spec, (lh, rh, force_ref) in zip(
+                refspecs_normalized,
                 parse_reftuples(
                     remote_refs_container, r.refs, refspecs_normalized, force=force
-                )
-            )
+                ),
+            ):
+                # Like git, a refspec without a destination only fetches; it
+                # does not update a local ref of the same name.
+                if b":" not in spec:
+                    rh = None
+                selected_refs.append((lh, rh, force_ref))
             return [
                 remote_refs[lh]
                 for (lh, rh, force_ref) in selected_refs
@@ -3846,44 +3846,48 @@ def pull(
         except KeyError:
             old_tree_id = None
 
-        merged = False
+        # Store fetched refs in their destinations, rejecting non-fast-forward
+        # updates unless forced. As in git, the other refs are still updated
+        # before the first rejection is raised.
+        rejected: DivergedBranches | None = None
         for lh, rh, force_ref in selected_refs:
-            if not force_ref and rh is not None and rh in r.refs:
+            if rh is None or lh is None:
+                continue
+            lh_value = fetch_result.refs[lh]
+            if lh_value is None:
+                continue
+            old_value = r.refs.follow(rh)[1]
+            if not force_ref and old_value is not None:
                 try:
-                    assert lh is not None
-                    followed_ref = r.refs.follow(rh)[1]
-                    assert followed_ref is not None
-                    lh_ref = fetch_result.refs[lh]
-                    assert lh_ref is not None
-                    check_diverged(r, followed_ref, lh_ref)
+                    check_diverged(r, old_value, lh_value)
+                except DivergedBranches as exc:
+                    rejected = rejected or exc
+                    continue
+            r.refs[Ref(rh)] = lh_value
+        if rejected is not None:
+            raise rejected
+
+        # Bring the current branch up to date with the first fetched ref
+        merged = False
+        fetched = None
+        if selected_refs and selected_refs[0][0] is not None:
+            fetched = fetch_result.refs[selected_refs[0][0]]
+        if fetched is not None:
+            head = r.refs.follow(HEADREF)[1]
+            if head is None:
+                r[b"HEAD"] = fetched
+            elif head != fetched and not can_fast_forward(r, fetched, head):
+                try:
+                    check_diverged(r, head, fetched)
                 except DivergedBranches as exc:
                     if ff_only or fast_forward:
                         raise
-                    else:
-                        # Perform merge
-                        assert lh is not None
-                        merge_ref = fetch_result.refs[lh]
-                        assert merge_ref is not None
-                        _merge_result, conflicts = _do_merge(r, merge_ref)
-                        if conflicts:
-                            raise Error(
-                                f"Merge conflicts occurred: {conflicts}"
-                            ) from exc
-                        merged = True
-                        # Skip updating ref since merge already updated HEAD
-                        continue
-            if rh is not None and lh is not None:
-                lh_value = fetch_result.refs[lh]
-                if lh_value is not None:
-                    r.refs[Ref(rh)] = lh_value
-
-        # Only update HEAD if we didn't perform a merge
-        if selected_refs and not merged:
-            lh, rh, _ = selected_refs[0]
-            if lh is not None:
-                ref_value = fetch_result.refs[lh]
-                if ref_value is not None:
-                    r[b"HEAD"] = ref_value
+                    _merge_result, conflicts = _do_merge(r, fetched)
+                    if conflicts:
+                        raise Error(f"Merge conflicts occurred: {conflicts}") from exc
+                    merged = True
+                else:
+                    r[b"HEAD"] = fetched
 
         # Update working tree to match the new HEAD
         # Skip if merge was performed as merge already updates the working tree

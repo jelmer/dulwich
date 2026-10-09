@@ -3342,8 +3342,63 @@ def update_working_tree(
 
     # Check for uncommitted modifications before making any changes
     if not allow_overwrite_modified and old_tree_id:
+        old_tree_paths = {
+            entry.path
+            for entry in iter_tree_contents(
+                repo.object_store,
+                old_tree_id,
+                include_trees=True,
+            )
+            if entry.path is not None
+        }
+
         for change in changes:
-            # Only check files that are being modified or deleted
+            if change.type == CHANGE_ADD and change.new:
+                path = change.new.path
+                assert path is not None
+
+                if not validate_path(path, validate_path_element):
+                    continue
+
+                full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
+
+                try:
+                    os.lstat(full_path)
+                except FileNotFoundError:
+                    continue
+                except NotADirectoryError:
+                    # A tracked file may legitimately become a directory,
+                    # e.g. "a" -> "a/b".
+                    parts = path.split(b"/")
+                    if any(
+                        b"/".join(parts[:i]) in paths_becoming_dirs
+                        for i in range(1, len(parts))
+                    ):
+                        continue
+
+                    from .errors import WorkingTreeModifiedError
+
+                    raise WorkingTreeModifiedError(
+                        f"Untracked working tree path blocks checkout of "
+                        f"'{path.decode('utf-8', errors='replace')}'."
+                    )
+
+                # The path is safe if it already existed in the old tree,
+                # either directly or as a directory containing tracked entries.
+                tracked_in_old_tree = path in old_tree_paths or any(
+                    old_path.startswith(path + b"/") for old_path in old_tree_paths
+                )
+
+                if not tracked_in_old_tree:
+                    from .errors import WorkingTreeModifiedError
+
+                    raise WorkingTreeModifiedError(
+                        f"Untracked working tree file "
+                        f"'{path.decode('utf-8', errors='replace')}' "
+                        f"would be overwritten by checkout."
+                    )
+
+            # Check tracked files that are being modified or deleted.
             if change.type in (CHANGE_MODIFY, CHANGE_DELETE) and change.old:
                 path = change.old.path
                 assert path is not None

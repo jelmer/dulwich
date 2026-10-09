@@ -1,5 +1,9 @@
 1.2.18	UNRELEASED
 
+ * Avoid checking every tracked file for unstaged changes in
+   ``porcelain.add`` when only file paths are given.
+   (Jelmer Vernooĳ, #2494)
+
  * Compare the index with a tree by exact path in
    ``Index.changes_from_tree``, so ``porcelain.status`` no longer raises
    ``KeyError`` on a staged case-only rename with ``core.ignorecase``

@@ -46,6 +46,7 @@ from dulwich.cli import (
     detect_terminal_width,
     format_bytes,
     launch_editor,
+    parse_commit_date,
     parse_time_to_timestamp,
     write_columns,
 )
@@ -229,6 +230,34 @@ class HelperFunctionsTest(TestCase):
         # Allow 2 second tolerance for test execution time
         self.assertAlmostEqual(expected, result, delta=2)
 
+    def test_parse_commit_date(self):
+        """Commit dates are parsed like C Git, keeping any explicit offset."""
+        cases = {
+            "1112911993 +0200": (1112911993, 7200),
+            "@1112911993": (1112911993, None),
+            "Thu, 07 Apr 2005 22:13:13 +0200": (1112904793, 7200),
+            "2005-04-07T22:13:13+02:00": (1112904793, 7200),
+            "2005-04-07T22:13:13+0200": (1112904793, 7200),
+            "2005-04-07T22:13:13Z": (1112911993, 0),
+            "2005-04-07 22:13:13 -0530": (1112931793, -19800),
+        }
+        for spec, expected in cases.items():
+            with self.subTest(spec=spec):
+                self.assertEqual(expected, parse_commit_date(spec))
+
+    def test_parse_commit_date_without_timezone(self):
+        """Dates without an offset leave the timezone to the caller."""
+        timestamp, timezone = parse_commit_date("2005-04-07 22:13:13")
+        self.assertIsNone(timezone)
+        self.assertEqual(parse_time_to_timestamp("2005-04-07 22:13:13"), timestamp)
+
+    def test_parse_commit_date_invalid(self):
+        """Unparseable dates raise ValueError."""
+        for spec in ("not a date", "2005-13-45T22:13:13+02:00"):
+            with self.subTest(spec=spec):
+                with self.assertRaises(ValueError):
+                    parse_commit_date(spec)
+
 
 class AddCommandTest(DulwichCliTestCase):
     """Tests for add command."""
@@ -336,6 +365,70 @@ class CommitCommandTest(DulwichCliTestCase):
                 )
                 self.assertEqual(commit.parents, original.parents)
                 self.assertEqual(commit.message, b"Amended commit")
+
+    def test_commit_date(self):
+        """--date sets the author date but leaves the committer date alone."""
+        for args in (
+            ("--date", "2005-04-07T22:13:13+02:00"),
+            ("--date=Thu, 07 Apr 2005 22:13:13 +0200",),
+        ):
+            with self.subTest(args=args):
+                result, _stdout, _stderr = self._run_cli(
+                    "commit", "-m", "Dated commit", *args
+                )
+                self.assertIsNone(result)
+                commit = self.repo[self.repo.head()]
+                self.assertEqual(commit.author_time, 1112904793)
+                self.assertEqual(commit.author_timezone, 7200)
+                self.assertNotEqual(commit.commit_time, 1112904793)
+
+    def test_commit_amend_date(self):
+        """--date overrides the author date of an amended commit."""
+        original_id = porcelain.commit(
+            self.repo,
+            message=b"Original commit",
+            author=b"Original Author <original@example.com>",
+        )
+        original = self.repo[original_id]
+        result, _stdout, _stderr = self._run_cli(
+            "commit", "--amend", "-m", "Amended", "--date", "1112911993 -0530"
+        )
+        self.assertIsNone(result)
+        commit = self.repo[self.repo.head()]
+        self.assertEqual(commit.author, b"Original Author <original@example.com>")
+        self.assertEqual(commit.author_time, 1112911993)
+        self.assertEqual(commit.author_timezone, -19800)
+        self.assertEqual(commit.parents, original.parents)
+
+    def test_commit_reuse_message_date_override(self):
+        """An explicit --date overrides the date of a reused commit."""
+        source = porcelain.commit(
+            self.repo,
+            message=b"Source message",
+            author=b"Old <old@example.com>",
+            author_timestamp=1234567890,
+            author_timezone=19800,
+        )
+        result, _stdout, _stderr = self._run_cli(
+            "commit", "-C", source.decode(), "--date", "1112911993 +0200"
+        )
+        self.assertIsNone(result)
+        commit = self.repo[self.repo.head()]
+        self.assertEqual(commit.author, b"Old <old@example.com>")
+        self.assertEqual(commit.message, b"Source message")
+        self.assertEqual(commit.author_time, 1112911993)
+        self.assertEqual(commit.author_timezone, 7200)
+
+    def test_commit_invalid_date(self):
+        """An unparseable --date fails without creating a commit."""
+        head = porcelain.commit(self.repo, message=b"Initial")
+        with self.assertLogs("dulwich.cli", level="ERROR") as logs:
+            result, _stdout, _stderr = self._run_cli(
+                "commit", "-m", "Bad date", "--date", "not a date"
+            )
+        self.assertEqual(result, 1)
+        self.assertIn("Invalid date format: not a date", logs.output[0])
+        self.assertEqual(self.repo.head(), head)
 
     def test_commit_reuse_message(self):
         """Reusing a message preserves authorship, not committer or parents."""

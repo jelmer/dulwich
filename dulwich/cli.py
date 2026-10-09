@@ -525,6 +525,72 @@ def parse_time_to_timestamp(time_spec: str) -> int:
     return parse_approxidate(time_spec)
 
 
+def parse_commit_date(date_spec: str) -> tuple[int, int | None]:
+    """Parse a ``--date`` value for a commit, as accepted by C Git.
+
+    Supported formats:
+     - Git internal format: ``<unix timestamp> <timezone offset>``,
+       optionally prefixed with ``@``
+     - RFC 2822: e.g. ``Mon, 20 Nov 1995 19:12:08 -0500``
+     - ISO 8601 with an offset: e.g. ``1995-11-20T19:12:08-05:00``
+     - Anything understood by approxidate (e.g. ``2005-04-07 22:13:13``,
+       ``2 days ago``), interpreted in local time
+
+    Args:
+        date_spec: Date specification
+
+    Returns:
+        Tuple of (Unix timestamp, timezone offset in seconds). The timezone
+        is None when the specification does not include one, in which case
+        the caller's default timezone should be used.
+
+    Raises:
+        ValueError: If the date specification cannot be parsed
+    """
+    import calendar
+    import email.utils
+    import re
+    from datetime import datetime
+
+    from .approxidate import parse_approxidate
+    from .objects import parse_timezone
+
+    spec = date_spec.strip()
+
+    # Git internal format, e.g. "1234567890 +0200" or "@1234567890"
+    match = re.fullmatch(r"@?([0-9]+)(?: ([+-][0-9]{4}))?", spec)
+    if match:
+        timezone = None
+        if match.group(2) is not None:
+            timezone = parse_timezone(match.group(2).encode("ascii"))[0]
+        return int(match.group(1)), timezone
+
+    # ISO 8601 with an explicit offset, e.g. "2005-04-07T22:13:13+02:00"
+    match = re.fullmatch(
+        r"([0-9]{4}-[0-9]{2}-[0-9]{2})[T ]([0-9]{2}:[0-9]{2}(?::[0-9]{2})?)"
+        r" ?(Z|[+-][0-9]{2}(?::?[0-9]{2})?)",
+        spec,
+    )
+    if match:
+        date_part, time_part, offset = match.groups()
+        time_format = "%H:%M:%S" if time_part.count(":") == 2 else "%H:%M"
+        local = datetime.strptime(f"{date_part} {time_part}", f"%Y-%m-%d {time_format}")
+        timezone = 0
+        if offset != "Z":
+            digits = offset[1:].replace(":", "")
+            timezone = int(digits[:2]) * 3600 + int(digits[2:] or 0) * 60
+            if offset[0] == "-":
+                timezone = -timezone
+        return calendar.timegm(local.timetuple()) - timezone, timezone
+
+    # RFC 2822, e.g. "Thu, 07 Apr 2005 22:13:13 +0200"
+    rfc_2822 = email.utils.parsedate_tz(spec)
+    if rfc_2822 is not None and rfc_2822[9] is not None:
+        return email.utils.mktime_tz(rfc_2822), rfc_2822[9]
+
+    return parse_approxidate(spec), None
+
+
 def format_bytes(bytes: float) -> str:
     """Format bytes as human-readable string.
 
@@ -2537,6 +2603,7 @@ class cmd_commit(Command):
             help="Reuse authorship and edit a commit's message",
         )
         parser.add_argument("--author", help="Override commit author (Name <email>)")
+        parser.add_argument("--date", help="Override the author date of the commit")
         parser.add_argument(
             "-a",
             "--all",
@@ -2549,6 +2616,15 @@ class cmd_commit(Command):
             help="Replace the tip of the current branch by creating a new commit",
         )
         parsed_args = parser.parse_args(args)
+
+        author_timestamp: int | None = None
+        author_timezone: int | None = None
+        if parsed_args.date is not None:
+            try:
+                author_timestamp, author_timezone = parse_commit_date(parsed_args.date)
+            except ValueError:
+                logger.error("Invalid date format: %s", parsed_args.date)
+                return 1
 
         message: bytes | str | Callable[[Repo | None, Commit | None], bytes]
         reused_commit = None
@@ -2609,10 +2685,14 @@ class cmd_commit(Command):
                 else reused_commit.author
                 if reused_commit is not None
                 else None,
-                author_timestamp=reused_commit.author_time
+                author_timestamp=author_timestamp
+                if parsed_args.date is not None
+                else reused_commit.author_time
                 if reused_commit is not None
                 else None,
-                author_timezone=reused_commit.author_timezone
+                author_timezone=author_timezone
+                if parsed_args.date is not None
+                else reused_commit.author_timezone
                 if reused_commit is not None
                 else None,
                 encoding=reused_commit.encoding if reused_commit is not None else None,

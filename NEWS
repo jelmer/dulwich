@@ -1,5 +1,9 @@
 1.2.18	UNRELEASED
 
+ * Add ``dulwich commit --date`` to override the author date, accepting the
+   same Git internal, RFC 2822, ISO 8601 and approxidate formats as C Git.
+   (Kush Agarwal, #1845)
+
  * Compare the index with a tree by exact path in
    ``Index.changes_from_tree``, so ``porcelain.status`` no longer raises
    ``KeyError`` on a staged case-only rename with ``core.ignorecase``

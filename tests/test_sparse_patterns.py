@@ -410,6 +410,26 @@ class ApplyIncludedPathsTests(TestCase):
         exclude_path = os.path.join(self.temp_dir, "exclude.md")
         self.assertFalse(os.path.exists(exclude_path))
 
+    def test_remove_empty_parent_dirs(self):
+        """Directories left empty by excluded files are removed."""
+        self._commit_blob("keep.txt", b"keep")
+        self._commit_blob("excluded/sub/x.txt", b"x")
+        self._commit_blob("mixed/keep.txt", b"keep")
+        self._commit_blob("mixed/drop.txt", b"drop")
+        self._commit_blob("untracked/y.txt", b"y")
+        with open(os.path.join(self.temp_dir, "untracked", "other.txt"), "wb") as f:
+            f.write(b"untracked")
+
+        apply_included_paths(
+            self.repo, included_paths={"keep.txt", "mixed/keep.txt"}, force=False
+        )
+
+        self.assertFalse(os.path.exists(os.path.join(self.temp_dir, "excluded")))
+        self.assertEqual(["keep.txt"], os.listdir(os.path.join(self.temp_dir, "mixed")))
+        self.assertEqual(
+            ["other.txt"], os.listdir(os.path.join(self.temp_dir, "untracked"))
+        )
+
     def test_conflict_with_local_modifications_no_force(self):
         """If local modifications exist for an excluded path, raise SparseCheckoutConflictError."""
         self._commit_blob("foo.txt", b"original")

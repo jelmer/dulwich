@@ -39,7 +39,7 @@ import unicodedata
 import warnings
 from io import BytesIO, StringIO
 from pathlib import Path
-from unittest import skipIf
+from unittest import mock, skipIf
 from wsgiref.simple_server import make_server
 
 from dulwich import porcelain
@@ -1907,6 +1907,23 @@ class AddTests(PorcelainTestCase):
             f.write("BAR")
         porcelain.add(self.repo.path, paths=[fullpath])
         self.assertIn(b"foo", self.repo.open_index())
+
+    def test_add_file_skips_unstaged_scan(self) -> None:
+        tracked = os.path.join(self.repo.path, "tracked")
+        with open(tracked, "w") as f:
+            f.write("old")
+        porcelain.add(self.repo.path, paths=[tracked])
+        with open(tracked, "w") as f:
+            f.write("new")
+        fullpath = os.path.join(self.repo.path, "foo")
+        with open(fullpath, "w") as f:
+            f.write("BAR")
+        with mock.patch(
+            "dulwich.porcelain.get_unstaged_changes",
+            side_effect=AssertionError("unexpected scan of unstaged changes"),
+        ):
+            added, ignored = porcelain.add(self.repo.path, paths=[fullpath])
+        self.assertEqual((["foo"], set()), (added, ignored))
 
     def test_add_ignored(self) -> None:
         with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:

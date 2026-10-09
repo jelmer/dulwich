@@ -2017,11 +2017,8 @@ def add(
         trust_ctime = config.get_boolean(b"core", b"trustctime", True)
         precompose_unicode = config.get_boolean(b"core", b"precomposeunicode", False)
 
-        all_unstaged_paths = list(
-            get_unstaged_changes(
-                index, r.path, filter_callback, preload_index, trust_ctime
-            )
-        )
+        # Only needed when adding directories, so computed on first use
+        all_unstaged_paths: list[bytes] | None = None
 
         if paths is None:
             # When no paths specified, add all untracked and modified files from repo root
@@ -2086,6 +2083,12 @@ def add(
                         ignored.add(untracked_path)
 
                 # Also add unstaged (modified) files within this directory
+                if all_unstaged_paths is None:
+                    all_unstaged_paths = list(
+                        get_unstaged_changes(
+                            index, r.path, filter_callback, preload_index, trust_ctime
+                        )
+                    )
                 for unstaged_path in all_unstaged_paths:
                     if isinstance(unstaged_path, bytes):
                         unstaged_path_str = unstaged_path.decode("utf-8")

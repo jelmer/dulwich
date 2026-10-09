@@ -7449,6 +7449,210 @@ class PullTests(PorcelainTestCase):
         with Repo(self.target_path) as r:
             self.assertEqual(r[b"HEAD"].id, self.repo[b"HEAD"].id)
 
+    def _commit_file(self, repo_path: str, name: str) -> bytes:
+        with open(os.path.join(repo_path, name), "w") as f:
+            f.write(name)
+        porcelain.add(repo=repo_path, paths=[os.path.join(repo_path, name)])
+        return porcelain.commit(
+            repo=repo_path,
+            message=name.encode(),
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+    def test_tracking_refspec_fast_forward(self) -> None:
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master:refs/remotes/origin/master",
+            ff_only=True,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+        with Repo(self.target_path) as r:
+            self.assertEqual(self.repo.head(), r.refs[b"refs/heads/master"])
+            self.assertEqual(self.repo.head(), r.refs[b"refs/remotes/origin/master"])
+
+    def test_tracking_refspec_local_ahead(self) -> None:
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+        local = self._commit_file(self.target_path, "local.txt")
+
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master:refs/remotes/origin/master",
+            ff_only=True,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+
+        with Repo(self.target_path) as r:
+            self.assertEqual(local, r.refs[b"refs/heads/master"])
+        self.assertTrue(os.path.exists(os.path.join(self.target_path, "local.txt")))
+
+    def test_tracking_refspec_diverged(self) -> None:
+        local = self._commit_file(self.target_path, "local.txt")
+        remote = self._commit_file(self.repo.path, "remote.txt")
+
+        self.assertRaises(
+            porcelain.DivergedBranches,
+            porcelain.pull,
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master:refs/remotes/origin/master",
+            ff_only=True,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+
+        with Repo(self.target_path) as r:
+            self.assertEqual(local, r.refs[b"refs/heads/master"])
+            self.assertEqual(remote, r.refs[b"refs/remotes/origin/master"])
+        self.assertTrue(os.path.exists(os.path.join(self.target_path, "local.txt")))
+        self.assertFalse(os.path.exists(os.path.join(self.target_path, "remote.txt")))
+
+    def test_current_branch_refspec_fast_forward(self) -> None:
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master:refs/heads/master",
+            ff_only=True,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+        with Repo(self.target_path) as r:
+            self.assertEqual(self.repo.head(), r.refs[b"refs/heads/master"])
+
+    def test_current_branch_refspec_local_ahead(self) -> None:
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+        local = self._commit_file(self.target_path, "local.txt")
+
+        self.assertRaises(
+            porcelain.DivergedBranches,
+            porcelain.pull,
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/master:refs/heads/master",
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+
+        with Repo(self.target_path) as r:
+            self.assertEqual(local, r.refs[b"refs/heads/master"])
+
+    def test_current_branch_refspec_forced(self) -> None:
+        self._commit_file(self.target_path, "local.txt")
+
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"+refs/heads/master:refs/heads/master",
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+
+        with Repo(self.target_path) as r:
+            self.assertEqual(self.repo.head(), r.refs[b"refs/heads/master"])
+        self.assertFalse(os.path.exists(os.path.join(self.target_path, "local.txt")))
+
+    def _setup_feature_branch(self) -> bytes:
+        """Create feature in both repos, with the remote one a commit ahead."""
+        with Repo(self.target_path) as r:
+            r.refs[b"refs/heads/feature"] = r.head()
+        porcelain.branch_create(self.repo, "feature")
+        porcelain.checkout(self.repo, "feature")
+        feature = self._commit_file(self.repo.path, "feature.txt")
+        porcelain.checkout(self.repo, "master")
+        return feature
+
+    def test_other_branch_refspec(self) -> None:
+        feature = self._setup_feature_branch()
+
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/feature:refs/heads/feature",
+            ff_only=True,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+
+        with Repo(self.target_path) as r:
+            self.assertEqual(feature, r.refs[b"refs/heads/feature"])
+            self.assertEqual(feature, r.refs[b"refs/heads/master"])
+        self.assertTrue(os.path.exists(os.path.join(self.target_path, "feature.txt")))
+
+    def test_other_branch_refspec_current_diverged(self) -> None:
+        feature = self._setup_feature_branch()
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+        local = self._commit_file(self.target_path, "local.txt")
+
+        self.assertRaises(
+            porcelain.DivergedBranches,
+            porcelain.pull,
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/feature:refs/heads/feature",
+            ff_only=True,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+
+        with Repo(self.target_path) as r:
+            self.assertEqual(feature, r.refs[b"refs/heads/feature"])
+            self.assertEqual(local, r.refs[b"refs/heads/master"])
+        self.assertFalse(os.path.exists(os.path.join(self.target_path, "feature.txt")))
+
+    def test_refspec_without_destination(self) -> None:
+        self.repo.refs[b"refs/heads/feature"] = self.repo.head()
+
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            b"refs/heads/feature",
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+
+        with Repo(self.target_path) as r:
+            self.assertEqual(self.repo.head(), r.refs[b"refs/heads/master"])
+            self.assertNotIn(b"refs/heads/feature", r.refs)
+
+    def test_local_ahead_ff_only(self) -> None:
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+        local = self._commit_file(self.target_path, "local.txt")
+
+        porcelain.pull(
+            self.target_path,
+            self.repo.path,
+            ff_only=True,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+
+        with Repo(self.target_path) as r:
+            self.assertEqual(local, r.refs[b"refs/heads/master"])
+
 
 class StatusTests(PorcelainTestCase):
     def test_empty(self) -> None:

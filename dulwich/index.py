@@ -2949,6 +2949,9 @@ def _transition_to_file(
 ) -> None:
     """Transition any type to regular file or symlink."""
     assert entry.sha is not None and entry.mode is not None
+    # Without core.filemode the working tree's executable bit is not
+    # trusted, so record the tree's mode in the index like git does.
+    index_mode = None if honor_filemode else entry.mode
     # Check if we need to update
     if (
         current_stat is not None
@@ -2981,7 +2984,7 @@ def _transition_to_file(
     if not needs_update:
         # Just update index - current_stat should always be valid here since we're not updating
         assert current_stat is not None
-        index[path] = index_entry_from_stat(current_stat, entry.sha)
+        index[path] = index_entry_from_stat(current_stat, entry.sha, mode=index_mode)
         return
 
     # Remove existing entry if needed
@@ -3024,7 +3027,7 @@ def _transition_to_file(
         tree_encoding=tree_encoding,
         symlink_fn=symlink_fn,
     )
-    index[path] = index_entry_from_stat(st, entry.sha)
+    index[path] = index_entry_from_stat(st, entry.sha, mode=index_mode)
 
 
 def _transition_to_absent(

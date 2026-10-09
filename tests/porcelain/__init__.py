@@ -10793,6 +10793,45 @@ class SparseCheckoutTests(PorcelainTestCase):
             lines = f.read().strip().split()
             self.assertIn("src/foo*.py", lines)
 
+    def _make_branch_without(self, branch, old_path, new_path=None):
+        """Create a branch removing old_path (or renaming it to new_path)."""
+        default_branch = porcelain.active_branch(self.repo)
+        porcelain.checkout(self.repo, "HEAD", new_branch=branch)
+        porcelain.remove(self.repo, [old_path])
+        if new_path is not None:
+            self._write_file(new_path, "x\n")
+            add(self.repo_path, paths=[new_path])
+        commit(self.repo_path, message=b"Change " + old_path.encode("utf-8"))
+        porcelain.checkout(self.repo, default_branch)
+
+    def test_checkout_removes_index_entry_of_excluded_deleted_file(self):
+        # https://github.com/jelmer/dulwich/issues/2485
+        self._commit_file("keep.txt", "keep\n")
+        self._commit_file("excluded/x.txt", "x\n")
+        self._make_branch_without("without-excluded", "excluded/x.txt")
+
+        self.sparse_checkout(self.repo, ["/keep.txt"], force=True)
+        porcelain.checkout(self.repo, "without-excluded", force=True)
+
+        self.assertEqual([b"keep.txt"], sorted(self.repo.open_index()))
+        self.assertEqual(
+            {"add": [], "delete": [], "modify": []},
+            porcelain.status(self.repo).staged,
+        )
+
+    def test_checkout_case_only_rename_of_excluded_file(self):
+        self._commit_file("keep.txt", "keep\n")
+        self._commit_file("ex/Foo.txt", "x\n")
+        self._make_branch_without("renamed", "ex/Foo.txt", "ex/foo.txt")
+
+        config = self.repo.get_config()
+        config.set((b"core",), b"ignorecase", True)
+        config.write_to_path()
+        self.sparse_checkout(self.repo, ["/keep.txt"], force=True)
+        porcelain.checkout(self.repo, "renamed", force=True)
+
+        self.assertEqual([b"ex/foo.txt", b"keep.txt"], sorted(self.repo.open_index()))
+
 
 class ConeModeTests(PorcelainTestCase):
     """Provide integration tests for Dulwich's cone mode sparse checkout.

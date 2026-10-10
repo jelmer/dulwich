@@ -4248,6 +4248,23 @@ def get_untracked_paths(
         from_root = frompath_str
         base_root = basepath_str
 
+    # Walked paths are spelled from frompath, so only the two roots need
+    # resolving rather than every walked path, which is slow on Windows.
+    frompath_resolved = os.path.realpath(frompath_str)
+    basepath_resolved = os.path.realpath(basepath_str)
+    if precompose_unicode:
+        frompath_resolved = _precompose_unicode_path(frompath_resolved)
+        basepath_resolved = _precompose_unicode_path(basepath_resolved)
+
+    def to_tree_path(path: str) -> bytes:
+        rel = os.path.relpath(
+            os.path.join(frompath_resolved, os.path.relpath(path, from_root)),
+            basepath_resolved,
+        )
+        if rel == os.pardir or rel.startswith(os.pardir + os.sep):
+            raise ValueError(f"{path!r} is not in the subpath of {basepath_str!r}")
+        return _fs_to_tree_path(rel)
+
     ignored_dirs = []
     # List to store untracked directories found during traversal
     untracked_dir_list = []
@@ -4288,7 +4305,7 @@ def get_untracked_paths(
             # For "normal" mode, check if the directory is entirely untracked
             if untracked_files == "normal":
                 # Convert directory path to tree path for index lookup
-                dir_tree_path = path_to_tree_path(basepath_str, path)
+                dir_tree_path = to_tree_path(path)
 
                 # Check if any file in this directory is tracked
                 dir_prefix = dir_tree_path + b"/" if dir_tree_path else b""
@@ -4325,7 +4342,7 @@ def get_untracked_paths(
             # frompath_str and basepath_str are both str, so ap must be str
             assert isinstance(ap, str)
             if not is_dir:
-                ip = path_to_tree_path(basepath_str, ap)
+                ip = to_tree_path(ap)
                 if ip not in index:
                     if not exclude_ignored or not ignore_manager.is_ignored(
                         os.path.relpath(ap, base_root)
@@ -4344,7 +4361,7 @@ def get_untracked_paths(
             # This part won't be reached for pruned directories
             if is_dir:
                 # Check if this directory is entirely untracked
-                dir_tree_path = path_to_tree_path(basepath_str, ap)
+                dir_tree_path = to_tree_path(ap)
                 dir_prefix = dir_tree_path + b"/" if dir_tree_path else b""
                 has_tracked_files = any(name.startswith(dir_prefix) for name in index)
                 if not has_tracked_files:
@@ -4354,7 +4371,7 @@ def get_untracked_paths(
                         yield os.path.join(os.path.relpath(ap, from_root), "")
             else:
                 # Check individual files in directories that contain tracked files
-                ip = path_to_tree_path(basepath_str, ap)
+                ip = to_tree_path(ap)
                 if ip not in index:
                     if not exclude_ignored or not ignore_manager.is_ignored(
                         os.path.relpath(ap, base_root)

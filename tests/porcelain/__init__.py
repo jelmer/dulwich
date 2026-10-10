@@ -5615,6 +5615,29 @@ class CheckoutTests(PorcelainTestCase):
         target_repo.close()
         remote_repo.close()
 
+    def _setup_file_becoming_dir(self) -> str:
+        porcelain.checkout(self.repo, b"uni")
+        os.mkdir(os.path.join(self.repo.path, "plain"))
+        _commit_file_with_content(self.repo, "plain/inner", "inner\n")
+        porcelain.checkout(self.repo, b"master")
+        _sha, plain_path = _commit_file_with_content(self.repo, "plain", "plain\n")
+        with open(plain_path, "w") as f:
+            f.write("locally modified\n")
+        return plain_path
+
+    def test_checkout_modified_file_becoming_dir_refused(self) -> None:
+        plain_path = self._setup_file_becoming_dir()
+        with self.assertRaises(porcelain.CheckoutError):
+            porcelain.checkout(self.repo, b"uni")
+        with open(plain_path) as f:
+            self.assertEqual("locally modified\n", f.read())
+
+    def test_checkout_force_modified_file_becoming_dir(self) -> None:
+        plain_path = self._setup_file_becoming_dir()
+        porcelain.checkout(self.repo, b"uni", force=True)
+        with open(os.path.join(plain_path, "inner")) as f:
+            self.assertEqual("inner\n", f.read())
+
 
 class RestoreTests(PorcelainTestCase):
     """Tests for the restore command."""

@@ -28,10 +28,12 @@ import stat
 import sys
 import tempfile
 import time
+import weakref
 from contextlib import closing
 from io import BytesIO
 from unittest.mock import patch
 
+import dulwich.objects
 import dulwich.pack
 from dulwich.config import ConfigDict
 from dulwich.errors import ChecksumMismatch, NotTreeError, ObjectFormatException
@@ -262,39 +264,223 @@ class IncomingPackValidationTests(TestCase):
                 store.add_thin_pack(stream.read, None)
                 self.assertIn(sha_to_hex(entries[0][3]), store)
 
-    def test_late_parse_failure_is_atomic_without_semantic_checks(self) -> None:
+    def test_late_parse_failure_is_atomic(self) -> None:
         for memory in (False, True):
-            with self.subTest(memory=memory):
-                store = self._new_store(memory)
+            for check_objects in (False, True):
+                with self.subTest(memory=memory, check_objects=check_objects):
+                    store = self._new_store(memory)
+                    store.add_object(testobject)
+                    files = self._files(store)
+                    stream = BytesIO()
+                    build_pack(
+                        stream,
+                        [(Blob.type_num, b"new blob"), (Tree.type_num, b"bad tree")],
+                    )
+                    with self.assertRaises(ObjectFormatException):
+                        store.add_thin_pack(
+                            stream.read, None, check_objects=check_objects
+                        )
+                    self.assertEqual([testobject.id], list(store))
+                    self.assertEqual(files, self._files(store))
+
+    def test_memory_add_pack_late_failure_is_atomic(self) -> None:
+        store = self._new_store(True)
+        store.add_object(testobject)
+        f, commit, abort = store.add_pack()
+        build_pack(f, [(Blob.type_num, b"new blob"), (Tree.type_num, b"bad tree")])
+        f.seek(0, os.SEEK_END)
+        with self.assertRaises(ObjectFormatException):
+            commit()
+        self.assertTrue(f.closed)
+        abort()
+        self.assertEqual([testobject.id], list(store))
+
+    def test_disk_add_pack_late_parse_failure_is_atomic(self) -> None:
+        store = self._new_store(False)
+        store.add_object(testobject)
+        files = self._files(store)
+        f, commit, abort = store.add_pack()
+        self.addCleanup(abort)
+        build_pack(f, [(Blob.type_num, b"new blob"), (Tree.type_num, b"bad tree")])
+        f.seek(0, os.SEEK_END)
+        with self.assertRaises(ObjectFormatException):
+            commit()
+        self.assertTrue(f.closed)
+        self.assertEqual([testobject.id], list(store))
+        self.assertEqual(files, self._files(store))
+
+    def test_generic_indexer_does_not_parse_objects(self) -> None:
+        stream = BytesIO()
+        entries = build_pack(stream, [(Tree.type_num, b"bad tree")])
+        with dulwich.pack.PackData.from_file(stream, DEFAULT_OBJECT_FORMAT) as data:
+            indexer = dulwich.pack.PackIndexer.for_pack_data(data)
+            self.assertEqual([entries[0][3]], [entry[0] for entry in indexer])
+
+    def test_disk_thin_pack_rejects_unparseable_appended_base(self) -> None:
+        for check_objects in (False, True):
+            with self.subTest(check_objects=check_objects):
+                store = self._new_store(False)
                 store.add_object(testobject)
                 files = self._files(store)
+                fixed = b"100644 file\0" + hex_to_sha(testobject.id)
                 stream = BytesIO()
-                build_pack(
-                    stream,
-                    [(Blob.type_num, b"new blob"), (Tree.type_num, b"bad tree")],
-                )
-                with self.assertRaises(ObjectFormatException):
-                    store.add_thin_pack(stream.read, None)
+                # Simulate a pre-existing packed base whose raw bytes are readable
+                # but cannot be parsed. The received delta fixes its syntax.
+                with patch.object(
+                    store, "get_raw", return_value=(Tree.type_num, b"bad tree")
+                ):
+                    build_pack(
+                        stream, [(REF_DELTA, (testobject.id, fixed))], store=store
+                    )
+                    with self.assertRaises(ObjectFormatException):
+                        store.add_thin_pack(
+                            stream.read, None, check_objects=check_objects
+                        )
                 self.assertEqual([testobject.id], list(store))
                 self.assertEqual(files, self._files(store))
 
-    def test_add_pack_late_failure_is_atomic(self) -> None:
-        for memory in (False, True):
-            with self.subTest(memory=memory):
-                store = self._new_store(memory)
+    def test_memory_late_copy_failure_is_atomic(self) -> None:
+        # Tree.copy currently parses SHA256 trees with the default SHA1 format.
+        # Until that is supported, a late copy failure must reject the whole pack.
+        for check_objects in (False, True):
+            with self.subTest(check_objects=check_objects):
+                store = self._new_store(True, SHA256)
                 store.add_object(testobject)
-                files = self._files(store)
-                f, commit, abort = store.add_pack()
-                build_pack(
-                    f, [(Blob.type_num, b"new blob"), (Tree.type_num, b"bad tree")]
+                original_ids = list(store)
+                tree = ShaFile.from_raw_string(
+                    Tree.type_num, b"100644 file\0" + b"a" * 32, object_format=SHA256
                 )
-                f.seek(0, os.SEEK_END)
-                with self.assertRaises(ObjectFormatException):
-                    commit()
-                self.assertTrue(f.closed)
-                abort()
-                self.assertEqual([testobject.id], list(store))
-                self.assertEqual(files, self._files(store))
+                tree.check()
+                stream = BytesIO()
+                write_pack_objects(
+                    stream.write,
+                    [(Blob.from_string(b"new blob"), None), (tree, None)],
+                    object_format=SHA256,
+                )
+                stream.seek(0)
+                with self.assertRaises(ValueError):
+                    store.add_thin_pack(stream.read, None, check_objects=check_objects)
+                self.assertEqual(original_ids, list(store))
+
+    def test_disk_validation_uses_existing_delta_walk(self) -> None:
+        for check_objects in (False, True):
+            for thin in (False, True):
+                with self.subTest(check_objects=check_objects, thin=thin):
+                    store = self._new_store(False)
+                    base = Blob.from_string(b"base")
+                    store.add_object(base)
+                    objects = [(Blob.type_num, b"new blob")]
+                    if thin:
+                        objects.append((REF_DELTA, (base.id, b"changed")))
+                    stream = BytesIO()
+                    build_pack(stream, objects, store=store)
+                    resolved = []
+                    original = dulwich.pack.DeltaChainIterator._resolve_object
+
+                    def resolve(walker, *args):
+                        resolved.append(args[0])
+                        return original(walker, *args)
+
+                    with patch.object(
+                        dulwich.pack.DeltaChainIterator, "_resolve_object", resolve
+                    ):
+                        store.add_thin_pack(
+                            stream.read, None, check_objects=check_objects
+                        )
+                    self.assertEqual(len(objects), len(resolved))
+
+    def test_memory_quarantine_does_not_retain_decoded_objects(self) -> None:
+        original_class = dulwich.objects.object_class
+        original_spool = tempfile.SpooledTemporaryFile
+        original_temp = tempfile.TemporaryFile
+        stream = BytesIO()
+        build_pack(stream, [(Blob.type_num, bytes([i]) * 32768) for i in range(64)])
+        for check_objects in (False, True):
+            with self.subTest(check_objects=check_objects):
+                refs = []
+                live_counts = []
+                opened = []
+                quarantines = []
+                published = False
+
+                class TrackedBlob(Blob):
+                    def __init__(self):
+                        super().__init__()
+                        refs.append(weakref.ref(self))
+                        if not published:
+                            live_counts.append(sum(ref() is not None for ref in refs))
+
+                class RecordingStore(MemoryObjectStore):
+                    def add_object(self, obj):
+                        nonlocal published
+                        published = True
+                        super().add_object(obj)
+
+                def object_type(type_num):
+                    return (
+                        TrackedBlob
+                        if type_num == Blob.type_num
+                        else original_class(type_num)
+                    )
+
+                def spool(*args, **kwargs):
+                    f = original_spool(*args, **kwargs)
+                    opened.append(f)
+                    return f
+
+                def disk_file(*args, **kwargs):
+                    f = original_temp(*args, **kwargs)
+                    opened.append(f)
+                    if kwargs.get("prefix") == "validated-":
+                        quarantines.append(f)
+                    return f
+
+                store = RecordingStore()
+                stream.seek(0)
+                with (
+                    patch("dulwich.objects.object_class", object_type),
+                    patch("dulwich.object_store.PACK_SPOOL_FILE_MAX_SIZE", 4096),
+                    patch("tempfile.SpooledTemporaryFile", spool),
+                    patch("tempfile.TemporaryFile", disk_file),
+                ):
+                    store.add_thin_pack(stream.read, None, check_objects=check_objects)
+                self.assertLessEqual(max(live_counts), 3)
+                self.assertEqual(1, len(quarantines))
+                self.assertTrue(all(f.closed for f in opened))
+                self.assertEqual(64, len(list(store)))
+
+    def test_memory_quarantine_cleanup_after_late_failure(self) -> None:
+        original_spool = tempfile.SpooledTemporaryFile
+        original_temp = tempfile.TemporaryFile
+        opened = []
+
+        def spool(*args, **kwargs):
+            f = original_spool(*args, **kwargs)
+            opened.append(f)
+            return f
+
+        def disk_file(*args, **kwargs):
+            f = original_temp(*args, **kwargs)
+            opened.append(f)
+            return f
+
+        store = self._new_store(True)
+        store.add_object(testobject)
+        stream = BytesIO()
+        build_pack(
+            stream,
+            [(Blob.type_num, b"a" * 32768), (Tree.type_num, b"100644 .\0" + b"a" * 20)],
+        )
+        with (
+            patch("dulwich.object_store.PACK_SPOOL_FILE_MAX_SIZE", 4096),
+            patch("tempfile.SpooledTemporaryFile", spool),
+            patch("tempfile.TemporaryFile", disk_file),
+        ):
+            with self.assertRaises(ObjectFormatException):
+                store.add_thin_pack(stream.read, None, check_objects=True)
+        self.assertEqual(2, len(opened))
+        self.assertTrue(all(f.closed for f in opened))
+        self.assertEqual([testobject.id], list(store))
 
     def test_memory_bad_pack_header_closes_spool(self) -> None:
         store = self._new_store(True)

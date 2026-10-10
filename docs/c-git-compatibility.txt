@@ -617,7 +617,6 @@ Pull/Push/Fetch/Rebase
 * ✗ ``push.followTags`` - Push annotated tags
 * ✗ ``rebase.autoStash`` - Auto-stash before rebase
 * ✗ ``transfer.fsckObjects`` - Validate object integrity on transfer
-  (supported as a fallback for ``receive.fsckObjects`` only)
 
 Credentials
 -----------
@@ -657,10 +656,7 @@ Other
 * ✗ ``commit.template`` - Commit message template file
 * ✗ ``format.pretty`` - Default pretty-print format
 * ✗ ``log.abbrevCommit`` - Abbreviate commits in log
-* ◐ ``receive.fsckObjects`` - Validate received objects with Dulwich's
-  internal consistency checks before publishing the incoming pack;
-  full C Git fsck checks, connectivity checks, severity overrides and
-  skip lists are not implemented
+* ◐ ``receive.fsckObjects`` - Validate received objects (partial)
 * ✗ ``tag.sort`` - Default tag sorting
 
 Known Limitations

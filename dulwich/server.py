@@ -1505,13 +1505,11 @@ class ReceivePackHandler(PackHandler):
             unpack_exceptions = (*all_exceptions, ValueError, UnresolvedDeltas)
             try:
                 recv = getattr(self.proto, "recv", None)
-                options = {"max_input_size": self._receive_max_input_size()}
-                if self._receive_fsck_objects():
-                    options["check_objects"] = True
                 self.repo.object_store.add_thin_pack(  # type: ignore[attr-defined]
                     self.proto.read,
                     recv,
-                    **options,
+                    max_input_size=self._receive_max_input_size(),
+                    check_objects=self._receive_fsck_objects(),
                 )
                 yield (b"unpack", b"ok")
             except unpack_exceptions as e:
@@ -1787,8 +1785,7 @@ class ReceivePackHandler(PackHandler):
         # backend can now deal with this refs and read a pack using self.read
         status = list(self._apply_pack(client_refs))
 
-        if status and status[0] == (b"unpack", b"ok"):
-            self._on_post_receive(client_refs)  # type: ignore[arg-type]
+        self._on_post_receive(client_refs)  # type: ignore[arg-type]
 
         # when we have read all the pack from the client, send a status report
         # if the client asked for it

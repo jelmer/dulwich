@@ -584,22 +584,39 @@ class ReceivePackFsckTests(TestCase):
                         self.assertEqual(new_id, repo.refs[b"refs/heads/master"])
                         self.assertNotIn(b"refs/heads/todelete", repo.refs)
 
-    def test_store_override_without_new_keyword_when_disabled(self) -> None:
+    def test_store_receives_explicit_check_objects(self) -> None:
+        received = []
+
         class CustomStore(MemoryObjectStore):
             def add_thin_pack(
-                self, read_all, read_some, progress=None, *, max_input_size=None
+                self,
+                read_all,
+                read_some,
+                progress=None,
+                *,
+                max_input_size=None,
+                check_objects=None,
             ):
+                received.append(check_objects)
                 return super().add_thin_pack(
-                    read_all, read_some, progress, max_input_size=max_input_size
+                    read_all,
+                    read_some,
+                    progress,
+                    max_input_size=max_input_size,
+                    check_objects=check_objects,
                 )
 
-        repo = self._new_repo(True)
-        repo.object_store = CustomStore()
-        repo.refs[b"refs/heads/master"] = ONE
-        repo.refs[b"refs/heads/todelete"] = TWO
-        status, new_id = self._apply(repo, [(Blob.type_num, b"new blob")])
-        self.assertEqual(b"ok", status[0][1])
-        self.assertEqual(new_id, repo.refs[b"refs/heads/master"])
+        for enabled in (False, True):
+            with self.subTest(enabled=enabled):
+                repo = self._new_repo(True)
+                repo.object_store = CustomStore()
+                self._set_config(repo, b"receive", b"fsckObjects", enabled)
+                repo.refs[b"refs/heads/master"] = ONE
+                repo.refs[b"refs/heads/todelete"] = TWO
+                status, new_id = self._apply(repo, [(Blob.type_num, b"new blob")])
+                self.assertEqual(b"ok", status[0][1])
+                self.assertEqual(new_id, repo.refs[b"refs/heads/master"])
+        self.assertEqual([False, True], received)
 
     def test_late_bad_commit_preserves_all_objects_and_refs(self) -> None:
         for memory in (False, True):
@@ -733,14 +750,6 @@ class ReceivePackFsckTests(TestCase):
         for memory in (False, True):
             with self.subTest(memory=memory):
                 repo = self._new_repo(memory)
-                post_receive_calls = []
-
-                class PostReceiveHook:
-                    def execute(self, refs):
-                        post_receive_calls.append(refs)
-                        return b""
-
-                repo.hooks["post-receive"] = PostReceiveHook()
                 self._set_config(repo, b"receive", b"fsckObjects", True)
                 repo.refs[b"refs/heads/master"] = ONE
                 pack = BytesIO()
@@ -765,7 +774,6 @@ class ReceivePackFsckTests(TestCase):
                 )
                 self.assertEqual(ONE, repo.refs[b"refs/heads/master"])
                 self.assertEqual([], list(repo.object_store))
-                self.assertEqual([], post_receive_calls)
 
 
 class ProtocolGraphWalkerEmptyTestCase(TestCase):

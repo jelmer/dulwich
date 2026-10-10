@@ -2863,6 +2863,47 @@ class PackIndexer(DeltaChainIterator[PackIndexEntry]):
 
     _compute_crc32 = True
 
+    def __init__(
+        self,
+        file_obj: IO[bytes] | None,
+        hash_func: Callable[[], "HashObject"],
+        *,
+        resolve_ext_ref: ResolveExtRefFn | None = None,
+        object_format: "ObjectFormat | None" = None,
+        check_objects: bool | None = None,
+    ) -> None:
+        """Initialize the indexer.
+
+        Args:
+          file_obj: Pack file to read.
+          hash_func: Hash function for object IDs.
+          resolve_ext_ref: Optional resolver for external delta bases.
+          object_format: Object format for parsing and semantic checks.
+          check_objects: None indexes without parsing; False parses objects;
+            True also checks their internal consistency.
+        """
+        super().__init__(
+            file_obj,
+            hash_func,
+            resolve_ext_ref=resolve_ext_ref,
+            object_format=object_format,
+        )
+        self._check_objects = check_objects
+
+    @classmethod
+    def for_pack_data(
+        cls,
+        pack_data: PackData,
+        resolve_ext_ref: ResolveExtRefFn | None = None,
+        *,
+        check_objects: bool | None = None,
+    ) -> "PackIndexer":
+        """Create an indexer with optional object parsing or semantic checks."""
+        indexer = super().for_pack_data(pack_data, resolve_ext_ref)
+        assert isinstance(indexer, cls)
+        indexer._check_objects = check_objects
+        return indexer
+
     def _result(self, unpacked: UnpackedObject) -> PackIndexEntry:
         """Convert unpacked object to pack index entry.
 
@@ -2873,6 +2914,15 @@ class PackIndexer(DeltaChainIterator[PackIndexEntry]):
             Tuple of (sha, offset, crc32) for index entry
         """
         assert unpacked.offset is not None
+        if self._check_objects is not None:
+            assert unpacked.obj_type_num is not None and unpacked.obj_chunks is not None
+            obj = ShaFile.from_raw_chunks(
+                unpacked.obj_type_num,
+                unpacked.obj_chunks,
+                object_format=self._object_format,
+            )
+            if self._check_objects:
+                obj.check()
         return unpacked.sha(), unpacked.offset, unpacked.crc32
 
 

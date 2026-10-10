@@ -60,6 +60,7 @@ import binascii
 import logging
 import os
 import stat
+import struct
 import sys
 import time
 import warnings
@@ -2200,8 +2201,6 @@ class DiskObjectStore(PackBasedObjectStore):
         ext_refs: set[RawObjectID],
         progress: Callable[..., None] | None = None,
         refs: dict[Ref, ObjectID] | None = None,
-        *,
-        check_objects: bool = False,
     ) -> Pack:
         """Move a specific file containing a pack into the pack directory.
 
@@ -2221,34 +2220,23 @@ class DiskObjectStore(PackBasedObjectStore):
           ext_refs: Objects the pack deltas against that it does not contain.
           progress: Optional progress reporting function.
           refs: Optional dictionary of refs for bitmap generation.
-          check_objects: Check each object's internal consistency before
-            publishing the pack.
         """
-        if check_objects:
-            # Check received objects before appending delta bases that were
-            # already in the store. Release the mapping before extending.
-            f.flush()
-            with PackData(path, file=f, object_format=self.object_format) as pd:
-                for obj in PackInflater.for_pack_data(pd, resolve_ext_ref=self.get_raw):
-                    obj.check()
+
+        def get_parsed_raw(sha: ObjectID | RawObjectID) -> tuple[int, bytes]:
+            type_num, data = self.get_raw(sha)
+            # Preserve parsing of appended thin bases without another pack walk.
+            ShaFile.from_raw_string(type_num, data, object_format=self.object_format)
+            return type_num, data
+
         pack_sha, extra_entries = extend_pack(
             f,
             ext_refs,
-            get_raw=self.get_raw,
+            get_raw=get_parsed_raw,
             compression_level=self.pack_compression_level,
             progress=progress,
             object_format=self.object_format,
         )
         f.flush()
-        # Validate while the pack is still private. Close the mapping before
-        # renaming so this also works on Windows.
-        with PackData(path, file=f, object_format=self.object_format) as pd:
-            pd.check()
-            if not check_objects or extra_entries:
-                for _obj in PackInflater.for_pack_data(
-                    pd, resolve_ext_ref=self.get_raw
-                ):
-                    pass
         if self.fsync_object_files:
             try:
                 fileno = f.fileno()
@@ -2408,6 +2396,8 @@ class DiskObjectStore(PackBasedObjectStore):
                     f,
                     self.object_format.hash_func,
                     resolve_ext_ref=self.get_raw,
+                    object_format=self.object_format,
+                    check_objects=check_objects,
                 )
                 copier = PackStreamCopier(
                     self.object_format.hash_func,
@@ -2426,7 +2416,6 @@ class DiskObjectStore(PackBasedObjectStore):
                     entries,
                     ext_refs,
                     progress=progress,
-                    check_objects=check_objects,
                 )
         finally:
             with suppress(FileNotFoundError):
@@ -2459,8 +2448,9 @@ class DiskObjectStore(PackBasedObjectStore):
                         indexer = PackIndexer.for_pack_data(
                             pd,
                             resolve_ext_ref=self.get_raw,
+                            check_objects=False,
                         )
-                        entries, ext_refs = self._index_pack(indexer, len(pd))  # type: ignore[arg-type]
+                        entries, ext_refs = self._index_pack(indexer, len(pd))
                     return self._complete_pack(f, path, entries, ext_refs)
                 finally:
                     f.close()
@@ -3037,7 +3027,7 @@ class MemoryObjectStore(PackCapableObjectStore):
         Returns: Fileobject to write to and a commit function to
             call when the pack is finished.
         """
-        from tempfile import SpooledTemporaryFile
+        from tempfile import SpooledTemporaryFile, TemporaryFile
 
         f = SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE, prefix="incoming-")
 
@@ -3056,13 +3046,34 @@ class MemoryObjectStore(PackCapableObjectStore):
                         # ``add_thin_pack`` already validates via
                         # ``PackStreamCopier.verify``; do the equivalent here.
                         p.check()
-                        objects = []
-                        for obj in PackInflater.for_pack_data(p, self.get_raw):
-                            if check_objects:
-                                obj.check()
-                            objects.append(obj.copy())
-                        for obj in objects:
-                            self.add_object(obj)
+                        # Quarantine decoded objects without retaining their
+                        # payloads in memory until the whole pack is valid.
+                        with TemporaryFile(prefix="validated-") as pending:
+                            for obj in PackInflater.for_pack_data(p, self.get_raw):
+                                if check_objects:
+                                    obj.check()
+                                # add_object copies objects; ensure a late copy
+                                # failure cannot leave earlier objects published.
+                                obj = obj.copy()
+                                chunks = obj.as_raw_chunks()
+                                pending.write(
+                                    struct.pack(
+                                        ">BQ", obj.type_num, sum(map(len, chunks))
+                                    )
+                                )
+                                pending.writelines(chunks)
+                                del obj, chunks
+                            pending.seek(0)
+                            while header := pending.read(9):
+                                type_num, size = struct.unpack(">BQ", header)
+                                data = pending.read(size)
+                                if len(data) != size:
+                                    raise EOFError("Truncated quarantined object")
+                                self.add_object(
+                                    ShaFile.from_raw_string(
+                                        type_num, data, object_format=self.object_format
+                                    )
+                                )
             finally:
                 f.close()
 

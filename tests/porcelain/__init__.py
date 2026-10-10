@@ -8729,6 +8729,55 @@ class StatusTests(PorcelainTestCase):
             ),
         )
 
+    def test_get_untracked_paths_from_subdir(self) -> None:
+        sub = os.path.join(self.repo.path, "sub")
+        os.makedirs(os.path.join(sub, "tracked_dir"))
+        os.makedirs(os.path.join(sub, "untracked_dir"))
+        for name in [
+            "tracked",
+            "untracked",
+            os.path.join("tracked_dir", "tracked"),
+            os.path.join("tracked_dir", "untracked"),
+            os.path.join("untracked_dir", "untracked"),
+        ]:
+            with open(os.path.join(sub, name), "w") as f:
+                f.write("content\n")
+        porcelain.add(
+            self.repo.path,
+            paths=[
+                os.path.join(sub, "tracked"),
+                os.path.join(sub, "tracked_dir", "tracked"),
+            ],
+        )
+
+        self.assertEqual(
+            {
+                "untracked",
+                os.path.join("tracked_dir", "untracked"),
+                os.path.join("untracked_dir", "untracked"),
+            },
+            set(
+                porcelain.get_untracked_paths(
+                    sub, self.repo.path, self.repo.open_index()
+                )
+            ),
+        )
+        self.assertEqual(
+            {
+                "untracked",
+                os.path.join("tracked_dir", "untracked"),
+                os.path.join("untracked_dir", ""),
+            },
+            set(
+                porcelain.get_untracked_paths(
+                    sub,
+                    self.repo.path,
+                    self.repo.open_index(),
+                    untracked_files="normal",
+                )
+            ),
+        )
+
     def test_get_untracked_paths_invalid_untracked_files(self) -> None:
         with self.assertRaises(ValueError):
             list(

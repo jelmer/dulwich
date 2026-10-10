@@ -30,10 +30,11 @@ __all__ = [
     "determine_included_paths",
     "match_sparse_patterns",
     "parse_sparse_patterns",
+    "sparse_path_matcher",
 ]
 
 import os
-from collections.abc import Sequence, Set
+from collections.abc import Callable, Sequence, Set
 from fnmatch import fnmatch
 from typing import TYPE_CHECKING
 
@@ -95,14 +96,8 @@ def compute_included_paths_full(index: Index, lines: Sequence[str]) -> set[str]:
     Returns:
       A set of included path strings.
     """
-    parsed = parse_sparse_patterns(lines)
-    included = set()
-    for path_bytes, entry in index.items():
-        path_str = path_bytes.decode("utf-8")
-        # For .gitignore logic, match_sparse_patterns returns True if 'included'
-        if match_sparse_patterns(path_str, parsed, path_is_dir=False):
-            included.add(path_str)
-    return included
+    matcher = sparse_path_matcher(lines, cone=False)
+    return {path for path in (p.decode("utf-8") for p in index) if matcher(path)}
 
 
 def compute_included_paths_cone(index: Index, lines: Sequence[str]) -> set[str]:
@@ -121,6 +116,25 @@ def compute_included_paths_cone(index: Index, lines: Sequence[str]) -> set[str]:
     Returns:
       A set of included path strings.
     """
+    matcher = sparse_path_matcher(lines, cone=True)
+    return {path for path in (p.decode("utf-8") for p in index) if matcher(path)}
+
+
+def sparse_path_matcher(lines: Sequence[str], cone: bool) -> Callable[[str], bool]:
+    """Build a predicate that tells whether a file path is in the sparse checkout.
+
+    Args:
+      lines: A list of pattern lines (strings) from sparse-checkout config.
+      cone: A bool indicating cone mode.
+
+    Returns:
+      A function taking a slash-separated file path and returning True if it
+      should be present in the working tree.
+    """
+    if not cone:
+        parsed = parse_sparse_patterns(lines)
+        return lambda path: match_sparse_patterns(path, parsed, path_is_dir=False)
+
     include_top_level = False
     exclude_subdirs = False
     reinclude_dirs = set()
@@ -136,29 +150,18 @@ def compute_included_paths_cone(index: Index, lines: Sequence[str]) -> set[str]:
             if d:
                 reinclude_dirs.add(d)
 
-    included = set()
-
-    for path_bytes, entry in index.items():
-        path_str = path_bytes.decode("utf-8")
-
+    def matches_cone(path: str) -> bool:
         # Check if this is top-level (no slash) or which top_dir it belongs to
-        if "/" not in path_str:
-            # top-level file
-            if include_top_level:
-                included.add(path_str)
-            continue
-
-        top_dir = path_str.split("/", 1)[0]
+        if "/" not in path:
+            return include_top_level
         if exclude_subdirs:
             # subdirs are excluded unless they appear in reinclude_dirs
-            if top_dir in reinclude_dirs:
-                included.add(path_str)
-        else:
-            # if we never set exclude_subdirs, we might include everything by default
-            # or handle partial subdir logic. For now, let's assume everything is included
-            included.add(path_str)
+            return path.split("/", 1)[0] in reinclude_dirs
+        # if we never set exclude_subdirs, we might include everything by default
+        # or handle partial subdir logic. For now, let's assume everything is included
+        return True
 
-    return included
+    return matches_cone
 
 
 def apply_included_paths(

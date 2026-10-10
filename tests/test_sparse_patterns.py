@@ -41,6 +41,7 @@ from dulwich.sparse_patterns import (
     determine_included_paths,
     match_sparse_patterns,
     parse_sparse_patterns,
+    sparse_path_matcher,
 )
 
 from . import TestCase
@@ -331,6 +332,25 @@ class ComputeIncludedPathsConeTests(TestCase):
         included = compute_included_paths_cone(self.repo.open_index(), lines)
         # Only docs/* should be included since we didn't include top level
         self.assertEqual(included, {"docs/readme.md"})
+
+
+class SparsePathMatcherTests(TestCase):
+    def test_full(self):
+        matcher = sparse_path_matcher(["/docs/", "*.md", "!secret.md"], cone=False)
+        self.assertEqual(
+            [True, True, False, False],
+            [
+                matcher(p)
+                for p in ["docs/a.txt", "src/readme.md", "src/secret.md", "src/x.py"]
+            ],
+        )
+
+    def test_cone(self):
+        matcher = sparse_path_matcher(["/*", "!/*/", "/docs/"], cone=True)
+        self.assertEqual(
+            [True, True, False],
+            [matcher(p) for p in ["top.txt", "docs/a/b.txt", "src/x.py"]],
+        )
 
 
 class DetermineIncludedPathsTests(TestCase):

@@ -1,5 +1,10 @@
 1.2.18	UNRELEASED
 
+ * Fix ``porcelain.reset`` with ``mode="hard"`` failing after a conflicted
+   merge. Like git, hard and mixed resets now remove merge state, and a
+   soft reset in the middle of a merge is refused.
+   (Jelmer Vernooĳ, #2461)
+
  * Don't remove the lockfile in ``GitFile.close()`` after a successful
    rename; another writer may already hold it, letting two writers update
    the same file (e.g. ``.git/index``) concurrently.

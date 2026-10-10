@@ -6581,14 +6581,20 @@ def sparse_checkout(
         else:
             lines = patterns
             repo_obj.get_worktree().set_sparse_checkout_patterns(patterns)
-            config = repo_obj.get_config()
-            config.set((b"core",), b"sparseCheckout", True)
-            config.set((b"core",), b"sparseCheckoutCone", cone)
-            config.write_to_path()
+            repo_config = repo_obj.get_config()
+            repo_config.set((b"core",), b"sparseCheckout", True)
+            repo_config.set((b"core",), b"sparseCheckoutCone", cone)
+            repo_config.write_to_path()
 
         # --- 2) Determine the set of included paths ---
-        index = repo_obj.open_index(config=repo_obj.get_config_stack())
-        included_paths = determine_included_paths(index, lines, cone)
+        config = repo_obj.get_config_stack()
+        index = repo_obj.open_index(config=config)
+        included_paths = determine_included_paths(
+            index,
+            lines,
+            cone,
+            ignorecase=config.get_boolean((b"core",), b"ignorecase", False),
+        )
 
         # --- 3) Apply those results to the index & working tree ---
         try:
@@ -6596,7 +6602,7 @@ def sparse_checkout(
                 repo_obj,
                 included_paths,
                 force=force,
-                config=repo_obj.get_config_stack(),
+                config=config,
             )
         except SparseCheckoutConflictError as exc:
             raise CheckoutError(*exc.args) from exc

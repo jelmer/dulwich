@@ -5615,6 +5615,29 @@ class CheckoutTests(PorcelainTestCase):
         target_repo.close()
         remote_repo.close()
 
+    def _setup_file_becoming_dir(self) -> str:
+        porcelain.checkout(self.repo, b"uni")
+        os.mkdir(os.path.join(self.repo.path, "plain"))
+        _commit_file_with_content(self.repo, "plain/inner", "inner\n")
+        porcelain.checkout(self.repo, b"master")
+        _sha, plain_path = _commit_file_with_content(self.repo, "plain", "plain\n")
+        with open(plain_path, "w") as f:
+            f.write("locally modified\n")
+        return plain_path
+
+    def test_checkout_modified_file_becoming_dir_refused(self) -> None:
+        plain_path = self._setup_file_becoming_dir()
+        with self.assertRaises(porcelain.CheckoutError):
+            porcelain.checkout(self.repo, b"uni")
+        with open(plain_path) as f:
+            self.assertEqual("locally modified\n", f.read())
+
+    def test_checkout_force_modified_file_becoming_dir(self) -> None:
+        plain_path = self._setup_file_becoming_dir()
+        porcelain.checkout(self.repo, b"uni", force=True)
+        with open(os.path.join(plain_path, "inner")) as f:
+            self.assertEqual("inner\n", f.read())
+
 
 class RestoreTests(PorcelainTestCase):
     """Tests for the restore command."""
@@ -5842,6 +5865,55 @@ class SwitchTests(PorcelainTestCase):
         # Switching to a commit SHA without --detach should fail
         with self.assertRaises(porcelain.CheckoutError):
             porcelain.switch(self.repo, self._sha.decode())
+
+
+class CheckoutLineEndingTests(PorcelainTestCase):
+    """Checkout over files subject to line ending conversion (issue #2466)."""
+
+    def _commit(self, files: dict[str, bytes], message: bytes) -> None:
+        for name, contents in files.items():
+            with open(os.path.join(self.repo.path, name), "wb") as f:
+                f.write(contents)
+        porcelain.add(self.repo, paths=[os.path.join(self.repo.path, n) for n in files])
+        porcelain.commit(
+            self.repo,
+            message=message,
+            author=b"Test <test@example.com>",
+            committer=b"Test <test@example.com>",
+        )
+
+    def _check_checkout_with_on_disk(self, on_disk: bytes) -> None:
+        self._commit(
+            {".gitattributes": b"*.bat text eol=crlf\n", "run.bat": b"echo base\n"},
+            b"base",
+        )
+        porcelain.branch_create(self.repo, "feature")
+        self._commit({"run.bat": on_disk}, b"change run.bat")
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [], []],
+            list(porcelain.status(self.repo)),
+        )
+        porcelain.checkout(self.repo, "feature")
+        with open(os.path.join(self.repo.path, "run.bat"), "rb") as f:
+            self.assertEqual(b"echo base\r\n", f.read())
+
+    def test_crlf_on_disk(self) -> None:
+        self._check_checkout_with_on_disk(b"echo changed\r\n")
+
+    def test_lf_on_disk(self) -> None:
+        self._check_checkout_with_on_disk(b"echo changed\n")
+
+    def test_modified_file_still_refused(self) -> None:
+        self._commit(
+            {".gitattributes": b"*.bat text eol=crlf\n", "run.bat": b"echo base\n"},
+            b"base",
+        )
+        porcelain.branch_create(self.repo, "feature")
+        self._commit({"run.bat": b"echo changed\r\n"}, b"change run.bat")
+        with open(os.path.join(self.repo.path, "run.bat"), "wb") as f:
+            f.write(b"echo local\r\n")
+        with self.assertRaises(porcelain.CheckoutError):
+            porcelain.checkout(self.repo, "feature")
 
 
 class GeneralCheckoutTests(PorcelainTestCase):

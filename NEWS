@@ -6,6 +6,14 @@
    ``reset --hard``, checkout, pull and merge, rather than those of the
    commit being left. (Jelmer Vernooĳ, #2463)
 
+ * Fix ``get_untracked_paths`` with ``precompose_unicode`` returning paths
+   starting with ``../`` when the walk root's name is decomposed (NFD).
+   (Jelmer Vernooĳ)
+
+ * Speed up ``porcelain.status`` by no longer resolving every walked path
+   when looking for untracked files, which was particularly slow on
+   Windows. (Jelmer Vernooĳ, #2465)
+
  * Fix checkout, pull and merge refusing to overwrite clean files subject to
    line ending conversion (e.g. ``eol=crlf``). (Jelmer Vernooĳ, #2466)
 

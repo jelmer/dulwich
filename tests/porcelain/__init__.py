@@ -7311,6 +7311,9 @@ class PullTests(PorcelainTestCase):
         with open(target_file, "w") as f:
             f.write("local modifications")
 
+        with Repo(self.target_path) as r:
+            old_head = r.head()
+
         # Pull should fail because of uncommitted changes
         with self.assertRaises(WorkingTreeModifiedError) as cm:
             porcelain.pull(
@@ -7327,6 +7330,54 @@ class PullTests(PorcelainTestCase):
         # Verify the file still has local modifications
         with open(target_file) as f:
             self.assertEqual(f.read(), "local modifications")
+
+        # HEAD and the index are left alone
+        with Repo(self.target_path) as r:
+            self.assertEqual(old_head, r.head())
+        status = porcelain.status(self.target_path)
+        self.assertEqual({"add": [], "delete": [], "modify": []}, status.staged)
+        self.assertEqual([b"testfile.txt"], status.unstaged)
+
+    def test_pull_protects_modified_files_updates_remote_refs(self) -> None:
+        test_file = os.path.join(self.repo.path, "testfile.txt")
+        with open(test_file, "w") as f:
+            f.write("original content")
+        porcelain.add(repo=self.repo.path, paths=[test_file])
+        porcelain.commit(
+            repo=self.repo.path,
+            message=b"Add test file",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+        porcelain.pull(self.target_path, outstream=BytesIO(), errstream=BytesIO())
+
+        with open(test_file, "w") as f:
+            f.write("updated content")
+        porcelain.add(repo=self.repo.path, paths=[test_file])
+        new_tip = porcelain.commit(
+            repo=self.repo.path,
+            message=b"Update test file",
+            author=b"test <email>",
+            committer=b"test <email>",
+        )
+
+        with open(os.path.join(self.target_path, "testfile.txt"), "w") as f:
+            f.write("local modifications")
+        with Repo(self.target_path) as r:
+            old_head = r.head()
+
+        self.assertRaises(
+            WorkingTreeModifiedError,
+            porcelain.pull,
+            self.target_path,
+            outstream=BytesIO(),
+            errstream=BytesIO(),
+        )
+
+        # Like git, the fetch still updates the remote-tracking refs
+        with Repo(self.target_path) as r:
+            self.assertEqual(old_head, r.head())
+            self.assertEqual(new_tip, r.refs[b"refs/remotes/origin/master"])
 
     def test_pull_force_overwrites_modified_files(self) -> None:
         """Test that pull with force=True overwrites uncommitted changes."""

@@ -1,18 +1,18 @@
 1.2.18	UNRELEASED
 
+ * Add support for Python 3.15. (Jelmer Vernooĳ)
+
  * Keep paths outside the sparse checkout out of the working tree in
    ``update_working_tree``, so ``reset --hard``, checkout and merge no longer
    write excluded files and drop their skip-worktree bits.
    (Jelmer Vernooĳ, #2472)
 
  * Don't report sparse-excluded (skip-worktree) files as unstaged changes
-   in ``porcelain.status``.
-   (Jelmer Vernooĳ, #2484)
+   in ``porcelain.status``. (Jelmer Vernooĳ, #2484)
 
  * Fix ``porcelain.reset`` with ``mode="hard"`` failing after a conflicted
    merge. Like git, hard and mixed resets now remove merge state, and a
-   soft reset in the middle of a merge is refused.
-   (Jelmer Vernooĳ, #2461)
+   soft reset in the middle of a merge is refused. (Jelmer Vernooĳ, #2461)
 
  * Don't remove the lockfile in ``GitFile.close()`` after a successful
    rename; another writer may already hold it, letting two writers update

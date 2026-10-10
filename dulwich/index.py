@@ -2886,25 +2886,25 @@ def _check_file_matches(
             if current_mode != expected_mode:
                 return False
 
-    # If mode matches (or we don't care), check content via size first
     blob_obj = repo_object_store[entry_sha]
-    if current_stat.st_size != blob_obj.raw_length():
+    normalize = blob_normalizer is not None and tree_path is not None
+    # Filters can change the size, so only take the shortcut without them.
+    if not normalize and current_stat.st_size != blob_obj.raw_length():
         return False
 
-    # Size matches, check actual content
     try:
         with open(full_path, "rb") as f:
             current_content = f.read()
-            expected_content = blob_obj.as_raw_string()
-            if blob_normalizer and tree_path is not None:
-                assert isinstance(blob_obj, Blob)
-                normalized_blob = blob_normalizer.checkout_normalize(
-                    blob_obj, tree_path
-                )
-                expected_content = normalized_blob.as_raw_string()
-            return current_content == expected_content
     except (FileNotFoundError, PermissionError, IsADirectoryError):
         return False
+
+    # Like git, clean the working tree file and compare it with the blob.
+    if normalize:
+        assert blob_normalizer is not None and tree_path is not None
+        current_content = blob_normalizer.checkin_normalize(
+            Blob.from_string(current_content), tree_path
+        ).as_raw_string()
+    return current_content == blob_obj.as_raw_string()
 
 
 def _transition_to_submodule(

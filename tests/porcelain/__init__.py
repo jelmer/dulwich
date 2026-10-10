@@ -5844,6 +5844,55 @@ class SwitchTests(PorcelainTestCase):
             porcelain.switch(self.repo, self._sha.decode())
 
 
+class CheckoutLineEndingTests(PorcelainTestCase):
+    """Checkout over files subject to line ending conversion (issue #2466)."""
+
+    def _commit(self, files: dict[str, bytes], message: bytes) -> None:
+        for name, contents in files.items():
+            with open(os.path.join(self.repo.path, name), "wb") as f:
+                f.write(contents)
+        porcelain.add(self.repo, paths=[os.path.join(self.repo.path, n) for n in files])
+        porcelain.commit(
+            self.repo,
+            message=message,
+            author=b"Test <test@example.com>",
+            committer=b"Test <test@example.com>",
+        )
+
+    def _check_checkout_with_on_disk(self, on_disk: bytes) -> None:
+        self._commit(
+            {".gitattributes": b"*.bat text eol=crlf\n", "run.bat": b"echo base\n"},
+            b"base",
+        )
+        porcelain.branch_create(self.repo, "feature")
+        self._commit({"run.bat": on_disk}, b"change run.bat")
+        self.assertEqual(
+            [{"add": [], "delete": [], "modify": []}, [], []],
+            list(porcelain.status(self.repo)),
+        )
+        porcelain.checkout(self.repo, "feature")
+        with open(os.path.join(self.repo.path, "run.bat"), "rb") as f:
+            self.assertEqual(b"echo base\r\n", f.read())
+
+    def test_crlf_on_disk(self) -> None:
+        self._check_checkout_with_on_disk(b"echo changed\r\n")
+
+    def test_lf_on_disk(self) -> None:
+        self._check_checkout_with_on_disk(b"echo changed\n")
+
+    def test_modified_file_still_refused(self) -> None:
+        self._commit(
+            {".gitattributes": b"*.bat text eol=crlf\n", "run.bat": b"echo base\n"},
+            b"base",
+        )
+        porcelain.branch_create(self.repo, "feature")
+        self._commit({"run.bat": b"echo changed\r\n"}, b"change run.bat")
+        with open(os.path.join(self.repo.path, "run.bat"), "wb") as f:
+            f.write(b"echo local\r\n")
+        with self.assertRaises(porcelain.CheckoutError):
+            porcelain.checkout(self.repo, "feature")
+
+
 class GeneralCheckoutTests(PorcelainTestCase):
     """Tests for the general checkout function that handles branches, tags, and commits."""
 

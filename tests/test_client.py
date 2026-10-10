@@ -4154,6 +4154,49 @@ class TestPackfileUris(TestCase):
 
         self.assertIn("does not support URI downloads", str(cm.exception))
 
+    def test_handle_upload_pack_tail_shallow_info(self) -> None:
+        # A shallow client's v2 fetch response may open with a
+        # shallow-info section before packfile (#2478).
+        sha = b"55dcc6bf963f922e1ed5c4bbaaefcfacef57b1d7"
+        packfile_data = b"PACK\x00\x00\x00\x02\x00\x00\x00\x00"
+        self.rin.write(
+            pkt_line(b"shallow-info\n")
+            + pkt_line(b"shallow " + sha + b"\n")
+            + b"0001"
+            + pkt_line(b"packfile\n")
+            + pkt_line(b"\x01" + packfile_data)
+            + b"0000"
+        )
+        self.rin.seek(0)
+
+        proto = Protocol(self.rin.read, self.rout.write)
+
+        class DummyGraphWalker:
+            def ack(self, sha):
+                pass
+
+            def nak(self):
+                pass
+
+        collected_data = BytesIO()
+
+        def pack_data_callback(data):
+            collected_data.write(data)
+            return len(data)
+
+        (new_shallow, new_unshallow) = _handle_upload_pack_tail(
+            proto,
+            {CAPABILITY_SIDE_BAND_64K},
+            DummyGraphWalker(),
+            pack_data_callback,
+            None,
+            protocol_version=2,
+        )
+
+        self.assertEqual(collected_data.getvalue(), packfile_data)
+        self.assertEqual(new_shallow, {sha})
+        self.assertEqual(new_unshallow, set())
+
     def test_verify_and_read_sha256(self) -> None:
         """Test verify_and_read() with SHA-256 hash algorithm."""
         data = b"test data for sha256"

@@ -1223,7 +1223,7 @@ def _handle_upload_pack_tail(
     protocol_version: int = 0,
     http_request: Callable[[str], tuple["HTTPResponse", Callable[[int], bytes]]]
     | None = None,
-) -> None:
+) -> tuple[set[ObjectID], set[ObjectID]]:
     """Handle the tail of a 'git-upload-pack' request.
 
     Args:
@@ -1235,11 +1235,24 @@ def _handle_upload_pack_tail(
       rbufsize: Read buffer size
       protocol_version: Neogiated Git protocol version.
       http_request: Optional HTTP request function for downloading packfile URIs
+    Returns:
+      Tuple of (new_shallow, new_unshallow) sets read from an optional
+      shallow-info section, or empty sets if none was sent.
     """
+    new_shallow: set[ObjectID] = set()
+    new_unshallow: set[ObjectID] = set()
     pkt = proto.read_pkt_line()
     while pkt:
         parts = pkt.rstrip(b"\n").split(b" ")
         if protocol_version == 2:
+            # A shallow client's fetch response may open with an optional
+            # shallow-info section; consume it before looking for the pack.
+            if parts[0] == b"shallow-info":
+                (new_shallow, new_unshallow) = _read_shallow_updates(
+                    proto.read_pkt_seq()
+                )
+                pkt = proto.read_pkt_line()
+                continue
             # Check for packfile-uris response
             if parts[0] == b"packfile-uris":
                 if http_request is None:
@@ -1301,6 +1314,7 @@ def _handle_upload_pack_tail(
             if data == b"":
                 break
             pack_data(data)
+    return (new_shallow, new_unshallow)
 
 
 def _extract_symrefs_and_agent(
@@ -2387,7 +2401,7 @@ class TraditionalGitClient(GitClient):
             # Nothing more will be written on a fetch; half-close so the
             # server sees EOF and closes gracefully rather than RST-ing.
             proto.shutdown_write()
-            _handle_upload_pack_tail(
+            (tail_shallow, tail_unshallow) = _handle_upload_pack_tail(
                 proto,
                 negotiated_capabilities,
                 graph_walker,
@@ -2395,6 +2409,8 @@ class TraditionalGitClient(GitClient):
                 progress,
                 protocol_version=self.protocol_version,
             )
+            new_shallow = new_shallow or tail_shallow
+            new_unshallow = new_unshallow or tail_unshallow
             return FetchPackResult(
                 refs, symrefs, agent, new_shallow, new_unshallow, object_format
             )
@@ -5128,7 +5144,7 @@ class AbstractHttpGitClient(GitClient):
                 (new_shallow, new_unshallow) = _read_shallow_updates(
                     resp_proto.read_pkt_seq()
                 )
-            _handle_upload_pack_tail(
+            (tail_shallow, tail_unshallow) = _handle_upload_pack_tail(
                 resp_proto,
                 negotiated_capabilities,
                 graph_walker,
@@ -5137,6 +5153,8 @@ class AbstractHttpGitClient(GitClient):
                 protocol_version=self.protocol_version,
                 http_request=self._http_request,
             )
+            new_shallow = new_shallow or tail_shallow
+            new_unshallow = new_unshallow or tail_unshallow
             return FetchPackResult(
                 refs, symrefs, agent, new_shallow, new_unshallow, object_format
             )

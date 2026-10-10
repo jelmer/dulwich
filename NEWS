@@ -1,5 +1,7 @@
 1.2.18	UNRELEASED
 
+ * Add support for Python 3.15. (Jelmer Vernooĳ)
+
  * Fix ``porcelain.reset`` with ``mode="hard"`` failing after a conflicted
    merge. Like git, hard and mixed resets now remove merge state, and a
    soft reset in the middle of a merge is refused.

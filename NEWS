@@ -2,6 +2,10 @@
 
  * Add support for Python 3.15. (Jelmer Vernooĳ)
 
+ * Apply the ``.gitattributes`` of the tree being checked out in
+   ``reset --hard``, checkout, pull and merge, rather than those of the
+   commit being left. (Jelmer Vernooĳ, #2463)
+
  * Fix ``get_untracked_paths`` with ``precompose_unicode`` returning paths
    starting with ``../`` when the walk root's name is decomposed (NFD).
    (Jelmer Vernooĳ)

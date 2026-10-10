@@ -5915,6 +5915,45 @@ class CheckoutLineEndingTests(PorcelainTestCase):
         with self.assertRaises(porcelain.CheckoutError):
             porcelain.checkout(self.repo, "feature")
 
+    def _commit_attributes_added(self) -> tuple[bytes, bytes]:
+        self._commit({"README": b"base\n"}, b"base")
+        base = self.repo.head()
+        self._commit(
+            {".gitattributes": b"f text eol=crlf\n", "f": b"one\r\ntwo\r\n"},
+            b"attributes and file",
+        )
+        return base, self.repo.head()
+
+    def _read(self, name: str) -> bytes:
+        with open(os.path.join(self.repo.path, name), "rb") as f:
+            return f.read()
+
+    def test_checkout_uses_target_attributes(self) -> None:
+        base, target = self._commit_attributes_added()
+        porcelain.branch_create(self.repo, "with-attrs", target)
+        porcelain.reset(self.repo, mode="hard", treeish=base)
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "f")))
+        porcelain.checkout(self.repo, "with-attrs")
+        self.assertEqual(b"one\r\ntwo\r\n", self._read("f"))
+
+    def test_reset_hard_uses_target_attributes(self) -> None:
+        base, target = self._commit_attributes_added()
+        porcelain.reset(self.repo, mode="hard", treeish=base)
+        porcelain.reset(self.repo, mode="hard", treeish=target)
+        self.assertEqual(b"one\r\ntwo\r\n", self._read("f"))
+
+    def test_reset_hard_ignores_replaced_worktree_attributes(self) -> None:
+        self._commit({".gitattributes": b"run.bat -text\n", "README": b"x\n"}, b"old")
+        old = self.repo.head()
+        self._commit(
+            {".gitattributes": b"run.bat text eol=crlf\n", "run.bat": b"echo hi\n"},
+            b"new",
+        )
+        new = self.repo.head()
+        porcelain.reset(self.repo, mode="hard", treeish=old)
+        porcelain.reset(self.repo, mode="hard", treeish=new)
+        self.assertEqual(b"echo hi\r\n", self._read("run.bat"))
+
 
 class GeneralCheckoutTests(PorcelainTestCase):
     """Tests for the general checkout function that handles branches, tags, and commits."""

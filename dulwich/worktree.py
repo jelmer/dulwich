@@ -833,7 +833,9 @@ class WorkTree:
         validate_path_element = get_path_element_validator(config)
         symlink_fn = get_symlink_fn(config)
 
-        blob_normalizer = self._repo.get_blob_normalizer(config=stacked_config)
+        blob_normalizer = self._repo.get_blob_normalizer(
+            config=stacked_config, tree=tree
+        )
         return build_index_from_tree(
             self.path,
             self._repo.index_path(),

@@ -3294,7 +3294,9 @@ def reset(
                 _get_worktree_update_config(r)
             )
 
-            blob_normalizer = r.get_blob_normalizer(config=r.get_config_stack())
+            blob_normalizer = r.get_blob_normalizer(
+                config=r.get_config_stack(), tree=tree.id
+            )
             changes = tree_changes(
                 r.object_store, index_tree_id, tree.id, want_unchanged=True
             )
@@ -3950,7 +3952,9 @@ def pull(
             head_commit = r[new_head if new_head is not None else HEADREF]
             assert isinstance(head_commit, Commit)
             new_tree_id = head_commit.tree
-            blob_normalizer = r.get_blob_normalizer(config=r.get_config_stack())
+            blob_normalizer = r.get_blob_normalizer(
+                config=r.get_config_stack(), tree=new_tree_id
+            )
             changes = tree_changes(r.object_store, old_tree_id, new_tree_id)
             update_working_tree(
                 r,
@@ -6032,7 +6036,7 @@ def _perform_tree_switch(
 
     config = repo.get_config_stack()
     # Get blob normalizer for line ending conversion
-    blob_normalizer = repo.get_blob_normalizer(config=config)
+    blob_normalizer = repo.get_blob_normalizer(config=config, tree=target_tree_id)
 
     # Update working tree
     tree_change_iterator: Iterator[TreeChange] = tree_changes(
@@ -7377,7 +7381,9 @@ def _do_merge(
         r.refs[HEADREF] = merge_commit_id
         # Update the working directory
         config_stack = r.get_config_stack()
-        blob_normalizer = r.get_blob_normalizer(config=config_stack)
+        blob_normalizer = r.get_blob_normalizer(
+            config=config_stack, tree=merge_commit.tree
+        )
         changes = tree_changes(r.object_store, head_commit.tree, merge_commit.tree)
         update_working_tree(
             r,
@@ -7412,7 +7418,7 @@ def _do_merge(
 
     # Update index and working directory
     config_stack = r.get_config_stack()
-    blob_normalizer = r.get_blob_normalizer(config=config_stack)
+    blob_normalizer = r.get_blob_normalizer(config=config_stack, tree=merged_tree.id)
     changes = tree_changes(r.object_store, head_commit.tree, merged_tree.id)
     update_working_tree(
         r,

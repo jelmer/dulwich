@@ -8844,6 +8844,57 @@ class StatusTests(PorcelainTestCase):
             self.assertNotIn(nfd_name, untracked_with)
             self.assertNotIn(nfc_name, untracked_with)
 
+    def test_get_untracked_paths_precompose_unicode_frompath(self) -> None:
+        config = self.repo.get_config()
+        config.set((b"core",), b"precomposeunicode", False)
+        config.write_to_path()
+
+        nfc_name = unicodedata.normalize("NFC", "täst")
+        nfd_name = unicodedata.normalize("NFD", "täst")
+        nfc_dir = os.path.join(self.repo.path, nfc_name)
+        os.makedirs(os.path.join(nfc_dir, "untracked_dir"))
+        for name in [
+            "tracked",
+            "untracked",
+            os.path.join("untracked_dir", "untracked"),
+        ]:
+            with open(os.path.join(nfc_dir, name), "w") as f:
+                f.write("content\n")
+        porcelain.add(self.repo.path, paths=[os.path.join(nfc_dir, "tracked")])
+
+        # Simulate a filesystem that hands back the decomposed form.
+        nfd_dir = os.path.join(self.repo.path, nfd_name)
+        try:
+            os.rename(nfc_dir, nfd_dir)
+        except OSError:
+            self.skipTest("filesystem normalizes unicode names")
+        if not os.path.exists(nfd_dir) or os.path.exists(nfc_dir):
+            self.skipTest("filesystem normalizes unicode names")
+
+        self.assertEqual(
+            {"untracked", os.path.join("untracked_dir", "untracked")},
+            set(
+                porcelain.get_untracked_paths(
+                    nfd_dir,
+                    self.repo.path,
+                    self.repo.open_index(),
+                    precompose_unicode=True,
+                )
+            ),
+        )
+        self.assertEqual(
+            {"untracked", os.path.join("untracked_dir", "")},
+            set(
+                porcelain.get_untracked_paths(
+                    nfd_dir,
+                    self.repo.path,
+                    self.repo.open_index(),
+                    untracked_files="normal",
+                    precompose_unicode=True,
+                )
+            ),
+        )
+
     def test_status_precompose_unicode_config(self) -> None:
         """Test that status reads core.precomposeunicode from config."""
         config = self.repo.get_config()

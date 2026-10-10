@@ -60,6 +60,7 @@ import binascii
 import logging
 import os
 import stat
+import struct
 import sys
 import time
 import warnings
@@ -2220,10 +2221,17 @@ class DiskObjectStore(PackBasedObjectStore):
           progress: Optional progress reporting function.
           refs: Optional dictionary of refs for bitmap generation.
         """
+
+        def get_parsed_raw(sha: ObjectID | RawObjectID) -> tuple[int, bytes]:
+            type_num, data = self.get_raw(sha)
+            # Preserve parsing of appended thin bases without another pack walk.
+            ShaFile.from_raw_string(type_num, data, object_format=self.object_format)
+            return type_num, data
+
         pack_sha, extra_entries = extend_pack(
             f,
             ext_refs,
-            get_raw=self.get_raw,
+            get_raw=get_parsed_raw,
             compression_level=self.pack_compression_level,
             progress=progress,
             object_format=self.object_format,
@@ -2328,15 +2336,6 @@ class DiskObjectStore(PackBasedObjectStore):
         )
         try:
             final_pack.check_length_and_checksum()
-            # Materialise every object so payloads that fail to parse
-            # (e.g. tree entries with garbage modes) are rejected rather
-            # than silently landed on disk. MemoryObjectStore already
-            # validates ingested objects this way via PackInflater; without
-            # the same check DiskObjectStore was strictly weaker.
-            for _obj in PackInflater.for_pack_data(
-                final_pack.data, resolve_ext_ref=self.get_raw
-            ):
-                pass
         except BaseException:
             final_pack.close()
             with suppress(FileNotFoundError):
@@ -2358,6 +2357,7 @@ class DiskObjectStore(PackBasedObjectStore):
         progress: Callable[..., None] | None = None,
         *,
         max_input_size: int | None = None,
+        check_objects: bool = False,
     ) -> "Pack":
         """Add a new thin pack to this object store.
 
@@ -2376,6 +2376,8 @@ class DiskObjectStore(PackBasedObjectStore):
             ``receive.maxInputSize`` / ``index-pack --max-input-size``
             semantics: ``None`` (the default) or ``0`` mean unlimited.
             Exceeding the cap raises ``PackInputTooLarge``.
+          check_objects: Check each object's internal consistency before
+            publishing the pack. Defaults to False.
         Returns: A Pack object pointing at the now-completed thin pack in the
             objects/pack directory.
         """
@@ -2387,25 +2389,37 @@ class DiskObjectStore(PackBasedObjectStore):
             )
 
         fd, path = tempfile.mkstemp(dir=self.path, prefix="tmp_pack_")
-        with os.fdopen(fd, "w+b") as f:
-            os.chmod(path, PACK_MODE)
-            indexer = PackIndexer(
-                f,
-                self.object_format.hash_func,
-                resolve_ext_ref=self.get_raw,
-            )
-            copier = PackStreamCopier(
-                self.object_format.hash_func,
-                read_all,
-                read_some,
-                f,
-                delta_iter=indexer,  # type: ignore[arg-type]
-            )
-            copier.verify(progress=progress)
-            entries, ext_refs = self._index_pack(
-                indexer, len(copier), progress=progress
-            )
-            return self._complete_pack(f, path, entries, ext_refs, progress=progress)
+        try:
+            with os.fdopen(fd, "w+b") as f:
+                os.chmod(path, PACK_MODE)
+                indexer = PackIndexer(
+                    f,
+                    self.object_format.hash_func,
+                    resolve_ext_ref=self.get_raw,
+                    object_format=self.object_format,
+                    check_objects=check_objects,
+                )
+                copier = PackStreamCopier(
+                    self.object_format.hash_func,
+                    read_all,
+                    read_some,
+                    f,
+                    delta_iter=indexer,  # type: ignore[arg-type]
+                )
+                copier.verify(progress=progress)
+                entries, ext_refs = self._index_pack(
+                    indexer, len(copier), progress=progress
+                )
+                return self._complete_pack(
+                    f,
+                    path,
+                    entries,
+                    ext_refs,
+                    progress=progress,
+                )
+        finally:
+            with suppress(FileNotFoundError):
+                _remove_readonly(path)
 
     def add_pack(
         self,
@@ -2427,16 +2441,21 @@ class DiskObjectStore(PackBasedObjectStore):
             if f.tell() > 0:
                 f.seek(0)
 
-                # Scope the mapping to indexing: _complete_pack writes to and
-                # renames this same file, which a live mapping blocks on
-                # Windows. PackData.close() leaves f open for it to finish.
-                with PackData(path, file=f, object_format=self.object_format) as pd:
-                    indexer = PackIndexer.for_pack_data(
-                        pd,
-                        resolve_ext_ref=self.get_raw,
-                    )
-                    entries, ext_refs = self._index_pack(indexer, len(pd))  # type: ignore[arg-type]
-                return self._complete_pack(f, path, entries, ext_refs)
+                try:
+                    # _complete_pack writes and renames this file, so release
+                    # the indexing mapping first for Windows.
+                    with PackData(path, file=f, object_format=self.object_format) as pd:
+                        indexer = PackIndexer.for_pack_data(
+                            pd,
+                            resolve_ext_ref=self.get_raw,
+                            check_objects=False,
+                        )
+                        entries, ext_refs = self._index_pack(indexer, len(pd))
+                    return self._complete_pack(f, path, entries, ext_refs)
+                finally:
+                    f.close()
+                    with suppress(FileNotFoundError):
+                        _remove_readonly(path)
             else:
                 f.close()
                 os.remove(path)
@@ -2444,7 +2463,8 @@ class DiskObjectStore(PackBasedObjectStore):
 
         def abort() -> None:
             f.close()
-            os.remove(path)
+            with suppress(FileNotFoundError):
+                _remove_readonly(path)
 
         return f, commit, abort  # type: ignore[return-value]
 
@@ -2992,41 +3012,69 @@ class MemoryObjectStore(PackCapableObjectStore):
         for obj, path in objects:
             self.add_object(obj)
 
-    def add_pack(self) -> tuple[BinaryIO, Callable[[], None], Callable[[], None]]:
+    def add_pack(
+        self, *, check_objects: bool = False
+    ) -> tuple[BinaryIO, Callable[[], None], Callable[[], None]]:
         """Add a new pack to this object store.
 
         Because this object store doesn't support packs, we extract and add the
         individual objects.
 
+        Args:
+          check_objects: Check each object's internal consistency before
+            adding any objects. Defaults to False.
+
         Returns: Fileobject to write to and a commit function to
             call when the pack is finished.
         """
-        from tempfile import SpooledTemporaryFile
+        from tempfile import SpooledTemporaryFile, TemporaryFile
 
         f = SpooledTemporaryFile(max_size=PACK_SPOOL_FILE_MAX_SIZE, prefix="incoming-")
 
         def commit() -> None:
-            size = f.tell()
-            if size > 0:
-                f.seek(0)
-
-                p = PackData.from_file(f, self.object_format, size)
-                try:
-                    # Verify the trailing pack checksum before extracting
-                    # objects. Without this, a fetch that delivered a
-                    # truncated pack would still be accepted: ``add_pack``
-                    # iterates objects by offset and never reaches the
-                    # trailing bytes, so a stream that lost the last few
-                    # bytes of its trailer slipped through silently.
-                    # ``add_thin_pack`` already validates via
-                    # ``PackStreamCopier.verify``; do the equivalent here.
-                    p.check()
-                    for obj in PackInflater.for_pack_data(p, self.get_raw):
-                        self.add_object(obj)
-                finally:
-                    p.close()
-                    f.close()
-            else:
+            try:
+                size = f.tell()
+                if size > 0:
+                    f.seek(0)
+                    with PackData.from_file(f, self.object_format, size) as p:
+                        # Verify the trailing pack checksum before extracting
+                        # objects. Without this, a fetch that delivered a
+                        # truncated pack would still be accepted: ``add_pack``
+                        # iterates objects by offset and never reaches the
+                        # trailing bytes, so a stream that lost the last few
+                        # bytes of its trailer slipped through silently.
+                        # ``add_thin_pack`` already validates via
+                        # ``PackStreamCopier.verify``; do the equivalent here.
+                        p.check()
+                        # Quarantine decoded objects without retaining their
+                        # payloads in memory until the whole pack is valid.
+                        with TemporaryFile(prefix="validated-") as pending:
+                            for obj in PackInflater.for_pack_data(p, self.get_raw):
+                                if check_objects:
+                                    obj.check()
+                                # add_object copies objects; ensure a late copy
+                                # failure cannot leave earlier objects published.
+                                obj = obj.copy()
+                                chunks = obj.as_raw_chunks()
+                                pending.write(
+                                    struct.pack(
+                                        ">BQ", obj.type_num, sum(map(len, chunks))
+                                    )
+                                )
+                                pending.writelines(chunks)
+                                del obj, chunks
+                            pending.seek(0)
+                            while header := pending.read(9):
+                                type_num, size = struct.unpack(">BQ", header)
+                                data = pending.read(size)
+                                if len(data) != size:
+                                    raise EOFError("Truncated quarantined object")
+                                self.add_object(
+                                    ShaFile.from_raw_string(
+                                        type_num, data, object_format=self.object_format
+                                    )
+                                )
+            finally:
                 f.close()
 
         def abort() -> None:
@@ -3073,6 +3121,9 @@ class MemoryObjectStore(PackCapableObjectStore):
         read_all: Callable[[int], bytes],
         read_some: Callable[[int], bytes] | None,
         progress: Callable[[str], None] | None = None,
+        *,
+        max_input_size: int | None = None,
+        check_objects: bool = False,
     ) -> None:
         """Add a new thin pack to this object store.
 
@@ -3086,8 +3137,18 @@ class MemoryObjectStore(PackCapableObjectStore):
           read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
           progress: Optional progress reporting function.
+          max_input_size: Maximum wire bytes; None or 0 mean unlimited.
+          check_objects: Check each object's internal consistency before
+            adding any objects. Defaults to False.
         """
-        f, commit, abort = self.add_pack()
+        if max_input_size:
+            read_all, read_some = _bound_read_callables(
+                read_all, read_some, max_input_size
+            )
+        if check_objects:
+            f, commit, abort = self.add_pack(check_objects=True)
+        else:
+            f, commit, abort = self.add_pack()
         try:
             copier = PackStreamCopier(
                 self.object_format.hash_func,

@@ -81,6 +81,7 @@ from typing import IO, TYPE_CHECKING
 from typing import Protocol as TypingProtocol
 
 if TYPE_CHECKING:
+    from .config import Config
     from .object_format import ObjectFormat
     from .object_store import BaseObjectStore
     from .repo import BaseRepo
@@ -108,7 +109,7 @@ from .object_filters import (
 )
 from .object_store import MissingObjectFinder, PackBasedObjectStore, find_shallow
 from .objects import Commit, ObjectID, Tree, valid_hexsha
-from .pack import ObjectContainer, write_pack_from_container
+from .pack import ObjectContainer, UnresolvedDeltas, write_pack_from_container
 from .protocol import (
     CAPABILITIES_REF,
     CAPABILITY_AGENT,
@@ -1462,6 +1463,14 @@ class ReceivePackHandler(PackHandler):
             return None
         return value if value > 0 else None
 
+    def _receive_fsck_objects(self) -> bool:
+        """Return whether incoming objects need semantic validation."""
+        config: Config = self.repo.get_config_stack()  # type: ignore[attr-defined]
+        value = config.get_boolean((b"receive",), b"fsckObjects")
+        if value is None:
+            return config.get_boolean((b"transfer",), b"fsckObjects", False)
+        return value
+
     def _apply_pack(
         self, refs: list[tuple[ObjectID, ObjectID, Ref]]
     ) -> Iterator[tuple[bytes, bytes]]:
@@ -1493,18 +1502,18 @@ class ReceivePackHandler(PackHandler):
         if will_send_pack:
             # TODO: more informative error messages than just the exception
             # string
+            unpack_exceptions = (*all_exceptions, ValueError, UnresolvedDeltas)
             try:
                 recv = getattr(self.proto, "recv", None)
                 self.repo.object_store.add_thin_pack(  # type: ignore[attr-defined]
                     self.proto.read,
                     recv,
                     max_input_size=self._receive_max_input_size(),
+                    check_objects=self._receive_fsck_objects(),
                 )
                 yield (b"unpack", b"ok")
-            except all_exceptions as e:
+            except unpack_exceptions as e:
                 yield (b"unpack", str(e).replace("\n", "").encode("utf-8"))
-                # The pack may still have been moved in, but it may contain
-                # broken objects. We trust a later GC to clean it up.
                 return
         else:
             # The git protocol want to find a status entry related to unpack

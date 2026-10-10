@@ -656,7 +656,7 @@ Other
 * ✗ ``commit.template`` - Commit message template file
 * ✗ ``format.pretty`` - Default pretty-print format
 * ✗ ``log.abbrevCommit`` - Abbreviate commits in log
-* ✗ ``receive.fsckObjects`` - Validate received objects
+* ◐ ``receive.fsckObjects`` - Validate received objects (partial)
 * ✗ ``tag.sort`` - Default tag sorting
 
 Known Limitations

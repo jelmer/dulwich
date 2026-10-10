@@ -1,5 +1,10 @@
 1.2.18	UNRELEASED
 
+ * Don't remove the lockfile in ``GitFile.close()`` after a successful
+   rename; another writer may already hold it, letting two writers update
+   the same file (e.g. ``.git/index``) concurrently.
+   (Parham Alvani, #2490)
+
  * Update the working tree in ``porcelain.pull`` before moving HEAD, so a
    pull that refuses to overwrite local changes no longer leaves the
    branch at the fetched commit with the upstream changes staged as reverted.

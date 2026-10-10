@@ -1132,13 +1132,15 @@ class BaseRepo:
         raise NotImplementedError(self.get_rebase_state_manager)
 
     def get_blob_normalizer(
-        self, config: "Config | None" = None
+        self, config: "Config | None" = None, tree: bytes | None = None
     ) -> "FilterBlobNormalizer":
         """Return a BlobNormalizer object for checkin/checkout operations.
 
         Args:
           config: Configuration to consult for filter setup. If None,
             implementations may fall back to ``self.get_config_stack()``.
+          tree: Tree to read .gitattributes from, e.g. the tree being
+            checked out. See ``get_gitattributes``.
 
         Returns: BlobNormalizer instance
         """
@@ -2743,19 +2745,21 @@ class Repo(BaseRepo):
         return gitattributes
 
     def get_blob_normalizer(
-        self, config: "Config | None" = None
+        self, config: "Config | None" = None, tree: bytes | None = None
     ) -> "FilterBlobNormalizer":
         """Return a BlobNormalizer object.
 
         Args:
           config: Configuration to consult for filter setup. If None,
             falls back to ``self.get_config_stack()``.
+          tree: Tree to read .gitattributes from, e.g. the tree being
+            checked out. See ``get_gitattributes``.
         """
         from .filters import FilterBlobNormalizer, FilterContext, FilterRegistry
 
         if config is None:
             config = self.get_config_stack()
-        git_attributes = self.get_gitattributes()
+        git_attributes = self.get_gitattributes(tree)
 
         # Lazily create FilterContext if needed
         if self.filter_context is None:
@@ -2963,19 +2967,20 @@ class MemoryRepo(BaseRepo):
         return MemoryRebaseStateManager(self)
 
     def get_blob_normalizer(
-        self, config: "Config | None" = None
+        self, config: "Config | None" = None, tree: bytes | None = None
     ) -> "FilterBlobNormalizer":
         """Return a BlobNormalizer object for checkin/checkout operations.
 
         Args:
           config: Configuration to consult for filter setup. If None,
             falls back to ``self.get_config_stack()``.
+          tree: Tree to read .gitattributes from
         """
         from .filters import FilterBlobNormalizer, FilterContext, FilterRegistry
 
         if config is None:
             config = self.get_config_stack()
-        git_attributes = self.get_gitattributes()
+        git_attributes = self.get_gitattributes(tree)
 
         if self.filter_context is None:
             filter_registry = FilterRegistry(config, self)

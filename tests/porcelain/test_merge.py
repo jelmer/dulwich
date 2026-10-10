@@ -536,6 +536,32 @@ class PorcelainMergeTests(TestCase):
             with open(os.path.join(tmpdir, "new.bat"), "rb") as f:
                 self.assertEqual(f.read(), b"echo new\r\n")
 
+    def test_merge_fast_forward_uses_incoming_attributes(self):
+        """Fast-forward merge applies .gitattributes added by the merged commit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            porcelain.init(tmpdir)
+
+            with open(os.path.join(tmpdir, ".gitattributes"), "wb") as f:
+                f.write(b"*.bat -text\n")
+            porcelain.add(tmpdir, paths=[".gitattributes"])
+            porcelain.commit(tmpdir, message=b"base")
+
+            porcelain.branch_create(tmpdir, "feature")
+            with open(os.path.join(tmpdir, ".gitattributes"), "wb") as f:
+                f.write(b"*.bat text eol=crlf\n")
+            with open(os.path.join(tmpdir, "new.bat"), "wb") as f:
+                f.write(b"echo new\n")
+            porcelain.add(tmpdir, paths=[".gitattributes", "new.bat"])
+            porcelain.commit(tmpdir, message=b"add new.bat")
+
+            porcelain.checkout(tmpdir, "feature", force=True)
+            self.assertFalse(os.path.exists(os.path.join(tmpdir, "new.bat")))
+
+            _, conflicts = porcelain.merge(tmpdir, "master")
+            self.assertEqual(conflicts, [])
+            with open(os.path.join(tmpdir, "new.bat"), "rb") as f:
+                self.assertEqual(f.read(), b"echo new\r\n")
+
     def test_merge_three_way_applies_eol_attribute(self):
         """Three-way merge applies eol=crlf from .gitattributes."""
         if importlib.util.find_spec("merge3") is None:

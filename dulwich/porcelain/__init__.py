@@ -3836,6 +3836,8 @@ def pull(
             filter_spec=filter_spec_bytes,
             protocol_version=protocol_version,
         )
+        if remote_name is not None:
+            _import_remote_refs(r.refs, remote_name, fetch_result.refs)
 
         # Store the old HEAD tree before making changes
         try:
@@ -3870,12 +3872,13 @@ def pull(
         # Bring the current branch up to date with the first fetched ref
         merged = False
         fetched = None
+        new_head = None
         if selected_refs and selected_refs[0][0] is not None:
             fetched = fetch_result.refs[selected_refs[0][0]]
         if fetched is not None:
             head = r.refs.follow(HEADREF)[1]
             if head is None:
-                r[b"HEAD"] = fetched
+                new_head = fetched
             elif head != fetched and not can_fast_forward(r, fetched, head):
                 try:
                     check_diverged(r, head, fetched)
@@ -3887,12 +3890,13 @@ def pull(
                         raise Error(f"Merge conflicts occurred: {conflicts}") from exc
                     merged = True
                 else:
-                    r[b"HEAD"] = fetched
+                    new_head = fetched
 
-        # Update working tree to match the new HEAD
+        # Update the working tree before moving HEAD, so that HEAD stays put
+        # if the update refuses to overwrite local changes.
         # Skip if merge was performed as merge already updates the working tree
         if not merged and old_tree_id is not None:
-            head_commit = r[b"HEAD"]
+            head_commit = r[new_head if new_head is not None else HEADREF]
             assert isinstance(head_commit, Commit)
             new_tree_id = head_commit.tree
             blob_normalizer = r.get_blob_normalizer(config=r.get_config_stack())
@@ -3906,8 +3910,8 @@ def pull(
                 allow_overwrite_modified=force,
                 config=r.get_config_stack(),
             )
-        if remote_name is not None:
-            _import_remote_refs(r.refs, remote_name, fetch_result.refs)
+        if new_head is not None:
+            r[b"HEAD"] = new_head
 
     # Trigger auto GC if needed
     from ..gc import maybe_auto_gc

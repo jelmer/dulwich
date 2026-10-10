@@ -1456,6 +1456,39 @@ class GetUnstagedChangesTests(TestCase):
 
             self.assertEqual(list(changes), [b"foo1"])
 
+    def test_get_unstaged_changes_skip_worktree(self) -> None:
+        """Sparse-excluded entries are absent, not unstaged (#2484)."""
+        repo_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, repo_dir)
+        with Repo.init(repo_dir) as repo:
+            keep_fullpath = os.path.join(repo_dir, "keep.txt")
+            with open(keep_fullpath, "wb") as f:
+                f.write(b"keep")
+            os.mkdir(os.path.join(repo_dir, "sparse"))
+            skip_fullpath = os.path.join(repo_dir, "sparse", "skip.txt")
+            with open(skip_fullpath, "wb") as f:
+                f.write(b"skip")
+
+            repo.get_worktree().stage(["keep.txt", "sparse/skip.txt"])
+            repo.get_worktree().commit(
+                message=b"test status",
+                committer=b"committer <email>",
+                author=b"author <email>",
+            )
+
+            index = repo.open_index()
+            index[b"sparse/skip.txt"].set_skip_worktree()
+            index.write()
+            os.unlink(skip_fullpath)
+
+            changes = list(get_unstaged_changes(index, repo_dir))
+            self.assertEqual(changes, [])
+
+            changes = list(
+                get_unstaged_changes(index, repo_dir, preload_index=True)
+            )
+            self.assertEqual(changes, [])
+
     def test_get_unstaged_changes_max_stat(self) -> None:
         """Test that max_stat limits the number of entries checked."""
         repo_dir = tempfile.mkdtemp()

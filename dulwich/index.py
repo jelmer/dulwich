@@ -3551,6 +3551,11 @@ def _check_entry_for_changes(
         # Conflicted files are always unstaged
         return tree_path
 
+    if entry.skip_worktree:
+        # Sparse-checkout exclusions: the file is supposed to be absent,
+        # so it is never an unstaged change.
+        return None
+
     full_path = _tree_to_fs_path(root_path, tree_path)
     try:
         st = os.lstat(full_path)

@@ -1,5 +1,9 @@
 1.2.18	UNRELEASED
 
+ * Don't report sparse-excluded files (skip-worktree entries) as
+   unstaged changes in ``porcelain.status``, matching ``git status``.
+   (#2484)
+
  * Don't remove the lockfile in ``GitFile.close()`` after a successful
    rename; another writer may already hold it, letting two writers update
    the same file (e.g. ``.git/index``) concurrently.

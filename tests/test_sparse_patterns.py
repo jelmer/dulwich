@@ -157,16 +157,46 @@ class MatchSparsePatternsTests(TestCase):
         self.assertFalse(match_sparse_patterns("A/bar", parsed))
 
     def test_anchored_empty_pattern(self):
-        """Test handling of empty pattern with anchoring (e.g., '/')."""
-        # `/` should be recursive match of all files
+        """A bare '/' matches nothing."""
         parsed = parse_sparse_patterns(["/"])
         self.assertEqual(parsed, [("", False, False, True)])  # anchored
-        self.assertTrue(match_sparse_patterns("", parsed, path_is_dir=True))
-        self.assertTrue(match_sparse_patterns("A", parsed, path_is_dir=True))
-        self.assertTrue(match_sparse_patterns("A/B", parsed, path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("A", parsed, path_is_dir=True))
+        self.assertFalse(match_sparse_patterns("foo", parsed))
+        self.assertFalse(match_sparse_patterns("A/foo", parsed))
+
+    def test_anchored_glob(self):
+        parsed = parse_sparse_patterns(["/inc*"])
+        self.assertTrue(match_sparse_patterns("inc", parsed))
+        self.assertTrue(match_sparse_patterns("include/x", parsed))
+        self.assertFalse(match_sparse_patterns("src/inc", parsed))
+
+    def test_anchored_glob_all(self):
+        parsed = parse_sparse_patterns(["/*"])
         self.assertTrue(match_sparse_patterns("foo", parsed))
-        self.assertTrue(match_sparse_patterns("A/foo", parsed))
         self.assertTrue(match_sparse_patterns("A/B/foo", parsed))
+
+    def test_glob_with_slash_is_anchored(self):
+        parsed = parse_sparse_patterns(["src/*.py"])
+        self.assertTrue(match_sparse_patterns("src/a.py", parsed))
+        self.assertFalse(match_sparse_patterns("src/sub/b.py", parsed))
+        self.assertFalse(match_sparse_patterns("x/src/a.py", parsed))
+
+    def test_double_star(self):
+        parsed = parse_sparse_patterns(["/deep/**/c.txt", "**/docs"])
+        self.assertTrue(match_sparse_patterns("deep/a/b/c.txt", parsed))
+        self.assertFalse(match_sparse_patterns("deep/a/b/d.txt", parsed))
+        self.assertTrue(match_sparse_patterns("x/docs/y", parsed))
+
+    def test_file_match_overrides_parent_directory(self):
+        parsed = parse_sparse_patterns(["!*.md", "/docs/"])
+        self.assertTrue(match_sparse_patterns("docs/a.txt", parsed))
+        self.assertFalse(match_sparse_patterns("docs/a.md", parsed))
+
+    def test_ignorecase(self):
+        parsed = parse_sparse_patterns(["/Docs/", "*.MD"])
+        self.assertFalse(match_sparse_patterns("docs/a.txt", parsed))
+        self.assertTrue(match_sparse_patterns("docs/a.txt", parsed, ignorecase=True))
+        self.assertTrue(match_sparse_patterns("x/b.md", parsed, ignorecase=True))
 
     def test_anchored_dir_only(self):
         """Test anchored directory-only patterns."""
@@ -254,6 +284,16 @@ class ComputeIncludedPathsConeTests(TestCase):
         with open(full, "wb") as f:
             f.write(content)
         self.repo.get_worktree().stage([relpath])
+
+    def test_cone_mode_ignorecase(self):
+        self._add_file_to_index("docs/readme.md", b"stuff")
+        lines = ["/*", "!/*/", "/DOCS/"]
+        index = self.repo.open_index()
+        self.assertEqual(set(), compute_included_paths_cone(index, lines))
+        self.assertEqual(
+            {"docs/readme.md"},
+            compute_included_paths_cone(index, lines, ignorecase=True),
+        )
 
     def test_cone_mode_patterns(self):
         """Simpler pattern handling in cone mode.

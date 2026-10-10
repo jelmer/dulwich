@@ -3207,7 +3207,11 @@ def _sparse_checkout_matcher(
     if not parse_sparse_patterns(lines):
         # An existing file without patterns excludes everything.
         return lambda path: False
-    matcher = sparse_path_matcher(lines, worktree.infer_cone_mode())
+    matcher = sparse_path_matcher(
+        lines,
+        worktree.infer_cone_mode(),
+        ignorecase=config.get_boolean((b"core",), b"ignorecase", False),
+    )
     return lambda path: matcher(path.decode(tree_encoding))
 
 

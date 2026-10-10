@@ -4547,6 +4547,22 @@ class TestUpdateWorkingTree(TestCase):
         self.assertEqual(["a"], self._list_worktree())
         self.assertFalse(self.repo.open_index()[b"a"].skip_worktree)
 
+    def test_sparse_checkout_honours_core_ignorecase(self):
+        self._enable_sparse_checkout(["/INC"])
+        config = self.repo.get_config()
+        config.set((b"core",), b"ignorecase", True)
+        config.write_to_path()
+        tree = self._make_tree({b"inc": b"a\n", b"exc": b"b\n"})
+
+        update_working_tree(
+            self.repo,
+            None,
+            tree.id,
+            change_iterator=tree_changes(self.repo.object_store, None, tree.id),
+        )
+
+        self.assertEqual(["inc"], self._list_worktree())
+
     def test_sparse_checkout_disabled_ignores_patterns(self):
         self.repo.get_worktree().set_sparse_checkout_patterns(["/inc"])
         tree = self._make_tree({b"inc": b"a\n", b"exc": b"b\n"})

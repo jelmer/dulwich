@@ -11037,6 +11037,17 @@ class SparseCheckoutTests(PorcelainTestCase):
         self.assertEqual({"add": [], "delete": [], "modify": []}, status.staged)
         self.assertEqual([], status.unstaged)
 
+    def test_sparse_checkout_honours_core_ignorecase(self):
+        self._commit_file("docs/readme.md", "docs\n")
+        self._commit_file("lib/code.py", "code\n")
+        config = self.repo.get_config()
+        config.set((b"core",), b"ignorecase", True)
+        config.write_to_path()
+
+        self.sparse_checkout(self.repo, ["/DOCS/"])
+
+        self.assertEqual({os.path.join("docs", "readme.md")}, self._list_wtree_files())
+
 
 class ConeModeTests(PorcelainTestCase):
     """Provide integration tests for Dulwich's cone mode sparse checkout.

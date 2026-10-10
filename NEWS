@@ -9,6 +9,11 @@
    in ``porcelain.status``.
    (Jelmer Vernooĳ, #2484)
 
+ * Match sparse-checkout patterns like git: anchored patterns such as
+   ``/src/*`` now honour wildcards, ``*`` no longer matches ``/``, a bare
+   ``/`` no longer includes everything, and ``core.ignorecase`` is honoured.
+   (Jelmer Vernooĳ)
+
  * Fix ``porcelain.reset`` with ``mode="hard"`` failing after a conflicted
    merge. Like git, hard and mixed resets now remove merge state, and a
    soft reset in the middle of a merge is refused.

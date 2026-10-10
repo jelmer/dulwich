@@ -6549,7 +6549,9 @@ def sparse_checkout(
     ``core.sparseCheckoutCone`` config setting.
 
     Steps:
-      1) If ``patterns`` is provided, write them to ``.git/info/sparse-checkout``.
+      1) If ``patterns`` is provided, write them to ``.git/info/sparse-checkout``
+         and enable ``core.sparseCheckout``, so that later checkouts, merges
+         and resets keep excluded paths out of the working tree.
       2) Determine which paths in the index are included vs. excluded.
          - If ``cone=True``, use "cone-compatible" directory-based logic.
          - If ``cone=False``, use standard .gitignore-style matching.
@@ -6579,6 +6581,10 @@ def sparse_checkout(
         else:
             lines = patterns
             repo_obj.get_worktree().set_sparse_checkout_patterns(patterns)
+            config = repo_obj.get_config()
+            config.set((b"core",), b"sparseCheckout", True)
+            config.set((b"core",), b"sparseCheckoutCone", cone)
+            config.write_to_path()
 
         # --- 2) Determine the set of included paths ---
         index = repo_obj.open_index(config=repo_obj.get_config_stack())

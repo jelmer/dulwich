@@ -10984,6 +10984,59 @@ class SparseCheckoutTests(PorcelainTestCase):
 
         self.assertEqual([b"ex/foo.txt", b"keep.txt"], sorted(self.repo.open_index()))
 
+    def test_sparse_checkout_enables_core_sparse_checkout(self):
+        self._commit_file("keep.txt", "keep\n")
+        self.sparse_checkout(self.repo, ["/keep.txt"])
+
+        config = self.repo.get_config()
+        self.assertTrue(config.get_boolean((b"core",), b"sparseCheckout"))
+        self.assertFalse(config.get_boolean((b"core",), b"sparseCheckoutCone"))
+
+    def test_status_ignores_excluded_paths(self):
+        self._commit_file("keep.txt", "keep\n")
+        self._commit_file("excluded/x.txt", "x\n")
+        self.sparse_checkout(self.repo, ["/keep.txt"], force=True)
+
+        self.assertEqual([], porcelain.status(self.repo).unstaged)
+
+    def test_reset_hard_keeps_excluded_paths_out_of_worktree(self):
+        # https://github.com/jelmer/dulwich/issues/2472
+        self._commit_file("included/a.txt", "a\n")
+        self._commit_file("excluded/b.txt", "b\n")
+        self.sparse_checkout(self.repo, ["/included/"], force=True)
+        self._commit_file("included/a.txt", "a changed\n")
+        os.remove(os.path.join(self.repo_path, "included", "a.txt"))
+
+        porcelain.reset(self.repo, "hard", b"HEAD")
+
+        self.assertEqual({os.path.join("included", "a.txt")}, self._list_wtree_files())
+        index = self.repo.open_index()
+        self.assertEqual(
+            {b"excluded/b.txt": True, b"included/a.txt": False},
+            {path: entry.skip_worktree for path, entry in index.items()},
+        )
+        status = porcelain.status(self.repo)
+        self.assertEqual({"add": [], "delete": [], "modify": []}, status.staged)
+        self.assertEqual([], status.unstaged)
+
+    def test_checkout_keeps_added_excluded_paths_out_of_worktree(self):
+        self._commit_file("keep.txt", "keep\n")
+        self._commit_file("excluded/x.txt", "x\n")
+        self._make_branch_without("renamed", "excluded/x.txt", "excluded/y.txt")
+        self.sparse_checkout(self.repo, ["/keep.txt"], force=True)
+
+        porcelain.checkout(self.repo, "renamed")
+
+        self.assertEqual({"keep.txt"}, self._list_wtree_files())
+        index = self.repo.open_index()
+        self.assertEqual(
+            {b"excluded/y.txt": True, b"keep.txt": False},
+            {path: entry.skip_worktree for path, entry in index.items()},
+        )
+        status = porcelain.status(self.repo)
+        self.assertEqual({"add": [], "delete": [], "modify": []}, status.staged)
+        self.assertEqual([], status.unstaged)
+
 
 class ConeModeTests(PorcelainTestCase):
     """Provide integration tests for Dulwich's cone mode sparse checkout.

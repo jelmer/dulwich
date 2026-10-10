@@ -3320,71 +3320,73 @@ def update_working_tree(
         config = repo.get_config()
         changes = detect_case_only_renames(changes, config)
 
-    # Check for path conflicts where files need to become directories
-    paths_becoming_dirs = set()
-    for change in changes:
-        if change.type in (CHANGE_ADD, CHANGE_MODIFY, CHANGE_RENAME, CHANGE_COPY):
-            assert change.new is not None
-            path = change.new.path
-            assert path is not None
-            if b"/" in path:  # This is a file inside a directory
-                # Check if any parent path exists as a file in the old tree or changes
-                parts = path.split(b"/")
-                for i in range(1, len(parts)):
-                    parent = b"/".join(parts[:i])
-                    # See if this parent path is being deleted (was a file, becoming a dir)
-                    for other_change in changes:
-                        if (
-                            other_change.type == CHANGE_DELETE
-                            and other_change.old
-                            and other_change.old.path == parent
-                        ):
-                            paths_becoming_dirs.add(parent)
+    if not allow_overwrite_modified:
+        # Check for path conflicts where files need to become directories
+        paths_becoming_dirs = set()
+        for change in changes:
+            if change.type in (CHANGE_ADD, CHANGE_MODIFY, CHANGE_RENAME, CHANGE_COPY):
+                assert change.new is not None
+                path = change.new.path
+                assert path is not None
+                if b"/" in path:  # This is a file inside a directory
+                    # Check if any parent path exists as a file in the old tree or changes
+                    parts = path.split(b"/")
+                    for i in range(1, len(parts)):
+                        parent = b"/".join(parts[:i])
+                        # See if this parent path is being deleted (was a file, becoming a dir)
+                        for other_change in changes:
+                            if (
+                                other_change.type == CHANGE_DELETE
+                                and other_change.old
+                                and other_change.old.path == parent
+                            ):
+                                paths_becoming_dirs.add(parent)
 
-    # Check if any path that needs to become a directory has been modified
-    for path in paths_becoming_dirs:
-        full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
-        try:
-            current_stat = os.lstat(full_path)
-        except FileNotFoundError:
-            continue  # File doesn't exist, nothing to check
-        except OSError as e:
-            raise OSError(
-                f"Cannot access {path.decode('utf-8', errors='replace')}: {e}"
-            ) from e
+        # Check if any path that needs to become a directory has been modified
+        for path in paths_becoming_dirs:
+            full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
+            try:
+                current_stat = os.lstat(full_path)
+            except FileNotFoundError:
+                continue  # File doesn't exist, nothing to check
+            except OSError as e:
+                raise OSError(
+                    f"Cannot access {path.decode('utf-8', errors='replace')}: {e}"
+                ) from e
 
-        if stat.S_ISREG(current_stat.st_mode):
-            # Find the old entry for this path
-            old_change = None
-            for change in changes:
-                if (
-                    change.type == CHANGE_DELETE
-                    and change.old
-                    and change.old.path == path
-                ):
-                    old_change = change
-                    break
+            if stat.S_ISREG(current_stat.st_mode):
+                # Find the old entry for this path
+                old_change = None
+                for change in changes:
+                    if (
+                        change.type == CHANGE_DELETE
+                        and change.old
+                        and change.old.path == path
+                    ):
+                        old_change = change
+                        break
 
-            if old_change:
-                # Check if file has been modified
-                assert old_change.old is not None
-                assert (
-                    old_change.old.sha is not None and old_change.old.mode is not None
-                )
-                file_matches = _check_file_matches(
-                    repo.object_store,
-                    full_path,
-                    old_change.old.sha,
-                    old_change.old.mode,
-                    current_stat,
-                    honor_filemode,
-                    blob_normalizer,
-                    path,
-                )
-                if not file_matches:
-                    raise OSError(
-                        f"Cannot replace modified file with directory: {path!r}"
+                if old_change:
+                    # Check if file has been modified
+                    assert old_change.old is not None
+                    assert (
+                        old_change.old.sha is not None
+                        and old_change.old.mode is not None
                     )
+                    file_matches = _check_file_matches(
+                        repo.object_store,
+                        full_path,
+                        old_change.old.sha,
+                        old_change.old.mode,
+                        current_stat,
+                        honor_filemode,
+                        blob_normalizer,
+                        path,
+                    )
+                    if not file_matches:
+                        raise OSError(
+                            f"Cannot replace modified file with directory: {path!r}"
+                        )
 
     # Check for uncommitted modifications before making any changes
     if not allow_overwrite_modified and old_tree_id:

@@ -245,6 +245,7 @@ class SparseOidFilter(FilterSpec):
         path_str = path.rstrip("/")
 
         assert self._patterns is not None  # _load_patterns ensures this
+        # TODO: Honour core.ignorecase of the serving repository.
         return match_sparse_patterns(path_str, self._patterns, path_is_dir=path_is_dir)
 
     def should_include_blob(self, blob_size: int) -> bool:

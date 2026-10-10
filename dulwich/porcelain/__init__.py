@@ -4156,6 +4156,13 @@ def _walk_working_dir_paths(
     # versus its expanded form.
     basepath_resolved = _resolve_path(basepath)
 
+    # dirpath is precomposed in full, so compare it against a precomposed root.
+    walk_root = (
+        _precompose_unicode_path(frompath)
+        if precompose_unicode and isinstance(frompath, str)
+        else frompath
+    )
+
     for dirpath, dirnames, filenames in os.walk(frompath):  # type: ignore[type-var]
         # Skip .git and below, unless this is the repo we are reporting
         # against, whose own files are still of interest.
@@ -4178,7 +4185,7 @@ def _walk_working_dir_paths(
                 _precompose_unicode_path(f) for f in filenames if isinstance(f, str)
             ]
 
-        if dirpath != frompath:
+        if dirpath != walk_root:
             yield dirpath, True  # type: ignore[misc]
 
         for filename in filenames:
@@ -4232,6 +4239,32 @@ def get_untracked_paths(
     with open_repo_closing(repo if repo is not None else basepath_str) as r:
         ignore_manager = IgnoreFilterManager.from_repo(r, config=r.get_config_stack())
 
+    # Walked paths are precomposed in full, including the roots, so make
+    # them relative to precomposed roots.
+    if precompose_unicode:
+        from_root = _precompose_unicode_path(frompath_str)
+        base_root = _precompose_unicode_path(basepath_str)
+    else:
+        from_root = frompath_str
+        base_root = basepath_str
+
+    # Walked paths are spelled from frompath, so only the two roots need
+    # resolving rather than every walked path, which is slow on Windows.
+    frompath_resolved = os.path.realpath(frompath_str)
+    basepath_resolved = os.path.realpath(basepath_str)
+    if precompose_unicode:
+        frompath_resolved = _precompose_unicode_path(frompath_resolved)
+        basepath_resolved = _precompose_unicode_path(basepath_resolved)
+
+    def to_tree_path(path: str) -> bytes:
+        rel = os.path.relpath(
+            os.path.join(frompath_resolved, os.path.relpath(path, from_root)),
+            basepath_resolved,
+        )
+        if rel == os.pardir or rel.startswith(os.pardir + os.sep):
+            raise ValueError(f"{path!r} is not in the subpath of {basepath_str!r}")
+        return _fs_to_tree_path(rel)
+
     ignored_dirs = []
     # List to store untracked directories found during traversal
     untracked_dir_list = []
@@ -4257,14 +4290,14 @@ def get_untracked_paths(
     def prune_dirnames(dirpath: str, dirnames: list[str]) -> list[str]:
         for i in range(len(dirnames) - 1, -1, -1):
             path = os.path.join(dirpath, dirnames[i])
-            ip = os.path.join(os.path.relpath(path, basepath_str), "")
+            ip = os.path.join(os.path.relpath(path, base_root), "")
 
             # A directory excluded only by a pattern covering its contents
             # still has to be entered, so that a negation below it is seen.
             if ignore_manager.may_prune_directory(ip):
                 if not exclude_ignored:
                     ignored_dirs.append(
-                        os.path.join(os.path.relpath(path, frompath_str), "")
+                        os.path.join(os.path.relpath(path, from_root), "")
                     )
                 del dirnames[i]
                 continue
@@ -4272,7 +4305,7 @@ def get_untracked_paths(
             # For "normal" mode, check if the directory is entirely untracked
             if untracked_files == "normal":
                 # Convert directory path to tree path for index lookup
-                dir_tree_path = path_to_tree_path(basepath_str, path)
+                dir_tree_path = to_tree_path(path)
 
                 # Check if any file in this directory is tracked
                 dir_prefix = dir_tree_path + b"/" if dir_tree_path else b""
@@ -4280,10 +4313,8 @@ def get_untracked_paths(
 
                 if not has_tracked_files:
                     # This directory is entirely untracked
-                    rel_path_base = os.path.relpath(path, basepath_str)
-                    rel_path_from = os.path.join(
-                        os.path.relpath(path, frompath_str), ""
-                    )
+                    rel_path_base = os.path.relpath(path, base_root)
+                    rel_path_from = os.path.join(os.path.relpath(path, from_root), "")
 
                     # If excluding ignored, check if directory contains any non-ignored files
                     if exclude_ignored:
@@ -4311,12 +4342,12 @@ def get_untracked_paths(
             # frompath_str and basepath_str are both str, so ap must be str
             assert isinstance(ap, str)
             if not is_dir:
-                ip = path_to_tree_path(basepath_str, ap)
+                ip = to_tree_path(ap)
                 if ip not in index:
                     if not exclude_ignored or not ignore_manager.is_ignored(
-                        os.path.relpath(ap, basepath_str)
+                        os.path.relpath(ap, base_root)
                     ):
-                        yield os.path.relpath(ap, frompath_str)
+                        yield os.path.relpath(ap, from_root)
     else:  # "normal" mode
         # Walk directories, handling both files and directories
         for ap, is_dir in _walk_working_dir_paths(
@@ -4330,22 +4361,22 @@ def get_untracked_paths(
             # This part won't be reached for pruned directories
             if is_dir:
                 # Check if this directory is entirely untracked
-                dir_tree_path = path_to_tree_path(basepath_str, ap)
+                dir_tree_path = to_tree_path(ap)
                 dir_prefix = dir_tree_path + b"/" if dir_tree_path else b""
                 has_tracked_files = any(name.startswith(dir_prefix) for name in index)
                 if not has_tracked_files:
                     if not exclude_ignored or not ignore_manager.is_ignored(
-                        os.path.relpath(ap, basepath_str)
+                        os.path.relpath(ap, base_root)
                     ):
-                        yield os.path.join(os.path.relpath(ap, frompath_str), "")
+                        yield os.path.join(os.path.relpath(ap, from_root), "")
             else:
                 # Check individual files in directories that contain tracked files
-                ip = path_to_tree_path(basepath_str, ap)
+                ip = to_tree_path(ap)
                 if ip not in index:
                     if not exclude_ignored or not ignore_manager.is_ignored(
-                        os.path.relpath(ap, basepath_str)
+                        os.path.relpath(ap, base_root)
                     ):
-                        yield os.path.relpath(ap, frompath_str)
+                        yield os.path.relpath(ap, from_root)
 
         # Yield any untracked directories found during pruning
         yield from untracked_dir_list

@@ -49,6 +49,7 @@ from dulwich.commit_graph import read_commit_graph
 from dulwich.diff_tree import TreeChange, tree_changes
 from dulwich.errors import CommitError, NoIndexPresent, WorkingTreeModifiedError
 from dulwich.index import (
+    ConflictedIndexEntry,
     Index,
     IndexEntry,
     InvalidPathError,
@@ -4626,6 +4627,106 @@ class ResetTests(PorcelainTestCase):
         # Check that working tree is unchanged
         with open(fullpath) as f:
             self.assertEqual(f.read(), "STAGED")
+
+    def _commit_file(self, name: str, contents: bytes, message: bytes) -> bytes:
+        with open(os.path.join(self.repo.path, name), "wb") as f:
+            f.write(contents)
+        porcelain.add(self.repo, [name])
+        return porcelain.commit(
+            self.repo,
+            message=message,
+            author=b"Test <test@example.com>",
+            committer=b"Test <test@example.com>",
+        )
+
+    def _conflicted_merge(self) -> tuple[bytes, bytes]:
+        """Leave the repository in the middle of a conflicted merge.
+
+        Returns: tuple with the base commit and the commit at HEAD
+        """
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
+        base = self._commit_file("file.txt", b"base\n", b"base")
+        porcelain.branch_create(self.repo, "feature")
+        self._commit_file("file.txt", b"master change\n", b"master change")
+        self._commit_file("other.txt", b"other\n", b"add other")
+        porcelain.checkout(self.repo, "feature")
+        feature_tip = self._commit_file("file.txt", b"feature change\n", b"feature")
+        _, conflicts = porcelain.merge(
+            self.repo,
+            "master",
+            author=b"Test <test@example.com>",
+            committer=b"Test <test@example.com>",
+        )
+        self.assertEqual([b"file.txt"], conflicts)
+        self.assertIsInstance(self.repo.open_index()[b"file.txt"], ConflictedIndexEntry)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo.controldir(), "MERGE_HEAD"))
+        )
+        return base, feature_tip
+
+    def _assert_no_merge_state(self) -> None:
+        for name in ("MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "AUTO_MERGE"):
+            self.assertFalse(
+                os.path.exists(os.path.join(self.repo.controldir(), name)), name
+            )
+
+    def test_hard_unmerged(self) -> None:
+        _, feature_tip = self._conflicted_merge()
+        with open(os.path.join(self.repo.controldir(), "MERGE_MODE"), "wb") as f:
+            f.write(b"no-ff")
+
+        porcelain.reset(self.repo, "hard", feature_tip)
+
+        self.assertEqual(feature_tip, self.repo.head())
+        index = self.repo.open_index()
+        self.assertFalse(index.has_conflicts())
+        self.assertEqual([b"file.txt"], list(index))
+        with open(os.path.join(self.repo.path, "file.txt"), "rb") as f:
+            self.assertEqual(b"feature change\n", f.read())
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "other.txt")))
+        self._assert_no_merge_state()
+
+    def test_hard_unmerged_path_absent_from_target(self) -> None:
+        base, _ = self._conflicted_merge()
+        blob = Blob.from_string(b"unrelated\n")
+        tree = Tree()
+        tree[b"unrelated.txt"] = (0o100644, blob.id)
+        target = make_commit(tree=tree.id, parents=[base])
+        for obj in (blob, tree, target):
+            self.repo.object_store.add_object(obj)
+
+        porcelain.reset(self.repo, "hard", target.id)
+
+        self.assertEqual([b"unrelated.txt"], list(self.repo.open_index()))
+        self.assertFalse(os.path.exists(os.path.join(self.repo.path, "file.txt")))
+        self._assert_no_merge_state()
+
+    def test_mixed_unmerged(self) -> None:
+        _, feature_tip = self._conflicted_merge()
+
+        porcelain.reset(self.repo, "mixed", feature_tip)
+
+        index = self.repo.open_index()
+        self.assertFalse(index.has_conflicts())
+        self.assertEqual(
+            self.repo[feature_tip].tree, index.commit(self.repo.object_store)
+        )
+        self._assert_no_merge_state()
+
+    def test_soft_unmerged(self) -> None:
+        _, feature_tip = self._conflicted_merge()
+        head = self.repo.head()
+
+        self.assertRaises(
+            porcelain.Error, porcelain.reset, self.repo, "soft", feature_tip
+        )
+
+        self.assertEqual(head, self.repo.head())
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo.controldir(), "MERGE_HEAD"))
+        )
 
 
 class ResetFileTests(PorcelainTestCase):

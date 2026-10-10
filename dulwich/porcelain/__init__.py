@@ -369,7 +369,7 @@ from ..diff_tree import (
     TreeChange,
     tree_changes,
 )
-from ..errors import SendPackError
+from ..errors import NoIndexPresent, SendPackError
 from ..file import FileLocked, open_nofollow
 from ..graph import can_fast_forward
 from ..ignore import IgnoreFilterManager
@@ -381,6 +381,7 @@ from ..index import (
     apply_stat_refresh,
     blob_from_path_and_stat,
     build_file_from_blob,
+    cleanup_mode,
     get_path_element_validator,
     get_symlink_fn,
     get_unstaged_changes,
@@ -388,6 +389,7 @@ from ..index import (
     update_working_tree,
     validate_path,
 )
+from ..index import commit_tree as commit_index_tree
 from ..object_store import BaseObjectStore, tree_lookup_path
 from ..objects import (
     Blob,
@@ -3242,7 +3244,8 @@ def reset(
 
         if mode == "soft":
             # Soft reset: only update HEAD, leave index and working tree unchanged
-            pass
+            if _in_merge(r):
+                raise Error("Cannot do a soft reset in the middle of a merge.")
 
         elif mode == "mixed":
             # Mixed reset: update HEAD and index, but leave working tree unchanged
@@ -3281,7 +3284,7 @@ def reset(
             # For reset --hard, use current index tree as old tree to get proper deletions
             index = r.open_index(config=r.get_config_stack())
             if len(index) > 0:
-                index_tree_id = index.commit(r.object_store)
+                index_tree_id = _index_tree_resolving_conflicts(index, r.object_store)
             else:
                 # Empty index
                 index_tree_id = None
@@ -3341,6 +3344,54 @@ def reset(
                 ),
                 message=reflog_message,
             )
+
+        if mode != "soft":
+            _remove_branch_state(r)
+
+
+def _in_merge(r: Repo) -> bool:
+    """Check whether a merge is in progress, like git's is_merge()."""
+    if os.path.exists(os.path.join(r.controldir(), "MERGE_HEAD")):
+        return True
+    try:
+        index = r.open_index()
+    except NoIndexPresent:
+        return False
+    return index.has_conflicts()
+
+
+def _index_tree_resolving_conflicts(
+    index: Index, object_store: BaseObjectStore
+) -> ObjectID:
+    """Write a tree for the index, using the lowest stage for unmerged paths.
+
+    This mirrors git's read_index_unmerged(), so that a hard reset treats
+    unmerged paths as tracked and overwrites or removes them.
+    """
+    blobs = []
+    for path, entry in index.items():
+        if isinstance(entry, ConflictedIndexEntry):
+            stage = entry.ancestor or entry.this or entry.other
+            assert stage is not None
+            entry = stage
+        blobs.append((path, entry.sha, cleanup_mode(entry.mode)))
+    return commit_index_tree(object_store, blobs, object_format=index.object_format)
+
+
+def _remove_branch_state(r: Repo) -> None:
+    """Remove merge, cherry-pick and revert state, like git's remove_branch_state()."""
+    # TODO: Clean up .git/sequencer and save MERGE_AUTOSTASH like git does.
+    for name in (
+        "CHERRY_PICK_HEAD",
+        "REVERT_HEAD",
+        "AUTO_MERGE",
+        "SQUASH_MSG",
+        "MERGE_HEAD",
+        "MERGE_RR",
+        "MERGE_MSG",
+        "MERGE_MODE",
+    ):
+        r._del_named_file(name)
 
 
 def get_remote_repo(

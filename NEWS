@@ -1,5 +1,10 @@
 1.2.18	UNRELEASED
 
+ * Update the working tree in ``porcelain.pull`` before moving HEAD, so a
+   pull that refuses to overwrite local changes no longer leaves the
+   branch at the fetched commit with the upstream changes staged as reverted.
+   (Jelmer Vernooĳ, #2468)
+
  * Remove the index entry of a deleted path in ``update_working_tree``
    even when the file is missing from disk, so checkouts in a sparse
    checkout no longer resurrect files the target branch deleted.

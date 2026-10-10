@@ -3191,6 +3191,42 @@ def detect_case_only_renames(
     return result
 
 
+def _sparse_checkout_matcher(
+    repo: "Repo", config: "Config", tree_encoding: str
+) -> Callable[[bytes], bool] | None:
+    """Return a predicate for paths inside the sparse checkout, if enabled."""
+    if not config.get_boolean((b"core",), b"sparseCheckout", False):
+        return None
+    worktree = repo.get_worktree()
+    if not os.path.exists(worktree._sparse_checkout_file_path()):
+        # Without a patterns file, sparse checkout is not in effect.
+        return None
+    from .sparse_patterns import parse_sparse_patterns, sparse_path_matcher
+
+    lines = worktree.get_sparse_checkout_patterns()
+    if not parse_sparse_patterns(lines):
+        # An existing file without patterns excludes everything.
+        return lambda path: False
+    matcher = sparse_path_matcher(lines, worktree.infer_cone_mode())
+    return lambda path: matcher(path.decode(tree_encoding))
+
+
+def _skip_worktree_entry(sha: ObjectID, mode: int) -> IndexEntry:
+    entry = IndexEntry(
+        ctime=0,
+        mtime=0,
+        dev=0,
+        ino=0,
+        mode=mode,
+        uid=0,
+        gid=0,
+        size=0,
+        sha=sha,
+    )
+    entry.set_skip_worktree(True)
+    return entry
+
+
 def update_working_tree(
     repo: "Repo",
     old_tree_id: bytes | None,
@@ -3216,6 +3252,10 @@ def update_working_tree(
     - Updating modified files
     - Removing deleted files
     - Cleaning up empty directories
+
+    If ``core.sparseCheckout`` is enabled, paths outside the sparse-checkout
+    patterns are recorded in the index with the skip-worktree bit set and
+    kept out of the working tree.
 
     Args:
       repo: Repository object
@@ -3264,6 +3304,7 @@ def update_working_tree(
         validate_path_element = get_path_element_validator(config)
 
     index = repo.open_index(config=config)
+    in_sparse_checkout = _sparse_checkout_matcher(repo, config, tree_encoding)
 
     # Convert iterator to list since we need multiple passes
     changes = list(change_iterator)
@@ -3423,6 +3464,7 @@ def update_working_tree(
                 change.new is not None
                 and change.new.path is not None
                 and change.new.mode is not None
+                and change.new.sha is not None
             )
             path = change.new.path
             # Validate as we go and abort on the first invalid path,
@@ -3438,7 +3480,21 @@ def update_working_tree(
                     f"Cannot access {path.decode('utf-8', errors='replace')}: {e}"
                 ) from e
 
-            if S_ISGITLINK(change.new.mode):
+            if in_sparse_checkout is not None and not in_sparse_checkout(path):
+                # Only record paths outside the sparse checkout in the index.
+                # Remove them from disk only if they were checked out before,
+                # leaving untracked files alone.
+                try:
+                    old_entry = index[path]
+                except KeyError:
+                    pass
+                else:
+                    if not (
+                        isinstance(old_entry, IndexEntry) and old_entry.skip_worktree
+                    ):
+                        _transition_to_absent(repo, path, full_path, modify_stat, index)
+                index[path] = _skip_worktree_entry(change.new.sha, change.new.mode)
+            elif S_ISGITLINK(change.new.mode):
                 _transition_to_submodule(
                     repo, path, full_path, modify_stat, change.new, index
                 )
@@ -3550,6 +3606,10 @@ def _check_entry_for_changes(
     if isinstance(entry, ConflictedIndexEntry):
         # Conflicted files are always unstaged
         return tree_path
+
+    if entry.skip_worktree:
+        # Paths outside the sparse checkout are not expected on disk.
+        return None
 
     full_path = _tree_to_fs_path(root_path, tree_path)
     try:

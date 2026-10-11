@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use Dulwich in your research or software, please cite it using the metadata below."
+title: "Dulwich"
+abstract: "A pure-Python implementation of the Git file formats and protocols."
+type: software
+authors:
+  - family-names: "Vernooij"
+    given-names: "Jelmer"
+    orcid: "https://orcid.org/0009-0004-1371-5889"
+license: "Apache-2.0 OR GPL-2.0-or-later"
+repository-code: "https://github.com/jelmer/dulwich"
+url: "https://www.dulwich.io/"
+keywords:
+  - "git"
+  - "python"
+  - "version-control"
+  - "vcs"

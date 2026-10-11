@@ -44,7 +44,7 @@ from wsgiref.simple_server import make_server
 
 from dulwich import porcelain
 from dulwich.am import AmConflict
-from dulwich.client import SendPackResult
+from dulwich.client import SendPackResult, TransportNotAllowed
 from dulwich.commit_graph import read_commit_graph
 from dulwich.diff_tree import TreeChange, tree_changes
 from dulwich.errors import CommitError, NoIndexPresent, WorkingTreeModifiedError
@@ -1714,7 +1714,9 @@ class CloneTests(PorcelainTestCase):
             committer=b"Test Committer <test@example.com>",
         )
 
-        # Clone with recurse_submodules
+        # Clone with recurse_submodules; the local-path submodule URL uses
+        # the file transport, which submodules may not use by default.
+        self.overrideEnv("GIT_ALLOW_PROTOCOL", "file")
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
 
@@ -6266,6 +6268,12 @@ class SubmoduleTests(PorcelainTestCase):
             committer=b"Test Committer <test@example.com>",
         )
 
+        # A local-path submodule URL uses the file transport, which is not
+        # allowed for submodules by default; opt in like git requires.
+        config = self.repo.get_config()
+        config.set((b"protocol", b"file"), b"allow", b"always")
+        config.write_to_path()
+
         # Initialize and update the submodule
         porcelain.submodule_init(self.repo)
         porcelain.submodule_update(self.repo)
@@ -6279,6 +6287,60 @@ class SubmoduleTests(PorcelainTestCase):
         self.assertTrue(os.path.exists(submodule_file))
         with open(submodule_file) as f:
             self.assertEqual(f.read(), "submodule content")
+
+    def test_update_file_transport_not_allowed(self) -> None:
+        # A .gitmodules URL is not user-supplied, so the file transport is
+        # refused unless protocol.file.allow permits it, like git.
+        sub_repo_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sub_repo_path)
+        sub_repo = Repo.init(sub_repo_path)
+        self.addCleanup(sub_repo.close)
+
+        sub_file = os.path.join(sub_repo_path, "test.txt")
+        with open(sub_file, "w") as f:
+            f.write("submodule content")
+
+        porcelain.add(sub_repo, paths=[sub_file])
+        sub_commit = porcelain.commit(
+            sub_repo,
+            message=b"Initial submodule commit",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        porcelain.submodule_add(self.repo, sub_repo_path, "test_submodule")
+
+        index = self.repo.open_index()
+        index[b"test_submodule"] = IndexEntry(
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=S_IFGITLINK,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=sub_commit,
+            flags=0,
+        )
+        index.write()
+
+        porcelain.add(self.repo, paths=[".gitmodules"])
+        porcelain.commit(
+            self.repo,
+            message=b"Add submodule",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        self.assertRaises(
+            TransportNotAllowed,
+            porcelain.submodule_update,
+            self.repo,
+            init=True,
+        )
+        submodule_file = os.path.join(self.repo.path, "test_submodule", "test.txt")
+        self.assertFalse(os.path.exists(submodule_file))
 
     def test_update_recursive(self) -> None:
         # Create a nested (innermost) submodule repository
@@ -6366,6 +6428,10 @@ class SubmoduleTests(PorcelainTestCase):
             author=b"Test Author <test@example.com>",
             committer=b"Test Committer <test@example.com>",
         )
+
+        # Allow the file transport for the nested submodule repositories too,
+        # whose config the per-repo protocol.file.allow setting can't reach.
+        self.overrideEnv("GIT_ALLOW_PROTOCOL", "file")
 
         # Initialize and recursively update the submodules
         porcelain.submodule_init(self.repo)

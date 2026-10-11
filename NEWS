@@ -10,7 +10,8 @@
  * Honour the ``export-ignore`` gitattribute in ``git archive``, taking the
    attribute from the tree being archived like git does, including the
    ``.gitattributes`` of each subdirectory, so ignored files and directories
-   stay out of the tarball. (Kartik Kenchi, #2481)
+   stay out of the tarball. Adds ``dulwich.attrs.parse_gitattributes_tree``
+   for reading a tree's ``.gitattributes``. (Kartik Kenchi, #2481)
 
  * Apply the blob normalizer to files written by ``porcelain.merge``,
    so fast-forward and three-way merges honour ``.gitattributes`` and

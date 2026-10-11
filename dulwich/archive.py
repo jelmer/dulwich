@@ -24,7 +24,6 @@
 
 __all__ = ["ChunkedBytesIO", "UnsafeArchivePathError", "tar_stream"]
 
-import logging
 import posixpath
 import stat
 import struct
@@ -36,21 +35,12 @@ from os import SEEK_END
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
-
-    from .attrs import AttributeValue, Pattern
     from .object_store import BaseObjectStore
     from .objects import TreeEntry
 
-    # Compiled .gitattributes patterns, as returned by
-    # dulwich.attrs.compile_gitattributes_patterns.
-    AttrPatterns = Sequence[tuple[Pattern, Mapping[bytes, AttributeValue]]]
-
-from .attrs import compile_gitattributes_patterns, match_path, parse_git_attributes
+from .attrs import AttrPatterns, match_path, parse_gitattributes_tree
 from .index import cleanup_mode
 from .objects import Blob, Tree
-
-logger = logging.getLogger(__name__)
 
 
 class UnsafeArchivePathError(ValueError):
@@ -103,44 +93,7 @@ def _is_unsafe_archive_path(path: bytes) -> bool:
     return False
 
 
-def _dir_gitattributes(
-    store: "BaseObjectStore", tree: "Tree", dirpath: bytes
-) -> "AttrPatterns":
-    """Read the ``.gitattributes`` of one directory of the tree being archived.
-
-    git archive takes attributes from the tree it is archiving, unless
-    ``--worktree-attributes`` is given, and reads the ``.gitattributes`` of
-    every directory it walks into. Patterns are relative to the directory
-    holding the file, so ``dirpath`` is passed as their base.
-
-    Args:
-      store: Object store to read the blob from
-      tree: Tree of the directory
-      dirpath: Path of the directory relative to the archive root; empty for
-        the root itself
-
-    Returns:
-      Compiled patterns, empty if the directory has no readable
-      ``.gitattributes``
-    """
-    try:
-        mode, sha = tree[b".gitattributes"]
-    except KeyError:
-        return []
-    source = posixpath.join(dirpath, b".gitattributes")
-    if not stat.S_ISREG(mode):
-        logger.debug("Ignoring %r: not a regular file", source)
-        return []
-    blob = store[sha]
-    if not isinstance(blob, Blob):
-        logger.warning("Ignoring %r: not a blob", source)
-        return []
-    return compile_gitattributes_patterns(
-        parse_git_attributes(BytesIO(blob.data)), source, dirpath
-    )
-
-
-def _is_export_ignored(patterns: "AttrPatterns", path: bytes, is_dir: bool) -> bool:
+def _is_export_ignored(patterns: AttrPatterns, path: bytes, is_dir: bool) -> bool:
     """Return True if ``path`` carries the ``export-ignore`` attribute.
 
     A directory is matched both with and without a trailing slash, since git
@@ -290,28 +243,19 @@ def _walk_tree(
     store: "BaseObjectStore",
     tree: "Tree",
     root: bytes = b"",
-    inherited: "AttrPatterns" = (),
+    inherited: AttrPatterns = (),
 ) -> Generator[tuple[bytes, "TreeEntry"], None, None]:
     """Recursively walk a dulwich Tree, yielding tuples of (tree path, TreeEntry) along the way.
 
-    Entries carrying the ``export-ignore`` attribute are skipped; an ignored
-    directory is not descended into, so its contents are left out too. The
-    ``.gitattributes`` of each directory walked into is added to the patterns
-    inherited from its parents, so that a deeper file overrides a shallower
-    one, as git does.
-
-    Args:
-      store: Object store to read subtrees and blobs from
-      tree: Tree of the directory to walk
-      root: Path of the directory relative to the archive root
-      inherited: Compiled patterns from the directories above this one
+    Entries carrying the ``export-ignore`` attribute from the tree's own
+    ``.gitattributes`` are skipped; an ignored directory is not descended into.
 
     Raises:
       UnsafeArchivePathError: if a tree entry's name is unsafe to emit into
         an archive (matches the spirit of git's ``verify_path`` /
         ``error: invalid path``).
     """
-    dir_patterns = _dir_gitattributes(store, tree, root)
+    dir_patterns = parse_gitattributes_tree(store, tree, root)
     # Later patterns win, so this directory's own file goes after its parents'.
     patterns = [*inherited, *dir_patterns] if dir_patterns else inherited
     for entry in tree.iteritems():

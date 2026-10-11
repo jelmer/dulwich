@@ -25,7 +25,7 @@
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
-__version__ = (1, 2, 17)
+__version__ = (1, 2, 18)
 
 __all__ = ["__version__", "replace_me"]
 

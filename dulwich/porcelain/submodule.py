@@ -216,9 +216,8 @@ def submodule_update(
                 # URL not in config, skip this submodule
                 continue
 
-            # The URL originates from the cloned tree's .gitmodules, so this
-            # transport is not user-initiated: apply git's protocol.<name>.allow
-            # policy, which forbids e.g. the file transport here by default.
+            # The URL comes from the tree's .gitmodules rather than from the
+            # caller, so this transport is not user-initiated.
             check_transport_allowed(url, config=protocol_config, from_user=False)
 
             # Get or create the submodule repository paths

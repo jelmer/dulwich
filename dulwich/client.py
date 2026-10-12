@@ -5767,7 +5767,7 @@ def _transport_protocol(location: str) -> str:
     """Return the transport protocol used for a location.
 
     Follows the same dispatch as get_transport_and_path; the returned
-    names match the ones git uses in ``protocol.<name>.allow``.
+    names are the ones used in ``protocol.<name>.allow`` configuration.
     """
     try:
         parsed = urlparse(location)
@@ -5794,35 +5794,27 @@ def _transport_protocol(location: str) -> str:
 def check_transport_allowed(
     location: str,
     config: Config | None = None,
-    from_user: bool | None = None,
+    from_user: bool = True,
 ) -> None:
     """Check that the transport protocol for a location is allowed.
 
-    This is the equivalent of git's transport restriction
-    (``transport_check_allowed``): when the ``GIT_ALLOW_PROTOCOL``
-    environment variable is set it is a colon-separated allowlist that
-    overrides any configuration; otherwise ``protocol.<name>.allow``
-    and ``protocol.allow`` apply, defaulting to ``always`` for http,
-    https, git and ssh and to ``user`` for everything else, notably
-    the file transport.
+    ``protocol.<name>.allow`` takes precedence over ``protocol.allow``.
+    ``always`` permits the transport, ``never`` refuses it and ``user``
+    permits it only when the transport was initiated by the user. The
+    default is ``always`` for http, https, git and ssh, and ``user`` for
+    everything else, notably the file transport.
 
     Args:
       location: URL or path as passed to get_transport_and_path
       config: Optional config to read protocol.*.allow settings from
       from_user: Whether this transport was directly initiated by the
         user (e.g. a URL they passed to clone) rather than by dulwich
-        itself (e.g. a submodule URL read from .gitmodules). None means
-        consult ``GIT_PROTOCOL_FROM_USER``, defaulting to True.
+        itself (e.g. a submodule URL read from .gitmodules)
 
     Raises:
       TransportNotAllowed: If policy forbids using this transport
     """
     protocol = _transport_protocol(location)
-    allow_env = os.environ.get("GIT_ALLOW_PROTOCOL")
-    if allow_env is not None:
-        if protocol not in allow_env.split(":"):
-            raise TransportNotAllowed(protocol)
-        return
     policy = None
     if config is not None:
         for section in ((b"protocol", protocol.encode("ascii")), (b"protocol",)):
@@ -5840,9 +5832,6 @@ def check_transport_allowed(
     if policy == b"never":
         raise TransportNotAllowed(protocol)
     if policy == b"user":
-        if from_user is None:
-            env = os.environ.get("GIT_PROTOCOL_FROM_USER")
-            from_user = env is None or env.lower() not in ("0", "false", "no", "off")
         if not from_user:
             raise TransportNotAllowed(protocol)
         return

@@ -3678,23 +3678,6 @@ class CheckTransportAllowedTests(TestCase):
             config=config,
         )
 
-    def test_allow_protocol_env(self) -> None:
-        self.overrideEnv("GIT_ALLOW_PROTOCOL", "file:git")
-        check_transport_allowed("/srv/repo", from_user=False)
-        check_transport_allowed("git://example.com/repo", from_user=False)
-        self.assertRaises(
-            TransportNotAllowed,
-            check_transport_allowed,
-            "https://example.com/repo.git",
-            from_user=False,
-        )
-
-    def test_protocol_from_user_env(self) -> None:
-        self.overrideEnv("GIT_PROTOCOL_FROM_USER", "0")
-        self.assertRaises(TransportNotAllowed, check_transport_allowed, "/srv/repo")
-        self.overrideEnv("GIT_PROTOCOL_FROM_USER", "1")
-        check_transport_allowed("/srv/repo")
-
 
 class CheckWantsTests(TestCase):
     def test_fine(self) -> None:

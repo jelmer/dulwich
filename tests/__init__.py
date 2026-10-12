@@ -72,8 +72,6 @@ _GIT_ENV_SCRUB: tuple[str, ...] = (
     "GIT_NAMESPACE",
     "GIT_COMMON_DIR",
     "GIT_LFS_SKIP_SMUDGE",
-    "GIT_ALLOW_PROTOCOL",
-    "GIT_PROTOCOL_FROM_USER",
 )
 
 

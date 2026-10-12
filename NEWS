@@ -4,11 +4,8 @@
    directories has been replaced by a symlink, rather than following the
    symlink and removing a file outside the work tree. (Kartik Kenchi)
 
- * Apply git's transport restriction to submodule URLs in
-   ``submodule_update``: ``protocol.<name>.allow`` / ``protocol.allow``
-   configuration and ``GIT_ALLOW_PROTOCOL`` are now honoured, and the file
-   transport is refused for submodules by default, like git.
-   (Kartik Kenchi)
+ * Honour ``protocol.<name>.allow`` for submodule URLs; the file transport
+   is now refused for submodules by default. (Kartik Kenchi)
 
 1.2.18	2026-10-11
 

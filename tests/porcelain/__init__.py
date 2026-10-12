@@ -125,6 +125,19 @@ class PorcelainTestCase(TestCase):
         self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)
 
+    def allowFileTransportForSubmodules(self) -> None:
+        """Permit the file transport for submodule URLs in every repository.
+
+        Submodule URLs are not user-initiated, so a local path needs an
+        explicit protocol.file.allow setting. Writing it to the global config
+        covers repositories the test does not create itself, such as clone
+        targets and nested submodules.
+        """
+        config_path = os.path.join(self.test_dir, "allow_file_transport")
+        with open(config_path, "wb") as f:
+            f.write(b'[protocol "file"]\n\tallow = always\n')
+        self.overrideEnv("GIT_CONFIG_GLOBAL", config_path)
+
     def assertRecentTimestamp(self, ts) -> None:
         # On some slow CIs it does actually take more than 5 seconds to go from
         # creating the tag to here.
@@ -1716,7 +1729,7 @@ class CloneTests(PorcelainTestCase):
 
         # Clone with recurse_submodules; the local-path submodule URL uses
         # the file transport, which submodules may not use by default.
-        self.overrideEnv("GIT_ALLOW_PROTOCOL", "file")
+        self.allowFileTransportForSubmodules()
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
 
@@ -6269,7 +6282,7 @@ class SubmoduleTests(PorcelainTestCase):
         )
 
         # A local-path submodule URL uses the file transport, which is not
-        # allowed for submodules by default; opt in like git requires.
+        # allowed for submodules by default, so opt in explicitly.
         config = self.repo.get_config()
         config.set((b"protocol", b"file"), b"allow", b"always")
         config.write_to_path()
@@ -6290,7 +6303,7 @@ class SubmoduleTests(PorcelainTestCase):
 
     def test_update_file_transport_not_allowed(self) -> None:
         # A .gitmodules URL is not user-supplied, so the file transport is
-        # refused unless protocol.file.allow permits it, like git.
+        # refused unless protocol.file.allow permits it.
         sub_repo_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, sub_repo_path)
         sub_repo = Repo.init(sub_repo_path)
@@ -6431,7 +6444,7 @@ class SubmoduleTests(PorcelainTestCase):
 
         # Allow the file transport for the nested submodule repositories too,
         # whose config the per-repo protocol.file.allow setting can't reach.
-        self.overrideEnv("GIT_ALLOW_PROTOCOL", "file")
+        self.allowFileTransportForSubmodules()
 
         # Initialize and recursively update the submodules
         porcelain.submodule_init(self.repo)

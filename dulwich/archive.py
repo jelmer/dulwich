@@ -96,9 +96,8 @@ def _is_unsafe_archive_path(path: bytes) -> bool:
 def _is_export_ignored(patterns: AttrPatterns, path: bytes, is_dir: bool) -> bool:
     """Return True if ``path`` carries the ``export-ignore`` attribute.
 
-    A directory is matched both with and without a trailing slash, since git
-    checks ``dir/`` (so that a ``dir/`` pattern applies) while a pattern
-    without the slash matches the name itself.
+    A directory is matched both with and without a trailing slash, so that
+    either a ``dir`` or a ``dir/`` pattern applies to it.
     """
     candidates = (path, path + b"/") if is_dir else (path,)
     return any(

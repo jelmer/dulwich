@@ -44,14 +44,11 @@ import stat
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from io import BytesIO
 from itertools import chain
-from typing import IO, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .object_store import BaseObjectStore
-    from .objects import Tree
+from typing import IO
 
 from .file import open_nofollow_read
-from .objects import Blob
+from .object_store import BaseObjectStore
+from .objects import Blob, Tree
 from .wildmatch import MalformedPattern
 from .wildmatch import translate as translate_wildmatch
 
@@ -275,13 +272,13 @@ def parse_gitattributes_file(
 
 
 def parse_gitattributes_tree(
-    store: "BaseObjectStore", tree: "Tree", base: bytes = b""
+    store: BaseObjectStore, tree: Tree, base: bytes = b""
 ) -> AttrPatterns:
     """Read and compile the ``.gitattributes`` of one tree (directory).
 
-    A ``.gitattributes`` entry that is not a regular file is skipped, as git
-    does. Patterns are relative to the directory holding the file, so ``base``
-    is passed as their base.
+    A ``.gitattributes`` entry that is not a regular file is skipped. Patterns
+    are relative to the directory holding the file, so ``base`` is passed as
+    their base.
 
     Args:
         store: Object store to read the blob from

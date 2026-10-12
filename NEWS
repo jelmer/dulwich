@@ -75,8 +75,8 @@
    set. (Jelmer Vernooĳ, #2487)
 
  * In ``update_working_tree``, leave a path alone when one of its leading
-   directories has been replaced by a symlink, like git's ``unlink_entry``.
-   Previously the removal followed the symlink. (Kartik Kenchi)
+   directories has been replaced by a symlink, rather than following the
+   symlink and removing a file outside the work tree. (Kartik Kenchi)
 
  * Read ``.gitattributes`` files in subdirectories, not just the one at the
    top of the tree. (Jelmer Vernooĳ, #2475)

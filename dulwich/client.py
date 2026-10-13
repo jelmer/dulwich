@@ -802,6 +802,23 @@ def _read_shallow_updates(
     return (new_shallow, new_unshallow)
 
 
+def _read_shallow_updates_v2(
+    proto: Protocol,
+) -> tuple[set[ObjectID], set[ObjectID]]:
+    """Consume a protocol-v2 shallow-info section if the server sent one.
+
+    The section is not only sent in response to a deepen request: C git's
+    upload-pack also sends one when the client announced shallow commits or
+    when the serving repository is itself shallow (``send_shallow_info``), so
+    peek for the section header like C git's ``process_section_header``.
+    """
+    pkt = proto.read_pkt_line()
+    if pkt is None or pkt.rstrip(b"\n") != b"shallow-info":
+        proto.unread_pkt_line(pkt)
+        return (set(), set())
+    return _read_shallow_updates(proto.read_pkt_seq())
+
+
 class _v1ReceivePackHeader:
     def __init__(
         self,
@@ -1016,7 +1033,17 @@ def _handle_upload_pack_head(
     if protocol_version == 2:
         proto.write_pkt_line(None)
 
-    if depth not in (0, None) or shallow_since is not None or shallow_exclude:
+    if protocol_version == 2:
+        # The response may carry a shallow-info section even when no depth
+        # change was requested, e.g. for a fetch from an already-shallow
+        # repository, so it has to be consumed from the response rather than
+        # predicted from the request.
+        if can_read is not None:
+            (new_shallow, new_unshallow) = _read_shallow_updates_v2(proto)
+        else:
+            new_shallow = None
+            new_unshallow = None
+    elif depth not in (0, None) or shallow_since is not None or shallow_exclude:
         if can_read is not None:
             (new_shallow, new_unshallow) = _read_shallow_updates(proto.read_pkt_seq())
         else:
@@ -5124,7 +5151,9 @@ class AbstractHttpGitClient(GitClient):
         resp, read = self._smart_request("git-upload-pack", url, data)
         try:
             resp_proto = Protocol(read, None)  # type: ignore
-            if new_shallow is None and new_unshallow is None:
+            if self.protocol_version == 2:
+                (new_shallow, new_unshallow) = _read_shallow_updates_v2(resp_proto)
+            elif new_shallow is None and new_unshallow is None:
                 (new_shallow, new_unshallow) = _read_shallow_updates(
                     resp_proto.read_pkt_seq()
                 )

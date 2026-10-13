@@ -2402,9 +2402,14 @@ class DiskObjectStore(PackBasedObjectStore):
                 delta_iter=indexer,  # type: ignore[arg-type]
             )
             copier.verify(progress=progress)
-            entries, ext_refs = self._index_pack(
-                indexer, len(copier), progress=progress
-            )
+            f.flush()
+            f.seek(0)
+            # Index from a mapping as add_pack does. Unmapped before completion.
+            with PackData(path, file=f, object_format=self.object_format) as pd:
+                indexer.set_pack_data(pd)
+                entries, ext_refs = self._index_pack(
+                    indexer, len(copier), progress=progress
+                )
             return self._complete_pack(f, path, entries, ext_refs, progress=progress)
 
     def add_pack(

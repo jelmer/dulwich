@@ -1,3 +1,10 @@
+1.2.19	UNRELEASED
+
+ * Consume the protocol-v2 ``shallow-info`` section a server sends when the
+   client is shallow but no depth change was requested. Fetching into a
+   shallow clone silently dropped the pack while still updating the remote
+   ref, leaving it pointing at missing objects. (Kartik Kenchi, #2478)
+
 1.2.18	2026-10-11
 
  * Add support for Python 3.15. (Jelmer Vernooĳ)

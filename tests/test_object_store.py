@@ -67,6 +67,7 @@ from dulwich.objects import (
 )
 from dulwich.pack import (
     DEFAULT_DELTA_BASE_CACHE_LIMIT,
+    OFS_DELTA,
     REF_DELTA,
     Pack,
     load_pack_index,
@@ -549,6 +550,70 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
                 (Blob.type_num, b"more yummy data"),
                 o.get_raw(packed_blob_sha),
             )
+
+    def test_add_thin_pack_does_not_reread_the_file(self) -> None:
+        """Indexing reads the mapping, so the file is not read back per object."""
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+
+        blob = make_object(Blob, data=b"yummy data")
+        o.add_object(blob)
+
+        f = BytesIO()
+        entries = build_pack(
+            f,
+            [
+                (Blob.type_num, b"other data"),
+                (OFS_DELTA, (0, b"other data, changed")),
+                (REF_DELTA, (blob.id, b"more yummy data")),
+            ],
+            store=o,
+        )
+
+        with patch.object(
+            dulwich.pack, "unpack_object", wraps=dulwich.pack.unpack_object
+        ) as unpack_object:
+            with o.add_thin_pack(f.read, None) as pack:
+                self.assertEqual(
+                    sorted([blob.id] + [sha_to_hex(e[3]) for e in entries]),
+                    list(pack),
+                )
+        self.assertEqual(len(entries), unpack_object.call_count)
+
+    def test_add_thin_pack_unmaps_before_rename(self) -> None:
+        """The mapping used for indexing is gone when the pack is completed."""
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+
+        blob = make_object(Blob, data=b"yummy data")
+        o.add_object(blob)
+
+        f = BytesIO()
+        build_pack(f, [(REF_DELTA, (blob.id, b"more yummy data"))], store=o)
+
+        mappings = []
+        real_load = dulwich.pack._load_file_contents
+
+        def tracking_load(f, size=None):
+            contents, size = real_load(f, size)
+            mappings.append(contents)
+            return contents, size
+
+        open_at_rename = []
+        real_rename = os.rename
+
+        def checking_rename(src, dst):
+            open_at_rename.extend(
+                m for m in mappings if isinstance(m, mmap.mmap) and not m.closed
+            )
+            return real_rename(src, dst)
+
+        with (
+            patch.object(dulwich.pack, "_load_file_contents", tracking_load),
+            patch("dulwich.object_store.os.rename", checking_rename),
+        ):
+            o.add_thin_pack(f.read, None).close()
+        self.assertEqual([], open_at_rename)
 
     def test_add_thin_pack_empty(self) -> None:
         with closing(DiskObjectStore(self.store_dir)) as o:

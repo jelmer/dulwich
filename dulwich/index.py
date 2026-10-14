@@ -3447,6 +3447,16 @@ def update_working_tree(
 
             full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
             try:
+                verify_leading_dirs(path, [], repo_path)
+            except InvalidPathError:
+                # Removing through the symlink would unlink a path outside
+                # the work tree; only drop the index entry, as git does.
+                logger.warning(
+                    "Not removing %r: leading path is not a real directory", path
+                )
+                _transition_to_absent(repo, path, full_path, None, index)
+                continue
+            try:
                 delete_stat: os.stat_result | None = os.lstat(full_path)
             except FileNotFoundError:
                 delete_stat = None

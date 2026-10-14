@@ -1,3 +1,9 @@
+1.2.19	UNRELEASED
+
+ * In ``update_working_tree``, leave a path alone when one of its leading
+   directories has been replaced by a symlink, rather than following the
+   symlink and removing a file outside the work tree. (Kartik Kenchi)
+
 1.2.18	2026-10-11
 
  * Add support for Python 3.15. (Jelmer Vernooĳ)

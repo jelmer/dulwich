@@ -1,3 +1,9 @@
+1.2.19	UNRELEASED
+
+ * In ``update_working_tree``, leave a path alone when one of its leading
+   directories has been replaced by a symlink, rather than following the
+   symlink and removing a file outside the work tree. (Kartik Kenchi)
+
 1.2.18	2026-10-11
 
  * Add support for Python 3.15. (Jelmer Vernooĳ)
@@ -73,10 +79,6 @@
    ``Index.changes_from_tree``, so ``porcelain.status`` no longer raises
    ``KeyError`` on a staged case-only rename with ``core.ignorecase``
    set. (Jelmer Vernooĳ, #2487)
-
- * In ``update_working_tree``, leave a path alone when one of its leading
-   directories has been replaced by a symlink, rather than following the
-   symlink and removing a file outside the work tree. (Kartik Kenchi)
 
  * Read ``.gitattributes`` files in subdirectories, not just the one at the
    top of the tree. (Jelmer Vernooĳ, #2475)

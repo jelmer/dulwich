@@ -3836,6 +3836,7 @@ class TestUpdateWorkingTree(TestCase):
 
         self.assertTrue(os.path.exists(outside_file))
         self.assertTrue(os.path.islink(os.path.join(self.tempdir, "d")))
+        self.assertEqual([b"keep"], sorted(self.repo.open_index().paths()))
 
     def test_update_working_tree_modified_file_to_dir_transition(self):
         """Test that modified files are not removed when they should be directories."""

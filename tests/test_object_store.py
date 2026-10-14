@@ -48,6 +48,7 @@ from dulwich.object_store import (
     ObjectStoreGraphWalker,
     OverlayObjectStore,
     PackInputTooLarge,
+    _collect_ancestors,
     commit_tree_changes,
     find_shallow,
     get_depth,
@@ -1074,6 +1075,46 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         shallow, not_shallow = find_shallow(self.store, [tail], 1)
         self.assertEqual({tail}, shallow)
         self.assertEqual(set(), not_shallow)
+
+    def test_collect_ancestors_wide_history(self) -> None:
+        # A tip with many parents that share a single root. The walk dedups, so
+        # the frontier is bounded; draining it with list.pop(0) was O(n^2) in
+        # the number of reachable commits, where deque.popleft is linear. The
+        # returned (commits, bases) sets are unchanged.
+        ts = int(time.time())
+        seq = [0]
+
+        def commit(parents):
+            seq[0] += 1
+            c = make_object(
+                Commit,
+                message=b"c%d" % seq[0],
+                tree=b"1" * 40,
+                parents=parents,
+                author=b"Test <test@example.com>",
+                committer=b"Test <test@example.com>",
+                commit_time=ts,
+                commit_timezone=0,
+                author_time=ts,
+                author_timezone=0,
+            )
+            self.store.add_object(c)
+            return c.id
+
+        root = commit([])
+        leaves = [commit([root]) for _ in range(500)]
+        tip = commit(leaves)
+
+        all_ids = {tip, root, *leaves}
+        commits, bases = _collect_ancestors(self.store, [tip])
+        self.assertEqual(all_ids, commits)
+        self.assertEqual(set(), bases)
+
+        # With the leaves marked common, the walk stops at them: they become
+        # bases and only the tip is collected.
+        commits, bases = _collect_ancestors(self.store, [tip], common=set(leaves))
+        self.assertEqual({tip}, commits)
+        self.assertEqual(set(leaves), bases)
 
     def test_fsync_object_files_disabled_by_default(self) -> None:
         """Test that fsync is disabled by default for object files."""

@@ -44,7 +44,7 @@ from wsgiref.simple_server import make_server
 
 from dulwich import porcelain
 from dulwich.am import AmConflict
-from dulwich.client import SendPackResult
+from dulwich.client import SendPackResult, TransportNotAllowed
 from dulwich.commit_graph import read_commit_graph
 from dulwich.diff_tree import TreeChange, tree_changes
 from dulwich.errors import CommitError, NoIndexPresent, WorkingTreeModifiedError
@@ -1714,16 +1714,19 @@ class CloneTests(PorcelainTestCase):
             committer=b"Test Committer <test@example.com>",
         )
 
-        # Clone with recurse_submodules
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
 
-        cloned = porcelain.clone(
-            self.repo.path,
-            target_path,
-            recurse_submodules=True,
-        )
+        cloned = porcelain.clone(self.repo.path, target_path)
         self.addCleanup(cloned.close)
+
+        # A local-path submodule URL uses the file transport, which is not
+        # allowed for submodules by default, so opt in explicitly before
+        # running the submodule step of recurse_submodules.
+        config = cloned.get_config()
+        config.set((b"protocol", b"file"), b"allow", b"always")
+        config.write_to_path()
+        porcelain.submodule_update(cloned, init=True, recursive=True)
 
         # Check main file exists
         cloned_main = os.path.join(target_path, "main.txt")
@@ -6266,6 +6269,12 @@ class SubmoduleTests(PorcelainTestCase):
             committer=b"Test Committer <test@example.com>",
         )
 
+        # A local-path submodule URL uses the file transport, which is not
+        # allowed for submodules by default, so opt in explicitly.
+        config = self.repo.get_config()
+        config.set((b"protocol", b"file"), b"allow", b"always")
+        config.write_to_path()
+
         # Initialize and update the submodule
         porcelain.submodule_init(self.repo)
         porcelain.submodule_update(self.repo)
@@ -6279,6 +6288,60 @@ class SubmoduleTests(PorcelainTestCase):
         self.assertTrue(os.path.exists(submodule_file))
         with open(submodule_file) as f:
             self.assertEqual(f.read(), "submodule content")
+
+    def test_update_file_transport_not_allowed(self) -> None:
+        # A .gitmodules URL is not user-supplied, so the file transport is
+        # refused unless protocol.file.allow permits it.
+        sub_repo_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, sub_repo_path)
+        sub_repo = Repo.init(sub_repo_path)
+        self.addCleanup(sub_repo.close)
+
+        sub_file = os.path.join(sub_repo_path, "test.txt")
+        with open(sub_file, "w") as f:
+            f.write("submodule content")
+
+        porcelain.add(sub_repo, paths=[sub_file])
+        sub_commit = porcelain.commit(
+            sub_repo,
+            message=b"Initial submodule commit",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        porcelain.submodule_add(self.repo, sub_repo_path, "test_submodule")
+
+        index = self.repo.open_index()
+        index[b"test_submodule"] = IndexEntry(
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=S_IFGITLINK,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=sub_commit,
+            flags=0,
+        )
+        index.write()
+
+        porcelain.add(self.repo, paths=[".gitmodules"])
+        porcelain.commit(
+            self.repo,
+            message=b"Add submodule",
+            author=b"Test Author <test@example.com>",
+            committer=b"Test Committer <test@example.com>",
+        )
+
+        self.assertRaises(
+            TransportNotAllowed,
+            porcelain.submodule_update,
+            self.repo,
+            init=True,
+        )
+        submodule_file = os.path.join(self.repo.path, "test_submodule", "test.txt")
+        self.assertFalse(os.path.exists(submodule_file))
 
     def test_update_recursive(self) -> None:
         # Create a nested (innermost) submodule repository
@@ -6367,8 +6430,22 @@ class SubmoduleTests(PorcelainTestCase):
             committer=b"Test Committer <test@example.com>",
         )
 
-        # Initialize and recursively update the submodules
+        # A local-path submodule URL uses the file transport, which is not
+        # allowed for submodules by default, so opt in explicitly.
+        config = self.repo.get_config()
+        config.set((b"protocol", b"file"), b"allow", b"always")
+        config.write_to_path()
+
+        # Update the middle submodule first, so the nested submodule URL can
+        # be allowed in its config too.
         porcelain.submodule_init(self.repo)
+        porcelain.submodule_update(self.repo)
+        with Repo(os.path.join(self.repo.controldir(), "modules", "middle")) as r:
+            middle_config = r.get_config()
+            middle_config.set((b"protocol", b"file"), b"allow", b"always")
+            middle_config.write_to_path()
+
+        # Recursively update the submodules
         porcelain.submodule_update(self.repo, recursive=True)
 
         # Check that the middle submodule directory and file exist

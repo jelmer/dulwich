@@ -71,11 +71,13 @@ __all__ = [
     "SubprocessWrapper",
     "TCPGitClient",
     "TraditionalGitClient",
+    "TransportNotAllowed",
     "Urllib3HttpGitClient",
     "apply_bundle_uri",
     "build_fetch_request_v2",
     "build_ls_refs_request_v2",
     "check_for_proxy_bypass",
+    "check_transport_allowed",
     "check_wants",
     "default_local_git_client_cls",
     "default_urllib3_manager",
@@ -5746,6 +5748,94 @@ def get_transport_and_path(
             quiet=quiet,
             include_tags=include_tags,
         ), path
+
+
+class TransportNotAllowed(Exception):
+    """Raised when the transport for a location is forbidden by policy."""
+
+    def __init__(self, protocol: str) -> None:
+        """Initialize TransportNotAllowed.
+
+        Args:
+          protocol: Name of the forbidden transport protocol
+        """
+        self.protocol = protocol
+        super().__init__(f"transport '{protocol}' not allowed")
+
+
+def _transport_protocol(location: str) -> str:
+    """Return the transport protocol used for a location.
+
+    Follows the same dispatch as get_transport_and_path; the returned
+    names are the ones used in ``protocol.<name>.allow`` configuration.
+    """
+    try:
+        parsed = urlparse(location)
+    except ValueError:
+        parsed = None
+    if parsed is not None:
+        if parsed.scheme == "git":
+            return "git"
+        if parsed.scheme in ("git+ssh", "ssh"):
+            return "ssh"
+        if parsed.scheme in ("http", "https"):
+            return parsed.scheme
+        if parsed.scheme == "file":
+            return "file"
+    if sys.platform == "win32" and location[0:1].isalpha() and location[1:3] == ":\\":
+        return "file"
+    try:
+        parse_rsync_url(location)
+    except ValueError:
+        return "file"
+    return "ssh"
+
+
+def check_transport_allowed(
+    location: str,
+    config: Config | None = None,
+    from_user: bool = True,
+) -> None:
+    """Check that the transport protocol for a location is allowed.
+
+    ``protocol.<name>.allow`` takes precedence over ``protocol.allow``.
+    ``always`` permits the transport, ``never`` refuses it and ``user``
+    permits it only when the transport was initiated by the user. The
+    default is ``always`` for http, https, git and ssh, and ``user`` for
+    everything else, notably the file transport.
+
+    Args:
+      location: URL or path as passed to get_transport_and_path
+      config: Optional config to read protocol.*.allow settings from
+      from_user: Whether this transport was directly initiated by the
+        user (e.g. a URL they passed to clone) rather than by dulwich
+        itself (e.g. a submodule URL read from .gitmodules)
+
+    Raises:
+      TransportNotAllowed: If policy forbids using this transport
+    """
+    protocol = _transport_protocol(location)
+    policy = None
+    if config is not None:
+        for section in ((b"protocol", protocol.encode("ascii")), (b"protocol",)):
+            try:
+                policy = config.get(section, b"allow")
+            except KeyError:
+                continue
+            else:
+                break
+    if policy is None:
+        policy = b"always" if protocol in ("http", "https", "git", "ssh") else b"user"
+    policy = policy.lower()
+    if policy == b"always":
+        return
+    if policy == b"never":
+        raise TransportNotAllowed(protocol)
+    if policy == b"user":
+        if not from_user:
+            raise TransportNotAllowed(protocol)
+        return
+    raise ValueError(f"unknown value for config protocol.allow: {policy.decode()!r}")
 
 
 DEFAULT_GIT_CREDENTIALS_PATHS = [

@@ -151,7 +151,7 @@ def submodule_update(
       recursive: If True, recursively update nested submodules
       errstream: Error stream for error messages
     """
-    from ..client import get_transport_and_path
+    from ..client import check_transport_allowed, get_transport_and_path
     from ..index import build_index_from_tree, get_path_element_validator
     from ..refs import HEADREF
     from ..submodule import iter_cached_submodules
@@ -167,6 +167,7 @@ def submodule_update(
             submodule_init(r)
 
         config = r.get_config()
+        protocol_config = r.get_config_stack()
         gitmodules_path = os.path.join(r.path, ".gitmodules")
         path_validator = get_path_element_validator(config)
 
@@ -214,6 +215,10 @@ def submodule_update(
             except KeyError:
                 # URL not in config, skip this submodule
                 continue
+
+            # The URL comes from the tree's .gitmodules rather than from the
+            # caller, so this transport is not user-initiated.
+            check_transport_allowed(url, config=protocol_config, from_user=False)
 
             # Get or create the submodule repository paths
             submodule_path = os.path.join(r.path, path_str)

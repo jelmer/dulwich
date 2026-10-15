@@ -4,6 +4,9 @@
    directories has been replaced by a symlink, rather than following the
    symlink and removing a file outside the work tree. (Kartik Kenchi)
 
+ * Honour ``protocol.<name>.allow`` for submodule URLs; the file transport
+   is now refused for submodules by default. (Kartik Kenchi)
+
 1.2.18	2026-10-11
 
  * Add support for Python 3.15. (Jelmer Vernooĳ)

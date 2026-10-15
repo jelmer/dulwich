@@ -807,10 +807,10 @@ def _read_shallow_updates_v2(
 ) -> tuple[set[ObjectID], set[ObjectID]]:
     """Consume a protocol-v2 shallow-info section if the server sent one.
 
-    The section is not only sent in response to a deepen request: C git's
-    upload-pack also sends one when the client announced shallow commits or
-    when the serving repository is itself shallow (``send_shallow_info``), so
-    peek for the section header like C git's ``process_section_header``.
+    The section is not only sent in response to a deepen request: servers
+    also send one when the client announced shallow commits or when the
+    serving repository is itself shallow, so peek for the section header and
+    leave the stream untouched if it is absent.
     """
     pkt = proto.read_pkt_line()
     if pkt is None or pkt.rstrip(b"\n") != b"shallow-info":

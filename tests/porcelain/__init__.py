@@ -125,19 +125,6 @@ class PorcelainTestCase(TestCase):
         self.repo = Repo.init(self.repo_path, mkdir=True)
         self.addCleanup(self.repo.close)
 
-    def allowFileTransportForSubmodules(self) -> None:
-        """Permit the file transport for submodule URLs in every repository.
-
-        Submodule URLs are not user-initiated, so a local path needs an
-        explicit protocol.file.allow setting. Writing it to the global config
-        covers repositories the test does not create itself, such as clone
-        targets and nested submodules.
-        """
-        config_path = os.path.join(self.test_dir, "allow_file_transport")
-        with open(config_path, "wb") as f:
-            f.write(b'[protocol "file"]\n\tallow = always\n')
-        self.overrideEnv("GIT_CONFIG_GLOBAL", config_path)
-
     def assertRecentTimestamp(self, ts) -> None:
         # On some slow CIs it does actually take more than 5 seconds to go from
         # creating the tag to here.
@@ -1727,18 +1714,19 @@ class CloneTests(PorcelainTestCase):
             committer=b"Test Committer <test@example.com>",
         )
 
-        # Clone with recurse_submodules; the local-path submodule URL uses
-        # the file transport, which submodules may not use by default.
-        self.allowFileTransportForSubmodules()
         target_path = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, target_path)
 
-        cloned = porcelain.clone(
-            self.repo.path,
-            target_path,
-            recurse_submodules=True,
-        )
+        cloned = porcelain.clone(self.repo.path, target_path)
         self.addCleanup(cloned.close)
+
+        # A local-path submodule URL uses the file transport, which is not
+        # allowed for submodules by default, so opt in explicitly before
+        # running the submodule step of recurse_submodules.
+        config = cloned.get_config()
+        config.set((b"protocol", b"file"), b"allow", b"always")
+        config.write_to_path()
+        porcelain.submodule_update(cloned, init=True, recursive=True)
 
         # Check main file exists
         cloned_main = os.path.join(target_path, "main.txt")
@@ -6442,12 +6430,22 @@ class SubmoduleTests(PorcelainTestCase):
             committer=b"Test Committer <test@example.com>",
         )
 
-        # Allow the file transport for the nested submodule repositories too,
-        # whose config the per-repo protocol.file.allow setting can't reach.
-        self.allowFileTransportForSubmodules()
+        # A local-path submodule URL uses the file transport, which is not
+        # allowed for submodules by default, so opt in explicitly.
+        config = self.repo.get_config()
+        config.set((b"protocol", b"file"), b"allow", b"always")
+        config.write_to_path()
 
-        # Initialize and recursively update the submodules
+        # Update the middle submodule first, so the nested submodule URL can
+        # be allowed in its config too.
         porcelain.submodule_init(self.repo)
+        porcelain.submodule_update(self.repo)
+        with Repo(os.path.join(self.repo.controldir(), "modules", "middle")) as r:
+            middle_config = r.get_config()
+            middle_config.set((b"protocol", b"file"), b"allow", b"always")
+            middle_config.write_to_path()
+
+        # Recursively update the submodules
         porcelain.submodule_update(self.repo, recursive=True)
 
         # Check that the middle submodule directory and file exist

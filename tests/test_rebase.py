@@ -485,6 +485,23 @@ break
         # Check break
         self.assertEqual(todo.entries[7].command, RebaseTodoCommand.BREAK)
 
+    def test_todo_subject_line_separators(self):
+        """A line separator in a subject must not start a new instruction."""
+        for sep in ["\r", "\x0b", "\x0c", "\x1c", "\x85", "\u2028"]:
+            commit = make_commit(message=f"fix{sep}exec touch pwned\n\nbody".encode())
+            todo = RebaseTodo.from_string(RebaseTodo.from_commits([commit]).to_string())
+            self.assertEqual(
+                [e.command for e in todo.entries], [RebaseTodoCommand.PICK]
+            )
+
+    def test_todo_parsing_crlf(self):
+        """A todo file with CRLF line endings still parses."""
+        todo = RebaseTodo.from_string("pick 1234567 First\r\nexec make\r\n")
+        self.assertEqual(
+            [(e.command, e.arguments) for e in todo.entries],
+            [(RebaseTodoCommand.PICK, None), (RebaseTodoCommand.EXEC, "make")],
+        )
+
     def test_todo_generation(self):
         """Test generation of todo list from commits."""
         commits = self._create_test_commits()

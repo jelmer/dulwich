@@ -3875,9 +3875,6 @@ def _collect_ancestors(
     """
     bases = set()
     commits = set()
-    # The walk already dedups via commits, so the frontier is bounded; use a
-    # deque so draining it stays O(1) per step. list.pop(0) is O(n), which made
-    # enumerating N reachable commits O(n^2), as it did in get_depth above.
     queue: deque[ObjectID] = deque()
     queue.extend(heads)
 

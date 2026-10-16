@@ -358,7 +358,8 @@ class IncomingPackValidationTests(TestCase):
                     object_format=SHA256,
                 )
                 stream.seek(0)
-                with self.assertRaises(ValueError):
+                # The Python and Rust tree parsers raise different exceptions.
+                with self.assertRaises((ValueError, ObjectFormatException)):
                     store.add_thin_pack(stream.read, None, check_objects=check_objects)
                 self.assertEqual(original_ids, list(store))
 

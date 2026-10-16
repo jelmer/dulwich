@@ -3875,14 +3875,14 @@ def _collect_ancestors(
     """
     bases = set()
     commits = set()
-    queue: list[ObjectID] = []
+    queue: deque[ObjectID] = deque()
     queue.extend(heads)
 
     # Try to use commit graph if available
     commit_graph = store.get_commit_graph()
 
     while queue:
-        e = queue.pop(0)
+        e = queue.popleft()
         if e in common:
             bases.add(e)
         elif e not in commits:

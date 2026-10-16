@@ -4030,6 +4030,10 @@ def apply_stat_refresh(
     pairs for entries whose on-disk stat drifted but whose content still
     matches the index entry sha.
 
+    Only the stat fields are refreshed; the entry's flags (stage,
+    assume-valid) and extended flags (skip-worktree, intent-to-add) are
+    preserved.
+
     Returns True if any entries were updated (caller may want to write
     the index).
     """
@@ -4038,7 +4042,10 @@ def apply_stat_refresh(
         entry = index[tree_path]
         if isinstance(entry, ConflictedIndexEntry):
             continue
-        index[tree_path] = index_entry_from_stat(st, entry.sha, mode=entry.mode)
+        refreshed_entry = index_entry_from_stat(st, entry.sha, mode=entry.mode)
+        refreshed_entry.flags = entry.flags
+        refreshed_entry.extended_flags = entry.extended_flags
+        index[tree_path] = refreshed_entry
         updated = True
     return updated
 

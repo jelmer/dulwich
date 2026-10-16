@@ -45,7 +45,9 @@ from dulwich.diff_tree import (
     tree_changes,
 )
 from dulwich.index import (
+    EXTENDED_FLAG_INTEND_TO_ADD,
     EXTENDED_FLAG_SKIP_WORKTREE,
+    FLAG_VALID,
     SDIR_EXTENSION,
     ConflictedIndexEntry,
     Index,
@@ -1823,6 +1825,23 @@ class StatRefreshTests(TestCase):
         list(get_unstaged_changes(index, repo.path, refresh_stat=refresh))
         self.assertTrue(apply_stat_refresh(index, refresh))
         self.assertNotEqual(index[b"foo"].mtime, stale_mtime)
+
+    def test_apply_stat_refresh_preserves_flags(self) -> None:
+        repo, fullpath = self._make_repo_with_file()
+        index = repo.open_index()
+        entry = index[b"foo"]
+        assert isinstance(entry, IndexEntry)
+        entry.flags |= FLAG_VALID
+        entry.set_skip_worktree(True)
+        entry.extended_flags |= EXTENDED_FLAG_INTEND_TO_ADD
+        os.utime(fullpath, (0, 0))
+        st = os.lstat(fullpath)
+        self.assertTrue(apply_stat_refresh(index, [(b"foo", st)]))
+        refreshed = index[b"foo"]
+        assert isinstance(refreshed, IndexEntry)
+        self.assertEqual(refreshed.mtime, (0, 0))
+        self.assertEqual(refreshed.flags, entry.flags)
+        self.assertEqual(refreshed.extended_flags, entry.extended_flags)
 
     def test_apply_stat_refresh_empty(self) -> None:
         repo, _ = self._make_repo_with_file()

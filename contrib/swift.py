@@ -786,21 +786,16 @@ class SwiftObjectStore(PackBasedObjectStore):
         self.pack_dir = posixpath.join(OBJECTDIR, PACKDIR)
         self._alternates = None
 
-    def _update_pack_cache(self) -> list[Any]:
+    def _scan_pack_names(self) -> set[str]:
         objects = self.scon.get_container_objects()
         if objects is None:
-            return []
-        pack_files = [
-            o["name"].replace(".pack", "")
-            for o in objects
-            if o["name"].endswith(".pack")
-        ]
-        ret = []
-        for basename in pack_files:
-            pack = SwiftPack(basename, object_format=self.object_format, scon=self.scon)
-            self._pack_cache[basename] = pack
-            ret.append(pack)
-        return ret
+            return set()
+        return {
+            o["name"][: -len(".pack")] for o in objects if o["name"].endswith(".pack")
+        }
+
+    def _open_pack(self, name: str) -> Pack:
+        return SwiftPack(name, object_format=self.object_format, scon=self.scon)
 
     def _iter_loose_objects(self) -> Iterator[Any]:
         """Loose objects are not supported by this repository."""

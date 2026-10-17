@@ -38,10 +38,16 @@ from dulwich.errors import (
 from dulwich.object_filters import BlobNoneFilter
 from dulwich.object_store import MemoryObjectStore, find_shallow
 from dulwich.objects import Tree
-from dulwich.protocol import ZERO_SHA, format_capability_line
+from dulwich.protocol import (
+    CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT,
+    CAPABILITY_ALLOW_TIP_SHA1_IN_WANT,
+    ZERO_SHA,
+    format_capability_line,
+)
 from dulwich.repo import MemoryRepo, Repo
 from dulwich.server import (
     Backend,
+    BackendRepo,
     DictBackend,
     FileSystemBackend,
     MultiAckDetailedGraphWalkerImpl,
@@ -510,6 +516,184 @@ class ReceivePackHandlerTestCase(TestCase):
         # Verify hook declined the ref
         self.assertIsNotNone(ref_status)
         self.assertIn(b"update hook declined", ref_status)
+
+
+class UploadPackSHA1InWantTestCase(TestCase):
+    """Tests for the uploadpack.allow*SHA1InWant options."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        # 1---2---4    refs/heads/advertised
+        #  \
+        #   3---5      refs/heads/hidden
+        #
+        # SIX is in the object store, but no ref reaches it.
+        commits = [
+            make_commit(id=ONE, parents=[], commit_time=111),
+            make_commit(id=TWO, parents=[ONE], commit_time=222),
+            make_commit(id=THREE, parents=[ONE], commit_time=333),
+            make_commit(id=FOUR, parents=[TWO], commit_time=444),
+            make_commit(id=FIVE, parents=[THREE], commit_time=555),
+            make_commit(id=SIX, parents=[], commit_time=666),
+        ]
+        self._repo = MemoryRepo.init_bare(commits, {})
+        self._repo.refs._update(
+            {b"refs/heads/advertised": FOUR, b"refs/heads/hidden": FIVE}
+        )
+
+    def _handler(self, *allow: bytes) -> UploadPackHandler:
+        """Build a handler with the given uploadpack options enabled."""
+        config = self._repo.get_config()
+        for name in allow:
+            config.set((b"uploadpack",), name, b"true")
+        backend = DictBackend({b"/": self._repo})
+        return TestUploadPackHandler(backend, [b"/", b"host=lolcats"], TestProto())
+
+    def _allowed(self, handler: UploadPackHandler, sha: bytes) -> bool:
+        return sha in handler.allowed_wants({sha})
+
+    def test_disallowed_by_default(self) -> None:
+        handler = self._handler()
+        for sha in (ONE, TWO, THREE, FIVE, SIX):
+            self.assertFalse(self._allowed(handler, sha))
+
+    def test_allow_tip(self) -> None:
+        handler = self._handler(b"allowTipSHA1InWant")
+        # Tip of a ref that was never advertised to this client.
+        self.assertTrue(self._allowed(handler, FIVE))
+        # Reachable, but not the tip of any ref.
+        self.assertFalse(self._allowed(handler, TWO))
+        self.assertFalse(self._allowed(handler, SIX))
+
+    def test_annotated_tag_policy(self) -> None:
+        target = self._repo.object_store[SIX]
+        tag = make_tag(target, name=b"hidden-tag")
+        self._repo.object_store.add_object(tag)
+        outer_tag = make_tag(tag, name=b"outer-hidden-tag")
+        self._repo.object_store.add_object(outer_tag)
+        self._repo.refs[b"refs/tags/hidden"] = outer_tag.id
+
+        handler = self._handler(b"allowTipSHA1InWant")
+        self.assertTrue(self._allowed(handler, outer_tag.id))
+        self.assertFalse(self._allowed(handler, tag.id))
+        self.assertFalse(self._allowed(handler, SIX))
+
+        reachable_handler = self._handler(b"allowReachableSHA1InWant")
+        self.assertTrue(self._allowed(reachable_handler, outer_tag.id))
+        self.assertTrue(self._allowed(reachable_handler, tag.id))
+        self.assertTrue(self._allowed(reachable_handler, SIX))
+
+    def test_allow_reachable(self) -> None:
+        handler = self._handler(b"allowReachableSHA1InWant")
+        self.assertTrue(self._allowed(handler, FIVE))
+        for sha in (ONE, TWO, THREE):
+            self.assertTrue(self._allowed(handler, sha))
+        # Present, but not reachable from any ref.
+        self.assertFalse(self._allowed(handler, SIX))
+
+    def test_allow_any(self) -> None:
+        handler = self._handler(b"allowAnySHA1InWant")
+        self.assertTrue(self._allowed(handler, SIX))
+        # Objects that are not in the store at all are still refused.
+        self.assertFalse(self._allowed(handler, b"f" * 40))
+
+    def test_no_unadvertised_wants_does_not_enumerate_refs(self) -> None:
+        # Every want being advertised is the common case, and an enabled
+        # policy should cost it nothing.
+        handler = self._handler(b"allowTipSHA1InWant")
+        self._repo.get_refs = Mock(wraps=self._repo.get_refs)
+
+        self.assertEqual(set(), handler.allowed_wants(set()))
+        self._repo.get_refs.assert_not_called()
+
+    def test_capabilities(self) -> None:
+        self.assertNotIn(
+            CAPABILITY_ALLOW_TIP_SHA1_IN_WANT, self._handler().capabilities()
+        )
+
+        caps = self._handler(b"allowTipSHA1InWant").capabilities()
+        self.assertIn(CAPABILITY_ALLOW_TIP_SHA1_IN_WANT, caps)
+        self.assertNotIn(CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT, caps)
+
+    def test_capabilities_allow_any_implies_both(self) -> None:
+        caps = self._handler(b"allowAnySHA1InWant").capabilities()
+        self.assertIn(CAPABILITY_ALLOW_TIP_SHA1_IN_WANT, caps)
+        self.assertIn(CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT, caps)
+
+    def test_configless_backend_defaults_to_disabled(self) -> None:
+        class ConfiglessRepo(BackendRepo):
+            def __init__(self, repo):
+                self._repo = repo
+
+            @property
+            def object_store(self):
+                return self._repo.object_store
+
+            @property
+            def refs(self):
+                return self._repo.refs
+
+            @property
+            def object_format(self):
+                return self._repo.object_format
+
+            def get_refs(self):
+                return self.refs.as_dict()
+
+        backend = DictBackend({b"/": ConfiglessRepo(self._repo)})
+        handler = TestUploadPackHandler(backend, [b"/", b"host=lolcats"], TestProto())
+
+        caps = handler.capabilities()
+        self.assertNotIn(CAPABILITY_ALLOW_TIP_SHA1_IN_WANT, caps)
+        self.assertNotIn(CAPABILITY_ALLOW_REACHABLE_SHA1_IN_WANT, caps)
+        self.assertFalse(self._allowed(handler, FIVE))
+
+    def test_determine_wants_accepts_unadvertised(self) -> None:
+        handler = self._handler(b"allowAnySHA1InWant")
+        walker = _ProtocolGraphWalker(
+            handler,
+            self._repo.object_store,
+            self._repo.get_peeled,
+            self._repo.refs.get_symrefs,
+        )
+        walker.proto.set_output([b"want " + SIX + b" multi_ack", None])
+        self.assertEqual(
+            [SIX], walker.determine_wants({b"refs/heads/advertised": FOUR})
+        )
+
+    def test_determine_wants_deduplicates_and_batches_reachability(self) -> None:
+        handler = self._handler(b"allowReachableSHA1InWant")
+        reachable_wants = Mock(wraps=handler._reachable_wants)
+        handler._reachable_wants = reachable_wants
+        walker = _ProtocolGraphWalker(
+            handler,
+            self._repo.object_store,
+            self._repo.get_peeled,
+            self._repo.refs.get_symrefs,
+        )
+        walker.proto.set_output(
+            [b"want " + ONE + b" multi_ack", b"want " + ONE, b"want " + TWO, None]
+        )
+
+        self.assertEqual(
+            [ONE, TWO], walker.determine_wants({b"refs/heads/advertised": FOUR})
+        )
+        reachable_wants.assert_called_once()
+
+    def test_determine_wants_still_rejects_when_disabled(self) -> None:
+        handler = self._handler()
+        walker = _ProtocolGraphWalker(
+            handler,
+            self._repo.object_store,
+            self._repo.get_peeled,
+            self._repo.refs.get_symrefs,
+        )
+        walker.proto.set_output([b"want " + SIX + b" multi_ack", None])
+        self.assertRaises(
+            GitProtocolError,
+            walker.determine_wants,
+            {b"refs/heads/advertised": FOUR},
+        )
 
 
 class ProtocolGraphWalkerEmptyTestCase(TestCase):

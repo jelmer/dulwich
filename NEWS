@@ -9,6 +9,10 @@
    pack generation) is linear rather than O(n^2) in the number of commits.
    (Kartik Kenchi)
 
+ * Resolve the delta chains of a received thin pack from a memory mapping
+   in ``DiskObjectStore.add_thin_pack``, as ``add_pack`` already does,
+   rather than through one seek and file read per object. (Zainab Mehmut)
+
 1.2.18	2026-10-11
 
  * Add support for Python 3.15. (Jelmer Vernooĳ)

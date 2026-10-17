@@ -2777,8 +2777,7 @@ class DeltaChainIterator(Generic[T]):
                 include_comp=self._include_comp,
             )
         else:
-            # add_thin_pack may still be writing to this file, so it cannot be
-            # mapped up front; read through the file position instead.
+            # No mapping was set, see set_pack_data. Read through the file position.
             assert self._file is not None
             self._file.seek(offset)
             unpacked, _ = unpack_object(

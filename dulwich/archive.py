@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from .object_store import BaseObjectStore
     from .objects import TreeEntry
 
+from .attrs import AttrPatterns, match_path, parse_gitattributes_tree
 from .index import cleanup_mode
 from .objects import Blob, Tree
 
@@ -90,6 +91,19 @@ def _is_unsafe_archive_path(path: bytes) -> bool:
         if normalized in _INVALID_PATH_COMPONENTS:
             return True
     return False
+
+
+def _is_export_ignored(patterns: AttrPatterns, path: bytes, is_dir: bool) -> bool:
+    """Return True if ``path`` carries the ``export-ignore`` attribute.
+
+    A directory is matched both with and without a trailing slash, so that
+    either a ``dir`` or a ``dir/`` pattern applies to it.
+    """
+    candidates = (path, path + b"/") if is_dir else (path,)
+    return any(
+        match_path(patterns, candidate).get(b"export-ignore") is True
+        for candidate in candidates
+    )
 
 
 class ChunkedBytesIO:
@@ -186,7 +200,7 @@ def tar_stream(
             buf.write(struct.pack("<L", mtime))
             buf.seek(0, SEEK_END)
 
-        for entry_abspath, entry in _walk_tree(store, tree, prefix):
+        for entry_path, entry in _walk_tree(store, tree):
             assert entry.sha is not None
             try:
                 blob = store[entry.sha]
@@ -202,7 +216,9 @@ def tar_stream(
 
             info = tarfile.TarInfo()
             # tarfile only works with ascii.
-            info.name = entry_abspath.decode("utf-8", "surrogateescape")
+            info.name = posixpath.join(prefix, entry_path).decode(
+                "utf-8", "surrogateescape"
+            )
             info.size = blob.raw_length()
             assert entry.mode is not None
             # Canonicalize the tree-supplied mode the same way git's archive
@@ -223,25 +239,37 @@ def tar_stream(
 
 
 def _walk_tree(
-    store: "BaseObjectStore", tree: "Tree", root: bytes = b""
+    store: "BaseObjectStore",
+    tree: "Tree",
+    root: bytes = b"",
+    inherited: AttrPatterns = (),
 ) -> Generator[tuple[bytes, "TreeEntry"], None, None]:
-    """Recursively walk a dulwich Tree, yielding tuples of (absolute path, TreeEntry) along the way.
+    """Recursively walk a dulwich Tree, yielding tuples of (tree path, TreeEntry) along the way.
+
+    Entries carrying the ``export-ignore`` attribute from the tree's own
+    ``.gitattributes`` are skipped; an ignored directory is not descended into.
 
     Raises:
       UnsafeArchivePathError: if a tree entry's name is unsafe to emit into
         an archive (matches the spirit of git's ``verify_path`` /
         ``error: invalid path``).
     """
+    dir_patterns = parse_gitattributes_tree(store, tree, root)
+    # Later patterns win, so this directory's own file goes after its parents'.
+    patterns = [*inherited, *dir_patterns] if dir_patterns else inherited
     for entry in tree.iteritems():
         assert entry.path is not None
         if _is_unsafe_archive_path(entry.path):
             raise UnsafeArchivePathError(entry.path)
-        entry_abspath = posixpath.join(root, entry.path)
+        entry_path = posixpath.join(root, entry.path)
         assert entry.mode is not None
-        if stat.S_ISDIR(entry.mode):
+        is_dir = stat.S_ISDIR(entry.mode)
+        if patterns and _is_export_ignored(patterns, entry_path, is_dir):
+            continue
+        if is_dir:
             assert entry.sha is not None
             subtree = store[entry.sha]
             if isinstance(subtree, Tree):
-                yield from _walk_tree(store, subtree, entry_abspath)
+                yield from _walk_tree(store, subtree, entry_path, patterns)
         else:
-            yield (entry_abspath, entry)
+            yield (entry_path, entry)

@@ -23,6 +23,7 @@
 """Parse .gitattributes file."""
 
 __all__ = [
+    "AttrPatterns",
     "AttributeValue",
     "GitAttributes",
     "Pattern",
@@ -30,18 +31,24 @@ __all__ = [
     "match_path",
     "parse_git_attributes",
     "parse_gitattributes_file",
+    "parse_gitattributes_tree",
     "read_gitattributes",
 ]
 
 import errno
 import logging
 import os
+import posixpath
 import re
+import stat
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
+from io import BytesIO
 from itertools import chain
 from typing import IO
 
 from .file import open_nofollow_read
+from .object_store import BaseObjectStore
+from .objects import Blob, Tree
 from .wildmatch import MalformedPattern
 from .wildmatch import translate as translate_wildmatch
 
@@ -179,6 +186,11 @@ class Pattern:
         return bool(self._regex.match(path))
 
 
+# Compiled .gitattributes patterns, as returned by
+# compile_gitattributes_patterns.
+AttrPatterns = Sequence[tuple[Pattern, Mapping[bytes, AttributeValue]]]
+
+
 def match_path(
     patterns: Iterable[tuple[Pattern, Mapping[bytes, AttributeValue]]], path: bytes
 ) -> dict[bytes, AttributeValue]:
@@ -257,6 +269,42 @@ def parse_gitattributes_file(
 
     with open(filename, "rb") as f:
         return compile_gitattributes_patterns(parse_git_attributes(f), filename)
+
+
+def parse_gitattributes_tree(
+    store: BaseObjectStore, tree: Tree, base: bytes = b""
+) -> AttrPatterns:
+    """Read and compile the ``.gitattributes`` of one tree (directory).
+
+    A ``.gitattributes`` entry that is not a regular file is skipped. Patterns
+    are relative to the directory holding the file, so ``base`` is passed as
+    their base.
+
+    Args:
+        store: Object store to read the blob from
+        tree: Tree of the directory
+        base: Path of the directory relative to the repository root; empty
+          for the root itself
+
+    Returns:
+        Compiled patterns, empty if the tree has no readable
+        ``.gitattributes``
+    """
+    try:
+        mode, sha = tree[b".gitattributes"]
+    except KeyError:
+        return []
+    source = posixpath.join(base, b".gitattributes")
+    if not stat.S_ISREG(mode):
+        logger.debug("Ignoring %r: not a regular file", source)
+        return []
+    blob = store[sha]
+    if not isinstance(blob, Blob):
+        logger.warning("Ignoring %r: not a blob", source)
+        return []
+    return compile_gitattributes_patterns(
+        parse_git_attributes(BytesIO(blob.data)), source, base
+    )
 
 
 def read_gitattributes(

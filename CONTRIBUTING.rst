@@ -214,22 +214,41 @@ new pull requests on GitHub.
 
 See also Jelmer's [advice on getting your PRs merged](https://jelmer.uk/pages/pr-advice.html).
 
-AI slop
--------
+AI Usage
+--------
+
 AI slop is a major waste of maintainer time nowadays - it's very easy for
 contributors to create PRs with LLM tools with very little effort, and to then
 just have the LLM interact with the maintainers' code reviews.
 
-This adds no value - if I wanted to use a LLM I could just do so myself
-without a MITM, and give it review comments directly.
+This adds no value and actively hurts the ecosystem - if I wanted to use a LLM
+I could just do so myself without a MITM, and give it review comments directly.
 
-If you find a bug, please file a bug report - that is so much useful than
+If you find a bug, please file a clear bug report - that is so much useful than
 a rambling PR description that is clearly LLM-generated.
 
-So if you submit a PR of dubious quality that was obviously LLM-generated,
-expect it to be closed. This goes doubly for if you submit a burst of such
-PRs. This notably includes overly verbose and complex code, comments and
-PR descriptions.
+Rather than coming up with our own policy, we follow the
+excellent [attrs Generative AI / LLM Policy](https://github.com/python-attrs/attrs/blob/main/.github/AI_POLICY.md). In short:
+
+* We take the responsibility for this project very seriously and we expect you to take your responsibility for your contributions seriously, too. This used to be a given, but it changed now that a pull request is just one prompt away.
+
+* Every contribution has to be backed by a human who unequivocally owns the copyright for all changes. No LLM bots in Co-authored-by:s.
+
+* DoS-by-slop leads to a permanent ban.
+
+* Absolutely no unsupervised agentic tools like OpenClaw.
+
+Do not trigger bots like Copilot on this repository. GitHub won't let us block Copilot, but it's a great way to tell you didn't read this.
+
+By submitting a pull request, you certify that:
+
+* You are the author of the contribution or have the legal right to submit it.
+
+* You either hold the copyright to the changes or have explicit legal authorization to contribute them under this project's license.
+
+* You understand the code.
+
+* You accept full responsibility for it.
 
 Licensing
 ---------

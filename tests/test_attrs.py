@@ -328,6 +328,21 @@ class PatternTests(TestCase):
         self.assertFalse(pattern.match(b"foo/f.txt"))
         self.assertFalse(pattern.match(b"foo/sub/g.txt"))
 
+    def test_trailing_slash(self):
+        """A trailing slash only matches directories, at any depth."""
+        pattern = Pattern(b"build/")
+        self.assertTrue(pattern.match(b"build/"))
+        self.assertTrue(pattern.match(b"sub/build/"))
+        self.assertFalse(pattern.match(b"build"))
+        self.assertFalse(pattern.match(b"sub/build"))
+        self.assertFalse(pattern.match(b"build/out.o"))
+
+    def test_directory_path_without_trailing_slash_pattern(self):
+        """A pattern without a trailing slash also matches a directory."""
+        pattern = Pattern(b"build")
+        self.assertTrue(pattern.match(b"build"))
+        self.assertTrue(pattern.match(b"sub/build/"))
+
     def test_leading_slash(self):
         """Test pattern with leading slash."""
         pattern = Pattern(b"/README.txt")

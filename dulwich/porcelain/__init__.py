@@ -350,7 +350,7 @@ if TYPE_CHECKING:
     from ..maintenance import MaintenanceResult
     from ..merge import MergeConflictInfo
     from ..objects import RawObjectID
-from ..archive import tar_stream
+from ..archive import read_repo_attributes, tar_stream
 from ..bisect import BisectState
 from ..client import (
     FetchPackResult,
@@ -1218,7 +1218,16 @@ def archive(
         c = parse_commit(repo_obj, committish)
         tree = repo_obj.object_store[c.tree]
         assert isinstance(tree, Tree)
-        for chunk in tar_stream(repo_obj.object_store, tree, c.commit_time):
+        global_attributes, info_attributes = (
+            read_repo_attributes(repo_obj) if isinstance(repo_obj, Repo) else ((), ())
+        )
+        for chunk in tar_stream(
+            repo_obj.object_store,
+            tree,
+            c.commit_time,
+            global_attributes=global_attributes,
+            info_attributes=info_attributes,
+        ):
             outstream.write(chunk)
 
 

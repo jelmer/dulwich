@@ -87,7 +87,7 @@ if TYPE_CHECKING:
 
 from dulwich import log_utils
 
-from .archive import tar_stream
+from .archive import read_repo_attributes, tar_stream
 from .errors import (
     ApplyDeltaError,
     ChecksumMismatch,
@@ -1840,6 +1840,9 @@ class UploadArchiveHandler(Handler):
             i += 1
         if tree is None:
             raise GitProtocolError("upload-archive missing tree argument")
+        global_attributes, info_attributes = (
+            read_repo_attributes(self.repo) if isinstance(self.repo, Repo) else ((), ())
+        )
         self.proto.write_pkt_line(b"ACK")
         self.proto.write_pkt_line(None)
         for chunk in tar_stream(
@@ -1848,6 +1851,8 @@ class UploadArchiveHandler(Handler):
             mtime=int(time.time()),
             prefix=prefix,
             format=format,
+            global_attributes=global_attributes,
+            info_attributes=info_attributes,
         ):
             write(chunk)
         self.proto.write_pkt_line(None)

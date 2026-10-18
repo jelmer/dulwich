@@ -44,13 +44,15 @@ import stat
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from io import BytesIO
 from itertools import chain
-from typing import IO
+from typing import IO, TYPE_CHECKING
 
 from .file import open_nofollow_read
-from .object_store import BaseObjectStore
 from .objects import Blob, Tree
 from .wildmatch import MalformedPattern
 from .wildmatch import translate as translate_wildmatch
+
+if TYPE_CHECKING:
+    from .object_store import BaseObjectStore
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +124,9 @@ def _translate_pattern(pattern: bytes, base: bytes = b"") -> bytes:
     """Translate a gitattributes pattern to a regular expression.
 
     Similar to gitignore patterns, but simpler as gitattributes doesn't support
-    all the same features (e.g., no directory-only patterns with trailing /).
+    all the same features (e.g., no negated patterns). A trailing ``/`` should
+    already have been stripped; :class:`Pattern` handles directory-only
+    patterns itself.
 
     Args:
       pattern: The pattern to translate
@@ -158,12 +162,15 @@ class Pattern:
         """
         self.pattern = pattern
         self.base = base
+        # A trailing slash means the pattern only matches directories.
+        self.dir_only = pattern.endswith(b"/")
         self._regex: re.Pattern[bytes] | None = None
         self._compile()
 
     def _compile(self) -> None:
         """Compile the pattern to a regular expression."""
-        regex_pattern = _translate_pattern(self.pattern, self.base)
+        pattern = self.pattern[:-1] if self.dir_only else self.pattern
+        regex_pattern = _translate_pattern(pattern, self.base)
         # Add anchors
         regex_pattern = b"^" + regex_pattern + b"$"
         self._regex = re.compile(regex_pattern)
@@ -172,7 +179,8 @@ class Pattern:
         """Check if path matches this pattern.
 
         Args:
-            path: Path to check (relative to repository root, using / separators)
+            path: Path to check (relative to repository root, using / separators);
+              a directory is passed with a trailing slash
 
         Returns:
             True if path matches this pattern
@@ -180,6 +188,10 @@ class Pattern:
         # Normalize path
         if path.startswith(b"/"):
             path = path[1:]
+        if path.endswith(b"/"):
+            path = path[:-1]
+        elif self.dir_only:
+            return False
 
         # Try to match
         assert self._regex is not None  # Always set by _compile()
@@ -272,7 +284,7 @@ def parse_gitattributes_file(
 
 
 def parse_gitattributes_tree(
-    store: BaseObjectStore, tree: Tree, base: bytes = b""
+    store: "BaseObjectStore", tree: Tree, base: bytes = b""
 ) -> AttrPatterns:
     """Read and compile the ``.gitattributes`` of one tree (directory).
 
@@ -298,7 +310,11 @@ def parse_gitattributes_tree(
     if not stat.S_ISREG(mode):
         logger.debug("Ignoring %r: not a regular file", source)
         return []
-    blob = store[sha]
+    try:
+        blob = store[sha]
+    except KeyError:
+        logger.warning("Ignoring %r: object %s is missing", source, sha.decode("ascii"))
+        return []
     if not isinstance(blob, Blob):
         logger.warning("Ignoring %r: not a blob", source)
         return []

@@ -81,18 +81,54 @@ class WriteCommitPatchTests(TestCase):
         self.assertTrue(lines[2].startswith(b"Date: "))
         self.assertEqual(
             [
-                b"Subject: [PATCH 1/1] This is the first line\n",
-                b"And this is the second line.\n",
-                b"\n",
+                b"Subject: [PATCH 1/1] This is the first line"
+                b" And this is the second line.\n",
                 b"\n",
                 b"---\n",
             ],
-            lines[3:8],
+            lines[3:6],
         )
         self.assertEqual([b"CONTENTS-- \n", b"custom\n"], lines[-2:])
-        if len(lines) >= 12:
+        if len(lines) >= 10:
             # diffstat may not be present
-            self.assertEqual(lines[8], b" 0 files changed\n")
+            self.assertEqual(lines[6], b" 0 files changed\n")
+
+    def test_subject_body_split(self) -> None:
+        # A paragraph break splits the subject from the mail body, matching
+        # git format-patch.
+        f = BytesIO()
+        c = make_commit(
+            message=b"Summary line\n\nBody paragraph.\n",
+            tree=Tree().id,
+        )
+        write_commit_patch(f, c, b"CONTENTS", (1, 1), version="custom")
+        lines = f.getvalue().splitlines(keepends=True)
+        self.assertIn(b"Subject: [PATCH 1/1] Summary line\n", lines)
+        subject_idx = lines.index(b"Subject: [PATCH 1/1] Summary line\n")
+        self.assertEqual(
+            [b"\n", b"Body paragraph.\n", b"---\n"],
+            lines[subject_idx + 1 : subject_idx + 4],
+        )
+
+    def test_multiline_subject_does_not_inject_headers(self) -> None:
+        # The message's first paragraph is untrusted (it comes from a fetched
+        # commit); embedded newlines must not turn its lines into extra mail
+        # headers in the generated patch.
+        f = BytesIO()
+        c = make_commit(
+            message=b"Fix thing\nCc: victim@example.com\nBcc: secret@example.com\n",
+            tree=Tree().id,
+        )
+        write_commit_patch(f, c, b"CONTENTS", (1, 1), version="custom")
+        out = f.getvalue()
+        headers = out.split(b"\n\n", 1)[0]
+        self.assertNotIn(b"\nCc: victim@example.com", b"\n" + headers)
+        self.assertNotIn(b"\nBcc: secret@example.com", b"\n" + headers)
+        self.assertIn(
+            b"Subject: [PATCH 1/1] Fix thing Cc: victim@example.com"
+            b" Bcc: secret@example.com\n",
+            out,
+        )
 
 
 class ReadGitAmPatch(TestCase):

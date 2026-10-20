@@ -1,5 +1,9 @@
 1.2.19	UNRELEASED
 
+ * Split the interactive rebase todo list only on newlines, so a carriage
+   return or other line separator in a commit subject can no longer add an
+   instruction such as ``exec`` to the rebase. (Kartik Kenchi)
+
  * In ``update_working_tree``, leave a path alone when one of its leading
    directories has been replaced by a symlink, rather than following the
    symlink and removing a file outside the work tree. (Kartik Kenchi)

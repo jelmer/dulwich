@@ -353,7 +353,10 @@ class RebaseTodo:
             RebaseTodo instance
         """
         entries = []
-        for line in content.splitlines():
+        # Split on "\n" only. str.splitlines() also breaks on "\r" and other
+        # separators that can appear in a commit subject, which would turn
+        # the rest of that subject into a separate instruction.
+        for line in content.split("\n"):
             entry = RebaseTodoEntry.from_string(line)
             if entry:
                 entries.append(entry)

@@ -151,17 +151,9 @@ def write_commit_patch(
     f.write(
         b"Date: " + time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) + b"\n"
     )
-    # Git's format_subject folds the first paragraph of the message onto a
-    # single Subject line and writes the remaining paragraphs as the mail body.
-    # Keep the newline out of the Subject so a commit message from an untrusted
-    # branch cannot smuggle extra mail headers (e.g. Cc:/Bcc:) into the patch.
-    sep = commit.message.find(b"\n\n")
-    if sep == -1:
-        subject = commit.message
-        body = b""
-    else:
-        subject = commit.message[:sep]
-        body = commit.message[sep + 2 :]
+    # The first paragraph becomes the Subject, folded onto a single line; the
+    # rest of the message is written as the mail body.
+    subject, _, body = commit.message.partition(b"\n\n")
     subject = subject.replace(b"\n", b" ").strip()
     f.write((f"Subject: [PATCH {num}/{total}] ").encode(encoding) + subject + b"\n")
     f.write(b"\n")

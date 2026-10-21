@@ -10,8 +10,8 @@
    (Kartik Kenchi)
 
  * Fold the commit message's first paragraph onto a single ``Subject`` line
-   in ``write_commit_patch`` (``format-patch``), matching git, so a message
-   from an untrusted branch cannot inject extra mail headers. (Kartik Kenchi)
+   in ``write_commit_patch`` (``format-patch``), so later lines of the
+   message no longer end up in the mail headers. (Kartik Kenchi)
 
 1.2.18	2026-10-11
 

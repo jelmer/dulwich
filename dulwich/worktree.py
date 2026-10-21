@@ -395,10 +395,14 @@ class WorkTree:
         fs_paths = list(fs_paths)
 
         from .index import (
+            EXTENDED_FLAG_INTEND_TO_ADD,
+            FLAG_EXTENDED,
             _fs_to_tree_path,
             blob_from_path_and_stat,
+            cleanup_mode,
             index_entry_from_directory,
             index_entry_from_stat,
+            unchanged_entry_flags,
         )
 
         index = self._repo.open_index(config=config)
@@ -440,8 +444,16 @@ class WorkTree:
                     blob = blob_from_path_and_stat(full_path, st)
                     blob = blob_normalizer.checkin_normalize(blob, fs_path)
                     self._repo.object_store.add_object(blob)
+                    blob_id = ObjectID(blob.get_id(self._repo.object_format))
+                    flags, extended_flags = unchanged_entry_flags(
+                        index, tree_path, blob_id, cleanup_mode(st.st_mode)
+                    )
+                    # Staging the content ends any intent-to-add.
+                    extended_flags &= ~EXTENDED_FLAG_INTEND_TO_ADD
+                    if not extended_flags:
+                        flags &= ~FLAG_EXTENDED
                     index[tree_path] = index_entry_from_stat(
-                        st, ObjectID(blob.get_id(self._repo.object_format))
+                        st, blob_id, flags=flags, extended_flags=extended_flags
                     )
         index.write()
 

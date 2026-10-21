@@ -386,6 +386,7 @@ from ..index import (
     get_symlink_fn,
     get_unstaged_changes,
     index_entry_from_tree_entry,
+    unchanged_entry_flags,
     update_working_tree,
     validate_path,
 )
@@ -3256,7 +3257,7 @@ def reset(
             index = r.open_index(config=config)
             validate_path_element = get_path_element_validator(config)
 
-            # Clear the current index
+            old_entries = dict(index.items())
             index.clear()
 
             # Populate index from the target tree
@@ -3270,10 +3271,19 @@ def reset(
                 # outside the work tree.
                 if not validate_path(entry.path, validate_path_element):
                     raise InvalidPathError(entry.path)
+                flags, extended_flags = unchanged_entry_flags(
+                    old_entries, entry.path, entry.sha, entry.mode
+                )
                 # Use set_verbatim so case-differing tree entries aren't
                 # folded together under core.ignorecase.
                 index.set_verbatim(
-                    entry.path, index_entry_from_tree_entry(entry.mode, entry.sha)
+                    entry.path,
+                    index_entry_from_tree_entry(
+                        entry.mode,
+                        entry.sha,
+                        flags=flags,
+                        extended_flags=extended_flags,
+                    ),
                 )
 
             # Write the updated index
@@ -6425,7 +6435,12 @@ def restore(
                     from ..index import index_entry_from_stat
 
                     st = os.lstat(full_path)
-                    new_entry = index_entry_from_stat(st, sha, mode)
+                    flags, extended_flags = unchanged_entry_flags(
+                        index, tree_path, sha, mode
+                    )
+                    new_entry = index_entry_from_stat(
+                        st, sha, mode, flags=flags, extended_flags=extended_flags
+                    )
 
                 index[tree_path] = new_entry
                 index.write()

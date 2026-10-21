@@ -89,6 +89,7 @@ __all__ = [
     "read_submodule_head",
     "refresh_index",
     "symlink",
+    "unchanged_entry_flags",
     "update_working_tree",
     "validate_path",
     "validate_path_element_default",
@@ -1952,6 +1953,8 @@ def index_entry_from_stat(
     stat_val: os.stat_result,
     hex_sha: bytes,
     mode: int | None = None,
+    flags: int = 0,
+    extended_flags: int = 0,
 ) -> IndexEntry:
     """Create a new index entry from a stat value.
 
@@ -1959,6 +1962,8 @@ def index_entry_from_stat(
       stat_val: POSIX stat_result instance
       hex_sha: Hex sha of the object
       mode: Optional file mode, will be derived from stat if not provided
+      flags: Index entry flags
+      extended_flags: Index entry extended flags
     """
     if mode is None:
         mode = cleanup_mode(stat_val.st_mode)
@@ -1997,15 +2002,40 @@ def index_entry_from_stat(
         gid=stat_val.st_gid,
         size=stat_val.st_size,
         sha=ObjectID(hex_sha),
-        flags=0,
-        extended_flags=0,
+        flags=flags,
+        extended_flags=extended_flags,
     )
+
+
+def unchanged_entry_flags(
+    index: "Index | dict[bytes, IndexEntry | ConflictedIndexEntry]",
+    path: bytes,
+    hex_sha: bytes,
+    mode: int,
+) -> tuple[int, int]:
+    """Return the flags to carry over when replacing the index entry for path.
+
+    An entry keeps its flags (such as assume-unchanged or skip-worktree)
+    as long as its sha and mode stay the same.
+
+    Returns:
+      Tuple of (flags, extended_flags); zeros if there is no matching entry
+    """
+    try:
+        entry = index[path]
+    except KeyError:
+        return 0, 0
+    if isinstance(entry, IndexEntry) and entry.sha == hex_sha and entry.mode == mode:
+        return entry.flags, entry.extended_flags
+    return 0, 0
 
 
 def index_entry_from_tree_entry(
     mode: int,
     hex_sha: bytes,
     size: int = 0,
+    flags: int = 0,
+    extended_flags: int = 0,
 ) -> IndexEntry:
     """Create an index entry from a tree entry, with zeroed stat fields.
 
@@ -2018,6 +2048,8 @@ def index_entry_from_tree_entry(
       mode: File mode from the tree entry
       hex_sha: Hex sha of the object
       size: Size of the object (0 for gitlinks or when unknown)
+      flags: Index entry flags
+      extended_flags: Index entry extended flags
     """
     from dulwich.objects import ObjectID
 
@@ -2031,8 +2063,8 @@ def index_entry_from_tree_entry(
         gid=0,
         size=size,
         sha=ObjectID(hex_sha),
-        flags=0,
-        extended_flags=0,
+        flags=flags,
+        extended_flags=extended_flags,
     )
 
 
@@ -2928,8 +2960,11 @@ def _transition_to_submodule(
         ensure_submodule_placeholder(repo, path)
 
     st = os.lstat(full_path)
-    assert entry.sha is not None
-    index[path] = index_entry_from_stat(st, entry.sha)
+    assert entry.sha is not None and entry.mode is not None
+    flags, extended_flags = unchanged_entry_flags(index, path, entry.sha, entry.mode)
+    index[path] = index_entry_from_stat(
+        st, entry.sha, flags=flags, extended_flags=extended_flags
+    )
 
 
 def _transition_to_file(
@@ -2952,6 +2987,7 @@ def _transition_to_file(
     # Without core.filemode the working tree's executable bit is not
     # trusted, so record the tree's mode in the index like git does.
     index_mode = None if honor_filemode else entry.mode
+    flags, extended_flags = unchanged_entry_flags(index, path, entry.sha, entry.mode)
     # Check if we need to update
     if (
         current_stat is not None
@@ -2984,7 +3020,13 @@ def _transition_to_file(
     if not needs_update:
         # Just update index - current_stat should always be valid here since we're not updating
         assert current_stat is not None
-        index[path] = index_entry_from_stat(current_stat, entry.sha, mode=index_mode)
+        index[path] = index_entry_from_stat(
+            current_stat,
+            entry.sha,
+            mode=index_mode,
+            flags=flags,
+            extended_flags=extended_flags,
+        )
         return
 
     # Remove existing entry if needed
@@ -3027,7 +3069,9 @@ def _transition_to_file(
         tree_encoding=tree_encoding,
         symlink_fn=symlink_fn,
     )
-    index[path] = index_entry_from_stat(st, entry.sha, mode=index_mode)
+    index[path] = index_entry_from_stat(
+        st, entry.sha, mode=index_mode, flags=flags, extended_flags=extended_flags
+    )
 
 
 def _transition_to_absent(
@@ -3527,6 +3571,12 @@ def update_working_tree(
                     blob_normalizer,
                     tree_encoding,
                 )
+            if in_sparse_checkout is not None and in_sparse_checkout(path):
+                # The path is now checked out, so a skip-worktree bit kept
+                # from the old entry no longer applies.
+                checked_out = index[path]
+                assert isinstance(checked_out, IndexEntry)
+                checked_out.set_skip_worktree(False)
 
     index.write()
 
@@ -4038,7 +4088,13 @@ def apply_stat_refresh(
         entry = index[tree_path]
         if isinstance(entry, ConflictedIndexEntry):
             continue
-        index[tree_path] = index_entry_from_stat(st, entry.sha, mode=entry.mode)
+        index[tree_path] = index_entry_from_stat(
+            st,
+            entry.sha,
+            mode=entry.mode,
+            flags=entry.flags,
+            extended_flags=entry.extended_flags,
+        )
         updated = True
     return updated
 

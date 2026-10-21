@@ -42,6 +42,7 @@ from .index import (
     get_symlink_fn,
     index_entry_from_stat,
     iter_fresh_objects,
+    unchanged_entry_flags,
     update_working_tree,
     validate_path,
     verify_tree_path,
@@ -202,10 +203,19 @@ class Stash:
                 except FileNotFoundError:
                     # File doesn't exist yet, use dummy stats
                     st = os.stat_result((tree_entry.mode, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+                flags, extended_flags = unchanged_entry_flags(
+                    repo_index, tree_entry.path, tree_entry.sha, tree_entry.mode
+                )
                 # Tree paths are authoritative; use set_verbatim so
                 # case-differing entries aren't folded together.
                 repo_index.set_verbatim(
-                    tree_entry.path, index_entry_from_stat(st, tree_entry.sha)
+                    tree_entry.path,
+                    index_entry_from_stat(
+                        st,
+                        tree_entry.sha,
+                        flags=flags,
+                        extended_flags=extended_flags,
+                    ),
                 )
 
         # Apply working tree changes from the stash
@@ -266,7 +276,10 @@ class Stash:
                 ):
                     # Update with file stats from disk
                     repo_index[tree_entry2.path] = index_entry_from_stat(
-                        st, tree_entry2.sha
+                        st,
+                        tree_entry2.sha,
+                        flags=existing_entry.flags,
+                        extended_flags=existing_entry.extended_flags,
                     )
 
         # Write the updated index

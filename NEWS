@@ -1,5 +1,10 @@
 1.2.19	UNRELEASED
 
+ * Keep the assume-unchanged flag (and other index flags) on entries
+   whose content does not change, rather than clearing it when ``status``
+   refreshes the stat cache or on reset, checkout, restore, stash pop and
+   add. (Jelmer Vernooĳ)
+
  * Split the interactive rebase todo list only on newlines, so a carriage
    return or other line separator in a commit subject can no longer add an
    instruction such as ``exec`` to the rebase. (Kartik Kenchi)

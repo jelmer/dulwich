@@ -2265,7 +2265,10 @@ class TraditionalGitClient(GitClient):
         ):
             raise ValueError(f"unknown Git protocol version {protocol_version}")
         proto, can_read, stderr = self._connect(b"upload-pack", path, protocol_version)
-        server_protocol_version = negotiate_protocol_version(proto)
+        try:
+            server_protocol_version = negotiate_protocol_version(proto)
+        except HangupException as exc:
+            raise _remote_error_from_stderr(stderr) from exc
         if server_protocol_version not in GIT_PROTOCOL_VERSIONS:
             raise ValueError(
                 f"unknown Git protocol version {server_protocol_version} used by server"
@@ -2413,7 +2416,10 @@ class TraditionalGitClient(GitClient):
         ):
             raise ValueError(f"unknown Git protocol version {protocol_version}")
         proto, _, stderr = self._connect(b"upload-pack", path, protocol_version)
-        server_protocol_version = negotiate_protocol_version(proto)
+        try:
+            server_protocol_version = negotiate_protocol_version(proto)
+        except HangupException as exc:
+            raise _remote_error_from_stderr(stderr) from exc
         if server_protocol_version not in GIT_PROTOCOL_VERSIONS:
             raise ValueError(
                 f"unknown Git protocol version {server_protocol_version} used by server"

@@ -3765,6 +3765,51 @@ And this line is just random noise, too.
         )
 
 
+class ProtocolNegotiationHangupTests(TestCase):
+    """Hangups while negotiating the protocol version must keep stderr.
+
+    Before the version was negotiated inside the wrapper that converts a
+    ``HangupException`` into a remote error, an ssh server that rejected the
+    connection before sending anything surfaced as a bare hangup and its
+    diagnostic (for example a rejected public key) was dropped.
+    """
+
+    class HangingClient(TraditionalGitClient):
+        def __init__(self, stderr: bytes) -> None:
+            super().__init__()
+            self._stderr = stderr
+
+        def _connect(self, service, path, protocol_version=None):
+            return (
+                Protocol(BytesIO(b"").read, lambda data: None),
+                lambda: False,
+                BytesIO(self._stderr),
+            )
+
+    def test_fetch_pack_reports_stderr(self) -> None:
+        client = self.HangingClient(b"Permission denied (publickey).\n")
+        with self.assertRaises(HangupException) as raised:
+            client.fetch_pack(b"/repo", lambda refs: [], None, lambda data: None)
+        self.assertEqual(
+            raised.exception.stderr_lines, [b"Permission denied (publickey)."]
+        )
+        self.assertEqual(str(raised.exception), "Permission denied (publickey).")
+
+    def test_get_refs_reports_stderr(self) -> None:
+        client = self.HangingClient(b"Permission denied (publickey).\n")
+        with self.assertRaises(HangupException) as raised:
+            client.get_refs(b"/repo")
+        self.assertEqual(
+            raised.exception.stderr_lines, [b"Permission denied (publickey)."]
+        )
+
+    def test_get_refs_turns_error_line_into_protocol_error(self) -> None:
+        client = self.HangingClient(b"ERROR: no such repository\n")
+        with self.assertRaises(GitProtocolError) as raised:
+            client.get_refs(b"/repo")
+        self.assertEqual(str(raised.exception), "no such repository")
+
+
 class TestExtractAgentAndSymrefs(TestCase):
     def test_extract_agent_and_symrefs(self) -> None:
         (symrefs, agent) = _extract_symrefs_and_agent(

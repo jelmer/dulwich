@@ -28,7 +28,12 @@ import tempfile
 from unittest import skipIf
 
 from dulwich.errors import CommitError
-from dulwich.index import InvalidPathError
+from dulwich.index import (
+    EXTENDED_FLAG_INTEND_TO_ADD,
+    FLAG_EXTENDED,
+    FLAG_VALID,
+    InvalidPathError,
+)
 from dulwich.index import get_unstaged_changes as _get_unstaged_changes
 from dulwich.object_store import tree_lookup_path
 from dulwich.objects import Blob, Tree
@@ -147,6 +152,38 @@ class WorkTreeStagingTests(WorkTreeTestCase):
         self.worktree.stage(["a"])
         self.worktree.stage(["a"])  # double-stage a deleted path
         self.assertEqual([], list(r.open_index()))
+
+    def test_stage_keeps_flags_of_unchanged_entry(self):
+        index = self.repo.open_index()
+        index[b"a"].flags |= FLAG_VALID
+        index.write()
+        os.utime(os.path.join(self.test_dir, "a"), (0, 0))
+        self.worktree.stage(["a"])
+        entry = self.repo.open_index()[b"a"]
+        self.assertEqual((0, 0), entry.mtime)
+        self.assertEqual(FLAG_VALID, entry.flags)
+
+    def test_stage_drops_flags_of_changed_entry(self):
+        index = self.repo.open_index()
+        index[b"a"].flags |= FLAG_VALID
+        index.write()
+        with open(os.path.join(self.test_dir, "a"), "wb") as f:
+            f.write(b"new contents")
+        self.worktree.stage(["a"])
+        self.assertEqual(0, self.repo.open_index()[b"a"].flags)
+
+    def test_stage_clears_intent_to_add(self):
+        with open(os.path.join(self.test_dir, "a"), "wb") as f:
+            f.write(b"")
+        self.worktree.stage(["a"])
+        index = self.repo.open_index()
+        index[b"a"].flags |= FLAG_EXTENDED
+        index[b"a"].extended_flags |= EXTENDED_FLAG_INTEND_TO_ADD
+        index.write()
+        self.worktree.stage(["a"])
+        entry = self.repo.open_index()[b"a"]
+        self.assertEqual(0, entry.flags)
+        self.assertEqual(0, entry.extended_flags)
 
     def test_stage_directory(self):
         """Test staging a directory."""

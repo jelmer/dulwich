@@ -41,7 +41,6 @@ import logging
 import os
 import stat
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import replace
 from typing import Any
 
 from dulwich.index import (
@@ -679,8 +678,10 @@ def lfs_pull(
 
             # Like git-lfs, refresh the stat information so the file does not
             # show up as modified
-            index[path] = replace(
-                index_entry_from_stat(os.lstat(full_path), entry.sha, entry.mode),
+            index[path] = index_entry_from_stat(
+                os.lstat(full_path),
+                entry.sha,
+                entry.mode,
                 flags=entry.flags,
                 extended_flags=entry.extended_flags,
             )

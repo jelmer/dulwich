@@ -49,6 +49,7 @@ from dulwich.commit_graph import read_commit_graph
 from dulwich.diff_tree import TreeChange, tree_changes
 from dulwich.errors import CommitError, NoIndexPresent, WorkingTreeModifiedError
 from dulwich.index import (
+    FLAG_VALID,
     ConflictedIndexEntry,
     Index,
     IndexEntry,
@@ -4528,6 +4529,37 @@ class ResetTests(PorcelainTestCase):
         with open(fullpath) as f:
             self.assertEqual(f.read(), "MODIFIED")
 
+    def test_mixed_reset_keeps_flags_of_unchanged_entries(self) -> None:
+        for name in ["same", "changed"]:
+            with open(os.path.join(self.repo.path, name), "w") as f:
+                f.write("one")
+        porcelain.add(self.repo.path, paths=["same", "changed"])
+        first_sha = porcelain.commit(
+            self.repo.path,
+            message=b"First commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        with open(os.path.join(self.repo.path, "changed"), "w") as f:
+            f.write("two")
+        porcelain.add(self.repo.path, paths=["changed"])
+        porcelain.commit(
+            self.repo.path,
+            message=b"Second commit",
+            committer=b"Jane <jane@example.com>",
+            author=b"John <john@example.com>",
+        )
+        index = self.repo.open_index()
+        index[b"same"].flags |= FLAG_VALID
+        index[b"changed"].flags |= FLAG_VALID
+        index.write()
+
+        porcelain.reset(self.repo, "mixed", first_sha)
+
+        index = self.repo.open_index()
+        self.assertEqual(FLAG_VALID, index[b"same"].flags)
+        self.assertEqual(0, index[b"changed"].flags)
+
     def test_mixed_reset_preserves_case_differing_entries(self) -> None:
         # Build a commit whose tree holds two blobs whose paths only differ
         # by case. Real git creates these in a case-insensitive repo via
@@ -5720,6 +5752,17 @@ class RestoreTests(PorcelainTestCase):
         # Verify nothing is staged
         status = list(porcelain.status(self.repo))
         self.assertEqual([{"add": [], "delete": [], "modify": []}, [], []], status)
+
+    def test_restore_both_keeps_flags_of_unchanged_entry(self) -> None:
+        index = self.repo.open_index()
+        index[b"foo"].flags |= FLAG_VALID
+        index.write()
+        with open(self._foo_path, "w") as f:
+            f.write("worktree\n")
+
+        porcelain.restore(self.repo, paths=["foo"], staged=True, worktree=True)
+
+        self.assertEqual(FLAG_VALID, self.repo.open_index()[b"foo"].flags)
 
     def test_restore_nonexistent_path(self) -> None:
         with self.assertRaises(porcelain.CheckoutError):

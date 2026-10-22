@@ -1,4 +1,4 @@
-1.2.19	UNRELEASED
+1.2.19	2026-10-22
 
  * Keep the assume-unchanged flag (and other index flags) on entries
    whose content does not change, rather than clearing it when ``status``

@@ -1,3 +1,10 @@
+1.2.20	UNRELEASED
+
+ * Refuse to update refs outside ``refs/`` (such as ``HEAD``) in
+   ``receive-pack``, reporting ``funny refname`` like git. Pushing to
+   ``HEAD`` moved the branch it points at while hooks only saw ``HEAD``.
+   (Kartik Kenchi)
+
 1.2.19	2026-10-22
 
  * Keep the assume-unchanged flag (and other index flags) on entries

@@ -1521,6 +1521,15 @@ class ReceivePackHandler(PackHandler):
             for oldsha, sha, ref in refs:
                 ref_status = b"ok"
 
+                # Like git, only allow updating refs under refs/. Pushing to
+                # e.g. HEAD would update the branch it points at while hooks
+                # only see "HEAD".
+                if not ref.startswith(b"refs/"):
+                    ref_status = b"funny refname"
+                    has_failure = True
+                    ref_results.append((ref, ref_status))
+                    continue
+
                 hook_error = self._on_update(ref, oldsha, sha)
                 if hook_error:
                     ref_status = hook_error
@@ -1568,6 +1577,10 @@ class ReceivePackHandler(PackHandler):
         else:
             for oldsha, sha, ref in refs:
                 ref_status = b"ok"
+
+                if not ref.startswith(b"refs/"):
+                    yield (ref, b"funny refname")
+                    continue
 
                 # Run update hook for this ref
                 hook_error = self._on_update(ref, oldsha, sha)

@@ -38,6 +38,7 @@ from dulwich.errors import (
 from dulwich.object_filters import BlobNoneFilter
 from dulwich.object_store import MemoryObjectStore, find_shallow
 from dulwich.objects import Tree
+from dulwich.pack import write_pack_objects
 from dulwich.protocol import ZERO_SHA, format_capability_line
 from dulwich.repo import MemoryRepo, Repo
 from dulwich.server import (
@@ -387,6 +388,35 @@ class ReceivePackHandlerTestCase(TestCase):
         self.assertEqual(status[0][1], b"ok")
         self.assertEqual(status[1][0], b"refs/heads/fake-branch")
         self.assertEqual(status[1][1], b"ok")
+
+    def _push_through_head(self, caps: list[bytes]) -> list[tuple[bytes, bytes]]:
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path)
+        repo = Repo.init_bare(path)
+        self.addCleanup(repo.close)
+        c1 = make_commit()
+        c2 = make_commit(parents=[c1.id])
+        repo.object_store.add_objects([(c1, None), (c2, None)])
+        repo.refs[b"refs/heads/master"] = c1.id
+        pack = BytesIO()
+        write_pack_objects(pack.write, [], object_format=repo.object_format)
+        pack.seek(0)
+        proto = TestProto()
+        proto.read = pack.read  # type: ignore[attr-defined]
+        handler = ReceivePackHandler(DictBackend({b"/": repo}), [b"/"], proto)
+        handler.set_client_capabilities(caps)
+        status = list(handler._apply_pack([(c1.id, c2.id, b"HEAD")]))
+        self.assertEqual(c1.id, repo.refs[b"refs/heads/master"])
+        return status
+
+    def test_apply_pack_refuses_head(self) -> None:
+        """Like git, refs outside refs/ cannot be updated by a push."""
+        status = self._push_through_head([])
+        self.assertEqual([(b"unpack", b"ok"), (b"HEAD", b"funny refname")], status)
+
+    def test_apply_pack_atomic_refuses_head(self) -> None:
+        status = self._push_through_head([b"atomic"])
+        self.assertEqual([(b"unpack", b"ok"), (b"HEAD", b"funny refname")], status)
 
     def test_handle_invalid_ref_line(self) -> None:
         """A ref-update line without three fields is rejected, not crashed on."""

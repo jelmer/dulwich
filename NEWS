@@ -13,6 +13,8 @@
    removed, rather than a re-serialization, and read and write SHA-256 commit
    signatures in the ``gpgsig-sha256`` header. (Jelmer Vernooĳ)
 
+ * Refuse to check out ``.gitmodules`` as a symlink. (Kartik Kenchi)
+
 1.2.19	2026-10-22
 
  * Keep the assume-unchanged flag (and other index flags) on entries

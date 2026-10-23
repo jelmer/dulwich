@@ -1,3 +1,9 @@
+1.2.20	UNRELEASED
+
+ * Add ``PySequoiaSignatureVendor``, which signs and verifies OpenPGP
+   signatures with pysequoia using explicitly provided keys rather than
+   a GnuPG keyring. (Jelmer Vernooĳ)
+
 1.2.19	2026-10-22
 
  * Keep the assume-unchanged flag (and other index flags) on entries

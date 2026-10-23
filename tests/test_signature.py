@@ -38,6 +38,7 @@ from dulwich.signature import (
     BadSignature,
     GPGCliSignatureVendor,
     GPGSignatureVendor,
+    PySequoiaSignatureVendor,
     SSHCliSignatureVendor,
     SSHSigSignatureVendor,
     UntrustedSignature,
@@ -51,6 +52,11 @@ try:
     import gpg
 except ImportError:
     gpg = None
+
+try:
+    import pysequoia
+except ImportError:
+    pysequoia = None
 
 
 def get_valid_gpg_key() -> str | None:
@@ -366,6 +372,96 @@ class KeyIDMatchingTests(unittest.TestCase):
         stderr = b"gpgsm: Good signature from CN = DEADBEEF1234\n"
         with self.assertRaises(UntrustedSignature):
             self._run_with_status(vendor, status, stderr=stderr)
+
+
+@unittest.skipIf(pysequoia is None, "pysequoia not available")
+class PySequoiaSignatureVendorTests(unittest.TestCase):
+    """Tests for PySequoiaSignatureVendor."""
+
+    alice: "pysequoia.Tsk"
+    bob: "pysequoia.Tsk"
+    alice_fpr: str
+    bob_fpr: str
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.alice = pysequoia.Tsk.generate("Alice <alice@example.com>")
+        cls.bob = pysequoia.Tsk.generate("Bob <bob@example.com>")
+        cls.alice_fpr = cls.alice.extract_certificate().fingerprint
+        cls.bob_fpr = cls.bob.extract_certificate().fingerprint
+
+    def test_available(self) -> None:
+        self.assertTrue(PySequoiaSignatureVendor.available())
+
+    def test_sign_and_verify(self) -> None:
+        vendor = PySequoiaSignatureVendor(secret_keys=[self.alice])
+        signature = vendor.sign(b"test data")
+        self.assertTrue(signature.startswith(b"-----BEGIN PGP SIGNATURE-----"))
+        vendor.verify(b"test data", signature)
+
+    def test_verify_with_cert_only(self) -> None:
+        signature = PySequoiaSignatureVendor(secret_keys=[self.alice]).sign(
+            b"test data"
+        )
+        vendor = PySequoiaSignatureVendor(certs=[self.alice.extract_certificate()])
+        vendor.verify(b"test data", signature)
+
+    def test_verify_modified_data(self) -> None:
+        vendor = PySequoiaSignatureVendor(secret_keys=[self.alice])
+        signature = vendor.sign(b"test data")
+        with self.assertRaises(BadSignature):
+            vendor.verify(b"other data", signature)
+
+    def test_verify_unknown_cert(self) -> None:
+        signature = PySequoiaSignatureVendor(secret_keys=[self.alice]).sign(
+            b"test data"
+        )
+        vendor = PySequoiaSignatureVendor(certs=[self.bob.extract_certificate()])
+        with self.assertRaises(BadSignature):
+            vendor.verify(b"test data", signature)
+
+    def test_verify_invalid_signature(self) -> None:
+        vendor = PySequoiaSignatureVendor(secret_keys=[self.alice])
+        with self.assertRaises(BadSignature):
+            vendor.verify(b"test data", b"this is not a valid signature")
+
+    def test_sign_with_keyid(self) -> None:
+        vendor = PySequoiaSignatureVendor(secret_keys=[self.alice, self.bob])
+        signature = vendor.sign(b"test data", keyid=self.bob_fpr[-16:])
+        PySequoiaSignatureVendor(
+            certs=[self.bob.extract_certificate()], keyids=[self.bob_fpr]
+        ).verify(b"test data", signature)
+
+    def test_sign_unknown_keyid(self) -> None:
+        vendor = PySequoiaSignatureVendor(secret_keys=[self.alice])
+        with self.assertRaises(ValueError):
+            vendor.sign(b"test data", keyid=self.bob_fpr)
+
+    def test_sign_without_secret_keys(self) -> None:
+        vendor = PySequoiaSignatureVendor()
+        with self.assertRaises(ValueError):
+            vendor.sign(b"test data")
+
+    def test_verify_trusted_keyid(self) -> None:
+        signature = PySequoiaSignatureVendor(secret_keys=[self.alice]).sign(
+            b"test data"
+        )
+        vendor = PySequoiaSignatureVendor(
+            secret_keys=[self.alice], keyids=[self.alice_fpr.upper()]
+        )
+        vendor.verify(b"test data", signature)
+
+    def test_verify_untrusted_keyid(self) -> None:
+        signature = PySequoiaSignatureVendor(secret_keys=[self.alice]).sign(
+            b"test data"
+        )
+        vendor = PySequoiaSignatureVendor(
+            secret_keys=[self.alice, self.bob], keyids=[self.bob_fpr]
+        )
+        with self.assertRaises(UntrustedSignature) as cm:
+            vendor.verify(b"test data", signature)
+        self.assertEqual([self.bob_fpr], cm.exception.trusted_keys)
+        self.assertIn(self.alice_fpr, cm.exception.signing_keys)
 
 
 class X509SignatureVendorTests(unittest.TestCase):

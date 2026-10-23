@@ -1,5 +1,9 @@
 1.2.20	UNRELEASED
 
+ * Validate object ids in LFS server batch requests. An absolute path or
+   ``..`` in the ``oid`` let a client probe for the existence of any file
+   readable by the server. Reported by @JMak-Security. (Jelmer Vernooĳ)
+
  * Add ``PySequoiaSignatureVendor``, which signs and verifies OpenPGP
    signatures with pysequoia using explicitly provided keys rather than
    a GnuPG keyring. (Jelmer Vernooĳ)

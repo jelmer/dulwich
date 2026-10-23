@@ -109,7 +109,7 @@ from .errors import (
     ObjectFormatException,
 )
 from .file import GitFile
-from .object_format import DEFAULT_OBJECT_FORMAT, ObjectFormat
+from .object_format import DEFAULT_OBJECT_FORMAT, SHA256, ObjectFormat
 
 if TYPE_CHECKING:
     from _hashlib import HASH
@@ -127,6 +127,7 @@ _COMMITTER_HEADER = b"committer"
 _ENCODING_HEADER = b"encoding"
 _MERGETAG_HEADER = b"mergetag"
 _GPGSIG_HEADER = b"gpgsig"
+_GPGSIG_SHA256_HEADER = b"gpgsig-sha256"
 
 # Header fields for objects
 _OBJECT_HEADER = b"object"
@@ -883,7 +884,12 @@ class ShaFile:
         obj_class = object_class(self.type_num)
         if obj_class is None:
             raise AssertionError(f"invalid type num {self.type_num}")
-        return obj_class.from_raw_string(self.type_num, self.as_raw_string(), self.id)
+        return obj_class.from_raw_string(
+            self.type_num,
+            self.as_raw_string(),
+            self.id,
+            object_format=self.object_format,
+        )
 
     @property
     def id(self) -> ObjectID:
@@ -1924,15 +1930,18 @@ def _parse_commit(
     parse_ident: Callable[
         [bytes], tuple[bytes, int | None, tuple[int | None, bool]]
     ] = parse_time_entry,
+    signature_header: bytes = _GPGSIG_HEADER,
 ) -> _CommitParseResult:
     """Parse a commit object from chunks.
 
     Where a header is repeated, the first tree, author, committer and
     encoding are used, and only the parents directly following the tree.
+    Repeated signature headers are concatenated.
 
     Args:
       chunks: Chunks to parse
       parse_ident: Function to parse author and committer lines
+      signature_header: Name of the signature header for the hash algorithm
     Returns: Tuple of (tree, parents, author_info, commit_info,
         encoding, mergetag, gpgsig, message, extra)
     """
@@ -1944,7 +1953,7 @@ def _parse_commit(
     encoding = None
     mergetag = []
     message = None
-    gpgsig = None
+    signatures = []
 
     # Parents are the run of parent lines immediately following the tree;
     # any other header, including a second tree, ends the run.
@@ -1988,8 +1997,10 @@ def _parse_commit(
                 extra.append((field, value))
             else:
                 mergetag.append(tag)
-        elif field == _GPGSIG_HEADER:
-            gpgsig = value
+        elif field == signature_header:
+            if value is None:
+                raise ObjectFormatException("missing signature value")
+            signatures.append(value)
         elif field is None:
             message = value
         else:
@@ -2008,13 +2019,49 @@ def _parse_commit(
         parse_ident(committer) if committer is not None else no_ident,
         encoding,
         mergetag,
-        gpgsig,
+        b"\n".join(signatures) if signatures else None,
         message,
         extra,
     )
 
 
-def _parse_commit_broken(chunks: Iterable[bytes]) -> _CommitParseResult:
+def _signature_header(object_format: ObjectFormat) -> bytes:
+    if object_format == SHA256:
+        return _GPGSIG_SHA256_HEADER
+    return _GPGSIG_HEADER
+
+
+def _strip_signature_headers(raw: bytes) -> bytes:
+    """Return the commit payload covered by a signature.
+
+    This drops every header starting with "gpgsig" (both ``gpgsig`` and
+    ``gpgsig-sha256``) along with their continuation lines.
+    """
+    payload = []
+    in_header = False
+    start = 0
+    while start < len(raw):
+        end = raw.find(b"\n", start) + 1
+        if end == 0:
+            end = len(raw)
+        if in_header and raw.startswith(b" ", start):
+            pass
+        elif raw.startswith(b"gpgsig", start):
+            in_header = True
+        elif raw.startswith(b"\n", start):
+            payload.append(raw[start:])
+            break
+        else:
+            in_header = False
+            payload.append(raw[start:end])
+        start = end
+    return b"".join(payload)
+
+
+def _parse_commit_broken(
+    chunks: Iterable[bytes],
+    signature_header: bytes = _GPGSIG_HEADER,
+) -> _CommitParseResult:
     """Parse a commit object from chunks, accepting broken formats.
 
     This function handles various broken author/committer line formats:
@@ -2024,10 +2071,11 @@ def _parse_commit_broken(chunks: Iterable[bytes]) -> _CommitParseResult:
 
     Args:
       chunks: Chunks to parse
+      signature_header: Name of the signature header for the hash algorithm
     Returns: Tuple of (tree, parents, author_info, commit_info,
         encoding, mergetag, gpgsig, message, extra)
     """
-    return _parse_commit(chunks, parse_time_entry_broken)
+    return _parse_commit(chunks, parse_time_entry_broken, signature_header)
 
 
 class Commit(ShaFile):
@@ -2106,7 +2154,9 @@ class Commit(ShaFile):
             gpgsig,
             message,
             extra,
-        ) = _parse_commit(chunks)
+        ) = _parse_commit(
+            chunks, signature_header=_signature_header(self.object_format)
+        )
 
         self._tree = tree
         self._parents = [ObjectID(p) for p in parents]
@@ -2183,11 +2233,7 @@ class Commit(ShaFile):
 
         self.gpgsig is a signature for the returned raw byte string serialization.
         """
-        tmp = self.copy()
-        assert isinstance(tmp, Commit)
-        tmp._gpgsig = None
-        tmp.gpgsig = None
-        return tmp.as_raw_string()
+        return _strip_signature_headers(self.as_raw_string())
 
     def extract_signature(self) -> tuple[bytes, bytes | None, bytes | None]:
         """Extract the payload, signature, and signature type from this commit.
@@ -2260,7 +2306,7 @@ class Commit(ShaFile):
             (field, value) for field, value in self._extra if value is not None
         )
         if self.gpgsig:
-            headers.append((_GPGSIG_HEADER, self.gpgsig))
+            headers.append((_signature_header(self.object_format), self.gpgsig))
         return list(_format_message(headers, self._message))
 
     tree = serializable_property("tree", "Tree that is the state of this commit")

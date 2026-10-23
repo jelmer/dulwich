@@ -9,6 +9,8 @@
    different tree than git does. Commits and tags that git refuses to parse
    are now rejected, and unknown tag headers are preserved. (Jelmer Vernooĳ)
 
+ * Refuse to check out ``.gitmodules`` as a symlink. (Kartik Kenchi)
+
 1.2.19	2026-10-22
 
  * Keep the assume-unchanged flag (and other index flags) on entries

@@ -1004,6 +1004,30 @@ class BuildIndexTests(TestCase):
             # Nothing was written through the symlink to the outside path.
             self.assertFalse(os.path.exists(outside_file))
 
+    @skipIf(not can_symlink(), "Requires symlink support")
+    def test_symlinked_gitmodules_refused(self) -> None:
+        # Refused at any depth and regardless of case.
+        for name in [b".gitmodules", b"sub/.GitModules"]:
+            repo_dir = tempfile.mkdtemp()
+            self.addCleanup(shutil.rmtree, repo_dir)
+            with Repo.init(repo_dir) as repo:
+                link = Blob.from_string(b"/etc/passwd")
+                tree = Tree()
+                tree[name] = (stat.S_IFLNK, link.id)
+                repo.object_store.add_objects([(o, None) for o in [link, tree]])
+
+                self.assertRaises(
+                    InvalidPathError,
+                    build_index_from_tree,
+                    repo.path,
+                    repo.index_path(),
+                    repo.object_store,
+                    tree.id,
+                )
+                self.assertFalse(
+                    os.path.lexists(os.path.join(repo.path, os.fsdecode(name)))
+                )
+
     def test_nonempty(self) -> None:
         repo_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, repo_dir)

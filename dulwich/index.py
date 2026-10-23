@@ -2178,7 +2178,14 @@ def build_file_from_blob(
       tree_encoding: Encoding to use for tree contents
       symlink_fn: Function to use for creating symlinks
     Returns: stat object for the file
+
+    Raises:
+      InvalidPathError: If asked to write ``.gitmodules`` as a symlink
     """
+    if stat.S_ISLNK(mode) and os.path.basename(target_path).lower() == b".gitmodules":
+        # .gitmodules is read from the work tree, so a symlink here would
+        # source submodule configuration from a file outside the tree.
+        raise InvalidPathError(target_path)
     try:
         oldstat = os.lstat(target_path)
     except FileNotFoundError:

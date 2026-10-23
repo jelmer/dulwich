@@ -25,6 +25,7 @@
 __all__ = [
     "BEGIN_PGP_SIGNATURE",
     "BEGIN_SSH_SIGNATURE",
+    "BEGIN_X509_SIGNATURE",
     "DEFAULT_LOOSE_OBJECT_SIZE_LIMIT",
     "MAX_TIME",
     "OBJECT_CLASSES",
@@ -149,6 +150,13 @@ MAX_TIME = 9223372036854775807  # (2**63) - 1 - signed long int max
 
 BEGIN_PGP_SIGNATURE = b"-----BEGIN PGP SIGNATURE-----"
 BEGIN_SSH_SIGNATURE = b"-----BEGIN SSH SIGNATURE-----"
+BEGIN_X509_SIGNATURE = b"-----BEGIN SIGNED MESSAGE-----"
+_PGP_SIGNATURE_MARKERS = (BEGIN_PGP_SIGNATURE, b"-----BEGIN PGP MESSAGE-----")
+_SIGNATURE_MARKERS = (
+    *_PGP_SIGNATURE_MARKERS,
+    BEGIN_X509_SIGNATURE,
+    BEGIN_SSH_SIGNATURE,
+)
 
 # Signature type constants
 SIGNATURE_PGP = b"pgp"
@@ -1124,6 +1132,20 @@ def _format_message(
         yield body
 
 
+def _find_signature(body: bytes) -> int | None:
+    """Find the offset of the last line starting a signature, if any."""
+    match = None
+    pos = 0
+    while pos < len(body):
+        if body.startswith(_SIGNATURE_MARKERS, pos):
+            match = pos
+        nl = body.find(b"\n", pos)
+        if nl == -1:
+            break
+        pos = nl + 1
+    return match
+
+
 class Tag(ShaFile):
     """A Git Tag object."""
 
@@ -1312,16 +1334,7 @@ class Tag(ShaFile):
                     self._message = None
                     self._signature = None
                 else:
-                    # Try to find either PGP or SSH signature
-                    sig_idx = None
-                    try:
-                        sig_idx = value.index(BEGIN_PGP_SIGNATURE)
-                    except ValueError:
-                        try:
-                            sig_idx = value.index(BEGIN_SSH_SIGNATURE)
-                        except ValueError:
-                            pass
-
+                    sig_idx = _find_signature(value)
                     if sig_idx is not None:
                         self._message = value[:sig_idx]
                         self._signature = value[sig_idx:]
@@ -1391,7 +1404,7 @@ class Tag(ShaFile):
         payload = self.raw_without_sig()
 
         # Determine signature type
-        if self._signature.startswith(BEGIN_PGP_SIGNATURE):
+        if self._signature.startswith(_PGP_SIGNATURE_MARKERS):
             sig_type = SIGNATURE_PGP
         elif self._signature.startswith(BEGIN_SSH_SIGNATURE):
             sig_type = SIGNATURE_SSH
@@ -2254,7 +2267,7 @@ class Commit(ShaFile):
         payload = self.raw_without_sig()
 
         # Determine signature type
-        if self._gpgsig.startswith(BEGIN_PGP_SIGNATURE):
+        if self._gpgsig.startswith(_PGP_SIGNATURE_MARKERS):
             sig_type = SIGNATURE_PGP
         elif self._gpgsig.startswith(BEGIN_SSH_SIGNATURE):
             sig_type = SIGNATURE_SSH

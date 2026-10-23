@@ -23,6 +23,10 @@
    when an ssh connection closes before the server sends anything, rather
    than a bare hangup error. (Jelmer Vernooĳ, #2523)
 
+ * Split a tag's signature from its message at the last signature marker and
+   recognise PGP message and X.509 signatures, matching git, so a message that
+   quotes a signature no longer confuses signature extraction. (Jelmer Vernooĳ)
+
 1.2.19	2026-10-22
 
  * Keep the assume-unchanged flag (and other index flags) on entries

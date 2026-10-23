@@ -38,7 +38,7 @@ from .lfs import LFSStore
 
 # LFS object ids are SHA-256 digests, i.e. 64 lowercase hex characters. The
 # store maps an oid onto a path (objects/<oid[:2]>/<oid[2:4]>/<oid>), so an oid
-# taken from the request path must be checked before it reaches the filesystem.
+# taken from a request must be checked before it reaches the filesystem.
 _OID_LENGTH = 64
 _HEX_DIGITS = frozenset("0123456789abcdef")
 
@@ -126,6 +126,16 @@ class LFSRequestHandler(BaseHTTPRequestHandler):
                         "oid": oid,
                         "size": size,
                         "error": {"code": 400, "message": "Missing oid or size"},
+                    }
+                )
+                continue
+
+            if not isinstance(oid, str) or not _is_valid_oid(oid):
+                response_objects.append(
+                    {
+                        "oid": oid,
+                        "size": size,
+                        "error": {"code": 422, "message": "Invalid oid"},
                     }
                 )
                 continue

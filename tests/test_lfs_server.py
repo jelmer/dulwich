@@ -22,10 +22,12 @@
 """Tests for the LFS server."""
 
 import http.client
+import json
 import os
 import shutil
 import tempfile
 import threading
+from typing import Any
 
 from dulwich.lfs_server import run_lfs_server
 
@@ -52,6 +54,7 @@ class LFSServerOidValidationTests(TestCase):
 
         self.addCleanup(stop)
         host, port = self.server.server_address[:2]
+        assert isinstance(host, str)
         self.host = host
         self.port = port
 
@@ -63,6 +66,25 @@ class LFSServerOidValidationTests(TestCase):
             conn.request("GET", path)
             resp = conn.getresponse()
             return resp.status, resp.read()
+        finally:
+            conn.close()
+
+    def _batch(self, operation: str, oid: object) -> dict[str, Any]:
+        conn = http.client.HTTPConnection(self.host, self.port)
+        try:
+            body = json.dumps(
+                {"operation": operation, "objects": [{"oid": oid, "size": 1}]}
+            )
+            conn.request(
+                "POST",
+                "/objects/batch",
+                body=body,
+                headers={"Content-Type": "application/vnd.git-lfs+json"},
+            )
+            resp = conn.getresponse()
+            self.assertEqual(200, resp.status)
+            result: dict[str, Any] = json.loads(resp.read())
+            return result
         finally:
             conn.close()
 
@@ -92,3 +114,61 @@ class LFSServerOidValidationTests(TestCase):
     def test_non_hex_oid_is_rejected(self) -> None:
         status, _ = self._get("/objects/" + "z" * 64)
         self.assertEqual(404, status)
+
+    def test_batch_absolute_oid_is_rejected(self) -> None:
+        # os.path.join discards the store prefix for an absolute oid, which
+        # would let the batch endpoint probe for arbitrary files.
+        secret = os.path.join(self.base, "secret")
+        with open(secret, "wb") as f:
+            f.write(b"secret")
+        for operation in ["download", "upload"]:
+            result = self._batch(operation, secret)
+            self.assertEqual(
+                [
+                    {
+                        "oid": secret,
+                        "size": 1,
+                        "error": {"code": 422, "message": "Invalid oid"},
+                    }
+                ],
+                result["objects"],
+            )
+
+    def test_batch_traversing_oid_is_rejected(self) -> None:
+        result = self._batch("download", "....")
+        self.assertEqual(
+            [
+                {
+                    "oid": "....",
+                    "size": 1,
+                    "error": {"code": 422, "message": "Invalid oid"},
+                }
+            ],
+            result["objects"],
+        )
+
+    def test_batch_non_string_oid_is_rejected(self) -> None:
+        result = self._batch("download", ["ab"])
+        self.assertEqual(
+            [
+                {
+                    "oid": ["ab"],
+                    "size": 1,
+                    "error": {"code": 422, "message": "Invalid oid"},
+                }
+            ],
+            result["objects"],
+        )
+
+    def test_batch_valid_oid(self) -> None:
+        oid = self.server.lfs_store.write_object([b"x"])
+        result = self._batch("download", oid)
+        self.assertEqual(
+            {
+                "download": {
+                    "href": f"http://{self.host}:{self.port}/objects/{oid}",
+                    "header": {"Accept": "application/octet-stream"},
+                }
+            },
+            result["objects"][0]["actions"],
+        )

@@ -727,6 +727,77 @@ class CommitParseTests(ShaFileCheckTests):
             else:
                 self.assertCheckFails(Commit, text)
 
+    def test_parse_duplicate_tree(self) -> None:
+        lines = self.make_commit_lines(parents=[a_sha])
+        lines.insert(1, b"tree " + b_sha)
+        text = b"\n".join(lines)
+        tree = b"d80c186a03f423a81b39df39dc87fd269736ca86"
+        self.assertEqual(tree, Commit.from_string(text).tree)
+        self.assertEqual(tree, parse_commit_broken(text).tree)
+
+    def test_parse_parents_after_second_tree(self) -> None:
+        lines = self.make_commit_lines(parents=[a_sha])
+        lines.insert(2, b"tree " + b_sha)
+        lines.insert(3, b"parent " + b_sha)
+        text = b"\n".join(lines)
+        self.assertEqual([a_sha], Commit.from_string(text).parents)
+        self.assertEqual([a_sha], parse_commit_broken(text).parents)
+
+    def test_parse_parent_after_author(self) -> None:
+        lines = self.make_commit_lines(parents=[a_sha])
+        lines.insert(3, b"parent " + b_sha)
+        text = b"\n".join(lines)
+        self.assertEqual([a_sha], Commit.from_string(text).parents)
+        self.assertEqual([a_sha], parse_commit_broken(text).parents)
+
+    def test_parse_duplicate_encoding(self) -> None:
+        lines = self.make_commit_lines(encoding=b"ISO-8859-1")
+        lines.insert(6, b"encoding UTF-8")
+        text = b"\n".join(lines)
+        self.assertEqual(b"ISO-8859-1", Commit.from_string(text).encoding)
+        self.assertEqual(b"ISO-8859-1", parse_commit_broken(text).encoding)
+
+    def test_parse_duplicate_author(self) -> None:
+        lines = self.make_commit_lines(parents=[a_sha])
+        lines.insert(3, b"author Other <other@example.com> 1 +0000")
+        text = b"\n".join(lines)
+        self.assertEqual(
+            default_committer.rsplit(b" ", 2)[0], Commit.from_string(text).author
+        )
+
+    def test_parse_duplicate_committer(self) -> None:
+        lines = self.make_commit_lines(parents=[a_sha])
+        lines.insert(4, b"committer Other <other@example.com> 1 +0000")
+        text = b"\n".join(lines)
+        self.assertEqual(
+            default_committer.rsplit(b" ", 2)[0], Commit.from_string(text).committer
+        )
+
+    def test_parse_tree_not_first(self) -> None:
+        lines = self.make_commit_lines(parents=[a_sha])
+        lines[0], lines[1] = lines[1], lines[0]
+        with self.assertRaises(ObjectFormatException):
+            Commit.from_string(b"\n".join(lines))
+
+    def test_parse_missing_tree(self) -> None:
+        with self.assertRaises(ObjectFormatException):
+            Commit.from_string(self.make_commit_text(tree=None))
+
+    def test_parse_invalid_tree(self) -> None:
+        with self.assertRaises(ObjectFormatException):
+            Commit.from_string(self.make_commit_text(tree=b"xxx"))
+
+    def test_parse_invalid_parent(self) -> None:
+        with self.assertRaises(ObjectFormatException):
+            Commit.from_string(self.make_commit_text(parents=[a_sha, b"xxx"]))
+
+    def test_parse_invalid_mergetag(self) -> None:
+        text = self.make_commit_text(extra={b"mergetag": b"not a tag"})
+        c = Commit.from_string(text)
+        self.assertEqual([], c.mergetag)
+        self.assertEqual([(b"mergetag", b"not a tag")], c._extra)
+        self.assertEqual(text, c.as_raw_string())
+
     def test_check_order(self) -> None:
         lines = self.make_commit_lines(parents=[a_sha], encoding=b"UTF-8")
         headers = lines[:5]
@@ -1665,6 +1736,52 @@ class TagParseTests(ShaFileCheckTests):
             lines = self.make_tag_lines()
             lines.insert(i, lines[i])
             self.assertCheckFails(Tag, b"\n".join(lines))
+
+    def test_parse_duplicate_object(self) -> None:
+        lines = self.make_tag_lines()
+        lines.insert(1, b"object " + a_sha)
+        with self.assertRaises(ObjectFormatException):
+            Tag.from_string(b"\n".join(lines))
+
+    def test_parse_duplicate_type(self) -> None:
+        lines = self.make_tag_lines()
+        lines.insert(2, b"type tree")
+        with self.assertRaises(ObjectFormatException):
+            Tag.from_string(b"\n".join(lines))
+
+    def test_parse_duplicate_name(self) -> None:
+        lines = self.make_tag_lines()
+        lines.insert(3, b"tag other")
+        self.assertEqual(b"v2.6.22-rc7", Tag.from_string(b"\n".join(lines)).name)
+
+    def test_parse_duplicate_tagger(self) -> None:
+        lines = self.make_tag_lines()
+        lines.insert(4, b"tagger Other <other@example.com> 1 +0000")
+        tag = Tag.from_string(b"\n".join(lines))
+        self.assertEqual(default_tagger.rsplit(b" ", 2)[0], tag.tagger)
+
+    def test_parse_missing_tag_name(self) -> None:
+        with self.assertRaises(ObjectFormatException):
+            Tag.from_string(self.make_tag_text(name=None))
+
+    def test_parse_out_of_order(self) -> None:
+        lines = self.make_tag_lines()
+        lines[1], lines[2] = lines[2], lines[1]
+        with self.assertRaises(ObjectFormatException):
+            Tag.from_string(b"\n".join(lines))
+
+    def test_parse_invalid_object(self) -> None:
+        with self.assertRaises(ObjectFormatException):
+            Tag.from_string(self.make_tag_text(object_sha=b"xxx"))
+
+    def test_parse_extra_header(self) -> None:
+        lines = self.make_tag_lines()
+        lines.insert(4, b"gpgsig-sha256 sig")
+        text = b"\n".join(lines)
+        tag = Tag.from_string(text)
+        self.assertEqual([(b"gpgsig-sha256", b"sig")], tag._extra)
+        tag.message = tag.message
+        self.assertEqual(text, tag.as_raw_string())
 
     def test_check_order(self) -> None:
         lines = self.make_tag_lines()

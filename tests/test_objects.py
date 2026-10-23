@@ -31,6 +31,7 @@ from io import BytesIO
 from itertools import permutations
 
 from dulwich.errors import ObjectFormatException
+from dulwich.object_format import SHA256
 from dulwich.objects import (
     MAX_TIME,
     SIGNATURE_PGP,
@@ -1054,6 +1055,84 @@ ZTpDKBGsVP6ydcKdZxAvJlUAAAAEZmlsZQAAAAAAAAAGc2hhNTEyAAAAUwAAAAtz
         # Unknown signature format should raise an exception
         with self.assertRaises(ObjectFormatException):
             c.extract_signature()
+
+    def test_commit_signature_payload_keeps_header_order(self) -> None:
+        payload = (
+            b"tree d80c186a03f423a81b39df39dc87fd269736ca86\n"
+            b"tree 2969be3e8ee1c0222396a5611407e4769f14e54b\n"
+            b"author A <a@example.com> 1 +0000\n"
+            b"committer C <c@example.com> 1 +0000\n"
+            b"extra value\n"
+        )
+        signature = b"gpgsig -----BEGIN SSH SIGNATURE-----\n sig\n -----END SSH SIGNATURE-----\n"
+        body = b"encoding UTF-8\n\nmessage\n"
+        c = Commit.from_string(payload + signature + body)
+        self.assertEqual(payload + body, c.raw_without_sig())
+        self.assertEqual(
+            b"-----BEGIN SSH SIGNATURE-----\nsig\n-----END SSH SIGNATURE-----",
+            c.gpgsig,
+        )
+
+    def test_commit_multiple_signatures(self) -> None:
+        lines = [
+            b"tree d80c186a03f423a81b39df39dc87fd269736ca86",
+            b"author A <a@example.com> 1 +0000",
+            b"committer C <c@example.com> 1 +0000",
+            b"gpgsig -----BEGIN SSH SIGNATURE-----",
+            b" one",
+            b"gpgsig two",
+            b"",
+            b"message",
+        ]
+        c = Commit.from_string(b"\n".join(lines))
+        self.assertEqual(b"-----BEGIN SSH SIGNATURE-----\none\ntwo", c.gpgsig)
+        self.assertEqual(b"\n".join(lines[:3] + lines[6:]), c.raw_without_sig())
+
+    def test_commit_signature_payload_only_splits_on_newline(self) -> None:
+        lines = [
+            b"tree d80c186a03f423a81b39df39dc87fd269736ca86",
+            b"author A <a@example.com> 1 +0000",
+            b"committer C <c@example.com> 1 +0000",
+            b"extra a\rgpgsig b",
+            b"gpgsig sig",
+            b"",
+            b"message",
+        ]
+        c = Commit.from_string(b"\n".join(lines))
+        self.assertEqual(b"sig", c.gpgsig)
+        self.assertEqual(b"\n".join(lines[:4] + lines[5:]), c.raw_without_sig())
+
+    def test_commit_other_signature_header_excluded_from_payload(self) -> None:
+        lines = [
+            b"tree d80c186a03f423a81b39df39dc87fd269736ca86",
+            b"author A <a@example.com> 1 +0000",
+            b"committer C <c@example.com> 1 +0000",
+            b"gpgsig-sha256 -----BEGIN SSH SIGNATURE-----",
+            b" other",
+            b"",
+            b"message",
+        ]
+        c = Commit.from_string(b"\n".join(lines))
+        self.assertIsNone(c.gpgsig)
+        self.assertEqual(b"\n".join(lines[:3] + lines[5:]), c.raw_without_sig())
+
+    def test_commit_sha256_signature_header(self) -> None:
+        lines = [
+            b"tree " + b"a" * 64,
+            b"author A <a@example.com> 1 +0000",
+            b"committer C <c@example.com> 1 +0000",
+            b"gpgsig sha1-signature",
+            b"gpgsig-sha256 sha256-signature",
+            b"",
+            b"message",
+        ]
+        text = b"\n".join(lines)
+        c = ShaFile.from_raw_string(Commit.type_num, text, object_format=SHA256)
+        self.assertEqual(b"sha256-signature", c.gpgsig)
+        self.assertEqual(b"sha256-signature", c.copy().gpgsig)
+        self.assertEqual(b"\n".join(lines[:3] + lines[5:]), c.raw_without_sig())
+        c.message = b"other\n"
+        self.assertEqual(b"\n".join([*lines[:6], b"other\n"]), c.as_raw_string())
 
     def test_parse_time_entry_broken_negative_date(self) -> None:
         author_line = b"Jane Doe <jdoe@example.org> -12345 +0100"

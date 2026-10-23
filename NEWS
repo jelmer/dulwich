@@ -9,6 +9,10 @@
    different tree than git does. Commits and tags that git refuses to parse
    are now rejected, and unknown tag headers are preserved. (Jelmer Vernooĳ)
 
+ * Verify commit signatures against the raw commit with its signature headers
+   removed, rather than a re-serialization, and read and write SHA-256 commit
+   signatures in the ``gpgsig-sha256`` header. (Jelmer Vernooĳ)
+
 1.2.19	2026-10-22
 
  * Keep the assume-unchanged flag (and other index flags) on entries

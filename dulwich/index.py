@@ -2183,9 +2183,8 @@ def build_file_from_blob(
       InvalidPathError: If asked to write ``.gitmodules`` as a symlink
     """
     if stat.S_ISLNK(mode) and os.path.basename(target_path).lower() == b".gitmodules":
-        # Like git's verify_path, refuse a symlinked .gitmodules: it is read
-        # from the work tree, so a link would source submodule configuration
-        # from a file outside the tree (CVE-2018-11235).
+        # .gitmodules is read from the work tree, so a symlink here would
+        # source submodule configuration from a file outside the tree.
         raise InvalidPathError(target_path)
     try:
         oldstat = os.lstat(target_path)

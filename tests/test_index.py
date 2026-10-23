@@ -1006,8 +1006,7 @@ class BuildIndexTests(TestCase):
 
     @skipIf(not can_symlink(), "Requires symlink support")
     def test_symlinked_gitmodules_refused(self) -> None:
-        # C git refuses to check out .gitmodules as a symlink, at any depth
-        # and in any case (verify_dotfile in read-cache.c).
+        # Refused at any depth and regardless of case.
         for name in [b".gitmodules", b"sub/.GitModules"]:
             repo_dir = tempfile.mkdtemp()
             self.addCleanup(shutil.rmtree, repo_dir)

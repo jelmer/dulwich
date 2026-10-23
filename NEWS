@@ -1,5 +1,9 @@
 1.2.20	UNRELEASED
 
+ * Add ``PySequoiaSignatureVendor``, which signs and verifies OpenPGP
+   signatures with pysequoia using explicitly provided keys rather than
+   a GnuPG keyring. (Jelmer Vernooĳ)
+
  * Pick the same commit and tag headers as git when they are repeated or out
    of place, so a commit with two ``tree`` headers no longer checks out a
    different tree than git does. Commits and tags that git refuses to parse

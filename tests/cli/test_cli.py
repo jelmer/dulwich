@@ -714,6 +714,51 @@ class BranchCommandTest(DulwichCliTestCase):
                 self.assertEqual(result, 0)
                 self.assertEqual(stdout, "")
 
+    def test_branch_show_current(self) -> None:
+        self._run_cli("commit", "--message=Initial")
+        self._run_cli("branch", "feature")
+        refs_before = self.repo.refs.as_dict()
+        for args in [(), ("--all",), ("--remotes",), ("--column",)]:
+            with self.subTest(args=args):
+                result, stdout, _stderr = self._run_cli(
+                    "branch", "--show-current", *args
+                )
+                self.assertEqual(result, 0)
+                self.assertEqual(stdout, "master\n")
+                self.assertEqual(self.repo.refs.as_dict(), refs_before)
+        porcelain.checkout(self.repo, "feature")
+        result, stdout, _stderr = self._run_cli("branch", "--show-current")
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "feature\n")
+
+    def test_branch_show_current_unborn(self) -> None:
+        result, stdout, _stderr = self._run_cli("branch", "--show-current")
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "master\n")
+
+    def test_branch_show_current_detached(self) -> None:
+        self._run_cli("commit", "--message=Initial")
+        porcelain.checkout(self.repo, self.repo.head().decode())
+        result, stdout, _stderr = self._run_cli("branch", "--show-current")
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout, "")
+
+    def test_branch_show_current_conflicting_options(self) -> None:
+        for args in [
+            ("-d", "feature"),
+            ("--list",),
+            ("--merged",),
+            ("--no-merged",),
+            ("--contains", "HEAD"),
+        ]:
+            with self.subTest(args=args):
+                stderr = io.StringIO()
+                with patch("sys.stderr", stderr):
+                    with self.assertRaises(SystemExit) as error:
+                        cli.cmd_branch().run(["--show-current", *args])
+                self.assertEqual(error.exception.code, 2)
+                self.assertIn("--show-current cannot be used", stderr.getvalue())
+
     def test_branch_create(self):
         # Create initial commit
         test_file = os.path.join(self.repo_path, "test.txt")

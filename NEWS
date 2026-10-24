@@ -1,5 +1,10 @@
 1.2.20	UNRELEASED
 
+ * Consume the protocol-v2 ``shallow-info`` section a server sends when the
+   client is shallow but no depth change was requested. Fetching into a
+   shallow clone silently dropped the pack while still updating the remote
+   ref, leaving it pointing at missing objects. (Kartik Kenchi, #2478)
+
  * Validate object ids in LFS server batch requests. An absolute path or
    ``..`` in the ``oid`` let a client probe for the existence of any file
    readable by the server. Reported by @JMak-Security. (Jelmer Vernooĳ)

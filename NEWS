@@ -23,6 +23,9 @@
    when an ssh connection closes before the server sends anything, rather
    than a bare hangup error. (Jelmer Vernooĳ, #2523)
 
+ * Speed up indexing of received thin packs in
+   ``DiskObjectStore.add_thin_pack``. (Zainab Mehmut)
+
 1.2.19	2026-10-22
 
  * Keep the assume-unchanged flag (and other index flags) on entries

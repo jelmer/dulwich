@@ -134,6 +134,11 @@
    a tree where a directory becomes a file (or vice versa) no longer
    fails with ``IsADirectoryError``. (Jelmer Vernooĳ, #2477)
 
+ * Honour the ``export-ignore`` gitattribute in ``git archive``, reading
+   the archived tree's ``.gitattributes``, ``core.attributesFile`` and
+   ``info/attributes``. Attribute patterns with a trailing slash now match
+   directories. (Kartik Kenchi, #2481)
+
  * Apply the blob normalizer to files written by ``porcelain.merge``,
    so fast-forward and three-way merges honour ``.gitattributes`` and
    ``core.autocrlf`` like ``checkout`` and ``reset --hard`` do.

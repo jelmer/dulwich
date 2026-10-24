@@ -251,14 +251,15 @@ _AUTO_ACTIONS = (CRLFAction.AUTO, CRLFAction.AUTO_INPUT, CRLFAction.AUTO_CRLF)
 
 def _crlf_action_from_attr(value: AttributeValue) -> CRLFAction:
     """Translate a ``text`` (or obsolete ``crlf``) attribute into an action."""
-    if value is True:
-        return CRLFAction.TEXT
-    elif value is False:
-        return CRLFAction.BINARY
-    elif value == b"input":
-        return CRLFAction.TEXT_INPUT
-    elif value == b"auto":
-        return CRLFAction.AUTO
+    match value:
+        case True:
+            return CRLFAction.TEXT
+        case False:
+            return CRLFAction.BINARY
+        case b"input":
+            return CRLFAction.TEXT_INPUT
+        case b"auto":
+            return CRLFAction.AUTO
     return CRLFAction.UNDEFINED
 
 

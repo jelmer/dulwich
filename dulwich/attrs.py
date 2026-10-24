@@ -475,15 +475,16 @@ class GitAttributes:
             attr_strs = []
 
             for name, value in sorted(attrs.items()):
-                if value is True:
-                    attr_strs.append(name)
-                elif value is False:
-                    attr_strs.append(b"-" + name)
-                elif value is None:
-                    attr_strs.append(b"!" + name)
-                else:
-                    # value is bytes
-                    attr_strs.append(name + b"=" + value)
+                match value:
+                    case True:
+                        attr_strs.append(name)
+                    case False:
+                        attr_strs.append(b"-" + name)
+                    case None:
+                        attr_strs.append(b"!" + name)
+                    case _:
+                        # value is bytes
+                        attr_strs.append(name + b"=" + value)
 
             if attr_strs:
                 line = pattern + b" " + b" ".join(attr_strs)

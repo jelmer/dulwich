@@ -1116,12 +1116,13 @@ def read_index_dict_with_version(
             existing = ret.setdefault(entry.name, ConflictedIndexEntry())
             if isinstance(existing, IndexEntry):
                 raise AssertionError(f"Non-conflicted entry for {entry.name!r} exists")
-            if stage == Stage.MERGE_CONFLICT_ANCESTOR:
-                existing.ancestor = IndexEntry.from_serialized(entry)
-            elif stage == Stage.MERGE_CONFLICT_THIS:
-                existing.this = IndexEntry.from_serialized(entry)
-            elif stage == Stage.MERGE_CONFLICT_OTHER:
-                existing.other = IndexEntry.from_serialized(entry)
+            match stage:
+                case Stage.MERGE_CONFLICT_ANCESTOR:
+                    existing.ancestor = IndexEntry.from_serialized(entry)
+                case Stage.MERGE_CONFLICT_THIS:
+                    existing.this = IndexEntry.from_serialized(entry)
+                case Stage.MERGE_CONFLICT_OTHER:
+                    existing.other = IndexEntry.from_serialized(entry)
 
     # Read extensions
     extensions = []
@@ -1183,12 +1184,13 @@ def read_index_dict(
             existing = ret.setdefault(entry.name, ConflictedIndexEntry())
             if isinstance(existing, IndexEntry):
                 raise AssertionError(f"Non-conflicted entry for {entry.name!r} exists")
-            if stage == Stage.MERGE_CONFLICT_ANCESTOR:
-                existing.ancestor = IndexEntry.from_serialized(entry)
-            elif stage == Stage.MERGE_CONFLICT_THIS:
-                existing.this = IndexEntry.from_serialized(entry)
-            elif stage == Stage.MERGE_CONFLICT_OTHER:
-                existing.other = IndexEntry.from_serialized(entry)
+            match stage:
+                case Stage.MERGE_CONFLICT_ANCESTOR:
+                    existing.ancestor = IndexEntry.from_serialized(entry)
+                case Stage.MERGE_CONFLICT_THIS:
+                    existing.this = IndexEntry.from_serialized(entry)
+                case Stage.MERGE_CONFLICT_OTHER:
+                    existing.other = IndexEntry.from_serialized(entry)
     return ret
 
 

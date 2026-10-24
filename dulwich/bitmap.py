@@ -1041,14 +1041,15 @@ def build_type_bitmaps(
 
         obj_type = obj.type_num
 
-        if obj_type == Commit.type_num:
-            commit_bitmap.add(pos)
-        elif obj_type == Tree.type_num:
-            tree_bitmap.add(pos)
-        elif obj_type == Blob.type_num:
-            blob_bitmap.add(pos)
-        elif obj_type == Tag.type_num:
-            tag_bitmap.add(pos)
+        match obj_type:
+            case Commit.type_num:
+                commit_bitmap.add(pos)
+            case Tree.type_num:
+                tree_bitmap.add(pos)
+            case Blob.type_num:
+                blob_bitmap.add(pos)
+            case Tag.type_num:
+                tag_bitmap.add(pos)
 
     return commit_bitmap, tree_bitmap, blob_bitmap, tag_bitmap
 

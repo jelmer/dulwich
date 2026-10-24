@@ -32,6 +32,7 @@ from unittest import skipIf
 from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 from dulwich.objects import Blob, Commit, Tag, Tree, parse_timezone
 from dulwich.pack import OFS_DELTA, MemoryPackIndex, Pack
+from dulwich.repo import SHA1InWantPolicy
 from dulwich.tests.utils import build_pack
 from tests import TestCase
 from tests.test_object_store import ObjectStoreTests
@@ -306,6 +307,17 @@ class TestSwiftRepo(TestCase):
             desc = b"Fake repo"
             repo._put_named_file("description", desc)
         self.assertEqual(repo.scon.store["fakerepo/description"], desc)
+
+    def test_sha1_in_want_policy_defaults_to_disabled(self) -> None:
+        store = {"fakerepo/objects/pack": ""}
+        with patch(
+            "contrib.swift.SwiftConnector",
+            new_callable=create_swift_connector,
+            store=store,
+        ):
+            repo = swift.SwiftRepo("fakerepo", conf=self.conf)
+
+        self.assertEqual(SHA1InWantPolicy(), repo.get_sha1_in_want_policy())
 
     def test_init_bare(self) -> None:
         fsc = FakeSwiftConnector("fakeroot", conf=self.conf)

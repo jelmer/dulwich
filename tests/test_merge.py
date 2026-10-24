@@ -49,6 +49,17 @@ class MergeTests(unittest.TestCase):
             raise DependencyMissing("merge3")
         self.merger = Merger(self.repo.object_store)
 
+    def test_merge3_to_bytes_unknown_group(self):
+        from dulwich.merge import _merge3_to_bytes
+
+        class FakeMerge3:
+            def merge_groups(self):
+                return [("unchanged", [b"a\n"]), ("bogus", [b"b\n"])]
+
+        with self.assertRaises(ValueError) as cm:
+            _merge3_to_bytes(FakeMerge3())
+        self.assertEqual("Unexpected merge3 group type 'bogus'", str(cm.exception))
+
     def test_merge_blobs_no_conflict(self):
         """Test merging blobs without conflicts."""
         # Create base blob

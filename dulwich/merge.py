@@ -144,6 +144,8 @@ if merge3 is not None:
                         result.append(b"=======\n")
                         result.extend(b_lines)
                         result.append(b">>>>>>> theirs\n")
+                case _:
+                    raise ValueError(f"Unexpected merge3 group type {group[0]!r}")
 
         return b"".join(result)
 

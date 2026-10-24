@@ -15,6 +15,10 @@
 
  * Refuse to check out ``.gitmodules`` as a symlink. (Kartik Kenchi)
 
+ * Report the remote's stderr (e.g. ``Permission denied (publickey).``)
+   when an ssh connection closes before the server sends anything, rather
+   than a bare hangup error. (Jelmer Vernooĳ, #2523)
+
 1.2.19	2026-10-22
 
  * Keep the assume-unchanged flag (and other index flags) on entries

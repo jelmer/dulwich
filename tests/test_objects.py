@@ -1875,6 +1875,23 @@ class TagParseTests(ShaFileCheckTests):
             else:
                 self.assertCheckFails(Tag, text)
 
+    def test_signature_uses_last_marker(self) -> None:
+        # A message quoting a signature, itself followed by a real one.
+        message = b"quote:\n-----BEGIN PGP SIGNATURE-----\nnot a sig\n\n"
+        sig = b"-----BEGIN SSH SIGNATURE-----\nreal\n-----END SSH SIGNATURE-----\n"
+        text = self.make_tag_text(message=message) + sig
+        tag = Tag.from_string(text)
+        self.assertEqual(message, tag.message)
+        self.assertEqual(sig, tag.signature)
+        self.assertEqual(SIGNATURE_SSH, tag.extract_signature()[2])
+
+    def test_x509_signature_split_from_message(self) -> None:
+        message = b"Tag message\n"
+        sig = b"-----BEGIN SIGNED MESSAGE-----\nsig\n-----END SIGNED MESSAGE-----\n"
+        tag = Tag.from_string(self.make_tag_text(message=message) + sig)
+        self.assertEqual(message, tag.message)
+        self.assertEqual(sig, tag.signature)
+
     def test_tree_copy_after_update(self) -> None:
         """Check Tree.id is correctly updated when the tree is copied after updated."""
         shas = []

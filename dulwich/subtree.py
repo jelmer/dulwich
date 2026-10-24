@@ -95,12 +95,13 @@ def parse_subtree_metadata(commit: Commit) -> SubtreeMetadata:
 
     # Extract subtree-specific trailers
     for trailer in trailers:
-        if trailer.key == "git-subtree-dir":
-            metadata["dir"] = trailer.value.encode("utf-8")
-        elif trailer.key == "git-subtree-split":
-            metadata["split"] = ObjectID(trailer.value.encode("utf-8"))
-        elif trailer.key == "git-subtree-mainline":
-            metadata["mainline"] = ObjectID(trailer.value.encode("utf-8"))
+        match trailer.key:
+            case "git-subtree-dir":
+                metadata["dir"] = trailer.value.encode("utf-8")
+            case "git-subtree-split":
+                metadata["split"] = ObjectID(trailer.value.encode("utf-8"))
+            case "git-subtree-mainline":
+                metadata["mainline"] = ObjectID(trailer.value.encode("utf-8"))
 
     return metadata
 

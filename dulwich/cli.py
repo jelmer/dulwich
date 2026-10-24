@@ -701,12 +701,13 @@ def format_columns(
 
     for part in mode_parts:
         part = part.strip()
-        if part in ("column", "row", "plain"):
-            layout_mode = part
-        elif part == "dense":
-            dense = True
-        elif part == "nodense":
-            dense = False
+        match part:
+            case "column" | "row" | "plain":
+                layout_mode = part
+            case "dense":
+                dense = True
+            case "nodense":
+                dense = False
 
     # Plain mode - one item per line
     if layout_mode == "plain":
@@ -1792,41 +1793,44 @@ class cmd_diff(Command):
                     output_stream = _create_output_stream(outstream)
 
                 try:
-                    if len(parsed_args.committish) == 0:
-                        # Show diff for working tree or staged changes
-                        porcelain.diff(
-                            repo,
-                            staged=(parsed_args.staged or parsed_args.cached),
-                            paths=parsed_args.paths or None,
-                            outstream=output_stream,
-                            diff_algorithm=diff_algorithm,
-                        )
-                    elif len(parsed_args.committish) == 1:
-                        # Show diff between working tree and specified commit
-                        if parsed_args.staged or parsed_args.cached:
-                            parser.error(
-                                "--staged/--cached cannot be used with commits"
+                    match len(parsed_args.committish):
+                        case 0:
+                            # Show diff for working tree or staged changes
+                            porcelain.diff(
+                                repo,
+                                staged=(parsed_args.staged or parsed_args.cached),
+                                paths=parsed_args.paths or None,
+                                outstream=output_stream,
+                                diff_algorithm=diff_algorithm,
                             )
-                        porcelain.diff(
-                            repo,
-                            commit=parsed_args.committish[0],
-                            staged=False,
-                            paths=parsed_args.paths or None,
-                            outstream=output_stream,
-                            diff_algorithm=diff_algorithm,
-                        )
-                    elif len(parsed_args.committish) == 2:
-                        # Show diff between two commits
-                        porcelain.diff(
-                            repo,
-                            commit=parsed_args.committish[0],
-                            commit2=parsed_args.committish[1],
-                            paths=parsed_args.paths or None,
-                            outstream=output_stream,
-                            diff_algorithm=diff_algorithm,
-                        )
-                    else:
-                        parser.error("Too many arguments - specify at most two commits")
+                        case 1:
+                            # Show diff between working tree and specified commit
+                            if parsed_args.staged or parsed_args.cached:
+                                parser.error(
+                                    "--staged/--cached cannot be used with commits"
+                                )
+                            porcelain.diff(
+                                repo,
+                                commit=parsed_args.committish[0],
+                                staged=False,
+                                paths=parsed_args.paths or None,
+                                outstream=output_stream,
+                                diff_algorithm=diff_algorithm,
+                            )
+                        case 2:
+                            # Show diff between two commits
+                            porcelain.diff(
+                                repo,
+                                commit=parsed_args.committish[0],
+                                commit2=parsed_args.committish[1],
+                                paths=parsed_args.paths or None,
+                                outstream=output_stream,
+                                diff_algorithm=diff_algorithm,
+                            )
+                        case _:
+                            parser.error(
+                                "Too many arguments - specify at most two commits"
+                            )
                 except DiffAlgorithmNotAvailable as e:
                     sys.stderr.write(f"fatal: {e}\n")
                     sys.exit(1)
@@ -4998,73 +5002,76 @@ class cmd_bisect(SuperCommand):
             return 1
 
         try:
-            if parsed_args.subcommand == "start":
-                next_sha = porcelain.bisect_start(
-                    bad=parsed_args.bad,
-                    good=parsed_args.good if parsed_args.good else None,
-                    paths=parsed_args.paths,
-                    no_checkout=parsed_args.no_checkout,
-                    term_bad=parsed_args.term_bad,
-                    term_good=parsed_args.term_good,
-                )
-                if next_sha:
-                    logger.info(
-                        "Bisecting: checking out '%s'", next_sha.decode("ascii")
+            match parsed_args.subcommand:
+                case "start":
+                    next_sha = porcelain.bisect_start(
+                        bad=parsed_args.bad,
+                        good=parsed_args.good if parsed_args.good else None,
+                        paths=parsed_args.paths,
+                        no_checkout=parsed_args.no_checkout,
+                        term_bad=parsed_args.term_bad,
+                        term_good=parsed_args.term_good,
                     )
-
-            elif parsed_args.subcommand == "bad":
-                next_sha = porcelain.bisect_bad(rev=parsed_args.rev)
-                if next_sha:
-                    logger.info(
-                        "Bisecting: checking out '%s'", next_sha.decode("ascii")
-                    )
-                else:
-                    # Bisect complete - find the first bad commit
-                    with porcelain.open_repo_closing(None) as r:
-                        bad_ref = os.path.join(r.controldir(), "refs", "bisect", "bad")
-                        with open(bad_ref, "rb") as f:
-                            bad_sha = ObjectID(f.read().strip())
-                        commit = r.object_store[bad_sha]
-                        assert isinstance(commit, Commit)
-                        message = commit.message.decode(
-                            "utf-8", errors="replace"
-                        ).split("\n")[0]
+                    if next_sha:
                         logger.info(
-                            "%s is the first bad commit", bad_sha.decode("ascii")
+                            "Bisecting: checking out '%s'", next_sha.decode("ascii")
                         )
-                        logger.info("commit %s", bad_sha.decode("ascii"))
-                        logger.info("    %s", message)
 
-            elif parsed_args.subcommand == "good":
-                next_sha = porcelain.bisect_good(rev=parsed_args.rev)
-                if next_sha:
-                    logger.info(
-                        "Bisecting: checking out '%s'", next_sha.decode("ascii")
+                case "bad":
+                    next_sha = porcelain.bisect_bad(rev=parsed_args.rev)
+                    if next_sha:
+                        logger.info(
+                            "Bisecting: checking out '%s'", next_sha.decode("ascii")
+                        )
+                    else:
+                        # Bisect complete - find the first bad commit
+                        with porcelain.open_repo_closing(None) as r:
+                            bad_ref = os.path.join(
+                                r.controldir(), "refs", "bisect", "bad"
+                            )
+                            with open(bad_ref, "rb") as f:
+                                bad_sha = ObjectID(f.read().strip())
+                            commit = r.object_store[bad_sha]
+                            assert isinstance(commit, Commit)
+                            message = commit.message.decode(
+                                "utf-8", errors="replace"
+                            ).split("\n")[0]
+                            logger.info(
+                                "%s is the first bad commit", bad_sha.decode("ascii")
+                            )
+                            logger.info("commit %s", bad_sha.decode("ascii"))
+                            logger.info("    %s", message)
+
+                case "good":
+                    next_sha = porcelain.bisect_good(rev=parsed_args.rev)
+                    if next_sha:
+                        logger.info(
+                            "Bisecting: checking out '%s'", next_sha.decode("ascii")
+                        )
+
+                case "skip":
+                    next_sha = porcelain.bisect_skip(
+                        revs=parsed_args.revs if parsed_args.revs else None
                     )
+                    if next_sha:
+                        logger.info(
+                            "Bisecting: checking out '%s'", next_sha.decode("ascii")
+                        )
 
-            elif parsed_args.subcommand == "skip":
-                next_sha = porcelain.bisect_skip(
-                    revs=parsed_args.revs if parsed_args.revs else None
-                )
-                if next_sha:
-                    logger.info(
-                        "Bisecting: checking out '%s'", next_sha.decode("ascii")
-                    )
+                case "reset":
+                    porcelain.bisect_reset(commit=parsed_args.commit)
+                    logger.info("Bisect reset")
 
-            elif parsed_args.subcommand == "reset":
-                porcelain.bisect_reset(commit=parsed_args.commit)
-                logger.info("Bisect reset")
+                case "log":
+                    log = porcelain.bisect_log()
+                    logger.info(log.rstrip())
 
-            elif parsed_args.subcommand == "log":
-                log = porcelain.bisect_log()
-                logger.info(log.rstrip())
+                case "replay":
+                    porcelain.bisect_replay(None, log_file=parsed_args.logfile)
+                    logger.info("Replayed bisect log from %s", parsed_args.logfile)
 
-            elif parsed_args.subcommand == "replay":
-                porcelain.bisect_replay(None, log_file=parsed_args.logfile)
-                logger.info("Replayed bisect log from %s", parsed_args.logfile)
-
-            elif parsed_args.subcommand == "help":
-                parser.print_help()
+                case "help":
+                    parser.print_help()
 
         except porcelain.Error as e:
             logger.error("%s", e)
@@ -5774,17 +5781,18 @@ class cmd_range_diff(Command):
         parsed_args = parser.parse_args(args)
 
         revs = parsed_args.revs
-        if len(revs) == 1:
-            range1: str = revs[0]
-            range2 = None
-            base = None
-        elif len(revs) == 2:
-            range1, range2 = revs
-            base = None
-        elif len(revs) == 3:
-            base, range1, range2 = revs
-        else:
-            parser.error("Too many arguments")
+        match len(revs):
+            case 1:
+                range1: str = revs[0]
+                range2 = None
+                base = None
+            case 2:
+                range1, range2 = revs
+                base = None
+            case 3:
+                base, range1, range2 = revs
+            case _:
+                parser.error("Too many arguments")
 
         with porcelain.open_repo_closing(None) as repo:
             config = repo.get_config_stack()
@@ -6118,57 +6126,58 @@ class cmd_maintenance(Command):
             parser.print_help()
             return 1
 
-        if parsed_args.subcommand == "run":
-            # Progress callback
-            def progress(msg: str) -> None:
-                if not parsed_args.quiet:
-                    logger.info(msg)
+        match parsed_args.subcommand:
+            case "run":
+                # Progress callback
+                def progress(msg: str) -> None:
+                    if not parsed_args.quiet:
+                        logger.info(msg)
 
-            try:
-                result = porcelain.maintenance_run(
-                    None,
-                    tasks=parsed_args.tasks,
-                    auto=parsed_args.auto,
-                    progress=progress if not parsed_args.quiet else None,
+                try:
+                    result = porcelain.maintenance_run(
+                        None,
+                        tasks=parsed_args.tasks,
+                        auto=parsed_args.auto,
+                        progress=progress if not parsed_args.quiet else None,
+                    )
+
+                    # Report results
+                    if not parsed_args.quiet:
+                        if result.tasks_succeeded:
+                            logger.info("\nSuccessfully completed tasks:")
+                            for task in result.tasks_succeeded:
+                                logger.info(f"  - {task}")
+
+                        if result.tasks_failed:
+                            logger.error("\nFailed tasks:")
+                            for task in result.tasks_failed:
+                                error_msg = result.errors.get(task, "Unknown error")
+                                logger.error(f"  - {task}: {error_msg}")
+                            return 1
+
+                except porcelain.Error as e:
+                    logger.error("%s", e)
+                    return 1
+            case "register":
+                porcelain.maintenance_register(None)
+                logger.info("Repository registered for background maintenance")
+            case "unregister":
+                try:
+                    force = getattr(parsed_args, "force", False)
+                    porcelain.maintenance_unregister(None, force=force)
+                except ValueError as e:
+                    logger.error(str(e))
+                    return 1
+                logger.info("Repository unregistered from background maintenance")
+            case "start" | "stop":
+                # TODO: Implement background maintenance scheduling
+                logger.error(
+                    f"The '{parsed_args.subcommand}' subcommand is not yet implemented"
                 )
-
-                # Report results
-                if not parsed_args.quiet:
-                    if result.tasks_succeeded:
-                        logger.info("\nSuccessfully completed tasks:")
-                        for task in result.tasks_succeeded:
-                            logger.info(f"  - {task}")
-
-                    if result.tasks_failed:
-                        logger.error("\nFailed tasks:")
-                        for task in result.tasks_failed:
-                            error_msg = result.errors.get(task, "Unknown error")
-                            logger.error(f"  - {task}: {error_msg}")
-                        return 1
-
-            except porcelain.Error as e:
-                logger.error("%s", e)
                 return 1
-        elif parsed_args.subcommand == "register":
-            porcelain.maintenance_register(None)
-            logger.info("Repository registered for background maintenance")
-        elif parsed_args.subcommand == "unregister":
-            try:
-                force = getattr(parsed_args, "force", False)
-                porcelain.maintenance_unregister(None, force=force)
-            except ValueError as e:
-                logger.error(str(e))
+            case _:
+                parser.print_help()
                 return 1
-            logger.info("Repository unregistered from background maintenance")
-        elif parsed_args.subcommand in ("start", "stop"):
-            # TODO: Implement background maintenance scheduling
-            logger.error(
-                f"The '{parsed_args.subcommand}' subcommand is not yet implemented"
-            )
-            return 1
-        else:
-            parser.print_help()
-            return 1
 
         return None
 
@@ -6782,113 +6791,116 @@ class cmd_lfs(Command):
 
         args = parser.parse_args(argv)
 
-        if args.subcommand == "init":
-            porcelain.lfs_init()
-            logger.info("Git LFS initialized.")
+        match args.subcommand:
+            case "init":
+                porcelain.lfs_init()
+                logger.info("Git LFS initialized.")
 
-        elif args.subcommand == "track":
-            if args.patterns:
-                tracked = porcelain.lfs_track(patterns=args.patterns)
-                logger.info("Tracking patterns:")
-            else:
-                tracked = porcelain.lfs_track()
-                logger.info("Currently tracked patterns:")
-            for pattern in tracked:
-                logger.info("  %s", pattern)
+            case "track":
+                if args.patterns:
+                    tracked = porcelain.lfs_track(patterns=args.patterns)
+                    logger.info("Tracking patterns:")
+                else:
+                    tracked = porcelain.lfs_track()
+                    logger.info("Currently tracked patterns:")
+                for pattern in tracked:
+                    logger.info("  %s", pattern)
 
-        elif args.subcommand == "untrack":
-            tracked = porcelain.lfs_untrack(patterns=args.patterns)
-            logger.info("Remaining tracked patterns:")
-            for pattern in tracked:
-                logger.info("  %s", to_display_str(pattern))
+            case "untrack":
+                tracked = porcelain.lfs_untrack(patterns=args.patterns)
+                logger.info("Remaining tracked patterns:")
+                for pattern in tracked:
+                    logger.info("  %s", to_display_str(pattern))
 
-        elif args.subcommand == "ls-files":
-            files = porcelain.lfs_ls_files(ref=args.ref)
-            for path, oid, size in files:
-                logger.info(
-                    "%s * %s (%s)",
-                    to_display_str(oid[:12]),
-                    to_display_str(path),
-                    format_bytes(size),
+            case "ls-files":
+                files = porcelain.lfs_ls_files(ref=args.ref)
+                for path, oid, size in files:
+                    logger.info(
+                        "%s * %s (%s)",
+                        to_display_str(oid[:12]),
+                        to_display_str(path),
+                        format_bytes(size),
+                    )
+
+            case "migrate":
+                count = porcelain.lfs_migrate(
+                    include=args.include,
+                    exclude=args.exclude,
+                    everything=args.everything,
                 )
+                logger.info("Migrated %d file(s) to Git LFS.", count)
 
-        elif args.subcommand == "migrate":
-            count = porcelain.lfs_migrate(
-                include=args.include, exclude=args.exclude, everything=args.everything
-            )
-            logger.info("Migrated %d file(s) to Git LFS.", count)
+            case "pointer":
+                if args.paths is not None:
+                    results = porcelain.lfs_pointer_check(paths=args.paths or None)
+                    for file_path, pointer in results.items():
+                        if pointer:
+                            logger.info(
+                                "%s: LFS pointer (oid: %s, size: %s)",
+                                to_display_str(file_path),
+                                to_display_str(pointer.oid[:12]),
+                                format_bytes(pointer.size),
+                            )
+                        else:
+                            logger.warning(
+                                "%s: Not an LFS pointer", to_display_str(file_path)
+                            )
 
-        elif args.subcommand == "pointer":
-            if args.paths is not None:
-                results = porcelain.lfs_pointer_check(paths=args.paths or None)
-                for file_path, pointer in results.items():
-                    if pointer:
-                        logger.info(
-                            "%s: LFS pointer (oid: %s, size: %s)",
-                            to_display_str(file_path),
-                            to_display_str(pointer.oid[:12]),
-                            format_bytes(pointer.size),
-                        )
-                    else:
-                        logger.warning(
-                            "%s: Not an LFS pointer", to_display_str(file_path)
-                        )
+            case "clean":
+                pointer = porcelain.lfs_clean(path=args.path)
+                sys.stdout.buffer.write(pointer)
 
-        elif args.subcommand == "clean":
-            pointer = porcelain.lfs_clean(path=args.path)
-            sys.stdout.buffer.write(pointer)
+            case "smudge":
+                if args.stdin:
+                    pointer_content = sys.stdin.buffer.read()
+                    try:
+                        content = porcelain.lfs_smudge(pointer_content=pointer_content)
+                    except LFSError as e:
+                        # Like git-lfs, pass the pointer through but fail
+                        sys.stdout.buffer.write(pointer_content)
+                        logger.error("Error downloading object: %s", e)
+                        return 2
+                    sys.stdout.buffer.write(content)
+                else:
+                    logger.error("--stdin required for smudge command")
+                    sys.exit(1)
 
-        elif args.subcommand == "smudge":
-            if args.stdin:
-                pointer_content = sys.stdin.buffer.read()
-                try:
-                    content = porcelain.lfs_smudge(pointer_content=pointer_content)
-                except LFSError as e:
-                    # Like git-lfs, pass the pointer through but fail
-                    sys.stdout.buffer.write(pointer_content)
-                    logger.error("Error downloading object: %s", e)
-                    return 2
-                sys.stdout.buffer.write(content)
-            else:
-                logger.error("--stdin required for smudge command")
+            case "fetch":
+                refs = args.refs or None
+                count = porcelain.lfs_fetch(remote=args.remote, refs=refs, all=args.all)
+                logger.info("Fetched %d LFS object(s).", count)
+
+            case "pull":
+                count = porcelain.lfs_pull(remote=args.remote)
+                logger.info("Pulled %d LFS object(s).", count)
+
+            case "push":
+                refs = args.refs or None
+                count = porcelain.lfs_push(remote=args.remote, refs=refs, all=args.all)
+                logger.info("Pushed %d LFS object(s).", count)
+
+            case "status":
+                status = porcelain.lfs_status()
+
+                if status["tracked"]:
+                    logger.info("LFS tracked files: %d", len(status["tracked"]))
+
+                if status["missing"]:
+                    logger.warning("\nMissing LFS objects:")
+                    for file_path in status["missing"]:
+                        logger.warning("  %s", to_display_str(file_path))
+
+                if status["not_staged"]:
+                    logger.info("\nModified LFS files not staged:")
+                    for file_path in status["not_staged"]:
+                        logger.warning("  %s", to_display_str(file_path))
+
+                if not any(status.values()):
+                    logger.info("No LFS files found.")
+
+            case _:
+                parser.print_help()
                 sys.exit(1)
-
-        elif args.subcommand == "fetch":
-            refs = args.refs or None
-            count = porcelain.lfs_fetch(remote=args.remote, refs=refs, all=args.all)
-            logger.info("Fetched %d LFS object(s).", count)
-
-        elif args.subcommand == "pull":
-            count = porcelain.lfs_pull(remote=args.remote)
-            logger.info("Pulled %d LFS object(s).", count)
-
-        elif args.subcommand == "push":
-            refs = args.refs or None
-            count = porcelain.lfs_push(remote=args.remote, refs=refs, all=args.all)
-            logger.info("Pushed %d LFS object(s).", count)
-
-        elif args.subcommand == "status":
-            status = porcelain.lfs_status()
-
-            if status["tracked"]:
-                logger.info("LFS tracked files: %d", len(status["tracked"]))
-
-            if status["missing"]:
-                logger.warning("\nMissing LFS objects:")
-                for file_path in status["missing"]:
-                    logger.warning("  %s", to_display_str(file_path))
-
-            if status["not_staged"]:
-                logger.info("\nModified LFS files not staged:")
-                for file_path in status["not_staged"]:
-                    logger.warning("  %s", to_display_str(file_path))
-
-            if not any(status.values()):
-                logger.info("No LFS files found.")
-
-        else:
-            parser.print_help()
-            sys.exit(1)
 
         return None
 
@@ -7164,17 +7176,18 @@ class cmd_bundle(Command):
         subcommand = args[0]
         subargs = args[1:]
 
-        if subcommand == "create":
-            return self._create(subargs)
-        elif subcommand == "verify":
-            return self._verify(subargs)
-        elif subcommand == "list-heads":
-            return self._list_heads(subargs)
-        elif subcommand == "unbundle":
-            return self._unbundle(subargs)
-        else:
-            logger.error("Unknown bundle subcommand: %s", subcommand)
-            return 1
+        match subcommand:
+            case "create":
+                return self._create(subargs)
+            case "verify":
+                return self._verify(subargs)
+            case "list-heads":
+                return self._list_heads(subargs)
+            case "unbundle":
+                return self._unbundle(subargs)
+            case _:
+                logger.error("Unknown bundle subcommand: %s", subcommand)
+                return 1
 
     def _create(self, args: Sequence[str]) -> int:
         parser = argparse.ArgumentParser(prog="bundle create")
@@ -7737,60 +7750,61 @@ class cmd_rerere(Command):
         )
         parsed_args = parser.parse_args(args)
 
-        if parsed_args.subcommand is None:
-            # Record current conflicts
-            recorded, resolved = porcelain.rerere(parsed_args.gitdir)
-            if not recorded:
-                sys.stdout.write("No conflicts to record.\n")
-            else:
-                for path, conflict_id in recorded:
-                    sys.stdout.write(
-                        f"Recorded resolution for {path.decode('utf-8')}: {conflict_id}\n"
-                    )
-                if resolved:
-                    sys.stdout.write("\nAutomatically resolved:\n")
-                    for path in resolved:
-                        sys.stdout.write(f"  {path.decode('utf-8')}\n")
+        match parsed_args.subcommand:
+            case None:
+                # Record current conflicts
+                recorded, resolved = porcelain.rerere(parsed_args.gitdir)
+                if not recorded:
+                    sys.stdout.write("No conflicts to record.\n")
+                else:
+                    for path, conflict_id in recorded:
+                        sys.stdout.write(
+                            f"Recorded resolution for {path.decode('utf-8')}: {conflict_id}\n"
+                        )
+                    if resolved:
+                        sys.stdout.write("\nAutomatically resolved:\n")
+                        for path in resolved:
+                            sys.stdout.write(f"  {path.decode('utf-8')}\n")
 
-        elif parsed_args.subcommand == "status":
-            status_list = porcelain.rerere_status(parsed_args.gitdir)
-            if not status_list:
-                sys.stdout.write("No recorded resolutions.\n")
-            else:
-                for conflict_id, has_resolution in status_list:
-                    status = "resolved" if has_resolution else "unresolved"
-                    sys.stdout.write(f"{conflict_id}\t{status}\n")
+            case "status":
+                status_list = porcelain.rerere_status(parsed_args.gitdir)
+                if not status_list:
+                    sys.stdout.write("No recorded resolutions.\n")
+                else:
+                    for conflict_id, has_resolution in status_list:
+                        status = "resolved" if has_resolution else "unresolved"
+                        sys.stdout.write(f"{conflict_id}\t{status}\n")
 
-        elif parsed_args.subcommand == "diff":
-            diff_list = porcelain.rerere_diff(parsed_args.gitdir)
-            if not diff_list:
-                sys.stdout.write("No recorded conflicts.\n")
-            else:
-                for conflict_id, preimage, postimage in diff_list:
-                    sys.stdout.write(f"--- {conflict_id} (preimage)\n")
-                    sys.stdout.buffer.write(preimage)
-                    sys.stdout.write("\n")
-                    if postimage:
-                        sys.stdout.write(f"+++ {conflict_id} (postimage)\n")
-                        sys.stdout.buffer.write(postimage)
+            case "diff":
+                diff_list = porcelain.rerere_diff(parsed_args.gitdir)
+                if not diff_list:
+                    sys.stdout.write("No recorded conflicts.\n")
+                else:
+                    for conflict_id, preimage, postimage in diff_list:
+                        sys.stdout.write(f"--- {conflict_id} (preimage)\n")
+                        sys.stdout.buffer.write(preimage)
                         sys.stdout.write("\n")
+                        if postimage:
+                            sys.stdout.write(f"+++ {conflict_id} (postimage)\n")
+                            sys.stdout.buffer.write(postimage)
+                            sys.stdout.write("\n")
 
-        elif parsed_args.subcommand == "forget":
-            porcelain.rerere_forget(parsed_args.gitdir, parsed_args.pathspec)
-            if parsed_args.pathspec:
-                sys.stdout.write(f"Forgot resolution for {parsed_args.pathspec}\n")
-            else:
-                sys.stdout.write("Forgot all resolutions\n")
+            case "forget":
+                porcelain.rerere_forget(parsed_args.gitdir, parsed_args.pathspec)
+                if parsed_args.pathspec:
+                    sys.stdout.write(f"Forgot resolution for {parsed_args.pathspec}\n")
+                else:
+                    sys.stdout.write("Forgot all resolutions\n")
 
-        elif parsed_args.subcommand == "clear":
-            porcelain.rerere_clear(parsed_args.gitdir)
-            sys.stdout.write("Cleared all rerere resolutions\n")
+            case "clear":
+                porcelain.rerere_clear(parsed_args.gitdir)
+                sys.stdout.write("Cleared all rerere resolutions\n")
 
-        elif parsed_args.subcommand == "gc":
-            porcelain.rerere_gc(parsed_args.gitdir, parsed_args.max_age_days)
-            sys.stdout.write(
-                f"Cleaned up resolutions older than {parsed_args.max_age_days} days\n"
-            )
+            case "gc":
+                porcelain.rerere_gc(parsed_args.gitdir, parsed_args.max_age_days)
+                sys.stdout.write(
+                    f"Cleaned up resolutions older than {parsed_args.max_age_days} days\n"
+                )
 
 
 class cmd_apply(Command):
@@ -8008,42 +8022,43 @@ class cmd_hook_run(Command):
                         return None
                     logger.error(f"cannot find a hook named {hook_name}")
                     return 1
-                if hook_name == "pre-commit":
-                    if hook_args:
-                        logger.error("pre-commit takes no arguments")
-                        return 1
-                    PreCommitShellHook(r.path, controldir).execute()
-                elif hook_name == "post-commit":
-                    if hook_args:
-                        logger.error("post-commit takes no arguments")
-                        return 1
-                    PostCommitShellHook(controldir).execute()
-                elif hook_name == "commit-msg":
-                    if len(hook_args) != 1:
-                        logger.error(
-                            "commit-msg takes a single argument: "
-                            "the commit message file"
+                match hook_name:
+                    case "pre-commit":
+                        if hook_args:
+                            logger.error("pre-commit takes no arguments")
+                            return 1
+                        PreCommitShellHook(r.path, controldir).execute()
+                    case "post-commit":
+                        if hook_args:
+                            logger.error("post-commit takes no arguments")
+                            return 1
+                        PostCommitShellHook(controldir).execute()
+                    case "commit-msg":
+                        if len(hook_args) != 1:
+                            logger.error(
+                                "commit-msg takes a single argument: "
+                                "the commit message file"
+                            )
+                            return 1
+                        with open(hook_args[0], "rb") as f:
+                            msg = f.read()
+                        new_msg = CommitMsgShellHook(controldir).execute(msg)
+                        if new_msg is not None:
+                            with open(hook_args[0], "wb") as f:
+                                f.write(new_msg)
+                    case "update":
+                        if len(hook_args) != 3:
+                            logger.error(
+                                "update takes three arguments: "
+                                "<ref-name> <old-sha> <new-sha>"
+                            )
+                            return 1
+                        ref_name, old_sha, new_sha = (a.encode() for a in hook_args)
+                        out, err = UpdateShellHook(controldir).execute(
+                            ref_name, old_sha, new_sha
                         )
-                        return 1
-                    with open(hook_args[0], "rb") as f:
-                        msg = f.read()
-                    new_msg = CommitMsgShellHook(controldir).execute(msg)
-                    if new_msg is not None:
-                        with open(hook_args[0], "wb") as f:
-                            f.write(new_msg)
-                elif hook_name == "update":
-                    if len(hook_args) != 3:
-                        logger.error(
-                            "update takes three arguments: "
-                            "<ref-name> <old-sha> <new-sha>"
-                        )
-                        return 1
-                    ref_name, old_sha, new_sha = (a.encode() for a in hook_args)
-                    out, err = UpdateShellHook(controldir).execute(
-                        ref_name, old_sha, new_sha
-                    )
-                    sys.stdout.buffer.write(out)
-                    sys.stderr.buffer.write(err)
+                        sys.stdout.buffer.write(out)
+                        sys.stderr.buffer.write(err)
         except (HookError, OSError) as e:
             logger.error(f"error: {e}")
             return 1

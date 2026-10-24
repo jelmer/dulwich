@@ -138,25 +138,28 @@ def parse_object(
             from .index import ConflictedIndexEntry
 
             if isinstance(entry, ConflictedIndexEntry):
-                if stage == 0:
-                    raise ValueError(
-                        f"Path {path!r} has unresolved conflicts. "
-                        "Use :1:path, :2:path, or :3:path to access specific stages."
-                    )
-                elif stage == 1:
-                    if entry.ancestor is None:
-                        raise KeyError(f"Path {path!r} has no ancestor (stage 1)")
-                    return repo[entry.ancestor.sha]
-                elif stage == 2:
-                    if entry.this is None:
-                        raise KeyError(f"Path {path!r} has no 'this' version (stage 2)")
-                    return repo[entry.this.sha]
-                elif stage == 3:
-                    if entry.other is None:
-                        raise KeyError(
-                            f"Path {path!r} has no 'other' version (stage 3)"
+                match stage:
+                    case 0:
+                        raise ValueError(
+                            f"Path {path!r} has unresolved conflicts. "
+                            "Use :1:path, :2:path, or :3:path to access specific stages."
                         )
-                    return repo[entry.other.sha]
+                    case 1:
+                        if entry.ancestor is None:
+                            raise KeyError(f"Path {path!r} has no ancestor (stage 1)")
+                        return repo[entry.ancestor.sha]
+                    case 2:
+                        if entry.this is None:
+                            raise KeyError(
+                                f"Path {path!r} has no 'this' version (stage 2)"
+                            )
+                        return repo[entry.this.sha]
+                    case 3:
+                        if entry.other is None:
+                            raise KeyError(
+                                f"Path {path!r} has no 'other' version (stage 3)"
+                            )
+                        return repo[entry.other.sha]
             else:
                 # Regular IndexEntry - only stage 0 is valid
                 if stage != 0:

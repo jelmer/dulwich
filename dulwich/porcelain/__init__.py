@@ -3243,87 +3243,90 @@ def reset(
         else:
             target_commit = parse_commit(r, treeish)
 
-        if mode == "soft":
-            # Soft reset: only update HEAD, leave index and working tree unchanged
-            if _in_merge(r):
-                raise Error("Cannot do a soft reset in the middle of a merge.")
+        match mode:
+            case "soft":
+                # Soft reset: only update HEAD, leave index and working tree unchanged
+                if _in_merge(r):
+                    raise Error("Cannot do a soft reset in the middle of a merge.")
 
-        elif mode == "mixed":
-            # Mixed reset: update HEAD and index, but leave working tree unchanged
-            from ..object_store import iter_tree_contents
+            case "mixed":
+                # Mixed reset: update HEAD and index, but leave working tree unchanged
+                from ..object_store import iter_tree_contents
 
-            # Open the index
-            config = r.get_config_stack()
-            index = r.open_index(config=config)
-            validate_path_element = get_path_element_validator(config)
+                # Open the index
+                config = r.get_config_stack()
+                index = r.open_index(config=config)
+                validate_path_element = get_path_element_validator(config)
 
-            old_entries = dict(index.items())
-            index.clear()
+                old_entries = dict(index.items())
+                index.clear()
 
-            # Populate index from the target tree
-            for entry in iter_tree_contents(r.object_store, tree.id):
-                assert (
-                    entry.mode is not None
-                    and entry.sha is not None
-                    and entry.path is not None
+                # Populate index from the target tree
+                for entry in iter_tree_contents(r.object_store, tree.id):
+                    assert (
+                        entry.mode is not None
+                        and entry.sha is not None
+                        and entry.path is not None
+                    )
+                    # Like git, refuse paths that a later checkout would write
+                    # outside the work tree.
+                    if not validate_path(entry.path, validate_path_element):
+                        raise InvalidPathError(entry.path)
+                    flags, extended_flags = unchanged_entry_flags(
+                        old_entries, entry.path, entry.sha, entry.mode
+                    )
+                    # Use set_verbatim so case-differing tree entries aren't
+                    # folded together under core.ignorecase.
+                    index.set_verbatim(
+                        entry.path,
+                        index_entry_from_tree_entry(
+                            entry.mode,
+                            entry.sha,
+                            flags=flags,
+                            extended_flags=extended_flags,
+                        ),
+                    )
+
+                # Write the updated index
+                index.write()
+
+            case "hard":
+                # Hard reset: update HEAD, index, and working tree
+                # For reset --hard, use current index tree as old tree to get proper deletions
+                index = r.open_index(config=r.get_config_stack())
+                if len(index) > 0:
+                    index_tree_id = _index_tree_resolving_conflicts(
+                        index, r.object_store
+                    )
+                else:
+                    # Empty index
+                    index_tree_id = None
+
+                # Get configuration for working tree updates
+                honor_filemode, validate_path_element, symlink_fn = (
+                    _get_worktree_update_config(r)
                 )
-                # Like git, refuse paths that a later checkout would write
-                # outside the work tree.
-                if not validate_path(entry.path, validate_path_element):
-                    raise InvalidPathError(entry.path)
-                flags, extended_flags = unchanged_entry_flags(
-                    old_entries, entry.path, entry.sha, entry.mode
+
+                blob_normalizer = r.get_blob_normalizer(
+                    config=r.get_config_stack(), tree=tree.id
                 )
-                # Use set_verbatim so case-differing tree entries aren't
-                # folded together under core.ignorecase.
-                index.set_verbatim(
-                    entry.path,
-                    index_entry_from_tree_entry(
-                        entry.mode,
-                        entry.sha,
-                        flags=flags,
-                        extended_flags=extended_flags,
-                    ),
+                changes = tree_changes(
+                    r.object_store, index_tree_id, tree.id, want_unchanged=True
                 )
-
-            # Write the updated index
-            index.write()
-
-        elif mode == "hard":
-            # Hard reset: update HEAD, index, and working tree
-            # For reset --hard, use current index tree as old tree to get proper deletions
-            index = r.open_index(config=r.get_config_stack())
-            if len(index) > 0:
-                index_tree_id = _index_tree_resolving_conflicts(index, r.object_store)
-            else:
-                # Empty index
-                index_tree_id = None
-
-            # Get configuration for working tree updates
-            honor_filemode, validate_path_element, symlink_fn = (
-                _get_worktree_update_config(r)
-            )
-
-            blob_normalizer = r.get_blob_normalizer(
-                config=r.get_config_stack(), tree=tree.id
-            )
-            changes = tree_changes(
-                r.object_store, index_tree_id, tree.id, want_unchanged=True
-            )
-            update_working_tree(
-                r,
-                index_tree_id,
-                tree.id,
-                change_iterator=changes,
-                honor_filemode=honor_filemode,
-                validate_path_element=validate_path_element,
-                symlink_fn=symlink_fn,
-                blob_normalizer=blob_normalizer,
-                allow_overwrite_modified=True,  # Allow overwriting modified files,
-                config=r.get_config_stack(),
-            )
-        else:
-            raise Error(f"Invalid reset mode: {mode}")
+                update_working_tree(
+                    r,
+                    index_tree_id,
+                    tree.id,
+                    change_iterator=changes,
+                    honor_filemode=honor_filemode,
+                    validate_path_element=validate_path_element,
+                    symlink_fn=symlink_fn,
+                    blob_normalizer=blob_normalizer,
+                    allow_overwrite_modified=True,  # Allow overwriting modified files,
+                    config=r.get_config_stack(),
+                )
+            case _:
+                raise Error(f"Invalid reset mode: {mode}")
 
         # Only move HEAD once the index and working tree were updated, so
         # that a rejected tree leaves the repository as it was.
@@ -8693,14 +8696,15 @@ def rebase(
                     if is_complete:
                         return [c.id for c in rebaser._done]
                     else:
-                        if pause_reason == "conflict":
-                            raise Error("Conflicts detected. Resolve and continue.")
-                        elif pause_reason == "edit":
-                            print("Stopped for editing. Make changes and continue.")
-                        elif pause_reason == "break":
-                            print("Rebase paused at break. Continue when ready.")
-                        else:
-                            print(f"Rebase paused: {pause_reason}")
+                        match pause_reason:
+                            case "conflict":
+                                raise Error("Conflicts detected. Resolve and continue.")
+                            case "edit":
+                                print("Stopped for editing. Make changes and continue.")
+                            case "break":
+                                print("Rebase paused at break. Continue when ready.")
+                            case _:
+                                print(f"Rebase paused: {pause_reason}")
                         return []
                 else:
                     # Continue regular rebase
@@ -8737,14 +8741,15 @@ def rebase(
                 if is_complete:
                     return [c.id for c in rebaser._done]
                 else:
-                    if pause_reason == "conflict":
-                        raise Error("Conflicts detected. Resolve and continue.")
-                    elif pause_reason == "edit":
-                        print("Stopped for editing. Make changes and continue.")
-                    elif pause_reason == "break":
-                        print("Rebase paused at break. Continue when ready.")
-                    else:
-                        print(f"Rebase paused: {pause_reason}")
+                    match pause_reason:
+                        case "conflict":
+                            raise Error("Conflicts detected. Resolve and continue.")
+                        case "edit":
+                            print("Stopped for editing. Make changes and continue.")
+                        case "break":
+                            print("Rebase paused at break. Continue when ready.")
+                        case _:
+                            print(f"Rebase paused: {pause_reason}")
                     return []
             else:
                 # Regular rebase

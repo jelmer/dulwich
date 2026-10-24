@@ -507,25 +507,26 @@ def filter_pack_objects_with_paths(
         except KeyError:
             continue
 
-        if isinstance(obj, Commit):
-            # Always include commits
-            included_objects.add(want)
-            # Add the root tree to process with depth 0
-            to_process.append((obj.tree, "", 0))
-        elif isinstance(obj, Tree):
-            # Direct tree wants start at depth 0
-            to_process.append((want, "", 0))
-        elif isinstance(obj, Tag):
-            # Always include tags
-            included_objects.add(want)
-            # Process the tagged object
-            tagged_oid = obj.object[1]
-            to_process.append((tagged_oid, "", 0))
-        elif isinstance(obj, Blob):
-            # Direct blob wants - check size filter
-            blob_size = len(obj.data)
-            if filter_spec.should_include_blob(blob_size):
+        match obj:
+            case Commit():
+                # Always include commits
                 included_objects.add(want)
+                # Add the root tree to process with depth 0
+                to_process.append((obj.tree, "", 0))
+            case Tree():
+                # Direct tree wants start at depth 0
+                to_process.append((want, "", 0))
+            case Tag():
+                # Always include tags
+                included_objects.add(want)
+                # Process the tagged object
+                tagged_oid = obj.object[1]
+                to_process.append((tagged_oid, "", 0))
+            case Blob():
+                # Direct blob wants - check size filter
+                blob_size = len(obj.data)
+                if filter_spec.should_include_blob(blob_size):
+                    included_objects.add(want)
 
     # Process trees and their contents
     processed_trees: set[ObjectID] = set()

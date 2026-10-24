@@ -295,30 +295,31 @@ class GitImportProcessor(processor.ImportProcessor):  # type: ignore[misc,unused
             cmd.from_ = self.lookup_object(cmd.from_)
             self._reset_base(cmd.from_)
         for filecmd in cmd.iter_files():  # type: ignore[no-untyped-call,unused-ignore]
-            if filecmd.name == b"filemodify":
-                assert isinstance(filecmd, commands.FileModifyCommand)
-                if filecmd.data is not None:
-                    blob = Blob.from_string(filecmd.data)
-                    self.repo.object_store.add_object(blob)
-                    blob_id = blob.id
-                else:
-                    assert filecmd.dataref is not None
-                    blob_id = self.lookup_object(filecmd.dataref)
-                self._contents[filecmd.path] = (filecmd.mode, blob_id)
-            elif filecmd.name == b"filedelete":
-                assert isinstance(filecmd, commands.FileDeleteCommand)
-                del self._contents[filecmd.path]
-            elif filecmd.name == b"filecopy":
-                assert isinstance(filecmd, commands.FileCopyCommand)
-                self._contents[filecmd.dest_path] = self._contents[filecmd.src_path]
-            elif filecmd.name == b"filerename":
-                assert isinstance(filecmd, commands.FileRenameCommand)
-                self._contents[filecmd.new_path] = self._contents[filecmd.old_path]
-                del self._contents[filecmd.old_path]
-            elif filecmd.name == b"filedeleteall":
-                self._contents = {}
-            else:
-                raise Exception(f"Command {filecmd.name!r} not supported")
+            match filecmd.name:
+                case b"filemodify":
+                    assert isinstance(filecmd, commands.FileModifyCommand)
+                    if filecmd.data is not None:
+                        blob = Blob.from_string(filecmd.data)
+                        self.repo.object_store.add_object(blob)
+                        blob_id = blob.id
+                    else:
+                        assert filecmd.dataref is not None
+                        blob_id = self.lookup_object(filecmd.dataref)
+                    self._contents[filecmd.path] = (filecmd.mode, blob_id)
+                case b"filedelete":
+                    assert isinstance(filecmd, commands.FileDeleteCommand)
+                    del self._contents[filecmd.path]
+                case b"filecopy":
+                    assert isinstance(filecmd, commands.FileCopyCommand)
+                    self._contents[filecmd.dest_path] = self._contents[filecmd.src_path]
+                case b"filerename":
+                    assert isinstance(filecmd, commands.FileRenameCommand)
+                    self._contents[filecmd.new_path] = self._contents[filecmd.old_path]
+                    del self._contents[filecmd.old_path]
+                case b"filedeleteall":
+                    self._contents = {}
+                case _:
+                    raise Exception(f"Command {filecmd.name!r} not supported")
         commit.tree = commit_tree(
             self.repo.object_store,
             (

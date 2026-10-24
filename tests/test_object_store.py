@@ -27,6 +27,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import threading
 import time
 from contextlib import closing
 from io import BytesIO
@@ -76,7 +77,7 @@ from dulwich.repo import Repo
 from dulwich.tests.test_object_store import ObjectStoreTests, PackBasedObjectStoreTests
 from dulwich.tests.utils import build_pack, make_object, make_tag
 
-from . import TestCase
+from . import TestCase, skipIf
 
 testobject = make_object(Blob, data=b"yummy data")
 
@@ -1186,6 +1187,130 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
         # Access b2: the first pack should have been evicted, but b2 is still
         # accessible because _update_pack_cache will re-open it if needed
         self.assertEqual((Blob.type_num, b"data for pack two"), store.get_raw(b2.id))
+
+    def test_packed_git_limit_does_not_close_pack_in_use(self) -> None:
+        store = self.store
+
+        b1 = make_object(Blob, data=b"first object in pack one")
+        b2 = make_object(Blob, data=b"second object in pack one")
+        pack_one = store.add_objects([(b1, None), (b2, None)])
+        b3 = make_object(Blob, data=b"object in pack two")
+        store.add_objects([(b3, None)])
+        assert pack_one is not None
+
+        # Load both packs before setting a limit that forces eviction.
+        store.get_raw(b3.id)
+        store.get_raw(b1.id)
+        store.packed_git_limit = store._total_pack_mmap_size() - 1
+
+        unpacked = pack_one.iter_unpacked()
+        next(unpacked)
+        # Reading pack two evicts pack one while its iterator is active.
+        store.get_raw(b3.id)
+
+        self.assertNotIn(pack_one, store._pack_cache.values())
+        self.assertIsNotNone(pack_one._data)
+        self.assertEqual(1, len(list(unpacked)))
+        pack_one.close()
+
+    def test_pack_cache_concurrent_lookups_and_eviction(self) -> None:
+        store = DiskObjectStore(self.store_dir, packed_git_limit=1)
+        self.addCleanup(store.close)
+
+        blobs = [make_object(Blob, data=b"data for pack %d" % i) for i in range(8)]
+        for blob in blobs:
+            store.add_objects([(blob, None)])
+
+        errors: list[BaseException] = []
+
+        def read_repeatedly(start: int) -> None:
+            try:
+                for i in range(200):
+                    if i % 8 == 0:
+                        store.packs
+                    blob = blobs[(start + i) % len(blobs)]
+                    self.assertEqual((Blob.type_num, blob.data), store.get_raw(blob.id))
+            except BaseException as exc:
+                errors.append(exc)
+
+        old_switch_interval = sys.getswitchinterval()
+        sys.setswitchinterval(1e-6)
+        try:
+            threads = [
+                threading.Thread(target=read_repeatedly, args=(i,)) for i in range(8)
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        finally:
+            sys.setswitchinterval(old_switch_interval)
+
+        self.assertEqual([], errors)
+        self.assertEqual(set(store._pack_access_order), set(store._pack_cache))
+
+    def test_iterobjects_subset_finds_pack_reopened_during_iteration(self) -> None:
+        store = self.store
+
+        blobs = [make_object(Blob, data=b"data for pack %d" % i) for i in range(2)]
+        packs = [store.add_objects([(blob, None)]) for blob in blobs]
+        assert packs[1] is not None
+        with store._pack_cache_lock:
+            store._drop_cached_pack(os.path.basename(packs[1]._basename))
+
+        iterator = store.iterobjects_subset([blob.id for blob in blobs])
+        found = [next(iterator).id]
+        # Another reader reopens the evicted pack.
+        store.packs
+        found.extend(obj.id for obj in iterator)
+
+        self.assertEqual({blob.id for blob in blobs}, set(found))
+
+    @skipIf(sys.platform == "win32", "Needs POSIX unlink of an open, mapped file.")
+    def test_add_objects_after_cached_pack_deleted(self) -> None:
+        store = self.store
+
+        blob = make_object(Blob, data=b"data")
+        pack = store.add_objects([(blob, None)])
+        assert pack is not None
+        # Load the pack so it stays readable once its files are unlinked.
+        pack.name()
+        os.remove(pack._data_path)
+        os.remove(pack._idx_path)
+
+        new_pack = store.add_objects([(blob, None)])
+        assert new_pack is not None
+        self.assertTrue(os.path.exists(new_pack._data_path))
+        self.assertTrue(os.path.exists(new_pack._idx_path))
+        self.assertEqual((Blob.type_num, b"data"), store.get_raw(blob.id))
+
+    def test_packed_git_limit_enforced_when_listing_packs(self) -> None:
+        store = self.store
+
+        for i in range(2):
+            store.add_objects([(make_object(Blob, data=b"data %d" % i), None)])
+        for pack in store.packs:
+            pack.index
+        store.packed_git_limit = 1
+
+        self.assertEqual(2, len(store.packs))
+        self.assertEqual(0, store._total_pack_mmap_size())
+
+    def test_packed_git_limit_miss_rescans_once(self) -> None:
+        store = DiskObjectStore(self.store_dir, packed_git_limit=1)
+        self.addCleanup(store.close)
+
+        blob = make_object(Blob, data=b"packed")
+        store.add_objects([(blob, None)])
+        # Evict the pack, so the rescan on a miss reopens it.
+        store.get_raw(blob.id)
+        missing = make_object(Blob, data=b"missing")
+
+        with patch.object(
+            store, "_scan_pack_names", wraps=store._scan_pack_names
+        ) as scan:
+            self.assertRaises(KeyError, store.get_raw, missing.id)
+        self.assertEqual(1, scan.call_count)
 
     def test_packed_git_limit_no_limit(self) -> None:
         store = DiskObjectStore(self.store_dir)

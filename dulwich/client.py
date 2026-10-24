@@ -2292,7 +2292,10 @@ class TraditionalGitClient(GitClient):
         ):
             raise ValueError(f"unknown Git protocol version {protocol_version}")
         proto, can_read, stderr = self._connect(b"upload-pack", path, protocol_version)
-        server_protocol_version = negotiate_protocol_version(proto)
+        try:
+            server_protocol_version = negotiate_protocol_version(proto)
+        except HangupException as exc:
+            raise _remote_error_from_stderr(stderr) from exc
         if server_protocol_version not in GIT_PROTOCOL_VERSIONS:
             raise ValueError(
                 f"unknown Git protocol version {server_protocol_version} used by server"
@@ -2440,7 +2443,10 @@ class TraditionalGitClient(GitClient):
         ):
             raise ValueError(f"unknown Git protocol version {protocol_version}")
         proto, _, stderr = self._connect(b"upload-pack", path, protocol_version)
-        server_protocol_version = negotiate_protocol_version(proto)
+        try:
+            server_protocol_version = negotiate_protocol_version(proto)
+        except HangupException as exc:
+            raise _remote_error_from_stderr(stderr) from exc
         if server_protocol_version not in GIT_PROTOCOL_VERSIONS:
             raise ValueError(
                 f"unknown Git protocol version {server_protocol_version} used by server"
@@ -2451,7 +2457,10 @@ class TraditionalGitClient(GitClient):
             )
         self.protocol_version = server_protocol_version
         if self.protocol_version == 2:
-            server_capabilities = read_server_capabilities(proto.read_pkt_seq())
+            try:
+                server_capabilities = read_server_capabilities(proto.read_pkt_seq())
+            except HangupException as exc:
+                raise _remote_error_from_stderr(stderr) from exc
             object_format = extract_object_format_from_capabilities(server_capabilities)
 
             # Send ls-refs command with protocol v2 structure
@@ -5591,34 +5600,21 @@ def _get_transport_and_path_from_url(
     pool_manager: "urllib3.PoolManager | None" = None,
 ) -> tuple[GitClient, str]:
     parsed = urlparse(url)
-    if parsed.scheme == "git":
-        return (
-            TCPGitClient.from_parsedurl(
-                parsed,
-                thin_packs=thin_packs,
-                report_activity=report_activity,
-                quiet=quiet,
-                include_tags=include_tags,
-                config=config,
-            ),
-            parsed.path,
-        )
-    elif parsed.scheme in ("git+ssh", "ssh"):
-        return SSHGitClient.from_parsedurl(
-            parsed,
-            config=config,
-            username=username,
-            password=password,
-            thin_packs=thin_packs,
-            report_activity=report_activity,
-            quiet=quiet,
-            include_tags=include_tags,
-            key_filename=key_filename,
-            ssh_command=ssh_command,
-        ), parsed.path
-    elif parsed.scheme in ("http", "https"):
-        return (
-            HttpGitClient.from_parsedurl(
+    match parsed.scheme:
+        case "git":
+            return (
+                TCPGitClient.from_parsedurl(
+                    parsed,
+                    thin_packs=thin_packs,
+                    report_activity=report_activity,
+                    quiet=quiet,
+                    include_tags=include_tags,
+                    config=config,
+                ),
+                parsed.path,
+            )
+        case "git+ssh" | "ssh":
+            return SSHGitClient.from_parsedurl(
                 parsed,
                 config=config,
                 username=username,
@@ -5627,28 +5623,42 @@ def _get_transport_and_path_from_url(
                 report_activity=report_activity,
                 quiet=quiet,
                 include_tags=include_tags,
-                pool_manager=pool_manager,
-            ),
-            parsed.path,
-        )
-    elif parsed.scheme == "file":
-        if sys.platform == "win32" or os.name == "nt":
-            return default_local_git_client_cls(
-                thin_packs=thin_packs,
-                report_activity=report_activity,
-                quiet=quiet,
-                include_tags=include_tags,
-            ), _win32_url_to_path(parsed)
-        return (
-            default_local_git_client_cls.from_parsedurl(
-                parsed,
-                thin_packs=thin_packs,
-                report_activity=report_activity,
-                quiet=quiet,
-                include_tags=include_tags,
-            ),
-            parsed.path,
-        )
+                key_filename=key_filename,
+                ssh_command=ssh_command,
+            ), parsed.path
+        case "http" | "https":
+            return (
+                HttpGitClient.from_parsedurl(
+                    parsed,
+                    config=config,
+                    username=username,
+                    password=password,
+                    thin_packs=thin_packs,
+                    report_activity=report_activity,
+                    quiet=quiet,
+                    include_tags=include_tags,
+                    pool_manager=pool_manager,
+                ),
+                parsed.path,
+            )
+        case "file":
+            if sys.platform == "win32" or os.name == "nt":
+                return default_local_git_client_cls(
+                    thin_packs=thin_packs,
+                    report_activity=report_activity,
+                    quiet=quiet,
+                    include_tags=include_tags,
+                ), _win32_url_to_path(parsed)
+            return (
+                default_local_git_client_cls.from_parsedurl(
+                    parsed,
+                    thin_packs=thin_packs,
+                    report_activity=report_activity,
+                    quiet=quiet,
+                    include_tags=include_tags,
+                ),
+                parsed.path,
+            )
 
     raise ValueError(f"unknown scheme '{parsed.scheme}'")
 

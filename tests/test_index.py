@@ -46,6 +46,8 @@ from dulwich.diff_tree import (
 )
 from dulwich.index import (
     EXTENDED_FLAG_SKIP_WORKTREE,
+    FLAG_EXTENDED,
+    FLAG_VALID,
     SDIR_EXTENSION,
     ConflictedIndexEntry,
     Index,
@@ -646,6 +648,30 @@ class IndexEntryFromStatTests(TestCase):
             ),
         )
 
+    def test_flags(self) -> None:
+        st = os.stat_result(
+            (
+                stat.S_IFREG + 0o644,
+                131078,
+                64769,
+                154,
+                1000,
+                1000,
+                12288,
+                1323629595,
+                1324180496,
+                1324180496,
+            )
+        )
+        entry = index_entry_from_stat(
+            st,
+            b"22" * 20,
+            flags=FLAG_VALID | FLAG_EXTENDED,
+            extended_flags=EXTENDED_FLAG_SKIP_WORKTREE,
+        )
+        self.assertEqual(FLAG_VALID | FLAG_EXTENDED, entry.flags)
+        self.assertEqual(EXTENDED_FLAG_SKIP_WORKTREE, entry.extended_flags)
+
 
 @skipIf(sys.platform == "win32", "Requires POSIX file modes")
 class BuildFileFromBlobTests(TestCase):
@@ -977,6 +1003,30 @@ class BuildIndexTests(TestCase):
 
             # Nothing was written through the symlink to the outside path.
             self.assertFalse(os.path.exists(outside_file))
+
+    @skipIf(not can_symlink(), "Requires symlink support")
+    def test_symlinked_gitmodules_refused(self) -> None:
+        # Refused at any depth and regardless of case.
+        for name in [b".gitmodules", b"sub/.GitModules"]:
+            repo_dir = tempfile.mkdtemp()
+            self.addCleanup(shutil.rmtree, repo_dir)
+            with Repo.init(repo_dir) as repo:
+                link = Blob.from_string(b"/etc/passwd")
+                tree = Tree()
+                tree[name] = (stat.S_IFLNK, link.id)
+                repo.object_store.add_objects([(o, None) for o in [link, tree]])
+
+                self.assertRaises(
+                    InvalidPathError,
+                    build_index_from_tree,
+                    repo.path,
+                    repo.index_path(),
+                    repo.object_store,
+                    tree.id,
+                )
+                self.assertFalse(
+                    os.path.lexists(os.path.join(repo.path, os.fsdecode(name)))
+                )
 
     def test_nonempty(self) -> None:
         repo_dir = tempfile.mkdtemp()
@@ -1823,6 +1873,21 @@ class StatRefreshTests(TestCase):
         list(get_unstaged_changes(index, repo.path, refresh_stat=refresh))
         self.assertTrue(apply_stat_refresh(index, refresh))
         self.assertNotEqual(index[b"foo"].mtime, stale_mtime)
+
+    def test_apply_stat_refresh_preserves_flags(self) -> None:
+        repo, fullpath = self._make_repo_with_file()
+        index = repo.open_index()
+        entry = index[b"foo"]
+        assert isinstance(entry, IndexEntry)
+        entry.flags |= FLAG_VALID
+        entry.set_skip_worktree(True)
+        os.utime(fullpath, (0, 0))
+        self.assertTrue(apply_stat_refresh(index, [(b"foo", os.lstat(fullpath))]))
+        refreshed = index[b"foo"]
+        assert isinstance(refreshed, IndexEntry)
+        self.assertEqual((0, 0), refreshed.mtime)
+        self.assertEqual(FLAG_VALID | FLAG_EXTENDED, refreshed.flags)
+        self.assertEqual(EXTENDED_FLAG_SKIP_WORKTREE, refreshed.extended_flags)
 
     def test_apply_stat_refresh_empty(self) -> None:
         repo, _ = self._make_repo_with_file()
@@ -3795,6 +3860,49 @@ class TestUpdateWorkingTree(TestCase):
         )
         self.assertFalse(os.path.exists(outside_file))
 
+    def test_update_working_tree_leading_symlink_not_followed_on_delete(self):
+        """An entry below an on-disk symlink must not be removed through it."""
+        if sys.platform == "win32":
+            self.skipTest("Symlinks not fully supported on Windows")
+
+        outside_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside_dir)
+        outside_file = os.path.join(outside_dir, "payload")
+        with open(outside_file, "wb") as f:
+            f.write(b"precious")
+
+        tracked = Blob.from_string(b"tracked")
+        self.repo.object_store.add_object(tracked)
+        tree1 = Tree()
+        tree1[b"d/payload"] = (0o100644, tracked.id)
+        self.repo.object_store.add_object(tree1)
+
+        changes = tree_changes(self.repo.object_store, None, tree1.id)
+        update_working_tree(self.repo, None, tree1.id, change_iterator=changes)
+
+        # The tracked directory is replaced by a symlink pointing outside.
+        shutil.rmtree(os.path.join(self.tempdir, "d"))
+        os.symlink(outside_dir, os.path.join(self.tempdir, "d"))
+
+        keep = Blob.from_string(b"keep")
+        self.repo.object_store.add_object(keep)
+        tree2 = Tree()
+        tree2[b"keep"] = (0o100644, keep.id)
+        self.repo.object_store.add_object(tree2)
+
+        changes = tree_changes(self.repo.object_store, tree1.id, tree2.id)
+        update_working_tree(
+            self.repo,
+            tree1.id,
+            tree2.id,
+            change_iterator=changes,
+            allow_overwrite_modified=True,
+        )
+
+        self.assertTrue(os.path.exists(outside_file))
+        self.assertTrue(os.path.islink(os.path.join(self.tempdir, "d")))
+        self.assertEqual([b"keep"], sorted(self.repo.open_index().paths()))
+
     def test_update_working_tree_modified_file_to_dir_transition(self):
         """Test that modified files are not removed when they should be directories."""
         # Create tree with file
@@ -4435,6 +4543,60 @@ class TestUpdateWorkingTree(TestCase):
             tree[path] = (0o100644, blob.id)
         self.repo.object_store.add_object(tree)
         return tree
+
+    def _set_index_flags(self, path, flags, extended_flags=0):
+        index = self.repo.open_index()
+        entry = index[path]
+        entry.flags |= flags
+        entry.extended_flags |= extended_flags
+        index.write()
+
+    def test_update_working_tree_keeps_flags_of_unchanged_entry(self):
+        tree = self._make_tree({b"same": b"a\n", b"changed": b"b\n"})
+        update_working_tree(
+            self.repo,
+            None,
+            tree.id,
+            change_iterator=tree_changes(self.repo.object_store, None, tree.id),
+        )
+        self._set_index_flags(b"same", FLAG_VALID)
+        self._set_index_flags(b"changed", FLAG_VALID)
+
+        new_tree = self._make_tree({b"same": b"a\n", b"changed": b"b2\n"})
+        update_working_tree(
+            self.repo,
+            tree.id,
+            new_tree.id,
+            change_iterator=tree_changes(self.repo.object_store, None, new_tree.id),
+        )
+
+        index = self.repo.open_index()
+        self.assertEqual(FLAG_VALID, index[b"same"].flags)
+        self.assertEqual(0, index[b"changed"].flags)
+
+    def test_sparse_checkout_clears_skip_worktree_of_included_path(self):
+        self._enable_sparse_checkout(["/inc"])
+        tree = self._make_tree({b"inc": b"a\n", b"exc": b"b\n"})
+        update_working_tree(
+            self.repo,
+            None,
+            tree.id,
+            change_iterator=tree_changes(self.repo.object_store, None, tree.id),
+        )
+        self.assertTrue(self.repo.open_index()[b"exc"].skip_worktree)
+
+        self._enable_sparse_checkout(["/inc", "/exc"])
+        update_working_tree(
+            self.repo,
+            tree.id,
+            tree.id,
+            change_iterator=tree_changes(self.repo.object_store, None, tree.id),
+        )
+
+        self.assertEqual(["exc", "inc"], self._list_worktree())
+        entry = self.repo.open_index()[b"exc"]
+        self.assertFalse(entry.skip_worktree)
+        self.assertEqual(0, entry.flags & FLAG_EXTENDED)
 
     def test_sparse_checkout_excluded_paths(self):
         self._enable_sparse_checkout(["/inc"])

@@ -2,7 +2,7 @@ name: Python tests
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
   schedule:
     - cron: "0 6 * * *" # Daily 6AM UTC build
@@ -16,8 +16,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version:
-          ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
       fail-fast: false
 
     steps:
@@ -28,25 +27,18 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
           cache: pip
-      - name: Install native dependencies (Ubuntu)
-        run: sudo apt-get update && sudo apt-get install -y libgpgme-dev libgpg-error-dev
-        if: "matrix.os == 'ubuntu-latest'"
-      - name: Provide gpgme-config and gpg-error-config
-        if: "matrix.os == 'ubuntu-latest'"
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          cp .github/gpgme-config "$HOME/.local/bin/gpgme-config"
-          cp .github/gpg-error-config "$HOME/.local/bin/gpg-error-config"
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      # TODO: Re-enable the gpg bindings (".[pgp]") on Ubuntu once a gpg
+      # release builds with SWIG >= 4.3; 2.0.0 still uses the removed
+      # Python 2 compat macros. See Debian bug #1145351.
       - name: Install dependencies
         run: |
           # Install build-time dependencies
           python -m pip install --upgrade "setuptools>=77"
           python -m pip install --upgrade pip
           pip install --upgrade ".[merge,fastimport,paramiko,https,patiencediff,colordiff,range_diff]"  setuptools-rust
-      - name: Install gpg on supported platforms
-        run: pip install --upgrade ".[pgp]"
-        if: "matrix.os == 'ubuntu-latest' && matrix.python-version != 'pypy3'"
+      - name: Install pysequoia on platforms with wheels
+        run: pip install --upgrade --only-binary pysequoia ".[sequoia]"
+        if: "matrix.os == 'ubuntu-latest' || (matrix.python-version != '3.10' && matrix.python-version != '3.15')"
       - name: Style checks
         run: |
           pip install ".[dev]"

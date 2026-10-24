@@ -109,7 +109,7 @@ from .errors import (
     ObjectFormatException,
 )
 from .file import GitFile
-from .object_format import DEFAULT_OBJECT_FORMAT, ObjectFormat
+from .object_format import DEFAULT_OBJECT_FORMAT, SHA256, ObjectFormat
 
 if TYPE_CHECKING:
     from _hashlib import HASH
@@ -127,6 +127,7 @@ _COMMITTER_HEADER = b"committer"
 _ENCODING_HEADER = b"encoding"
 _MERGETAG_HEADER = b"mergetag"
 _GPGSIG_HEADER = b"gpgsig"
+_GPGSIG_SHA256_HEADER = b"gpgsig-sha256"
 
 # Header fields for objects
 _OBJECT_HEADER = b"object"
@@ -883,7 +884,12 @@ class ShaFile:
         obj_class = object_class(self.type_num)
         if obj_class is None:
             raise AssertionError(f"invalid type num {self.type_num}")
-        return obj_class.from_raw_string(self.type_num, self.as_raw_string(), self.id)
+        return obj_class.from_raw_string(
+            self.type_num,
+            self.as_raw_string(),
+            self.id,
+            object_format=self.object_format,
+        )
 
     @property
     def id(self) -> ObjectID:
@@ -1125,6 +1131,7 @@ class Tag(ShaFile):
     type_num = 4
 
     __slots__ = (
+        "_extra",
         "_message",
         "_name",
         "_object_class",
@@ -1136,6 +1143,7 @@ class Tag(ShaFile):
         "_tagger",
     )
 
+    _extra: list[tuple[bytes, bytes]]
     _message: bytes | None
     _name: bytes | None
     _object_class: "type[ShaFile] | None"
@@ -1149,6 +1157,7 @@ class Tag(ShaFile):
     def __init__(self) -> None:
         """Initialize a new Tag object."""
         super().__init__()
+        self._extra = []
         self._tagger = None
         self._tag_time = None
         self._tag_timezone = None
@@ -1251,6 +1260,7 @@ class Tag(ShaFile):
                         ),
                     )
                 )
+        headers.extend(self._extra)
 
         if self.message is None and self._signature is None:
             body = None
@@ -1260,29 +1270,43 @@ class Tag(ShaFile):
 
     def _deserialize(self, chunks: list[bytes]) -> None:
         """Grab the metadata attached to the tag."""
+        self._object_sha = None
+        self._object_class = None
+        self._name = None
+        self._extra = []
         self._tagger = None
         self._tag_time = None
         self._tag_timezone = None
         self._tag_timezone_neg_utc = False
-        for field, value in _parse_message(chunks):
-            if field == _OBJECT_HEADER:
-                self._object_sha = value
-            elif field == _TYPE_HEADER:
-                assert isinstance(value, bytes)
-                obj_class = object_class(value)
-                if not obj_class:
-                    raise ObjectFormatException(f"Not a known type: {value!r}")
-                self._object_class = obj_class
-            elif field == _TAG_HEADER:
-                self._name = value
-            elif field == _TAGGER_HEADER:
+        fields = _parse_message(chunks)
+
+        def required(header: bytes) -> bytes:
+            field, value = next(fields, (b"", None))
+            if field != header or value is None:
+                raise ObjectFormatException(f"expected {header.decode('ascii')} header")
+            return value
+
+        object_sha = required(_OBJECT_HEADER)
+        check_hexsha(object_sha, "invalid object sha")
+        self._object_sha = object_sha
+        type_name = required(_TYPE_HEADER)
+        obj_class = object_class(type_name)
+        if not obj_class:
+            raise ObjectFormatException(f"Not a known type: {type_name!r}")
+        self._object_class = obj_class
+        self._name = required(_TAG_HEADER)
+
+        # Of the remaining headers, only the first tagger is used
+        for field, value in fields:
+            if field == _TAGGER_HEADER:
                 if value is None:
                     raise ObjectFormatException("missing tagger value")
-                (
-                    self._tagger,
-                    self._tag_time,
-                    (self._tag_timezone, self._tag_timezone_neg_utc),
-                ) = parse_time_entry(value)
+                if self._tagger is None:
+                    (
+                        self._tagger,
+                        self._tag_time,
+                        (self._tag_timezone, self._tag_timezone_neg_utc),
+                    ) = parse_time_entry(value)
             elif field is None:
                 if value is None:
                     self._message = None
@@ -1305,9 +1329,8 @@ class Tag(ShaFile):
                         self._message = value
                         self._signature = None
             else:
-                raise ObjectFormatException(
-                    f"Unknown field {field.decode('ascii', 'replace')}"
-                )
+                assert value is not None
+                self._extra.append((field, value))
 
     @property
     def object(self) -> tuple[type[ShaFile], ObjectID]:
@@ -1889,9 +1912,7 @@ def format_time_entry(
     )
 
 
-def _parse_commit(
-    chunks: Iterable[bytes],
-) -> tuple[
+_CommitParseResult = tuple[
     bytes | None,
     list[bytes],
     tuple[bytes | None, int | None, tuple[int | None, bool | None]],
@@ -1901,90 +1922,146 @@ def _parse_commit(
     bytes | None,
     bytes | None,
     list[tuple[bytes, bytes]],
-]:
+]
+
+
+def _parse_commit(
+    chunks: Iterable[bytes],
+    parse_ident: Callable[
+        [bytes], tuple[bytes, int | None, tuple[int | None, bool]]
+    ] = parse_time_entry,
+    signature_header: bytes = _GPGSIG_HEADER,
+) -> _CommitParseResult:
     """Parse a commit object from chunks.
+
+    Where a header is repeated, the first tree, author, committer and
+    encoding are used, and only the parents directly following the tree.
+    Repeated signature headers are concatenated.
 
     Args:
       chunks: Chunks to parse
+      parse_ident: Function to parse author and committer lines
+      signature_header: Name of the signature header for the hash algorithm
     Returns: Tuple of (tree, parents, author_info, commit_info,
         encoding, mergetag, gpgsig, message, extra)
     """
     parents = []
     extra: list[tuple[bytes, bytes]] = []
     tree = None
-    author_info: tuple[bytes | None, int | None, tuple[int | None, bool | None]] = (
-        None,
-        None,
-        (None, None),
-    )
-    commit_info: tuple[bytes | None, int | None, tuple[int | None, bool | None]] = (
-        None,
-        None,
-        (None, None),
-    )
+    author = None
+    committer = None
     encoding = None
     mergetag = []
     message = None
-    gpgsig = None
+    signatures = []
 
+    # Parents are the run of parent lines immediately following the tree;
+    # any other header, including a second tree, ends the run.
+    in_parents = False
     for field, value in _parse_message(chunks):
-        # TODO(jelmer): Enforce ordering
+        if tree is None and field != _TREE_HEADER:
+            raise ObjectFormatException("commit does not start with a tree")
+        if field != _PARENT_HEADER:
+            in_parents = tree is None and field == _TREE_HEADER
         if field == _TREE_HEADER:
-            tree = value
+            if tree is None:
+                if value is None:
+                    raise ObjectFormatException("missing tree value")
+                check_hexsha(value, "invalid tree sha")
+                tree = value
         elif field == _PARENT_HEADER:
             if value is None:
                 raise ObjectFormatException("missing parent value")
-            parents.append(value)
+            if in_parents:
+                check_hexsha(value, "invalid parent sha")
+                parents.append(value)
         elif field == _AUTHOR_HEADER:
             if value is None:
                 raise ObjectFormatException("missing author value")
-            author_info = parse_time_entry(value)
+            if author is None:
+                author = value
         elif field == _COMMITTER_HEADER:
             if value is None:
                 raise ObjectFormatException("missing committer value")
-            commit_info = parse_time_entry(value)
+            if committer is None:
+                committer = value
         elif field == _ENCODING_HEADER:
-            encoding = value
+            if encoding is None:
+                encoding = value
         elif field == _MERGETAG_HEADER:
             if value is None:
                 raise ObjectFormatException("missing mergetag value")
-            tag = Tag.from_string(value + b"\n")
-            assert isinstance(tag, Tag)
-            mergetag.append(tag)
-        elif field == _GPGSIG_HEADER:
-            gpgsig = value
+            try:
+                tag = Tag.from_string(value + b"\n")
+            except ObjectFormatException:
+                extra.append((field, value))
+            else:
+                mergetag.append(tag)
+        elif field == signature_header:
+            if value is None:
+                raise ObjectFormatException("missing signature value")
+            signatures.append(value)
         elif field is None:
             message = value
         else:
             if value is None:
                 raise ObjectFormatException(f"missing value for field {field!r}")
             extra.append((field, value))
+    no_ident: tuple[bytes | None, int | None, tuple[int | None, bool | None]] = (
+        None,
+        None,
+        (None, None),
+    )
     return (
         tree,
         parents,
-        author_info,
-        commit_info,
+        parse_ident(author) if author is not None else no_ident,
+        parse_ident(committer) if committer is not None else no_ident,
         encoding,
         mergetag,
-        gpgsig,
+        b"\n".join(signatures) if signatures else None,
         message,
         extra,
     )
 
 
+def _signature_header(object_format: ObjectFormat) -> bytes:
+    if object_format == SHA256:
+        return _GPGSIG_SHA256_HEADER
+    return _GPGSIG_HEADER
+
+
+def _strip_signature_headers(raw: bytes) -> bytes:
+    """Return the commit payload covered by a signature.
+
+    This drops every header starting with "gpgsig" (both ``gpgsig`` and
+    ``gpgsig-sha256``) along with their continuation lines.
+    """
+    payload = []
+    in_header = False
+    start = 0
+    while start < len(raw):
+        end = raw.find(b"\n", start) + 1
+        if end == 0:
+            end = len(raw)
+        if in_header and raw.startswith(b" ", start):
+            pass
+        elif raw.startswith(b"gpgsig", start):
+            in_header = True
+        elif raw.startswith(b"\n", start):
+            payload.append(raw[start:])
+            break
+        else:
+            in_header = False
+            payload.append(raw[start:end])
+        start = end
+    return b"".join(payload)
+
+
 def _parse_commit_broken(
     chunks: Iterable[bytes],
-) -> tuple[
-    bytes | None,
-    list[bytes],
-    tuple[bytes | None, int | None, tuple[int | None, bool | None]],
-    tuple[bytes | None, int | None, tuple[int | None, bool | None]],
-    bytes | None,
-    list[Tag],
-    bytes | None,
-    bytes | None,
-    list[tuple[bytes, bytes]],
-]:
+    signature_header: bytes = _GPGSIG_HEADER,
+) -> _CommitParseResult:
     """Parse a commit object from chunks, accepting broken formats.
 
     This function handles various broken author/committer line formats:
@@ -1994,70 +2071,11 @@ def _parse_commit_broken(
 
     Args:
       chunks: Chunks to parse
+      signature_header: Name of the signature header for the hash algorithm
     Returns: Tuple of (tree, parents, author_info, commit_info,
         encoding, mergetag, gpgsig, message, extra)
     """
-    parents = []
-    extra: list[tuple[bytes, bytes]] = []
-    tree = None
-    author_info: tuple[bytes | None, int | None, tuple[int | None, bool | None]] = (
-        None,
-        None,
-        (None, None),
-    )
-    commit_info: tuple[bytes | None, int | None, tuple[int | None, bool | None]] = (
-        None,
-        None,
-        (None, None),
-    )
-    encoding = None
-    mergetag = []
-    message = None
-    gpgsig = None
-
-    for field, value in _parse_message(chunks):
-        # TODO(jelmer): Enforce ordering
-        if field == _TREE_HEADER:
-            tree = value
-        elif field == _PARENT_HEADER:
-            if value is None:
-                raise ObjectFormatException("missing parent value")
-            parents.append(value)
-        elif field == _AUTHOR_HEADER:
-            if value is None:
-                raise ObjectFormatException("missing author value")
-            author_info = parse_time_entry_broken(value)
-        elif field == _COMMITTER_HEADER:
-            if value is None:
-                raise ObjectFormatException("missing committer value")
-            commit_info = parse_time_entry_broken(value)
-        elif field == _ENCODING_HEADER:
-            encoding = value
-        elif field == _MERGETAG_HEADER:
-            if value is None:
-                raise ObjectFormatException("missing mergetag value")
-            tag = Tag.from_string(value + b"\n")
-            assert isinstance(tag, Tag)
-            mergetag.append(tag)
-        elif field == _GPGSIG_HEADER:
-            gpgsig = value
-        elif field is None:
-            message = value
-        else:
-            if value is None:
-                raise ObjectFormatException(f"missing value for field {field!r}")
-            extra.append((field, value))
-    return (
-        tree,
-        parents,
-        author_info,
-        commit_info,
-        encoding,
-        mergetag,
-        gpgsig,
-        message,
-        extra,
-    )
+    return _parse_commit(chunks, parse_time_entry_broken, signature_header)
 
 
 class Commit(ShaFile):
@@ -2136,7 +2154,9 @@ class Commit(ShaFile):
             gpgsig,
             message,
             extra,
-        ) = _parse_commit(chunks)
+        ) = _parse_commit(
+            chunks, signature_header=_signature_header(self.object_format)
+        )
 
         self._tree = tree
         self._parents = [ObjectID(p) for p in parents]
@@ -2213,11 +2233,7 @@ class Commit(ShaFile):
 
         self.gpgsig is a signature for the returned raw byte string serialization.
         """
-        tmp = self.copy()
-        assert isinstance(tmp, Commit)
-        tmp._gpgsig = None
-        tmp.gpgsig = None
-        return tmp.as_raw_string()
+        return _strip_signature_headers(self.as_raw_string())
 
     def extract_signature(self) -> tuple[bytes, bytes | None, bytes | None]:
         """Extract the payload, signature, and signature type from this commit.
@@ -2290,7 +2306,7 @@ class Commit(ShaFile):
             (field, value) for field, value in self._extra if value is not None
         )
         if self.gpgsig:
-            headers.append((_GPGSIG_HEADER, self.gpgsig))
+            headers.append((_signature_header(self.object_format), self.gpgsig))
         return list(_format_message(headers, self._message))
 
     tree = serializable_property("tree", "Tree that is the state of this commit")

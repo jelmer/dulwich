@@ -366,38 +366,39 @@ def add_trailer_to_message(
             updated_trailers = [*existing_trailers, new_trailer]
 
     # Apply where logic
-    if where == "start":
-        updated_trailers = [new_trailer] + [
-            t for t in updated_trailers if t != new_trailer
-        ]
-    elif where == "before":
-        # Insert before the first trailer with the same key
-        result = []
-        inserted = False
-        for t in updated_trailers:
-            if not inserted and t.key == key and t != new_trailer:
+    match where:
+        case "start":
+            updated_trailers = [new_trailer] + [
+                t for t in updated_trailers if t != new_trailer
+            ]
+        case "before":
+            # Insert before the first trailer with the same key
+            result = []
+            inserted = False
+            for t in updated_trailers:
+                if not inserted and t.key == key and t != new_trailer:
+                    result.append(new_trailer)
+                    inserted = True
+                if t != new_trailer:
+                    result.append(t)
+            if not inserted:
                 result.append(new_trailer)
-                inserted = True
-            if t != new_trailer:
-                result.append(t)
-        if not inserted:
-            result.append(new_trailer)
-        updated_trailers = result
-    elif where == "after":
-        # Insert after the last trailer with the same key
-        result = []
-        last_key_index = -1
-        for i, t in enumerate(updated_trailers):
-            if t.key == key and t != new_trailer:
-                last_key_index = len(result)
-            if t != new_trailer:
-                result.append(t)
+            updated_trailers = result
+        case "after":
+            # Insert after the last trailer with the same key
+            result = []
+            last_key_index = -1
+            for i, t in enumerate(updated_trailers):
+                if t.key == key and t != new_trailer:
+                    last_key_index = len(result)
+                if t != new_trailer:
+                    result.append(t)
 
-        if last_key_index >= 0:
-            result.insert(last_key_index + 1, new_trailer)
-        else:
-            result.append(new_trailer)
-        updated_trailers = result
+            if last_key_index >= 0:
+                result.insert(last_key_index + 1, new_trailer)
+            else:
+                result.append(new_trailer)
+            updated_trailers = result
     # 'end' is the default - trailer is already at the end
 
     # Reconstruct the message

@@ -126,29 +126,26 @@ if merge3 is not None:
         """
         result: list[bytes] = []
         for group in m.merge_groups():  # type: ignore[no-untyped-call,unused-ignore]
-            if group[0] == "unchanged":
-                result.extend(group[1])
-            elif group[0] == "a":
-                result.extend(group[1])
-            elif group[0] == "b":
-                result.extend(group[1])
-            elif group[0] == "same":
-                result.extend(group[1])
-            elif group[0] == "conflict":
-                # Check if this is a real conflict or just different changes
-                base_lines, a_lines, b_lines = group[1], group[2], group[3]
+            match group[0]:
+                case "unchanged" | "a" | "b" | "same":
+                    result.extend(group[1])
+                case "conflict":
+                    # Check if this is a real conflict or just different changes
+                    base_lines, a_lines, b_lines = group[1], group[2], group[3]
 
-                # Try to merge line by line
-                if _can_merge_lines(base_lines, a_lines, b_lines):
-                    merged_lines = _merge_lines(base_lines, a_lines, b_lines)
-                    result.extend(merged_lines)
-                else:
-                    # Real conflict - add conflict markers
-                    result.append(b"<<<<<<< ours\n")
-                    result.extend(a_lines)
-                    result.append(b"=======\n")
-                    result.extend(b_lines)
-                    result.append(b">>>>>>> theirs\n")
+                    # Try to merge line by line
+                    if _can_merge_lines(base_lines, a_lines, b_lines):
+                        merged_lines = _merge_lines(base_lines, a_lines, b_lines)
+                        result.extend(merged_lines)
+                    else:
+                        # Real conflict - add conflict markers
+                        result.append(b"<<<<<<< ours\n")
+                        result.extend(a_lines)
+                        result.append(b"=======\n")
+                        result.extend(b_lines)
+                        result.append(b">>>>>>> theirs\n")
+                case _:
+                    raise ValueError(f"Unexpected merge3 group type {group[0]!r}")
 
         return b"".join(result)
 

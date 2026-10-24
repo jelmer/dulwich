@@ -151,10 +151,16 @@ def write_commit_patch(
     f.write(
         b"Date: " + time.strftime("%a, %d %b %Y %H:%M:%S %Z").encode(encoding) + b"\n"
     )
-    f.write(
-        (f"Subject: [PATCH {num}/{total}] ").encode(encoding) + commit.message + b"\n"
-    )
+    # The first paragraph becomes the Subject, folded onto a single line; the
+    # rest of the message is written as the mail body.
+    subject, _, body = commit.message.partition(b"\n\n")
+    subject = subject.replace(b"\n", b" ").strip()
+    f.write((f"Subject: [PATCH {num}/{total}] ").encode(encoding) + subject + b"\n")
     f.write(b"\n")
+    if body:
+        f.write(body)
+        if not body.endswith(b"\n"):
+            f.write(b"\n")
     f.write(b"---\n")
     try:
         import subprocess

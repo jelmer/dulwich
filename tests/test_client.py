@@ -3831,6 +3831,43 @@ And this line is just random noise, too.
         )
 
 
+class StderrDummyClient(TraditionalGitClient):
+    def __init__(self, stdout: bytes, stderr: bytes) -> None:
+        self.stdout = BytesIO(stdout)
+        self.stderr = BytesIO(stderr)
+        TraditionalGitClient.__init__(self)
+
+    def _connect(self, service, path, protocol_version=None):
+        return (
+            Protocol(self.stdout.read, BytesIO().write),
+            lambda: False,
+            self.stderr,
+        )
+
+
+class HangupBeforeAdvertisementTests(TestCase):
+    def expected(self):
+        return HangupException([b"Permission denied (publickey)."])
+
+    def test_get_refs(self) -> None:
+        c = StderrDummyClient(b"", b"Permission denied (publickey).\n")
+        with self.assertRaises(HangupException) as cm:
+            c.get_refs(b"/")
+        self.assertEqual(self.expected(), cm.exception)
+
+    def test_get_refs_v2_capabilities(self) -> None:
+        c = StderrDummyClient(b"000eversion 2\n", b"Permission denied (publickey).\n")
+        with self.assertRaises(HangupException) as cm:
+            c.get_refs(b"/", protocol_version=2)
+        self.assertEqual(self.expected(), cm.exception)
+
+    def test_fetch_pack(self) -> None:
+        c = StderrDummyClient(b"", b"Permission denied (publickey).\n")
+        with self.assertRaises(HangupException) as cm:
+            c.fetch_pack(b"/", lambda heads, depth=None: [], None, None)
+        self.assertEqual(self.expected(), cm.exception)
+
+
 class TestExtractAgentAndSymrefs(TestCase):
     def test_extract_agent_and_symrefs(self) -> None:
         (symrefs, agent) = _extract_symrefs_and_agent(

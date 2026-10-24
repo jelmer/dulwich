@@ -155,28 +155,29 @@ def find_reachable_objects(
             continue
 
         # Add referenced objects
-        if isinstance(obj, Commit):
-            # Tree
-            if obj.tree not in reachable:
-                pending.append(obj.tree)
-                reachable.add(obj.tree)
-            # Parents
-            for parent in obj.parents:
-                if parent not in reachable:
-                    pending.append(parent)
-                    reachable.add(parent)
-        elif isinstance(obj, Tree):
-            # Tree entries
-            for entry in obj.items():
-                assert entry.sha is not None
-                if entry.sha not in reachable:
-                    pending.append(entry.sha)
-                    reachable.add(entry.sha)
-        elif isinstance(obj, Tag):
-            # Tagged object
-            if obj.object[1] not in reachable:
-                pending.append(obj.object[1])
-                reachable.add(obj.object[1])
+        match obj:
+            case Commit():
+                # Tree
+                if obj.tree not in reachable:
+                    pending.append(obj.tree)
+                    reachable.add(obj.tree)
+                # Parents
+                for parent in obj.parents:
+                    if parent not in reachable:
+                        pending.append(parent)
+                        reachable.add(parent)
+            case Tree():
+                # Tree entries
+                for entry in obj.items():
+                    assert entry.sha is not None
+                    if entry.sha not in reachable:
+                        pending.append(entry.sha)
+                        reachable.add(entry.sha)
+            case Tag():
+                # Tagged object
+                if obj.object[1] not in reachable:
+                    pending.append(obj.object[1])
+                    reachable.add(obj.object[1])
 
     return reachable
 

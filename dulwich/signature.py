@@ -31,6 +31,11 @@ if TYPE_CHECKING:
     except ImportError:
         pass
 
+    try:
+        import pysequoia
+    except ImportError:
+        pass
+
     from dulwich.config import Config
 
 __all__ = [
@@ -40,6 +45,7 @@ __all__ = [
     "BadSignature",
     "GPGCliSignatureVendor",
     "GPGSignatureVendor",
+    "PySequoiaSignatureVendor",
     "SSHCliSignatureVendor",
     "SSHSigSignatureVendor",
     "SignatureSigner",
@@ -79,6 +85,18 @@ def _parse_status_fingerprints(status: bytes) -> list[str]:
             fingerprints.append(fields[1])
             fingerprints.append(fields[-1])
     return fingerprints
+
+
+def _keyid_matches(fingerprint: str, keyid: str) -> bool:
+    """Check whether a key ID or fingerprint refers to the given fingerprint.
+
+    A key ID is the trailing hex of a fingerprint, so the shorter value must
+    be a suffix of the longer one. Plain substring matching would accept a key
+    whose fingerprint merely contains the trusted ID somewhere in the middle.
+    """
+    fingerprint = fingerprint.replace(" ", "").upper()
+    keyid = keyid.replace(" ", "").upper()
+    return fingerprint.endswith(keyid) or keyid.endswith(fingerprint)
 
 
 # Signature verification exceptions
@@ -490,21 +508,8 @@ class GPGCliSignatureVendor(SignatureSigner, SignatureVerifier):
                         "Could not determine signing key from GPG status output"
                     )
 
-                # Check if any of the signing keys (subkey or primary) match the trusted keyids
-                keyids_normalized = [k.replace(" ", "").upper() for k in self.keyids]
-
-                # Check each signing key against trusted keyids
                 for signed_by in signing_keys:
-                    signed_by_normalized = signed_by.replace(" ", "").upper()
-                    # A key ID is the trailing hex of a fingerprint, so the
-                    # shorter value must be a suffix of the longer one. Plain
-                    # substring matching would accept a key whose fingerprint
-                    # merely contains the trusted ID somewhere in the middle.
-                    if any(
-                        signed_by_normalized.endswith(keyid)
-                        or keyid.endswith(signed_by_normalized)
-                        for keyid in keyids_normalized
-                    ):
+                    if any(_keyid_matches(signed_by, k) for k in self.keyids):
                         return
 
                 # None of the signing keys matched
@@ -514,6 +519,127 @@ class GPGCliSignatureVendor(SignatureSigner, SignatureVerifier):
                     signing_keys=signing_keys,
                     trusted_keys=list(self.keyids),
                 )
+
+
+class PySequoiaSignatureVendor(SignatureSigner, SignatureVerifier):
+    """Signature vendor that uses the pysequoia package for OpenPGP signatures.
+
+    Unlike the GPG vendors, this does not use a GnuPG keyring; the secret keys
+    used for signing and the certificates used for verification have to be
+    passed in explicitly.
+    """
+
+    def __init__(
+        self,
+        secret_keys: "Iterable[pysequoia.Tsk]" = (),
+        certs: "Iterable[pysequoia.Cert]" = (),
+        password: str | None = None,
+        keyids: Iterable[str] | None = None,
+    ) -> None:
+        """Initialize the pysequoia vendor.
+
+        Args:
+          secret_keys: Secret keys available for signing. Their public
+                 certificates are also used for verification.
+          certs: Certificates used to verify signatures.
+          password: Password used to unlock the secret keys, if they are
+                 password-protected.
+          keyids: Optional iterable of trusted key IDs/fingerprints for
+                 verification. If provided, only signatures from these keys
+                 will be trusted.
+        """
+        SignatureVerifier.__init__(self, keyids)
+        self.secret_keys = list(secret_keys)
+        self.certs = list(certs) + [
+            tsk.extract_certificate() for tsk in self.secret_keys
+        ]
+        self.password = password
+
+    @classmethod
+    def available(cls) -> bool:
+        """Check if the pysequoia Python package is available.
+
+        Returns:
+          True if pysequoia package can be imported, False otherwise
+        """
+        import importlib.util
+
+        return importlib.util.find_spec("pysequoia") is not None
+
+    def sign(self, data: bytes, keyid: str | None = None) -> bytes:
+        """Sign data with one of the configured secret keys.
+
+        Args:
+          data: The data to sign
+          keyid: Optional key ID or fingerprint of the primary key to sign
+                 with. If not specified, the first secret key is used.
+
+        Returns:
+          The ASCII-armored detached signature as bytes
+
+        Raises:
+          ValueError: if no secret key is available, or none matches keyid
+        """
+        import pysequoia
+
+        if keyid is None:
+            if not self.secret_keys:
+                raise ValueError("No secret keys available for signing")
+            tsk = self.secret_keys[0]
+        else:
+            for tsk in self.secret_keys:
+                if _keyid_matches(tsk.extract_certificate().fingerprint, keyid):
+                    break
+            else:
+                raise ValueError(f"No secret key available for {keyid}")
+
+        signature = pysequoia.sign(
+            tsk.signer(self.password),
+            data,
+            mode=pysequoia.SignatureMode.DETACHED,
+        )
+        assert isinstance(signature, bytes)
+        return signature
+
+    def verify(self, data: bytes, signature: bytes) -> None:
+        """Verify an OpenPGP signature against the configured certificates.
+
+        Args:
+          data: The data that was signed
+          signature: The signature to verify
+
+        Raises:
+          BadSignature: if signature verification fails
+          UntrustedSignature: if signature was not created by a trusted key
+        """
+        import pysequoia
+
+        try:
+            sig = pysequoia.Sig.from_bytes(signature)
+            result = pysequoia.verify(
+                bytes=data, store=lambda keyids: self.certs, signature=sig
+            )
+        except RuntimeError as e:
+            raise BadSignature(f"OpenPGP signature verification failed: {e}") from e
+
+        if not result.valid_sigs:
+            raise BadSignature(
+                "OpenPGP signature verification failed: no signatures found"
+            )
+
+        if self.keyids:
+            signing_keys: list[str] = []
+            for valid_sig in result.valid_sigs:
+                signing_keys.extend([valid_sig.signing_key, valid_sig.certificate])
+            for signed_by in signing_keys:
+                if any(_keyid_matches(signed_by, keyid) for keyid in self.keyids):
+                    return
+            raise UntrustedSignature(
+                f"Signature not created by a trusted key. "
+                f"Signed by: {signing_keys}, trusted keys: {list(self.keyids)}",
+                signing_keys=signing_keys,
+                trusted_keys=list(self.keyids),
+            )
 
 
 class X509SignatureVendor(SignatureSigner, SignatureVerifier):
@@ -658,19 +784,8 @@ class X509SignatureVendor(SignatureSigner, SignatureVerifier):
                         "Could not determine signing certificate from gpgsm status output"
                     )
 
-                # Check if any of the signing certs match the trusted keyids
-                keyids_normalized = [k.replace(" ", "").upper() for k in self.keyids]
-
                 for signed_by in signing_certs:
-                    signed_by_normalized = signed_by.replace(" ", "").upper()
-                    # A key ID is the trailing hex of a fingerprint, so the
-                    # shorter value must be a suffix of the longer one rather
-                    # than appearing anywhere inside it.
-                    if any(
-                        signed_by_normalized.endswith(keyid)
-                        or keyid.endswith(signed_by_normalized)
-                        for keyid in keyids_normalized
-                    ):
+                    if any(_keyid_matches(signed_by, k) for k in self.keyids):
                         return
 
                 # None of the signing certs matched
@@ -891,16 +1006,17 @@ class SSHSigSignatureVendor(SignatureVerifier):
         ts = timestamp_str.rstrip("Z")
 
         try:
-            if len(ts) == 8:  # YYYYMMDD
-                dt = datetime.datetime.strptime(ts, "%Y%m%d")
-            elif len(ts) == 12:  # YYYYMMDDHHMM
-                dt = datetime.datetime.strptime(ts, "%Y%m%d%H%M")
-            elif len(ts) == 14:  # YYYYMMDDHHMMSS
-                dt = datetime.datetime.strptime(ts, "%Y%m%d%H%M%S")
-            else:
-                raise UntrustedSignature(
-                    f"Invalid SSH timestamp format: {timestamp_str}"
-                )
+            match len(ts):
+                case 8:  # YYYYMMDD
+                    dt = datetime.datetime.strptime(ts, "%Y%m%d")
+                case 12:  # YYYYMMDDHHMM
+                    dt = datetime.datetime.strptime(ts, "%Y%m%d%H%M")
+                case 14:  # YYYYMMDDHHMMSS
+                    dt = datetime.datetime.strptime(ts, "%Y%m%d%H%M%S")
+                case _:
+                    raise UntrustedSignature(
+                        f"Invalid SSH timestamp format: {timestamp_str}"
+                    )
 
             # Convert to UTC timestamp
             return int(dt.replace(tzinfo=datetime.timezone.utc).timestamp())
@@ -1516,6 +1632,8 @@ def get_available_vendors() -> dict[
         openpgp_vendors.append(GPGSignatureVendor)
     if GPGCliSignatureVendor.available():
         openpgp_vendors.append(GPGCliSignatureVendor)
+    if PySequoiaSignatureVendor.available():
+        openpgp_vendors.append(PySequoiaSignatureVendor)
     if openpgp_vendors:
         available[SIGNATURE_FORMAT_OPENPGP] = openpgp_vendors
 

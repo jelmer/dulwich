@@ -1,9 +1,56 @@
-1.2.19	UNRELEASED
+1.2.20	UNRELEASED
 
  * Consume the protocol-v2 ``shallow-info`` section a server sends when the
    client is shallow but no depth change was requested. Fetching into a
    shallow clone silently dropped the pack while still updating the remote
    ref, leaving it pointing at missing objects. (Kartik Kenchi, #2478)
+
+ * Validate object ids in LFS server batch requests. An absolute path or
+   ``..`` in the ``oid`` let a client probe for the existence of any file
+   readable by the server. Reported by @JMak-Security. (Jelmer Vernooĳ)
+
+ * Add ``PySequoiaSignatureVendor``, which signs and verifies OpenPGP
+   signatures with pysequoia using explicitly provided keys rather than
+   a GnuPG keyring. (Jelmer Vernooĳ)
+
+ * Pick the same commit and tag headers as git when they are repeated or out
+   of place, so a commit with two ``tree`` headers no longer checks out a
+   different tree than git does. Commits and tags that git refuses to parse
+   are now rejected, and unknown tag headers are preserved. (Jelmer Vernooĳ)
+
+ * Verify commit signatures against the raw commit with its signature headers
+   removed, rather than a re-serialization, and read and write SHA-256 commit
+   signatures in the ``gpgsig-sha256`` header. (Jelmer Vernooĳ)
+
+ * Refuse to check out ``.gitmodules`` as a symlink. (Kartik Kenchi)
+
+ * Report the remote's stderr (e.g. ``Permission denied (publickey).``)
+   when an ssh connection closes before the server sends anything, rather
+   than a bare hangup error. (Jelmer Vernooĳ, #2523)
+
+1.2.19	2026-10-22
+
+ * Keep the assume-unchanged flag (and other index flags) on entries
+   whose content does not change, rather than clearing it when ``status``
+   refreshes the stat cache or on reset, checkout, restore, stash pop and
+   add. (Jelmer Vernooĳ)
+
+ * Split the interactive rebase todo list only on newlines, so a carriage
+   return or other line separator in a commit subject can no longer add an
+   instruction such as ``exec`` to the rebase. (Kartik Kenchi)
+
+ * In ``update_working_tree``, leave a path alone when one of its leading
+   directories has been replaced by a symlink, rather than following the
+   symlink and removing a file outside the work tree. (Kartik Kenchi)
+
+ * Walk the commit graph with a ``deque`` in ``_collect_ancestors`` so
+   enumerating reachable commits (during ``upload-pack`` negotiation and
+   pack generation) is linear rather than O(n^2) in the number of commits.
+   (Kartik Kenchi)
+
+ * Fold the commit message's first paragraph onto a single ``Subject`` line
+   in ``write_commit_patch`` (``format-patch``), so later lines of the
+   message no longer end up in the mail headers. (Kartik Kenchi)
 
 1.2.18	2026-10-11
 

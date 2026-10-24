@@ -27,7 +27,7 @@ import sys
 import tempfile
 import unittest
 
-from dulwich.index import InvalidPathError
+from dulwich.index import FLAG_VALID, InvalidPathError
 from dulwich.objects import Blob, Tree
 from dulwich.repo import Repo
 from dulwich.stash import DEFAULT_STASH_REF, Stash
@@ -98,6 +98,25 @@ class StashTests(TestCase):
         entry = stash[0]
         self.assertEqual(commit_id, entry.new_sha)
         self.assertTrue(b"Test stash message" in entry.message)
+
+    def test_pop_keeps_flags_of_unchanged_entry(self) -> None:
+        stash = Stash.from_repo(self.repo)
+        os.makedirs(os.path.join(self.repo.commondir(), "logs"), exist_ok=True)
+        with open(os.path.join(self.repo_dir, "initial.txt"), "wb") as f:
+            f.write(b"initial data")
+        self.repo.get_worktree().stage(["initial.txt"])
+        self.repo.get_worktree().commit(message=b"Add initial.txt")
+        with open(os.path.join(self.repo_dir, "testfile.txt"), "wb") as f:
+            f.write(b"test data")
+        self.repo.get_worktree().stage(["testfile.txt"])
+        stash.push()
+        index = self.repo.open_index()
+        index[b"initial.txt"].flags |= FLAG_VALID
+        index.write()
+
+        stash.pop(0)
+
+        self.assertEqual(FLAG_VALID, self.repo.open_index()[b"initial.txt"].flags)
 
     def test_drop_stash(self) -> None:
         stash = Stash.from_repo(self.repo)

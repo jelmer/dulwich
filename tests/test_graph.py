@@ -326,7 +326,7 @@ class CanFastForwardTests(TestCase):
         # We only have c1 and c2, base is missing (shallow boundary at c1)
 
         # Create a fake base commit ID (won't exist in repo)
-        base_sha = b"1" * 20  # Valid SHA format but doesn't exist (20 bytes)
+        base_sha = b"1" * 40
 
         c1 = make_commit(parents=[base_sha], commit_time=2000)
         c2 = make_commit(parents=[c1.id], commit_time=3000)

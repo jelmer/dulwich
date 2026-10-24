@@ -26,9 +26,11 @@ import shutil
 import stat
 import sys
 import tempfile
+import time
 import zlib
 from io import BytesIO, StringIO
 from typing import NoReturn
+from unittest.mock import patch
 
 from dulwich.index import index_entry_from_stat
 from dulwich.object_store import MemoryObjectStore
@@ -81,18 +83,69 @@ class WriteCommitPatchTests(TestCase):
         self.assertTrue(lines[2].startswith(b"Date: "))
         self.assertEqual(
             [
-                b"Subject: [PATCH 1/1] This is the first line\n",
-                b"And this is the second line.\n",
-                b"\n",
+                b"Subject: [PATCH 1/1] This is the first line"
+                b" And this is the second line.\n",
                 b"\n",
                 b"---\n",
             ],
-            lines[3:8],
+            lines[3:6],
         )
         self.assertEqual([b"CONTENTS-- \n", b"custom\n"], lines[-2:])
-        if len(lines) >= 12:
+        if len(lines) >= 10:
             # diffstat may not be present
-            self.assertEqual(lines[8], b" 0 files changed\n")
+            self.assertEqual(lines[6], b" 0 files changed\n")
+
+    def _write_patch(self, c: Commit) -> bytes:
+        # Pin the Date header and disable diffstat so the output is fixed.
+        f = BytesIO()
+        with (
+            patch("time.strftime", return_value="Thu, 01 Jan 1970 00:00:00 UTC"),
+            patch("subprocess.Popen", side_effect=OSError),
+        ):
+            write_commit_patch(f, c, b"CONTENTS", (1, 1), version="custom")
+        return f.getvalue()
+
+    def test_subject_body_split(self) -> None:
+        c = make_commit(
+            author=b"Jelmer <jelmer@samba.org>",
+            commit_time=1271350201,
+            message=b"Summary line\n\nBody paragraph.\n",
+            tree=Tree().id,
+        )
+        self.assertEqual(
+            b"From " + c.id + b" " + time.ctime(1271350201).encode() + b"\n"
+            b"From: Jelmer <jelmer@samba.org>\n"
+            b"Date: Thu, 01 Jan 1970 00:00:00 UTC\n"
+            b"Subject: [PATCH 1/1] Summary line\n"
+            b"\n"
+            b"Body paragraph.\n"
+            b"---\n"
+            b"CONTENTS-- \n"
+            b"custom\n",
+            self._write_patch(c),
+        )
+
+    def test_multiline_subject_folded(self) -> None:
+        # Lines of the first paragraph are folded into the Subject rather
+        # than being written as separate header lines.
+        c = make_commit(
+            author=b"Jelmer <jelmer@samba.org>",
+            commit_time=1271350201,
+            message=b"Fix thing\nCc: someone@example.com\nBcc: other@example.com\n",
+            tree=Tree().id,
+        )
+        self.assertEqual(
+            b"From " + c.id + b" " + time.ctime(1271350201).encode() + b"\n"
+            b"From: Jelmer <jelmer@samba.org>\n"
+            b"Date: Thu, 01 Jan 1970 00:00:00 UTC\n"
+            b"Subject: [PATCH 1/1] Fix thing Cc: someone@example.com"
+            b" Bcc: other@example.com\n"
+            b"\n"
+            b"---\n"
+            b"CONTENTS-- \n"
+            b"custom\n",
+            self._write_patch(c),
+        )
 
 
 class ReadGitAmPatch(TestCase):

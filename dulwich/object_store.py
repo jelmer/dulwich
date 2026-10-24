@@ -3348,26 +3348,31 @@ class MissingObjectFinder:
                 break
         if not leaf:
             o = self.object_store[sha]
-            if isinstance(o, Commit):
-                self.add_todo([(o.tree, b"", Tree.type_num, False)])
-            elif isinstance(o, Tree):
-                todos = []
-                for n, m, s in o.iteritems():
-                    assert m is not None
-                    assert n is not None
-                    assert s is not None
-                    if not S_ISGITLINK(m):
-                        todos.append(
-                            (
-                                s,
-                                n,
-                                (Blob.type_num if stat.S_ISREG(m) else Tree.type_num),
-                                not stat.S_ISDIR(m),
+            match o:
+                case Commit():
+                    self.add_todo([(o.tree, b"", Tree.type_num, False)])
+                case Tree():
+                    todos = []
+                    for n, m, s in o.iteritems():
+                        assert m is not None
+                        assert n is not None
+                        assert s is not None
+                        if not S_ISGITLINK(m):
+                            todos.append(
+                                (
+                                    s,
+                                    n,
+                                    (
+                                        Blob.type_num
+                                        if stat.S_ISREG(m)
+                                        else Tree.type_num
+                                    ),
+                                    not stat.S_ISDIR(m),
+                                )
                             )
-                        )
-                self.add_todo(todos)
-            elif isinstance(o, Tag):
-                self.add_todo([(o.object[1], None, o.object[0].type_num, False)])
+                    self.add_todo(todos)
+                case Tag():
+                    self.add_todo([(o.object[1], None, o.object[0].type_num, False)])
         if sha in self._tagged:
             self.add_todo([(self._tagged[sha], None, None, True)])
         self.sha_done.add(sha)

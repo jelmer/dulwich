@@ -66,14 +66,15 @@ def update_lines(
         a=[line for (h, line) in annotated_lines], b=new_lines
     )
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == "equal":
-            ret.extend(annotated_lines[i1:i2])
-        elif tag in ("insert", "replace"):
-            ret.extend([(new_history_data, line) for line in new_lines[j1:j2]])
-        elif tag == "delete":
-            pass  # don't care
-        else:
-            raise RuntimeError(f"Unknown tag {tag} returned in diff")
+        match tag:
+            case "equal":
+                ret.extend(annotated_lines[i1:i2])
+            case "insert" | "replace":
+                ret.extend([(new_history_data, line) for line in new_lines[j1:j2]])
+            case "delete":
+                pass  # don't care
+            case _:
+                raise RuntimeError(f"Unknown tag {tag} returned in diff")
     return ret
 
 

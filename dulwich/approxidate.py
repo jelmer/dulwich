@@ -60,15 +60,16 @@ def parse_approxidate(time_spec: str | bytes) -> int:
     now = time.time()
 
     # Handle special keywords
-    if time_spec == "yesterday":
-        return int(now - 86400)
-    elif time_spec == "today":
-        # Start of today (midnight)
-        dt = datetime.fromtimestamp(now)
-        dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
-        return int(dt.timestamp())
-    elif time_spec == "now":
-        return int(now)
+    match time_spec:
+        case "yesterday":
+            return int(now - 86400)
+        case "today":
+            # Start of today (midnight)
+            dt = datetime.fromtimestamp(now)
+            dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            return int(dt.timestamp())
+        case "now":
+            return int(now)
 
     # Try parsing as Unix timestamp
     try:

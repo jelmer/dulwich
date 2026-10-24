@@ -1006,16 +1006,17 @@ class SSHSigSignatureVendor(SignatureVerifier):
         ts = timestamp_str.rstrip("Z")
 
         try:
-            if len(ts) == 8:  # YYYYMMDD
-                dt = datetime.datetime.strptime(ts, "%Y%m%d")
-            elif len(ts) == 12:  # YYYYMMDDHHMM
-                dt = datetime.datetime.strptime(ts, "%Y%m%d%H%M")
-            elif len(ts) == 14:  # YYYYMMDDHHMMSS
-                dt = datetime.datetime.strptime(ts, "%Y%m%d%H%M%S")
-            else:
-                raise UntrustedSignature(
-                    f"Invalid SSH timestamp format: {timestamp_str}"
-                )
+            match len(ts):
+                case 8:  # YYYYMMDD
+                    dt = datetime.datetime.strptime(ts, "%Y%m%d")
+                case 12:  # YYYYMMDDHHMM
+                    dt = datetime.datetime.strptime(ts, "%Y%m%d%H%M")
+                case 14:  # YYYYMMDDHHMMSS
+                    dt = datetime.datetime.strptime(ts, "%Y%m%d%H%M%S")
+                case _:
+                    raise UntrustedSignature(
+                        f"Invalid SSH timestamp format: {timestamp_str}"
+                    )
 
             # Convert to UTC timestamp
             return int(dt.replace(tzinfo=datetime.timezone.utc).timestamp())

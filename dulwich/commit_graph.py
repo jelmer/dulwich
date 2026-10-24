@@ -394,20 +394,31 @@ class CommitGraph:
             commit_data += hex_to_sha(entry.tree_id)
 
             # Parent positions (2 x 4 bytes)
-            if len(entry.parents) == 0:
-                parent1_pos = GRAPH_PARENT_MISSING
-                parent2_pos = GRAPH_PARENT_MISSING
-            elif len(entry.parents) == 1:
-                parent1_pos = oid_to_index.get(entry.parents[0], GRAPH_PARENT_MISSING)
-                parent2_pos = GRAPH_PARENT_MISSING
-            elif len(entry.parents) == 2:
-                parent1_pos = oid_to_index.get(entry.parents[0], GRAPH_PARENT_MISSING)
-                parent2_pos = oid_to_index.get(entry.parents[1], GRAPH_PARENT_MISSING)
-            else:
-                # More than 2 parents - would need extra edge list chunk
-                # For now, just store first two parents
-                parent1_pos = oid_to_index.get(entry.parents[0], GRAPH_PARENT_MISSING)
-                parent2_pos = oid_to_index.get(entry.parents[1], GRAPH_PARENT_MISSING)
+            match len(entry.parents):
+                case 0:
+                    parent1_pos = GRAPH_PARENT_MISSING
+                    parent2_pos = GRAPH_PARENT_MISSING
+                case 1:
+                    parent1_pos = oid_to_index.get(
+                        entry.parents[0], GRAPH_PARENT_MISSING
+                    )
+                    parent2_pos = GRAPH_PARENT_MISSING
+                case 2:
+                    parent1_pos = oid_to_index.get(
+                        entry.parents[0], GRAPH_PARENT_MISSING
+                    )
+                    parent2_pos = oid_to_index.get(
+                        entry.parents[1], GRAPH_PARENT_MISSING
+                    )
+                case _:
+                    # More than 2 parents - would need extra edge list chunk
+                    # For now, just store first two parents
+                    parent1_pos = oid_to_index.get(
+                        entry.parents[0], GRAPH_PARENT_MISSING
+                    )
+                    parent2_pos = oid_to_index.get(
+                        entry.parents[1], GRAPH_PARENT_MISSING
+                    )
 
             commit_data += struct.pack(">LL", parent1_pos, parent2_pos)
 

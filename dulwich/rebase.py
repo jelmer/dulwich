@@ -1114,100 +1114,105 @@ def process_interactive_rebase(
             break
 
         # Handle each command type
-        if entry.command == RebaseTodoCommand.PICK:
-            # Regular cherry-pick
-            result = rebaser.continue_()
-            if result is not None:
-                # Conflicts
-                return False, "conflict"
+        match entry.command:
+            case RebaseTodoCommand.PICK:
+                # Regular cherry-pick
+                result = rebaser.continue_()
+                if result is not None:
+                    # Conflicts
+                    return False, "conflict"
 
-        elif entry.command == RebaseTodoCommand.REWORD:
-            # Cherry-pick then edit message
-            result = rebaser.continue_()
-            if result is not None:
-                # Conflicts
-                return False, "conflict"
+            case RebaseTodoCommand.REWORD:
+                # Cherry-pick then edit message
+                result = rebaser.continue_()
+                if result is not None:
+                    # Conflicts
+                    return False, "conflict"
 
-            # Get the last commit and allow editing its message
-            if rebaser._done and editor_callback:
-                last_commit = rebaser._done[-1]
-                new_message = editor_callback(last_commit.message)
+                # Get the last commit and allow editing its message
+                if rebaser._done and editor_callback:
+                    last_commit = rebaser._done[-1]
+                    new_message = editor_callback(last_commit.message)
 
-                # Create new commit with edited message
-                new_commit = Commit()
-                new_commit.tree = last_commit.tree
-                new_commit.parents = last_commit.parents
-                new_commit.author = last_commit.author
-                new_commit.author_time = last_commit.author_time
-                new_commit.author_timezone = last_commit.author_timezone
-                new_commit.committer = last_commit.committer
-                new_commit.commit_time = last_commit.commit_time
-                new_commit.commit_timezone = last_commit.commit_timezone
-                new_commit.message = new_message
-                new_commit.encoding = last_commit.encoding
+                    # Create new commit with edited message
+                    new_commit = Commit()
+                    new_commit.tree = last_commit.tree
+                    new_commit.parents = last_commit.parents
+                    new_commit.author = last_commit.author
+                    new_commit.author_time = last_commit.author_time
+                    new_commit.author_timezone = last_commit.author_timezone
+                    new_commit.committer = last_commit.committer
+                    new_commit.commit_time = last_commit.commit_time
+                    new_commit.commit_timezone = last_commit.commit_timezone
+                    new_commit.message = new_message
+                    new_commit.encoding = last_commit.encoding
 
-                repo.object_store.add_object(new_commit)
+                    repo.object_store.add_object(new_commit)
 
-                # Replace last commit in done list
-                rebaser._done[-1] = new_commit
+                    # Replace last commit in done list
+                    rebaser._done[-1] = new_commit
 
-        elif entry.command == RebaseTodoCommand.EDIT:
-            # Cherry-pick then pause
-            result = rebaser.continue_()
-            if result is not None:
-                # Conflicts
-                return False, "conflict"
+            case RebaseTodoCommand.EDIT:
+                # Cherry-pick then pause
+                result = rebaser.continue_()
+                if result is not None:
+                    # Conflicts
+                    return False, "conflict"
 
-            # Pause for user to amend
-            todo.advance()
-            state_manager.save_todo(todo)
-            return False, "edit"
+                # Pause for user to amend
+                todo.advance()
+                state_manager.save_todo(todo)
+                return False, "edit"
 
-        elif entry.command == RebaseTodoCommand.SQUASH:
-            # Combine with previous commit, keeping both messages
-            if not rebaser._done:
-                raise RebaseError("Cannot squash without a previous commit")
+            case RebaseTodoCommand.SQUASH:
+                # Combine with previous commit, keeping both messages
+                if not rebaser._done:
+                    raise RebaseError("Cannot squash without a previous commit")
 
-            conflict_result = _squash_commits(
-                repo, rebaser, entry, keep_message=True, editor_callback=editor_callback
-            )
-            if conflict_result == "conflict":
-                return False, "conflict"
+                conflict_result = _squash_commits(
+                    repo,
+                    rebaser,
+                    entry,
+                    keep_message=True,
+                    editor_callback=editor_callback,
+                )
+                if conflict_result == "conflict":
+                    return False, "conflict"
 
-        elif entry.command == RebaseTodoCommand.FIXUP:
-            # Combine with previous commit, discarding this message
-            if not rebaser._done:
-                raise RebaseError("Cannot fixup without a previous commit")
+            case RebaseTodoCommand.FIXUP:
+                # Combine with previous commit, discarding this message
+                if not rebaser._done:
+                    raise RebaseError("Cannot fixup without a previous commit")
 
-            conflict_result = _squash_commits(
-                repo, rebaser, entry, keep_message=False, editor_callback=None
-            )
-            if conflict_result == "conflict":
-                return False, "conflict"
+                conflict_result = _squash_commits(
+                    repo, rebaser, entry, keep_message=False, editor_callback=None
+                )
+                if conflict_result == "conflict":
+                    return False, "conflict"
 
-        elif entry.command == RebaseTodoCommand.DROP:
-            # Skip this commit
-            if rebaser._todo:
-                rebaser._todo.pop(0)
+            case RebaseTodoCommand.DROP:
+                # Skip this commit
+                if rebaser._todo:
+                    rebaser._todo.pop(0)
 
-        elif entry.command == RebaseTodoCommand.EXEC:
-            # Execute shell command
-            if entry.arguments:
-                try:
-                    subprocess.run(entry.arguments, shell=True, check=True)
-                except subprocess.CalledProcessError as e:
-                    # Command failed, pause rebase
-                    return False, f"exec failed: {e}"
+            case RebaseTodoCommand.EXEC:
+                # Execute shell command
+                if entry.arguments:
+                    try:
+                        subprocess.run(entry.arguments, shell=True, check=True)
+                    except subprocess.CalledProcessError as e:
+                        # Command failed, pause rebase
+                        return False, f"exec failed: {e}"
 
-        elif entry.command == RebaseTodoCommand.BREAK:
-            # Pause rebase
-            todo.advance()
-            state_manager.save_todo(todo)
-            return False, "break"
+            case RebaseTodoCommand.BREAK:
+                # Pause rebase
+                todo.advance()
+                state_manager.save_todo(todo)
+                return False, "break"
 
-        else:
-            # Unsupported command
-            raise RebaseError(f"Unsupported rebase command: {entry.command.value}")
+            case _:
+                # Unsupported command
+                raise RebaseError(f"Unsupported rebase command: {entry.command.value}")
 
         # Move to next entry
         todo.advance()

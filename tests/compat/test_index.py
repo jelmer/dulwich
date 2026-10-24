@@ -886,20 +886,21 @@ class IndexV4CompatTestCase(CompatTestCase):
         # Create many files
         files = []
         for i in range(200):  # Reasonable for CI
-            if i % 7 == 0:
-                filename = f"src/main/java/com/example/Service{i}.java"
-            elif i % 7 == 1:
-                filename = f"src/test/java/com/example/Test{i}.java"
-            elif i % 7 == 2:
-                filename = f"docs/api/page{i}.md"
-            elif i % 7 == 3:
-                filename = f"config/env/config{i}.properties"
-            elif i % 7 == 4:
-                filename = f"scripts/build/script{i}.sh"
-            elif i % 7 == 5:
-                filename = f"src/main/resources/resource{i}.txt"
-            else:
-                filename = f"file{i}.txt"
+            match i % 7:
+                case 0:
+                    filename = f"src/main/java/com/example/Service{i}.java"
+                case 1:
+                    filename = f"src/test/java/com/example/Test{i}.java"
+                case 2:
+                    filename = f"docs/api/page{i}.md"
+                case 3:
+                    filename = f"config/env/config{i}.properties"
+                case 4:
+                    filename = f"scripts/build/script{i}.sh"
+                case 5:
+                    filename = f"src/main/resources/resource{i}.txt"
+                case _:
+                    filename = f"file{i}.txt"
 
             files.append(filename)
             filepath = os.path.join(repo.path, filename)

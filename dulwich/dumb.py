@@ -560,16 +560,17 @@ class DumbRemoteHTTPRepo:
             # Parse the object to find references to other objects
             obj = ShaFile.from_raw_string(type_num, content)
 
-            if isinstance(obj, Commit):  # Commit
-                to_fetch.add(obj.tree)
-                for parent in obj.parents:
-                    to_fetch.add(parent)
-            elif isinstance(obj, Tag):  # Tag
-                to_fetch.add(obj.object[1])
-            elif isinstance(obj, Tree):  # Tree
-                for _, _, item_sha in obj.items():
-                    assert item_sha is not None
-                    to_fetch.add(item_sha)
+            match obj:
+                case Commit():
+                    to_fetch.add(obj.tree)
+                    for parent in obj.parents:
+                        to_fetch.add(parent)
+                case Tag():
+                    to_fetch.add(obj.object[1])
+                case Tree():
+                    for _, _, item_sha in obj.items():
+                        assert item_sha is not None
+                        to_fetch.add(item_sha)
 
             if progress:
                 progress(f"Fetching objects: {len(seen)} done\n".encode())

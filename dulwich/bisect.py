@@ -291,17 +291,22 @@ class BisectState:
             cmd = parts[2]
             args = parts[3:] if len(parts) > 3 else []
 
-            if cmd == "start":
-                self.start()
-            elif cmd == "bad":
-                rev = ObjectID(args[0].encode("ascii")) if args else None
-                self.mark_bad(rev)
-            elif cmd == "good":
-                rev = ObjectID(args[0].encode("ascii")) if args else None
-                self.mark_good(rev)
-            elif cmd == "skip":
-                revs = [ObjectID(arg.encode("ascii")) for arg in args] if args else None
-                self.skip(revs)
+            match cmd:
+                case "start":
+                    self.start()
+                case "bad":
+                    rev = ObjectID(args[0].encode("ascii")) if args else None
+                    self.mark_bad(rev)
+                case "good":
+                    rev = ObjectID(args[0].encode("ascii")) if args else None
+                    self.mark_good(rev)
+                case "skip":
+                    revs = (
+                        [ObjectID(arg.encode("ascii")) for arg in args]
+                        if args
+                        else None
+                    )
+                    self.skip(revs)
 
     def _find_next_commit(self) -> ObjectID | None:
         """Find the next commit to test using binary search.

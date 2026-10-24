@@ -139,26 +139,27 @@ class PackInfoMissingObjectFinder(GreenThreadsMissingObjectFinder):
         if not leaf:
             try:
                 obj = self.object_store[sha]
-                if isinstance(obj, Commit):
-                    self.add_todo([(obj.tree, b"", None, False)])
-                elif isinstance(obj, Tree):
-                    tree_items = [
-                        (
-                            item.sha,
-                            item.path
-                            if isinstance(item.path, bytes)
-                            else item.path.encode("utf-8")
-                            if item.path is not None
-                            else b"",
-                            None,
-                            False,
-                        )
-                        for item in obj.items()
-                        if item.sha is not None
-                    ]
-                    self.add_todo(tree_items)
-                elif isinstance(obj, Tag):
-                    self.add_todo([(obj.object[1], None, None, False)])
+                match obj:
+                    case Commit():
+                        self.add_todo([(obj.tree, b"", None, False)])
+                    case Tree():
+                        tree_items = [
+                            (
+                                item.sha,
+                                item.path
+                                if isinstance(item.path, bytes)
+                                else item.path.encode("utf-8")
+                                if item.path is not None
+                                else b"",
+                                None,
+                                False,
+                            )
+                            for item in obj.items()
+                            if item.sha is not None
+                        ]
+                        self.add_todo(tree_items)
+                    case Tag():
+                        self.add_todo([(obj.object[1], None, None, False)])
                 if sha in self._tagged:
                     self.add_todo([(self._tagged[sha], None, None, True)])
             except KeyError:
@@ -230,28 +231,29 @@ def pack_info_create(pack_data: "PackData", pack_index: "PackIndex") -> bytes:
     info: dict[bytes, Any] = {}
     for obj in pack.iterobjects():
         # Commit
-        if obj.type_num == Commit.type_num:
-            commit_obj = obj
-            assert isinstance(commit_obj, Commit)
-            info[obj.id] = (obj.type_num, commit_obj.parents, commit_obj.tree)
-        # Tree
-        elif obj.type_num == Tree.type_num:
-            tree_obj = obj
-            assert isinstance(tree_obj, Tree)
-            shas = [
-                (s, n, not stat.S_ISDIR(m))
-                for n, m, s in tree_obj.items()
-                if m is not None and not S_ISGITLINK(m)
-            ]
-            info[obj.id] = (obj.type_num, shas)
-        # Blob
-        elif obj.type_num == Blob.type_num:
-            info[obj.id] = (obj.type_num,)
-        # Tag
-        elif obj.type_num == Tag.type_num:
-            tag_obj = obj
-            assert isinstance(tag_obj, Tag)
-            info[obj.id] = (obj.type_num, tag_obj.object[1])
+        match obj.type_num:
+            case Commit.type_num:
+                commit_obj = obj
+                assert isinstance(commit_obj, Commit)
+                info[obj.id] = (obj.type_num, commit_obj.parents, commit_obj.tree)
+            # Tree
+            case Tree.type_num:
+                tree_obj = obj
+                assert isinstance(tree_obj, Tree)
+                shas = [
+                    (s, n, not stat.S_ISDIR(m))
+                    for n, m, s in tree_obj.items()
+                    if m is not None and not S_ISGITLINK(m)
+                ]
+                info[obj.id] = (obj.type_num, shas)
+            # Blob
+            case Blob.type_num:
+                info[obj.id] = (obj.type_num,)
+            # Tag
+            case Tag.type_num:
+                tag_obj = obj
+                assert isinstance(tag_obj, Tag)
+                info[obj.id] = (obj.type_num, tag_obj.object[1])
     return zlib.compress(json.dumps(info).encode("utf-8"))
 
 

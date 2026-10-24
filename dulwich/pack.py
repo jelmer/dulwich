@@ -2484,23 +2484,24 @@ class PackData:
           hash_format: Hash algorithm identifier for v3 (1 = SHA-1, 2 = SHA-256)
         Returns: Checksum of index file
         """
-        if version == 1:
-            return self.create_index_v1(
-                filename, progress, resolve_ext_ref=resolve_ext_ref
-            )
-        elif version == 2:
-            return self.create_index_v2(
-                filename, progress, resolve_ext_ref=resolve_ext_ref
-            )
-        elif version == 3:
-            return self.create_index_v3(
-                filename,
-                progress,
-                resolve_ext_ref=resolve_ext_ref,
-                hash_format=hash_format,
-            )
-        else:
-            raise ValueError(f"unknown index format {version}")
+        match version:
+            case 1:
+                return self.create_index_v1(
+                    filename, progress, resolve_ext_ref=resolve_ext_ref
+                )
+            case 2:
+                return self.create_index_v2(
+                    filename, progress, resolve_ext_ref=resolve_ext_ref
+                )
+            case 3:
+                return self.create_index_v3(
+                    filename,
+                    progress,
+                    resolve_ext_ref=resolve_ext_ref,
+                    hash_format=hash_format,
+                )
+            case _:
+                raise ValueError(f"unknown index format {version}")
 
     def get_stored_checksum(self) -> bytes:
         """Return the expected checksum stored in this pack."""
@@ -3454,15 +3455,16 @@ def pack_object_chunks(
         delta_base = None
 
     # Convert object to list of bytes chunks
-    if isinstance(object, bytes):
-        chunks = [object]
-    elif isinstance(object, list):
-        chunks = object
-    elif isinstance(object, ShaFile):
-        chunks = object.as_raw_chunks()
-    else:
-        # Shouldn't reach here with proper typing
-        raise TypeError(f"Unexpected object type: {object.__class__.__name__}")
+    match object:
+        case bytes():
+            chunks = [object]
+        case list():
+            chunks = object
+        case ShaFile():
+            chunks = object.as_raw_chunks()
+        case _:
+            # Shouldn't reach here with proper typing
+            raise TypeError(f"Unexpected object type: {object.__class__.__name__}")
 
     yield bytes(
         pack_object_header(
@@ -4442,14 +4444,15 @@ def write_pack_index(
     if version is None:
         version = DEFAULT_PACK_INDEX_VERSION
 
-    if version == 1:
-        return write_pack_index_v1(f, entries, pack_checksum)
-    elif version == 2:
-        return write_pack_index_v2(f, entries, pack_checksum)
-    elif version == 3:
-        return write_pack_index_v3(f, entries, pack_checksum)
-    else:
-        raise ValueError(f"Unsupported pack index version: {version}")
+    match version:
+        case 1:
+            return write_pack_index_v1(f, entries, pack_checksum)
+        case 2:
+            return write_pack_index_v2(f, entries, pack_checksum)
+        case 3:
+            return write_pack_index_v3(f, entries, pack_checksum)
+        case _:
+            raise ValueError(f"Unsupported pack index version: {version}")
 
 
 class Pack:

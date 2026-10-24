@@ -5562,34 +5562,21 @@ def _get_transport_and_path_from_url(
     pool_manager: "urllib3.PoolManager | None" = None,
 ) -> tuple[GitClient, str]:
     parsed = urlparse(url)
-    if parsed.scheme == "git":
-        return (
-            TCPGitClient.from_parsedurl(
-                parsed,
-                thin_packs=thin_packs,
-                report_activity=report_activity,
-                quiet=quiet,
-                include_tags=include_tags,
-                config=config,
-            ),
-            parsed.path,
-        )
-    elif parsed.scheme in ("git+ssh", "ssh"):
-        return SSHGitClient.from_parsedurl(
-            parsed,
-            config=config,
-            username=username,
-            password=password,
-            thin_packs=thin_packs,
-            report_activity=report_activity,
-            quiet=quiet,
-            include_tags=include_tags,
-            key_filename=key_filename,
-            ssh_command=ssh_command,
-        ), parsed.path
-    elif parsed.scheme in ("http", "https"):
-        return (
-            HttpGitClient.from_parsedurl(
+    match parsed.scheme:
+        case "git":
+            return (
+                TCPGitClient.from_parsedurl(
+                    parsed,
+                    thin_packs=thin_packs,
+                    report_activity=report_activity,
+                    quiet=quiet,
+                    include_tags=include_tags,
+                    config=config,
+                ),
+                parsed.path,
+            )
+        case "git+ssh" | "ssh":
+            return SSHGitClient.from_parsedurl(
                 parsed,
                 config=config,
                 username=username,
@@ -5598,28 +5585,42 @@ def _get_transport_and_path_from_url(
                 report_activity=report_activity,
                 quiet=quiet,
                 include_tags=include_tags,
-                pool_manager=pool_manager,
-            ),
-            parsed.path,
-        )
-    elif parsed.scheme == "file":
-        if sys.platform == "win32" or os.name == "nt":
-            return default_local_git_client_cls(
-                thin_packs=thin_packs,
-                report_activity=report_activity,
-                quiet=quiet,
-                include_tags=include_tags,
-            ), _win32_url_to_path(parsed)
-        return (
-            default_local_git_client_cls.from_parsedurl(
-                parsed,
-                thin_packs=thin_packs,
-                report_activity=report_activity,
-                quiet=quiet,
-                include_tags=include_tags,
-            ),
-            parsed.path,
-        )
+                key_filename=key_filename,
+                ssh_command=ssh_command,
+            ), parsed.path
+        case "http" | "https":
+            return (
+                HttpGitClient.from_parsedurl(
+                    parsed,
+                    config=config,
+                    username=username,
+                    password=password,
+                    thin_packs=thin_packs,
+                    report_activity=report_activity,
+                    quiet=quiet,
+                    include_tags=include_tags,
+                    pool_manager=pool_manager,
+                ),
+                parsed.path,
+            )
+        case "file":
+            if sys.platform == "win32" or os.name == "nt":
+                return default_local_git_client_cls(
+                    thin_packs=thin_packs,
+                    report_activity=report_activity,
+                    quiet=quiet,
+                    include_tags=include_tags,
+                ), _win32_url_to_path(parsed)
+            return (
+                default_local_git_client_cls.from_parsedurl(
+                    parsed,
+                    thin_packs=thin_packs,
+                    report_activity=report_activity,
+                    quiet=quiet,
+                    include_tags=include_tags,
+                ),
+                parsed.path,
+            )
 
     raise ValueError(f"unknown scheme '{parsed.scheme}'")
 

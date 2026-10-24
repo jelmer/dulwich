@@ -183,28 +183,29 @@ def _translate_segment(segment: bytes) -> bytes:
     while i < n:
         c = segment[i : i + 1]
         i += 1
-        if c == b"*":
-            # Collapse a run of consecutive '*' into a single quantifier.
-            # Within a segment repeated '*' are redundant ([^/]*[^/]* is
-            # equivalent to [^/]*), and emitting one quantifier per star
-            # builds a regex with adjacent unbounded quantifiers that
-            # backtracks catastrophically on non-matching input (ReDoS).
-            while i < n and segment[i : i + 1] == b"*":
-                i += 1
-            res += b"[^/]*"
-        elif c == b"?":
-            res += b"[^/]"
-        elif c == b"\\":
-            if i < n:
-                res += re.escape(segment[i : i + 1])
-                i += 1
-            else:
+        match c:
+            case b"*":
+                # Collapse a run of consecutive '*' into a single quantifier.
+                # Within a segment repeated '*' are redundant ([^/]*[^/]* is
+                # equivalent to [^/]*), and emitting one quantifier per star
+                # builds a regex with adjacent unbounded quantifiers that
+                # backtracks catastrophically on non-matching input (ReDoS).
+                while i < n and segment[i : i + 1] == b"*":
+                    i += 1
+                res += b"[^/]*"
+            case b"?":
+                res += b"[^/]"
+            case b"\\":
+                if i < n:
+                    res += re.escape(segment[i : i + 1])
+                    i += 1
+                else:
+                    res += re.escape(c)
+            case b"[":
+                i, bracket = translate_bracket_expression(segment, i)
+                res += bracket
+            case _:
                 res += re.escape(c)
-        elif c == b"[":
-            i, bracket = translate_bracket_expression(segment, i)
-            res += bracket
-        else:
-            res += re.escape(c)
     return res
 
 

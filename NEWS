@@ -4,6 +4,11 @@
    to a server backed by a ``MemoryRepo`` failed with a ``TypeError``.
    (Jelmer Vernooĳ)
 
+ * Refuse ref names outside ``refs/`` (such as ``HEAD``) or malformed ones
+   in ``receive-pack``, reporting ``funny refname``. Pushing to ``HEAD``
+   moved the branch it pointed at while hooks only saw ``HEAD``.
+   (Jelmer Vernooĳ, #2530)
+
  * Consume the protocol-v2 ``shallow-info`` section a server sends when the
    client is shallow but no depth change was requested. Fetching into a
    shallow clone silently dropped the pack while still updating the remote
@@ -35,6 +40,9 @@
  * Split a tag's signature from its message at the last signature marker and
    recognise PGP message and X.509 signatures, matching git, so a message that
    quotes a signature no longer confuses signature extraction. (Jelmer Vernooĳ)
+
+ * Speed up indexing of received thin packs in
+   ``DiskObjectStore.add_thin_pack``. (Zainab Mehmut)
 
 1.2.19	2026-10-22
 

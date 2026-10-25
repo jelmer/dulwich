@@ -1,5 +1,9 @@
 1.2.20	UNRELEASED
 
+ * Apply zero-context insertion hunks (as written by ``diff -U0``) after
+   the line named in the hunk header rather than before it. Such patches
+   inserted their lines one line too early. (Jelmer Vernooĳ, #2544)
+
  * Accept ``max_input_size`` in ``MemoryObjectStore.add_thin_pack``. A push
    to a server backed by a ``MemoryRepo`` failed with a ``TypeError``.
    (Jelmer Vernooĳ)

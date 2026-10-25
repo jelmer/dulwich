@@ -1,5 +1,9 @@
 1.2.20	UNRELEASED
 
+ * Accept ``max_input_size`` in ``MemoryObjectStore.add_thin_pack``. A push
+   to a server backed by a ``MemoryRepo`` failed with a ``TypeError``.
+   (Jelmer Vernooĳ)
+
  * Consume the protocol-v2 ``shallow-info`` section a server sends when the
    client is shallow but no depth change was requested. Fetching into a
    shallow clone silently dropped the pack while still updating the remote

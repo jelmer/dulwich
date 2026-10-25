@@ -5,6 +5,10 @@
    shallow clone silently dropped the pack while still updating the remote
    ref, leaving it pointing at missing objects. (Kartik Kenchi, #2478)
 
+ * Apply hunks without context lines that only insert lines, as written by
+   ``git diff -U0``, after the line named in the hunk header rather than
+   before it. (Wleeaf)
+
  * Validate object ids in LFS server batch requests. An absolute path or
    ``..`` in the ``oid`` let a client probe for the existence of any file
    readable by the server. Reported by @JMak-Security. (Jelmer Vernooĳ)

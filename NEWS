@@ -9,6 +9,11 @@
    moved the branch it pointed at while hooks only saw ``HEAD``.
    (Jelmer Vernooĳ, #2530)
 
+ * Only pass successfully updated refs to the ``post-receive`` hook in
+   ``receive-pack``, and skip the hook when nothing was updated. Refused
+   or failed ref updates were reported to it as if they had happened.
+   (Jelmer Vernooĳ)
+
  * Consume the protocol-v2 ``shallow-info`` section a server sends when the
    client is shallow but no depth change was requested. Fetching into a
    shallow clone silently dropped the pack while still updating the remote

@@ -570,6 +570,34 @@ class ReceivePackHandlerTestCase(TestCase):
         self.assertIsNotNone(ref_status)
         self.assertIn(b"update hook declined", ref_status)
 
+    def test_post_receive_hook_only_gets_updated_refs(self) -> None:
+        self._repo.refs[b"refs/heads/master"] = ONE
+        self._repo.refs[b"refs/heads/other"] = TWO
+        mock_hook = Mock()
+        mock_hook.execute.return_value = None
+        self._repo.hooks["post-receive"] = mock_hook
+        self._handler.proto.set_output(
+            [
+                ONE + b" " + ZERO_SHA + b" HEAD\x00delete-refs",
+                TWO + b" " + ZERO_SHA + b" refs/heads/other",
+                None,
+            ]
+        )
+        self._handler.handle()
+        mock_hook.execute.assert_called_once_with(
+            [(TWO, ZERO_SHA, b"refs/heads/other")]
+        )
+
+    def test_post_receive_hook_skipped_without_updates(self) -> None:
+        self._repo.refs[b"refs/heads/master"] = ONE
+        mock_hook = Mock()
+        self._repo.hooks["post-receive"] = mock_hook
+        self._handler.proto.set_output(
+            [ONE + b" " + ZERO_SHA + b" HEAD\x00delete-refs", None]
+        )
+        self._handler.handle()
+        mock_hook.execute.assert_not_called()
+
 
 class ProtocolGraphWalkerEmptyTestCase(TestCase):
     def setUp(self) -> None:

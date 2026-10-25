@@ -1,5 +1,10 @@
 1.2.20	UNRELEASED
 
+ * Write ``\ No newline at end of file`` after an unchanged last line that
+   has no newline in ``unified_diff`` and ``write_blob_diff``. The context
+   line was written without a newline, which ``git apply`` and ``patch``
+   reject as a corrupt patch. (Wleeaf)
+
  * Consume the protocol-v2 ``shallow-info`` section a server sends when the
    client is shallow but no depth change was requested. Fetching into a
    shallow clone silently dropped the pack while still updating the remote

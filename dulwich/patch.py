@@ -299,6 +299,9 @@ def unified_diff(
             if tag == "equal":
                 for line in a[i1:i2]:
                     yield b" " + line
+                if i2 == len(a) and not a[-1].endswith(b"\n"):
+                    # The unchanged last line has no newline.
+                    yield b"\n\\ No newline at end of file\n"
                 continue
             if tag in ("replace", "delete"):
                 for line in a[i1:i2]:
@@ -402,6 +405,9 @@ def unified_diff_with_algorithm(
             if tag == "equal":
                 for line in a[i1:i2]:
                     yield b" " + line
+                if i2 == len(a) and not a[-1].endswith(b"\n"):
+                    # The unchanged last line has no newline.
+                    yield b"\n\\ No newline at end of file\n"
                 continue
             if tag in ("replace", "delete"):
                 for line in a[i1:i2]:

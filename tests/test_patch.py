@@ -48,6 +48,7 @@ from dulwich.patch import (
     mailinfo,
     parse_unified_diff,
     patch_id,
+    unified_diff,
     unified_diff_with_algorithm,
     write_blob_diff,
     write_commit_patch,
@@ -340,6 +341,37 @@ More help   : https://help.launchpad.net/ListHelp
 
 class DiffTests(TestCase):
     """Tests for write_blob_diff and write_tree_diff."""
+
+    def test_blob_diff_no_newline_on_context_line(self) -> None:
+        f = BytesIO()
+        write_blob_diff(
+            f,
+            (b"foo.txt", 0o644, Blob.from_string(b"x\ny\nlast")),
+            (b"foo.txt", 0o644, Blob.from_string(b"x\nY\nlast")),
+        )
+        diff = f.getvalue()
+        # Same hunk as "git diff".
+        self.assertEqual(
+            [
+                b"@@ -1,3 +1,3 @@",
+                b" x",
+                b"-y",
+                b"+Y",
+                b" last",
+                b"\\ No newline at end of file",
+            ],
+            diff.splitlines()[4:],
+        )
+        self.assertEqual(
+            [b"x\n", b"Y\n", b"last"],
+            apply_patch_hunks(parse_unified_diff(diff)[0], [b"x\n", b"y\n", b"last"]),
+        )
+        self.assertEqual(
+            b"".join(
+                unified_diff([b"y\n", b"last"], [b"Y\n", b"last"], b"a", b"b")
+            ).splitlines()[-2:],
+            [b" last", b"\\ No newline at end of file"],
+        )
 
     def test_blob_diff(self) -> None:
         f = BytesIO()

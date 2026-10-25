@@ -1,5 +1,10 @@
 1.2.20	UNRELEASED
 
+ * Refuse ref names outside ``refs/`` (such as ``HEAD``) or malformed ones
+   in ``receive-pack``, reporting ``funny refname``. Pushing to ``HEAD``
+   moved the branch it pointed at while hooks only saw ``HEAD``.
+   (Jelmer Vernooĳ, #2530)
+
  * Consume the protocol-v2 ``shallow-info`` section a server sends when the
    client is shallow but no depth change was requested. Fetching into a
    shallow clone silently dropped the pack while still updating the remote

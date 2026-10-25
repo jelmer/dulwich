@@ -1411,9 +1411,12 @@ def apply_patch_hunks(
     offset = 0  # Track line offset as we apply hunks
 
     for hunk in patch.hunks:
-        # Adjust hunk position by offset
-        # old_start is 1-indexed; 0 means the hunk inserts at the beginning
-        target_line = max(hunk.old_start - 1, 0) + offset
+        # old_start is 1-indexed, except that a hunk without old lines
+        # inserts after line old_start.
+        if hunk.old_count == 0:
+            target_line = hunk.old_start + offset
+        else:
+            target_line = hunk.old_start - 1 + offset
 
         # Extract old and new content from hunk
         old_content: list[bytes] = []

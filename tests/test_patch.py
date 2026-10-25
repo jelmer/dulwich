@@ -1356,6 +1356,26 @@ class ApplyPatchTests(TestCase):
             self._apply_diff(b"diff --git a/f b/f\n" + diff, [b"one\n", b"two"]),
         )
 
+    def test_zero_context_insertions(self) -> None:
+        # Produced by git diff -U0 after changing b"a\nb\nc\n" to
+        # b"X\na\nb\nY\nc\nZ\n".
+        diff = (
+            b"diff --git a/f b/f\n"
+            b"index de98044..2d934a2 100644\n"
+            b"--- a/f\n"
+            b"+++ b/f\n"
+            b"@@ -0,0 +1 @@\n"
+            b"+X\n"
+            b"@@ -2,0 +4 @@ b\n"
+            b"+Y\n"
+            b"@@ -3,0 +6 @@ c\n"
+            b"+Z\n"
+        )
+        self.assertEqual(
+            [b"X\n", b"a\n", b"b\n", b"Y\n", b"c\n", b"Z\n"],
+            self._apply_diff(diff, [b"a\n", b"b\n", b"c\n"]),
+        )
+
     def test_simple_modification(self) -> None:
         """Test applying a simple modification patch."""
         original = [b"line 1\n", b"line 2\n", b"line 3\n"]

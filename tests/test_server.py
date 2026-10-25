@@ -38,6 +38,7 @@ from dulwich.errors import (
 from dulwich.object_filters import BlobNoneFilter
 from dulwich.object_store import MemoryObjectStore, find_shallow
 from dulwich.objects import Tree
+from dulwich.pack import write_pack_objects
 from dulwich.protocol import ZERO_SHA, format_capability_line
 from dulwich.repo import MemoryRepo, Repo
 from dulwich.server import (
@@ -387,6 +388,64 @@ class ReceivePackHandlerTestCase(TestCase):
         self.assertEqual(status[0][1], b"ok")
         self.assertEqual(status[1][0], b"refs/heads/fake-branch")
         self.assertEqual(status[1][1], b"ok")
+
+    def _push_empty_pack(self, caps, update_refs):
+        path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, path)
+        repo = Repo.init_bare(path)
+        self.addCleanup(repo.close)
+        c1 = make_commit()
+        c2 = make_commit(parents=[c1.id])
+        repo.object_store.add_objects([(c1, None), (c2, None)])
+        repo.refs[b"refs/heads/master"] = c1.id
+        pack = BytesIO()
+        write_pack_objects(pack.write, [], object_format=repo.object_format)
+        pack.seek(0)
+        proto = TestProto()
+        proto.read = pack.read
+        handler = ReceivePackHandler(DictBackend({b"/": repo}), [b"/"], proto)
+        handler.set_client_capabilities(caps)
+        status = list(handler._apply_pack(update_refs(c1.id, c2.id)))
+        self.assertEqual(c1.id, repo.refs[b"refs/heads/master"])
+        self.assertNotIn(b"refs/heads/other", repo.refs)
+        return status
+
+    def test_apply_pack_refuses_head(self) -> None:
+        status = self._push_empty_pack([], lambda c1, c2: [(c1, c2, b"HEAD")])
+        self.assertEqual([(b"unpack", b"ok"), (b"HEAD", b"funny refname")], status)
+
+    def test_apply_pack_atomic_refuses_head(self) -> None:
+        status = self._push_empty_pack(
+            [b"atomic"],
+            lambda c1, c2: [(c1, c2, b"HEAD"), (ZERO_SHA, c2, b"refs/heads/other")],
+        )
+        self.assertEqual(
+            [
+                (b"unpack", b"ok"),
+                (b"HEAD", b"funny refname"),
+                (b"refs/heads/other", b"atomic push failed"),
+            ],
+            status,
+        )
+
+    def test_apply_pack_refuses_head_delete(self) -> None:
+        self._repo.refs[b"refs/heads/master"] = ONE
+        self._handler.set_client_capabilities([b"delete-refs"])
+        status = list(self._handler._apply_pack([(ONE, ZERO_SHA, b"HEAD")]))
+        self.assertEqual([(b"unpack", b"ok"), (b"HEAD", b"funny refname")], status)
+        self.assertEqual(ONE, self._repo.refs[b"refs/heads/master"])
+
+    def test_apply_pack_refuses_malformed_ref(self) -> None:
+        self._repo.refs[b"refs/heads/master"] = ONE
+        self._handler.set_client_capabilities([b"delete-refs"])
+        status = list(
+            self._handler._apply_pack([(ONE, ZERO_SHA, b"refs/heads/../master")])
+        )
+        self.assertEqual(
+            [(b"unpack", b"ok"), (b"refs/heads/../master", b"funny refname")],
+            status,
+        )
+        self.assertEqual(ONE, self._repo.refs[b"refs/heads/master"])
 
     def test_handle_invalid_ref_line(self) -> None:
         """A ref-update line without three fields is rejected, not crashed on."""

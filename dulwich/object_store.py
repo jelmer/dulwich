@@ -3078,6 +3078,8 @@ class MemoryObjectStore(PackCapableObjectStore):
         read_all: Callable[[int], bytes],
         read_some: Callable[[int], bytes] | None,
         progress: Callable[[str], None] | None = None,
+        *,
+        max_input_size: int | None = None,
     ) -> None:
         """Add a new thin pack to this object store.
 
@@ -3091,7 +3093,16 @@ class MemoryObjectStore(PackCapableObjectStore):
           read_some: Read function that returns at least one byte, but may
             not return the number of bytes requested.
           progress: Optional progress reporting function.
+          max_input_size: Maximum number of bytes that may be read from
+            the wire while ingesting this pack. ``None`` (the default) or
+            ``0`` mean unlimited. Exceeding the cap raises
+            ``PackInputTooLarge``.
         """
+        if max_input_size:
+            read_all, read_some = _bound_read_callables(
+                read_all, read_some, max_input_size
+            )
+
         f, commit, abort = self.add_pack()
         try:
             copier = PackStreamCopier(

@@ -152,6 +152,18 @@ class MemoryObjectStoreTests(ObjectStoreTests, TestCase):
         self.assertEqual([], entries)
         o.add_thin_pack(f.read, None)
 
+    def test_add_thin_pack_max_input_size(self) -> None:
+        o = MemoryObjectStore()
+        blob = make_object(Blob, data=b"yummy data")
+        o.add_object(blob)
+
+        f = BytesIO()
+        entries = build_pack(f, [(REF_DELTA, (blob.id, b"more yummy data"))], store=o)
+
+        with self.assertRaises(PackInputTooLarge):
+            o.add_thin_pack(f.read, None, max_input_size=8)
+        self.assertNotIn(sha_to_hex(entries[0][3]), o)
+
     def test_add_pack_rejects_truncated_checksum(self) -> None:
         # A pack stream that lost the last few bytes of its trailing
         # checksum must be rejected by MemoryObjectStore.add_pack;

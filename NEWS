@@ -1,5 +1,9 @@
 1.2.20	UNRELEASED
 
+ * Accept ``max_input_size`` in ``MemoryObjectStore.add_thin_pack``. A push
+   to a server backed by a ``MemoryRepo`` failed with a ``TypeError``.
+   (Jelmer Vernooĳ)
+
  * Refuse ref names outside ``refs/`` (such as ``HEAD``) or malformed ones
    in ``receive-pack``, reporting ``funny refname``. Pushing to ``HEAD``
    moved the branch it pointed at while hooks only saw ``HEAD``.

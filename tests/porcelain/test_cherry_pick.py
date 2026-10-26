@@ -26,6 +26,7 @@ import os
 import tempfile
 
 from dulwich import porcelain
+from dulwich.errors import WorkingTreeModifiedError
 
 from .. import DependencyMissing, TestCase
 
@@ -67,6 +68,257 @@ class PorcelainCherryPickTests(TestCase):
             # Check the content
             with open(os.path.join(tmpdir, "file2.txt")) as f:
                 self.assertEqual(f.read(), "Feature content\n")
+
+    def test_cherry_pick_preserves_modified_tracked_file(self):
+        """Cherry-pick should not overwrite local changes to a tracked file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            porcelain.init(tmpdir)
+
+            file_path = os.path.join(tmpdir, "file.txt")
+
+            # Create the base commit.
+            with open(file_path, "w") as f:
+                f.write("Base content\n")
+            porcelain.add(tmpdir, paths=["file.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            # Create a commit on another branch that modifies the same file.
+            porcelain.branch_create(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
+
+            with open(file_path, "w") as f:
+                f.write("Feature content\n")
+            porcelain.add(tmpdir, paths=["file.txt"])
+            feature_commit = porcelain.commit(tmpdir, message=b"Modify file on feature")
+
+            # Return to master and make an unstaged local modification.
+            porcelain.checkout(tmpdir, "master")
+
+            with open(file_path, "w") as f:
+                f.write("Local uncommitted content\n")
+
+            head_before = porcelain.rev_parse(tmpdir, "HEAD")
+            status_before = porcelain.status(tmpdir)
+
+            # Git refuses this cherry-pick rather than destroying local work.
+            with self.assertRaises(WorkingTreeModifiedError):
+                porcelain.cherry_pick(tmpdir, feature_commit)
+
+            # The failed operation must not modify repository state.
+            self.assertEqual(head_before, porcelain.rev_parse(tmpdir, "HEAD"))
+            self.assertEqual(status_before, porcelain.status(tmpdir))
+
+            with open(file_path) as f:
+                self.assertEqual(f.read(), "Local uncommitted content\n")
+
+    def test_cherry_pick_preserves_untracked_file(self):
+        """Cherry-pick should not overwrite an untracked file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            porcelain.init(tmpdir)
+
+            # Create the base commit.
+            base_path = os.path.join(tmpdir, "base.txt")
+            with open(base_path, "w") as f:
+                f.write("Base content\n")
+            porcelain.add(tmpdir, paths=["base.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            # Create a feature branch that adds a new file.
+            porcelain.branch_create(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
+
+            file_path = os.path.join(tmpdir, "new-file.txt")
+            with open(file_path, "w") as f:
+                f.write("Feature content\n")
+            porcelain.add(tmpdir, paths=["new-file.txt"])
+            feature_commit = porcelain.commit(tmpdir, message=b"Add feature file")
+
+            # Return to master, where new-file.txt does not exist.
+            porcelain.checkout(tmpdir, "master")
+
+            # Create an untracked file at the path cherry-pick wants to add.
+            with open(file_path, "w") as f:
+                f.write("Local untracked content\n")
+
+            head_before = porcelain.rev_parse(tmpdir, "HEAD")
+
+            with self.assertRaises(WorkingTreeModifiedError):
+                porcelain.cherry_pick(tmpdir, feature_commit)
+
+            self.assertEqual(
+                head_before,
+                porcelain.rev_parse(tmpdir, "HEAD"),
+            )
+
+            with open(file_path) as f:
+                self.assertEqual(
+                    "Local untracked content\n",
+                    f.read(),
+                )
+
+    def test_cherry_pick_preserves_unrelated_local_changes(self):
+        """Cherry-pick should preserve unrelated local modifications."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            porcelain.init(tmpdir)
+
+            tracked_path = os.path.join(tmpdir, "tracked.txt")
+            with open(tracked_path, "w") as f:
+                f.write("Base content\n")
+            porcelain.add(tmpdir, paths=["tracked.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            porcelain.branch_create(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
+
+            feature_path = os.path.join(tmpdir, "feature.txt")
+            with open(feature_path, "w") as f:
+                f.write("Feature content\n")
+            porcelain.add(tmpdir, paths=["feature.txt"])
+            feature_commit = porcelain.commit(tmpdir, message=b"Add feature file")
+
+            porcelain.checkout(tmpdir, "master")
+
+            # Unrelated unstaged change.
+            with open(tracked_path, "w") as f:
+                f.write("Local modification\n")
+
+            new_commit = porcelain.cherry_pick(tmpdir, feature_commit)
+
+            self.assertIsNotNone(new_commit)
+
+            with open(tracked_path) as f:
+                self.assertEqual("Local modification\n", f.read())
+
+            with open(feature_path) as f:
+                self.assertEqual("Feature content\n", f.read())
+
+    def test_cherry_pick_preserves_modified_tracked_symlink(self):
+        """Locally changed symlink targets must not be overwritten."""
+        if not hasattr(os, "symlink"):
+            self.skipTest("OS does not support symlinks")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            porcelain.init(tmpdir)
+            link_path = os.path.join(tmpdir, "link")
+            try:
+                os.symlink("original", link_path)
+            except OSError:
+                self.skipTest("Symlink creation is unavailable")
+            porcelain.add(tmpdir, paths=["link"])
+            porcelain.commit(tmpdir, message=b"Base symlink")
+            porcelain.branch_create(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
+            os.unlink(link_path)
+            os.symlink("feature", link_path)
+            porcelain.add(tmpdir, paths=["link"])
+            feature_commit = porcelain.commit(tmpdir, message=b"Update symlink")
+            porcelain.checkout(tmpdir, "master")
+            os.unlink(link_path)
+            os.symlink("local", link_path)
+            before = porcelain.rev_parse(tmpdir, "HEAD")
+
+            with self.assertRaises(WorkingTreeModifiedError):
+                porcelain.cherry_pick(tmpdir, feature_commit)
+
+            self.assertEqual("local", os.readlink(link_path))
+            self.assertEqual(before, porcelain.rev_parse(tmpdir, "HEAD"))
+
+    def test_cherry_pick_preserves_staged_only_modification(self):
+        """Staged content must survive even when the working file matches HEAD."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            porcelain.init(tmpdir)
+            file_path = os.path.join(tmpdir, "file.txt")
+            with open(file_path, "w") as f:
+                f.write("base\n")
+            porcelain.add(tmpdir, paths=["file.txt"])
+            porcelain.commit(tmpdir, message=b"Base")
+            porcelain.branch_create(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
+            with open(file_path, "w") as f:
+                f.write("feature\n")
+            porcelain.add(tmpdir, paths=["file.txt"])
+            feature_commit = porcelain.commit(tmpdir, message=b"Feature")
+            porcelain.checkout(tmpdir, "master")
+
+            with open(file_path, "w") as f:
+                f.write("staged-only\n")
+            porcelain.add(tmpdir, paths=["file.txt"])
+            # The working copy matches HEAD, but the index does not.
+            with open(file_path, "w") as f:
+                f.write("base\n")
+            head_before = porcelain.rev_parse(tmpdir, "HEAD")
+            status_before = porcelain.status(tmpdir)
+
+            with self.assertRaises(WorkingTreeModifiedError):
+                porcelain.cherry_pick(tmpdir, feature_commit)
+
+            self.assertEqual(head_before, porcelain.rev_parse(tmpdir, "HEAD"))
+            self.assertEqual(status_before, porcelain.status(tmpdir))
+            with open(file_path) as f:
+                self.assertEqual("base\n", f.read())
+
+    def test_cherry_pick_rejects_unrelated_staged_changes(self):
+        """A regular cherry-pick must not include unrelated staged content."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            porcelain.init(tmpdir)
+            base_path = os.path.join(tmpdir, "base.txt")
+            with open(base_path, "w") as f:
+                f.write("base\n")
+            porcelain.add(tmpdir, paths=["base.txt"])
+            porcelain.commit(tmpdir, message=b"Base")
+            porcelain.branch_create(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
+            feature_path = os.path.join(tmpdir, "feature.txt")
+            with open(feature_path, "w") as f:
+                f.write("feature\n")
+            porcelain.add(tmpdir, paths=["feature.txt"])
+            feature_commit = porcelain.commit(tmpdir, message=b"Feature")
+            porcelain.checkout(tmpdir, "master")
+
+            with open(base_path, "w") as f:
+                f.write("staged\n")
+            porcelain.add(tmpdir, paths=["base.txt"])
+            before = porcelain.status(tmpdir)
+            head_before = porcelain.rev_parse(tmpdir, "HEAD")
+            with self.assertRaises(WorkingTreeModifiedError):
+                porcelain.cherry_pick(tmpdir, feature_commit)
+            self.assertEqual(before, porcelain.status(tmpdir))
+            self.assertEqual(head_before, porcelain.rev_parse(tmpdir, "HEAD"))
+            self.assertFalse(os.path.exists(feature_path))
+
+    def test_cherry_pick_no_commit_preserves_unrelated_staged_changes(self):
+        """--no-commit merges onto the index without losing staged changes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            porcelain.init(tmpdir)
+            base_path = os.path.join(tmpdir, "base.txt")
+            with open(base_path, "w") as f:
+                f.write("base\n")
+            porcelain.add(tmpdir, paths=["base.txt"])
+            porcelain.commit(tmpdir, message=b"Base")
+            porcelain.branch_create(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
+            feature_path = os.path.join(tmpdir, "feature.txt")
+            with open(feature_path, "w") as f:
+                f.write("feature\n")
+            porcelain.add(tmpdir, paths=["feature.txt"])
+            feature_commit = porcelain.commit(tmpdir, message=b"Feature")
+            porcelain.checkout(tmpdir, "master")
+
+            with open(base_path, "w") as f:
+                f.write("staged\n")
+            porcelain.add(tmpdir, paths=["base.txt"])
+            head_before = porcelain.rev_parse(tmpdir, "HEAD")
+            self.assertIsNone(
+                porcelain.cherry_pick(tmpdir, feature_commit, no_commit=True)
+            )
+            self.assertEqual(head_before, porcelain.rev_parse(tmpdir, "HEAD"))
+            with open(base_path) as f:
+                self.assertEqual("staged\n", f.read())
+            with open(feature_path) as f:
+                self.assertEqual("feature\n", f.read())
+            status = porcelain.status(tmpdir)
+            staged_paths = {p for paths in status.staged.values() for p in paths}
+            self.assertIn(b"base.txt", staged_paths)
+            self.assertIn(b"feature.txt", staged_paths)
 
     def test_cherry_pick_no_commit(self):
         """Test cherry-pick with --no-commit."""
@@ -214,3 +466,97 @@ class PorcelainCherryPickTests(TestCase):
             # Check that we're back to the master state
             with open(os.path.join(tmpdir, "file1.txt")) as f:
                 self.assertEqual(f.read(), "Master content\n")
+
+    def test_cherry_pick_preserves_staged_added_file(self):
+        """Cherry-pick should not overwrite a staged added file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            porcelain.init(tmpdir)
+
+            base_path = os.path.join(tmpdir, "base.txt")
+            with open(base_path, "w") as f:
+                f.write("Base content\n")
+            porcelain.add(tmpdir, paths=["base.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            porcelain.branch_create(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
+
+            file_path = os.path.join(tmpdir, "new.txt")
+            with open(file_path, "w") as f:
+                f.write("Feature content\n")
+            porcelain.add(tmpdir, paths=["new.txt"])
+            feature_commit = porcelain.commit(
+                tmpdir,
+                message=b"Add new file",
+            )
+
+            porcelain.checkout(tmpdir, "master")
+
+            with open(file_path, "w") as f:
+                f.write("Local staged content\n")
+            porcelain.add(tmpdir, paths=["new.txt"])
+
+            head_before = porcelain.rev_parse(tmpdir, "HEAD")
+            status_before = porcelain.status(tmpdir)
+
+            with self.assertRaises(WorkingTreeModifiedError):
+                porcelain.cherry_pick(tmpdir, feature_commit)
+
+            self.assertEqual(head_before, porcelain.rev_parse(tmpdir, "HEAD"))
+            self.assertEqual(status_before, porcelain.status(tmpdir))
+
+            with open(file_path) as f:
+                self.assertEqual("Local staged content\n", f.read())
+
+    def test_cherry_pick_rejects_untracked_parent_file(self):
+        """Cherry-pick should fail before writing when an untracked parent blocks it."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            porcelain.init(tmpdir)
+
+            base_path = os.path.join(tmpdir, "base.txt")
+            with open(base_path, "w") as f:
+                f.write("Base content\n")
+            porcelain.add(tmpdir, paths=["base.txt"])
+            porcelain.commit(tmpdir, message=b"Initial commit")
+
+            porcelain.branch_create(tmpdir, "feature")
+            porcelain.checkout(tmpdir, "feature")
+
+            first_path = os.path.join(tmpdir, "0-first.txt")
+            with open(first_path, "w") as f:
+                f.write("First change\n")
+
+            dir_path = os.path.join(tmpdir, "a")
+            os.mkdir(dir_path)
+            nested_path = os.path.join(dir_path, "b.txt")
+            with open(nested_path, "w") as f:
+                f.write("Nested content\n")
+
+            porcelain.add(
+                tmpdir,
+                paths=["0-first.txt", "a/b.txt"],
+            )
+            feature_commit = porcelain.commit(
+                tmpdir,
+                message=b"Add nested files",
+            )
+
+            porcelain.checkout(tmpdir, "master")
+
+            with open(dir_path, "w") as f:
+                f.write("Local untracked file\n")
+
+            head_before = porcelain.rev_parse(tmpdir, "HEAD")
+            status_before = porcelain.status(tmpdir)
+
+            with self.assertRaises(WorkingTreeModifiedError):
+                porcelain.cherry_pick(tmpdir, feature_commit)
+
+            self.assertEqual(head_before, porcelain.rev_parse(tmpdir, "HEAD"))
+            self.assertEqual(status_before, porcelain.status(tmpdir))
+
+            # Nothing should have been applied before detecting the conflict.
+            self.assertFalse(os.path.exists(first_path))
+
+            with open(dir_path) as f:
+                self.assertEqual("Local untracked file\n", f.read())

@@ -138,10 +138,10 @@ if TYPE_CHECKING:
     from .repo import Repo
 
 from . import _deprecated_aliases
-from .errors import ChecksumMismatch
+from .errors import ChecksumMismatch, NotTreeError, WorkingTreeModifiedError
 from .file import GitFile, SharedPerm
 from .object_format import DEFAULT_OBJECT_FORMAT, ObjectFormat
-from .object_store import iter_tree_contents
+from .object_store import iter_tree_contents, tree_lookup_path
 from .objects import (
     S_IFGITLINK,
     S_ISGITLINK,
@@ -3447,8 +3447,164 @@ def update_working_tree(
 
     # Check for uncommitted modifications before making any changes
     if not allow_overwrite_modified and old_tree_id:
+        ignore_manager = None
+
         for change in changes:
-            # Only check files that are being modified or deleted
+            if change.type == CHANGE_ADD and change.new:
+                path = change.new.path
+                assert path is not None
+
+                if not validate_path(path, validate_path_element):
+                    continue
+
+                # Sparse paths are recorded in the index, not checked out.
+                if in_sparse_checkout is not None and not in_sparse_checkout(path):
+                    continue
+
+                # Index entries are only conflicting additions if absent from
+                # the old tree. An existing tracked path can change type (e.g.
+                # file -> submodule or symlink -> file) without being staged.
+                # Check the index before lstat: a staged file may be gone on disk.
+                if path in index:
+                    try:
+                        tree_lookup_path(
+                            repo.object_store.__getitem__, old_tree_id, path
+                        )
+                    except (KeyError, NotTreeError):
+                        raise WorkingTreeModifiedError(
+                            f"Staged path '{path.decode('utf-8', errors='replace')}' "
+                            "would be overwritten by checkout."
+                        ) from None
+
+                # Check parents explicitly. Windows can return FileNotFoundError
+                # instead of NotADirectoryError when a parent is a file.
+                parts = path.split(b"/")
+                for i in range(1, len(parts)):
+                    parent = b"/".join(parts[:i])
+                    parent_path = _tree_to_fs_path(repo_path, parent, tree_encoding)
+                    try:
+                        parent_stat = os.lstat(parent_path)
+                    except FileNotFoundError:
+                        break
+                    if parent in paths_becoming_dirs:
+                        continue
+                    # Keep the original security error for a symlinked parent.
+                    if stat.S_ISLNK(parent_stat.st_mode):
+                        raise InvalidPathError(path)
+                    if not stat.S_ISDIR(parent_stat.st_mode):
+                        raise WorkingTreeModifiedError(
+                            f"Untracked working tree parent "
+                            f"'{parent.decode('utf-8', errors='replace')}' "
+                            f"blocks checkout of '{path.decode('utf-8', errors='replace')}'."
+                        )
+
+                full_path = _tree_to_fs_path(repo_path, path, tree_encoding)
+                try:
+                    current_stat = os.lstat(full_path)
+                except (FileNotFoundError, NotADirectoryError):
+                    continue
+
+                # An added change may be a tracked type transition. Preserve
+                # locally modified tracked entries before overwriting them.
+                try:
+                    old_mode, old_sha = tree_lookup_path(
+                        repo.object_store.__getitem__, old_tree_id, path
+                    )
+                except (KeyError, NotTreeError):
+                    pass
+                else:
+                    if stat.S_ISREG(current_stat.st_mode):
+                        matches_old = stat.S_ISREG(old_mode) and _check_file_matches(
+                            repo.object_store,
+                            full_path,
+                            old_sha,
+                            old_mode,
+                            current_stat,
+                            honor_filemode,
+                            blob_normalizer,
+                            path,
+                        )
+                    elif stat.S_ISLNK(current_stat.st_mode):
+                        matches_old = stat.S_ISLNK(old_mode) and _check_symlink_matches(
+                            full_path, repo.object_store, old_sha
+                        )
+                    else:
+                        # Directory/submodule transitions are checked by the
+                        # existing removal and apply logic below.
+                        continue
+                    if not matches_old:
+                        raise WorkingTreeModifiedError(
+                            f"Local changes to '{path.decode('utf-8', errors='replace')}' "
+                            "would be overwritten by checkout."
+                        )
+                    continue
+
+                # A directory may contain tracked files scheduled for deletion
+                # by the two-phase apply loop. Refuse the transition if any
+                # other file or directory would be left behind: failing during
+                # apply could otherwise leave the checkout partially updated.
+                if stat.S_ISDIR(current_stat.st_mode):
+                    deleted_paths = {
+                        other.old.path
+                        for other in changes
+                        if other.type in (CHANGE_DELETE, CHANGE_RENAME)
+                        and other.old is not None
+                        and other.old.path is not None
+                        and other.old.path.startswith(path + b"/")
+                    }
+                    if deleted_paths:
+                        removable = True
+                        for root, dirs, files in os.walk(full_path, followlinks=False):
+                            for name in dirs + files:
+                                entry_path = os.path.join(root, name)
+                                entry = _fs_to_tree_path(
+                                    os.path.relpath(entry_path, repo_path),
+                                    tree_encoding,
+                                )
+                                if os.path.islink(entry_path) or not os.path.isdir(
+                                    entry_path
+                                ):
+                                    # Each file or symlink must be removed.
+                                    safe = entry in deleted_paths
+                                else:
+                                    # Each real directory must become empty
+                                    # after its tracked descendants are removed.
+                                    safe = any(
+                                        deleted.startswith(entry + b"/")
+                                        for deleted in deleted_paths
+                                    )
+                                if not safe:
+                                    removable = False
+                                    break
+                            if not removable:
+                                break
+                        if removable:
+                            continue
+                    # Empty directories can be replaced directly.
+                    with os.scandir(full_path) as entries:
+                        if next(entries, None) is None:
+                            continue
+                    raise IsADirectoryError(
+                        f"Cannot replace non-empty directory with file: {full_path!r}"
+                    )
+
+                # Git permits replacing ignored untracked files.
+                if ignore_manager is None:
+                    from .ignore import IgnoreFilterManager
+
+                    ignore_manager = IgnoreFilterManager.from_repo(repo)
+                if ignore_manager.is_ignored(
+                    path.decode(tree_encoding, errors="surrogateescape")
+                ):
+                    continue
+
+                raise WorkingTreeModifiedError(
+                    f"Untracked working tree path "
+                    f"'{path.decode('utf-8', errors='replace')}' "
+                    f"would be overwritten by checkout."
+                )
+
+            # Check tracked files that are being modified or deleted.
             if change.type in (CHANGE_MODIFY, CHANGE_DELETE) and change.old:
                 path = change.old.path
                 assert path is not None
@@ -3465,10 +3621,11 @@ def update_working_tree(
                         f"Cannot access {path.decode('utf-8', errors='replace')}: {e}"
                     ) from e
 
+                assert change.old.sha is not None and change.old.mode is not None
                 if stat.S_ISREG(current_stat.st_mode):
-                    # Check if working tree file differs from old tree
-                    assert change.old.sha is not None and change.old.mode is not None
-                    file_matches = _check_file_matches(
+                    file_matches = stat.S_ISREG(
+                        change.old.mode
+                    ) and _check_file_matches(
                         repo.object_store,
                         full_path,
                         change.old.sha,
@@ -3478,14 +3635,21 @@ def update_working_tree(
                         blob_normalizer,
                         path,
                     )
-                    if not file_matches:
-                        from .errors import WorkingTreeModifiedError
-
-                        raise WorkingTreeModifiedError(
-                            f"Your local changes to '{path.decode('utf-8', errors='replace')}' "
-                            f"would be overwritten by checkout. "
-                            f"Please commit your changes or stash them before you switch branches."
-                        )
+                elif stat.S_ISLNK(current_stat.st_mode):
+                    file_matches = stat.S_ISLNK(
+                        change.old.mode
+                    ) and _check_symlink_matches(
+                        full_path, repo.object_store, change.old.sha
+                    )
+                else:
+                    # Directories (including submodules) use existing transition checks.
+                    continue
+                if not file_matches:
+                    raise WorkingTreeModifiedError(
+                        f"Your local changes to '{path.decode('utf-8', errors='replace')}' "
+                        f"would be overwritten by checkout. "
+                        f"Please commit your changes or stash them before you switch branches."
+                    )
 
     # Apply deletes before adds so that a directory being replaced by a file
     # has its contents removed first (and vice versa, a file being replaced by

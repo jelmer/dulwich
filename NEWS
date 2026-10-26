@@ -4,6 +4,10 @@
    32-bit platforms with AssertionError rather than OverflowError.
    (Jelmer Vernooĳ, #2574)
 
+ * Speed up adding received packs in ``DiskObjectStore.add_thin_pack`` and
+   ``add_pack`` by resolving each object once. A rejected pack no longer
+   leaves its temporary file behind. (Zainab Mehmut)
+
 1.2.21	2026-11-04
 
  * SECURITY: Refuse ``porcelain.submodule_update`` when the submodule path

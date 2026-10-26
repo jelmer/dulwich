@@ -1,4 +1,4 @@
-1.2.20	UNRELEASED
+1.2.20	2026-10-26
 
  * Apply zero-context insertion hunks (as written by ``diff -U0``) after
    the line named in the hunk header rather than before it. Such patches

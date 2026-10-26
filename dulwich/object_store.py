@@ -317,6 +317,23 @@ def _bound_read_callables(
     return wrapped_read_all, wrapped_read_some
 
 
+class _ParsingPackIndexer(PackIndexer):
+    """PackIndexer that also parses each object while it is resolved.
+
+    Payloads that fail to parse (e.g. tree entries with garbage modes) are
+    rejected before the pack is moved in, without a second walk over it.
+    """
+
+    def _result(self, unpacked: UnpackedObject) -> PackIndexEntry:
+        assert unpacked.obj_type_num is not None and unpacked.obj_chunks is not None
+        ShaFile.from_raw_chunks(
+            unpacked.obj_type_num,
+            unpacked.obj_chunks,
+            object_format=self._object_format,
+        )
+        return super()._result(unpacked)
+
+
 def find_shallow(
     store: ObjectContainer, heads: Iterable[ObjectID], depth: int
 ) -> tuple[set[ObjectID], set[ObjectID]]:
@@ -2328,15 +2345,6 @@ class DiskObjectStore(PackBasedObjectStore):
         )
         try:
             final_pack.check_length_and_checksum()
-            # Materialise every object so payloads that fail to parse
-            # (e.g. tree entries with garbage modes) are rejected rather
-            # than silently landed on disk. MemoryObjectStore already
-            # validates ingested objects this way via PackInflater; without
-            # the same check DiskObjectStore was strictly weaker.
-            for _obj in PackInflater.for_pack_data(
-                final_pack.data, resolve_ext_ref=self.get_raw
-            ):
-                pass
         except BaseException:
             final_pack.close()
             with suppress(FileNotFoundError):
@@ -2387,30 +2395,39 @@ class DiskObjectStore(PackBasedObjectStore):
             )
 
         fd, path = tempfile.mkstemp(dir=self.path, prefix="tmp_pack_")
-        with os.fdopen(fd, "w+b") as f:
-            os.chmod(path, PACK_MODE)
-            indexer = PackIndexer(
-                f,
-                self.object_format.hash_func,
-                resolve_ext_ref=self.get_raw,
-            )
-            copier = PackStreamCopier(
-                self.object_format.hash_func,
-                read_all,
-                read_some,
-                f,
-                delta_iter=indexer,  # type: ignore[arg-type]
-            )
-            copier.verify(progress=progress)
-            f.flush()
-            f.seek(0)
-            # Index from a mapping as add_pack does. Unmapped before completion.
-            with PackData(path, file=f, object_format=self.object_format) as pd:
-                indexer.set_pack_data(pd)
-                entries, ext_refs = self._index_pack(
-                    indexer, len(copier), progress=progress
+        try:
+            with os.fdopen(fd, "w+b") as f:
+                os.chmod(path, PACK_MODE)
+                indexer = _ParsingPackIndexer(
+                    f,
+                    self.object_format.hash_func,
+                    resolve_ext_ref=self.get_raw,
+                    object_format=self.object_format,
                 )
-            return self._complete_pack(f, path, entries, ext_refs, progress=progress)
+                copier = PackStreamCopier(
+                    self.object_format.hash_func,
+                    read_all,
+                    read_some,
+                    f,
+                    delta_iter=indexer,  # type: ignore[arg-type]
+                )
+                copier.verify(progress=progress)
+                f.flush()
+                f.seek(0)
+                # Index from a mapping as add_pack does. Unmapped before completion.
+                with PackData(path, file=f, object_format=self.object_format) as pd:
+                    indexer.set_pack_data(pd)
+                    entries, ext_refs = self._index_pack(
+                        indexer, len(copier), progress=progress
+                    )
+                return self._complete_pack(
+                    f, path, entries, ext_refs, progress=progress
+                )
+        except BaseException:
+            # Do not leave the temporary pack behind when the pack is rejected.
+            with suppress(FileNotFoundError):
+                _remove_readonly(path)
+            raise
 
     def add_pack(
         self,
@@ -2435,13 +2452,20 @@ class DiskObjectStore(PackBasedObjectStore):
                 # Scope the mapping to indexing: _complete_pack writes to and
                 # renames this same file, which a live mapping blocks on
                 # Windows. PackData.close() leaves f open for it to finish.
-                with PackData(path, file=f, object_format=self.object_format) as pd:
-                    indexer = PackIndexer.for_pack_data(
-                        pd,
-                        resolve_ext_ref=self.get_raw,
-                    )
-                    entries, ext_refs = self._index_pack(indexer, len(pd))  # type: ignore[arg-type]
-                return self._complete_pack(f, path, entries, ext_refs)
+                try:
+                    with PackData(path, file=f, object_format=self.object_format) as pd:
+                        indexer = _ParsingPackIndexer.for_pack_data(
+                            pd,
+                            resolve_ext_ref=self.get_raw,
+                        )
+                        entries, ext_refs = self._index_pack(indexer, len(pd))  # type: ignore[arg-type]
+                    return self._complete_pack(f, path, entries, ext_refs)
+                except BaseException:
+                    # Do not leave the temporary pack behind when the pack is rejected.
+                    f.close()
+                    with suppress(FileNotFoundError):
+                        _remove_readonly(path)
+                    raise
             else:
                 f.close()
                 os.remove(path)
@@ -2449,7 +2473,9 @@ class DiskObjectStore(PackBasedObjectStore):
 
         def abort() -> None:
             f.close()
-            os.remove(path)
+            # commit() removes the file itself when it rejects the pack.
+            with suppress(FileNotFoundError):
+                os.remove(path)
 
         return f, commit, abort  # type: ignore[return-value]
 

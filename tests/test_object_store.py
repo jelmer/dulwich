@@ -34,12 +34,17 @@ from unittest.mock import patch
 
 import dulwich.pack
 from dulwich.config import ConfigDict
-from dulwich.errors import ChecksumMismatch, NotTreeError, ObjectFormatException
+from dulwich.errors import (
+    ApplyDeltaError,
+    ChecksumMismatch,
+    NotTreeError,
+    ObjectFormatException,
+)
 from dulwich.file import GitFile
 from dulwich.gc import garbage_collect
 from dulwich.index import commit_tree
 from dulwich.midx import write_midx_file
-from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+from dulwich.object_format import DEFAULT_OBJECT_FORMAT, SHA256
 from dulwich.object_store import (
     DEFAULT_TEMPFILE_GRACE_PERIOD,
     DiskObjectStore,
@@ -67,9 +72,16 @@ from dulwich.objects import (
 )
 from dulwich.pack import (
     DEFAULT_DELTA_BASE_CACHE_LIMIT,
+    OFS_DELTA,
     REF_DELTA,
+    HashWriter,
     Pack,
+    SHA1Writer,
+    UnresolvedDeltas,
+    create_delta,
     load_pack_index,
+    write_pack_header,
+    write_pack_object,
     write_pack_objects,
 )
 from dulwich.repo import Repo
@@ -569,6 +581,180 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
             self.assertEqual([], entries)
             o.add_thin_pack(f.read, None)
 
+    def _assert_nothing_left_behind(self, o: DiskObjectStore) -> None:
+        self.assertEqual([], os.listdir(o.pack_dir))
+        self.assertEqual(
+            [], [n for n in os.listdir(o.path) if n.startswith("tmp_pack_")]
+        )
+
+    def test_add_thin_pack_delta_chain(self) -> None:
+        # A chain of depth 3 that starts at a base outside the pack: a ref
+        # delta to the external blob, an ofs delta on that, and an in-pack
+        # ref delta on the ofs delta, plus a full object.
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+        blob = make_object(Blob, data=b"yummy data")
+        o.add_object(blob)
+
+        f = BytesIO()
+        entries = build_pack(
+            f,
+            [
+                (REF_DELTA, (blob.id, b"yummy data, one")),
+                (OFS_DELTA, (0, b"yummy data, one, two")),
+                (REF_DELTA, (1, b"yummy data, one, two, three")),
+                (Blob.type_num, b"standalone"),
+            ],
+            store=o,
+        )
+
+        with o.add_thin_pack(f.read, None) as pack:
+            pack.check()
+            shas = [sha_to_hex(e[3]) for e in entries]
+            self.assertEqual(sorted([blob.id, *shas]), sorted(pack))
+            for (_, type_num, data, _, _), sha in zip(entries, shas):
+                self.assertEqual((type_num, data), o.get_raw(sha))
+            # The external base is appended to complete the pack.
+            self.assertEqual((Blob.type_num, b"yummy data"), pack.get_raw(blob.id))
+
+    def test_add_thin_pack_tree_delta(self) -> None:
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+        blob = make_object(Blob, data=b"yummy data")
+        tree = Tree()
+        tree.add(b"a", 0o100644, blob.id)
+        o.add_objects([(blob, None), (tree, None)])
+        new_tree = Tree()
+        new_tree.add(b"a", 0o100644, blob.id)
+        new_tree.add(b"b", 0o100644, blob.id)
+
+        f = BytesIO()
+        build_pack(f, [(REF_DELTA, (tree.id, new_tree.as_raw_string()))], store=o)
+
+        with o.add_thin_pack(f.read, None) as pack:
+            self.assertIn(new_tree.id, pack)
+            self.assertEqual(new_tree, o[new_tree.id])
+
+    def test_add_thin_pack_resolves_each_object_once(self) -> None:
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+        blob = make_object(Blob, data=b"yummy data")
+        o.add_object(blob)
+
+        f = BytesIO()
+        entries = build_pack(
+            f,
+            [
+                (REF_DELTA, (blob.id, b"yummy data, one")),
+                (OFS_DELTA, (0, b"yummy data, one, two")),
+                (Blob.type_num, b"standalone"),
+            ],
+            store=o,
+        )
+
+        resolved: list[int] = []
+        real_resolve = dulwich.pack.DeltaChainIterator._resolve_object
+
+        def counting_resolve(
+            self: dulwich.pack.DeltaChainIterator,  # type: ignore[type-arg]
+            offset: int,
+            obj_type_num: int,
+            base_chunks: bytes | list[bytes] | None,
+        ) -> dulwich.pack.UnpackedObject:
+            resolved.append(offset)
+            return real_resolve(self, offset, obj_type_num, base_chunks)
+
+        with patch.object(
+            dulwich.pack.DeltaChainIterator, "_resolve_object", counting_resolve
+        ):
+            o.add_thin_pack(f.read, None).close()
+        self.assertEqual(sorted(e[0] for e in entries), sorted(resolved))
+
+    def test_add_thin_pack_sha256_tree_delta(self) -> None:
+        store_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, store_dir)
+        o = DiskObjectStore.init(store_dir, object_format=SHA256)
+        self.addCleanup(o.close)
+        blob = make_object(Blob, data=b"yummy data")
+        o.add_object(blob)
+        blob_id = blob.get_id(SHA256)
+        tree = Tree()
+        tree.add(b"a", 0o100644, blob_id)
+        o.add_object(tree)
+        new_tree = Tree()
+        new_tree.add(b"a", 0o100644, blob_id)
+        new_tree.add(b"b", 0o100644, blob_id)
+
+        f = BytesIO()
+        sf = HashWriter(f, SHA256.hash_func)
+        write_pack_header(sf.write, 1)
+        delta = list(create_delta(tree.as_raw_string(), new_tree.as_raw_string()))
+        write_pack_object(
+            sf.write,
+            REF_DELTA,
+            (hex_to_sha(tree.get_id(SHA256)), delta),
+            object_format=SHA256,
+        )
+        sf.write_hash()
+        f.seek(0)
+
+        new_id = new_tree.get_id(SHA256)
+        with o.add_thin_pack(f.read, None) as pack:
+            self.assertIn(new_id, pack)
+            self.assertEqual(new_tree.items(), o[new_id].items())
+
+    def test_add_thin_pack_rejects_malformed_tree_delta(self) -> None:
+        # A delta that resolves to a tree which cannot be parsed must not be
+        # ingested, as for a full object in test_add_pack_rejects_malformed_tree.
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+        tree = Tree()
+        tree.add(b"a", 0o100644, make_object(Blob, data=b"yummy data").id)
+        o.add_object(tree)
+
+        f = BytesIO()
+        build_pack(f, [(REF_DELTA, (tree.id, b"this is not a tree at all"))], store=o)
+
+        self.assertRaises(ObjectFormatException, o.add_thin_pack, f.read, None)
+        self._assert_nothing_left_behind(o)
+
+    def test_add_thin_pack_rejects_corrupt_delta(self) -> None:
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+        blob = make_object(Blob, data=b"yummy data")
+        o.add_object(blob)
+
+        # A delta made against a different base: its source size does not
+        # match the blob it claims to apply to.
+        f = BytesIO()
+        sf = SHA1Writer(f)
+        write_pack_header(sf.write, 1)
+        delta = list(create_delta(b"some other base data", b"more yummy data"))
+        write_pack_object(
+            sf.write,
+            REF_DELTA,
+            (hex_to_sha(blob.id), delta),
+            object_format=DEFAULT_OBJECT_FORMAT,
+        )
+        sf.write_sha()
+        f.seek(0)
+
+        self.assertRaises(ApplyDeltaError, o.add_thin_pack, f.read, None)
+        self._assert_nothing_left_behind(o)
+
+    def test_add_thin_pack_missing_external_base(self) -> None:
+        o = DiskObjectStore(self.store_dir)
+        self.addCleanup(o.close)
+        other = MemoryObjectStore()
+        blob = make_object(Blob, data=b"yummy data")
+        other.add_object(blob)
+
+        f = BytesIO()
+        build_pack(f, [(REF_DELTA, (blob.id, b"more yummy data"))], store=other)
+
+        self.assertRaises(UnresolvedDeltas, o.add_thin_pack, f.read, None)
+        self._assert_nothing_left_behind(o)
+
     def test_add_pack_rejects_malformed_tree(self) -> None:
         # A pack containing a "tree" whose body cannot be parsed must not
         # be ingested: MemoryObjectStore and ``git fsck`` already reject
@@ -609,6 +795,7 @@ class DiskObjectStoreTests(PackBasedObjectStoreTests, TestCase):
 
         with self.assertRaises(PackInputTooLarge):
             o.add_thin_pack(f.read, None, max_input_size=8)
+        self._assert_nothing_left_behind(o)
 
     def test_big_file_threshold_config(self) -> None:
         # core.bigFileThreshold caps single-object decompression to guard

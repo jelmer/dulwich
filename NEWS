@@ -18,6 +18,9 @@
    or failed ref updates were reported to it as if they had happened.
    (Jelmer Vernooĳ)
 
+ * Add ``dulwich branch --show-current``, which prints the name of the
+   current branch and nothing when HEAD is detached. (Hiram, #1847)
+
  * Consume the protocol-v2 ``shallow-info`` section a server sends when the
    client is shallow but no depth change was requested. Fetching into a
    shallow clone silently dropped the pack while still updating the remote

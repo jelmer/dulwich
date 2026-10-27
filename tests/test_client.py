@@ -56,6 +56,7 @@ from dulwich.client import (
     SubprocessSSHVendor,
     TCPGitClient,
     TraditionalGitClient,
+    TransportNotAllowed,
     Urllib3HttpGitClient,
     _buffer_or_stream,
     _download_packfile_from_uri,
@@ -68,6 +69,7 @@ from dulwich.client import (
     _win32_url_to_path,
     build_fetch_request_v2,
     build_ls_refs_request_v2,
+    check_transport_allowed,
     check_wants,
     default_urllib3_manager,
     default_user_agent_string,
@@ -3637,6 +3639,106 @@ class RsyncUrlTests(TestCase):
 
     def test_path(self) -> None:
         self.assertRaises(ValueError, parse_rsync_url, "/path")
+
+
+class CheckTransportAllowedTests(TestCase):
+    def check(self, location, config=None, from_user=True) -> None:
+        client, _ = get_transport_and_path(location, config=config)
+        check_transport_allowed(client, config=config, from_user=from_user)
+
+    def test_defaults_from_user(self) -> None:
+        for location in (
+            "https://example.com/repo.git",
+            "http://example.com/repo.git",
+            "git://example.com/repo",
+            "ssh://example.com/repo",
+            "git@example.com:repo.git",
+            "/srv/repo",
+            "file:///srv/repo",
+        ):
+            self.check(location, from_user=True)
+
+    def test_defaults_not_from_user(self) -> None:
+        for location in (
+            "https://example.com/repo.git",
+            "http://example.com/repo.git",
+            "git://example.com/repo",
+            "ssh://example.com/repo",
+            "git@example.com:repo.git",
+        ):
+            self.check(location, from_user=False)
+        for location in ("/srv/repo", "file:///srv/repo"):
+            self.assertRaises(
+                TransportNotAllowed,
+                self.check,
+                location,
+                from_user=False,
+            )
+
+    def test_config_file_always(self) -> None:
+        config = ConfigFile()
+        config.set((b"protocol", b"file"), b"allow", b"always")
+        self.check("/srv/repo", config=config, from_user=False)
+
+    def test_config_never(self) -> None:
+        config = ConfigFile()
+        config.set((b"protocol", b"https"), b"allow", b"never")
+        self.assertRaises(
+            TransportNotAllowed,
+            self.check,
+            "https://example.com/repo.git",
+            config=config,
+            from_user=True,
+        )
+
+    def test_config_global_user(self) -> None:
+        config = ConfigFile()
+        config.set((b"protocol",), b"allow", b"user")
+        self.check("https://example.com/repo.git", config=config, from_user=True)
+        self.assertRaises(
+            TransportNotAllowed,
+            self.check,
+            "https://example.com/repo.git",
+            config=config,
+            from_user=False,
+        )
+
+    def test_config_protocol_overrides_global(self) -> None:
+        config = ConfigFile()
+        config.set((b"protocol",), b"allow", b"never")
+        config.set((b"protocol", b"file"), b"allow", b"always")
+        self.check("/srv/repo", config=config, from_user=False)
+
+        config = ConfigFile()
+        config.set((b"protocol",), b"allow", b"always")
+        config.set((b"protocol", b"https"), b"allow", b"never")
+        self.assertRaises(
+            TransportNotAllowed,
+            self.check,
+            "https://example.com/repo.git",
+            config=config,
+        )
+
+    def test_config_insteadof(self) -> None:
+        config = ConfigFile()
+        config.set((b"url", b"/srv/"), b"insteadOf", b"https://example.com/")
+        self.assertRaises(
+            TransportNotAllowed,
+            self.check,
+            "https://example.com/repo.git",
+            config=config,
+            from_user=False,
+        )
+
+    def test_config_invalid_value(self) -> None:
+        config = ConfigFile()
+        config.set((b"protocol",), b"allow", b"sometimes")
+        self.assertRaises(
+            ValueError,
+            self.check,
+            "https://example.com/repo.git",
+            config=config,
+        )
 
 
 class CheckWantsTests(TestCase):

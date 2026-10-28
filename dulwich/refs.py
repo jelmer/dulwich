@@ -1433,11 +1433,19 @@ class DiskRefsContainer(RefsContainer):
         filename = self.refpath(name)
         ensure_dir_exists(os.path.dirname(filename))
         f = GitFile(filename, "wb")
+        packed_refs_file = None
         try:
+            packed_refs_file = GitFile(os.path.join(self.path, b"packed-refs"), "wb")
+            self._invalidate_packed_refs_cache()
+            packed_refs = self.get_packed_refs().copy()
+            peeled_refs = (
+                self._peeled_refs.copy() if self._peeled_refs is not None else None
+            )
+
             if old_ref is not None:
                 orig_ref = self.read_loose_ref(name)
                 if orig_ref is None:
-                    orig_ref = self.get_packed_refs().get(name)
+                    orig_ref = packed_refs.get(name)
                     if orig_ref is None:
                         orig_ref = ZERO_SHA
                 if orig_ref != old_ref:
@@ -1453,7 +1461,15 @@ class DiskRefsContainer(RefsContainer):
             if found:
                 os.remove(filename)
 
-            self._remove_packed_ref(name)
+            if name in packed_refs:
+                del packed_refs[name]
+                if peeled_refs is not None:
+                    peeled_refs.pop(name, None)
+                write_packed_refs(packed_refs_file, packed_refs, peeled_refs)
+                packed_refs_file.close()
+            else:
+                packed_refs_file.abort()
+            self._invalidate_packed_refs_cache()
             self._log(
                 name,
                 old_ref,
@@ -1465,6 +1481,8 @@ class DiskRefsContainer(RefsContainer):
             )
         finally:
             # never write, we just wanted the lock
+            if packed_refs_file is not None:
+                packed_refs_file.abort()
             f.abort()
 
         # outside of the lock, clean-up any parent directory that might now

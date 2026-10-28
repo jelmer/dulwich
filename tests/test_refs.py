@@ -544,18 +544,24 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertNotIn(b"refs/heads/packed", DiskRefsContainer(self._refs.path))
 
     def test_remove_loose_ref_while_packed_refs_locked(self) -> None:
-        # refs/heads/master is loose in this fixture, so removing it has no
-        # reason to touch packed-refs at all.
-        self.assertNotIn(b"refs/heads/master", self._refs.get_packed_refs())
+        ref = b"refs/heads/master"
+        value = self._refs[ref]
+        self.assertNotIn(ref, self._refs.get_packed_refs())
 
         # Simulate a concurrent `git pack-refs` holding the packed-refs lock.
         lockpath = os.path.join(self._refs.path, b"packed-refs.lock")
-        with open(lockpath, "wb"):
-            pass
+        with open(lockpath, "wb") as f:
+            write_packed_refs(f, {ref: value})
         self.addCleanup(lambda: os.path.exists(lockpath) and os.remove(lockpath))
 
-        self.assertTrue(self._refs.remove_if_equals(b"refs/heads/master", None))
-        self.assertNotIn(b"refs/heads/master", self._refs.keys())
+        with self.assertRaises(FileLocked):
+            self._refs.remove_if_equals(ref, None)
+        self.assertEqual(value, self._refs[ref])
+
+        # A pending packed-refs replacement must not make the failed delete
+        # appear to have succeeded.
+        os.replace(lockpath, os.path.join(self._refs.path, b"packed-refs"))
+        self.assertEqual(value, self._refs[ref])
 
     def test_get_packed_refs_reloads_when_replaced(self) -> None:
         # Populate the cache.

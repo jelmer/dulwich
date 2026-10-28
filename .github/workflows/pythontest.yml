@@ -15,8 +15,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest, windows-11-arm]
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+        exclude:
+          - os: windows-11-arm
+            python-version: "3.10"
       fail-fast: false
 
     steps:
@@ -35,10 +38,13 @@ jobs:
           # Install build-time dependencies
           python -m pip install --upgrade "setuptools>=77"
           python -m pip install --upgrade pip
-          pip install --upgrade ".[merge,fastimport,paramiko,https,patiencediff,colordiff,range_diff]"  setuptools-rust
+          pip install --upgrade ".[merge,fastimport,https,patiencediff,colordiff,range_diff]"  setuptools-rust
+      - name: Install paramiko on platforms with cryptography wheels
+        run: pip install --upgrade ".[paramiko]"
+        if: "matrix.os != 'windows-11-arm'"
       - name: Install pysequoia on platforms with wheels
         run: pip install --upgrade --only-binary pysequoia ".[sequoia]"
-        if: "matrix.os == 'ubuntu-latest' || (matrix.python-version != '3.10' && matrix.python-version != '3.15')"
+        if: "matrix.os == 'ubuntu-latest' || (matrix.os != 'windows-11-arm' && matrix.python-version != '3.10' && matrix.python-version != '3.15')"
       - name: Style checks
         run: |
           pip install ".[dev]"
@@ -48,7 +54,7 @@ jobs:
         run: |
           pip install --upgrade types-paramiko types-requests
           python -m mypy dulwich
-        if: "matrix.python-version != 'pypy3'"
+        if: "matrix.python-version != 'pypy3' && matrix.os != 'windows-11-arm'"
       - name: Build
         run: |
           python setup.py build_ext -i
@@ -80,8 +86,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest, windows-11-arm]
         python-version: ["3.10", "3.13"]
+        exclude:
+          - os: windows-11-arm
+            python-version: "3.10"
       fail-fast: false
 
     steps:

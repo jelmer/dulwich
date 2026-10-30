@@ -1196,7 +1196,7 @@ class DiskRefsContainer(RefsContainer):
     #: mirrors git's core.packedRefsTimeout default.
     packed_refs_lock_timeout = 1.0
 
-    def _lock_packed_refs(self) -> _GitFile:
+    def _lock_packed_refs(self) -> "_GitFile":
         """Take packed-refs.lock, retrying for a short while if it is held.
 
         Returns: The lock file. The caller must abort it when done.

@@ -3,6 +3,10 @@
  * Honour ``protocol.<name>.allow`` for submodule URLs; the file transport
    is now refused for submodules by default. (Kartik Kenchi)
 
+ * Speed up adding received packs in ``DiskObjectStore.add_thin_pack`` and
+   ``add_pack`` by resolving each object once. A rejected pack no longer
+   leaves its temporary file behind. (Zainab Mehmut)
+
 1.2.20	2026-10-26
 
  * Apply zero-context insertion hunks (as written by ``diff -U0``) after

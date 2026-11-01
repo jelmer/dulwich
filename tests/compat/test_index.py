@@ -29,6 +29,7 @@ import tempfile
 from dulwich.index import (
     Index,
     IndexEntry,
+    LinkExtension,
     SparseDirExtension,
     read_index_dict_with_version,
     write_index_dict,
@@ -1176,3 +1177,80 @@ class SparseIndexCompatTestCase(CompatTestCase):
             # Git should still be able to read it
             output = run_git_or_fail(["status"], cwd=repo_path)
             self.assertIsNotNone(output)
+
+
+class SplitIndexCompatTestCase(CompatTestCase):
+    """Verify dulwich interoperates with git's split-index."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir, True)
+
+    def _init_split_index_repo(self) -> str:
+        repo_path = os.path.join(self.tempdir, "repo")
+        os.mkdir(repo_path)
+        run_git_or_fail(["init", "--quiet", repo_path])
+        run_git_or_fail(["config", "core.splitIndex", "true"], cwd=repo_path)
+        for fn in ("a.txt", "b.txt", "c.txt"):
+            with open(os.path.join(repo_path, fn), "w") as f:
+                f.write(f"{fn} initial\n")
+        run_git_or_fail(["add", "."], cwd=repo_path)
+        run_git_or_fail(
+            [
+                "-c",
+                "user.email=t@t",
+                "-c",
+                "user.name=t",
+                "commit",
+                "-q",
+                "-m",
+                "init",
+            ],
+            cwd=repo_path,
+        )
+        return repo_path
+
+    def test_read_git_split_index(self):
+        repo_path = self._init_split_index_repo()
+        # Modify a file so git actually writes a split-index delta.
+        with open(os.path.join(repo_path, "a.txt"), "w") as f:
+            f.write("a modified\n")
+        run_git_or_fail(["rm", "-q", "b.txt"], cwd=repo_path)
+        run_git_or_fail(["add", "."], cwd=repo_path)
+
+        # Confirm this really is a split index.
+        git_files = os.listdir(os.path.join(repo_path, ".git"))
+        self.assertTrue(
+            any(f.startswith("sharedindex.") for f in git_files),
+            git_files,
+        )
+
+        idx = Index(os.path.join(repo_path, ".git", "index"))
+        self.assertEqual(sorted(idx), [b"a.txt", b"c.txt"])
+        self.assertTrue(any(isinstance(e, LinkExtension) for e in idx._extensions))
+
+        git_entries = run_git_or_fail(["ls-files", "-s"], cwd=repo_path).decode()
+        for line in git_entries.strip().splitlines():
+            _mode, sha, _stage, name = line.replace("\t", " ").split()
+            self.assertEqual(idx[name.encode()].sha.decode(), sha)
+
+    def test_dulwich_write_collapses_split_index(self):
+        """After dulwich writes, git must still read the index correctly."""
+        repo_path = self._init_split_index_repo()
+        with open(os.path.join(repo_path, "a.txt"), "w") as f:
+            f.write("a modified\n")
+        run_git_or_fail(["add", "."], cwd=repo_path)
+
+        idx_path = os.path.join(repo_path, ".git", "index")
+        idx = Index(idx_path)
+        expected = {k: idx[k].sha for k in idx}
+        idx.write()
+
+        # Git must still be able to read and should see the same entries.
+        git_entries = run_git_or_fail(["ls-files", "-s"], cwd=repo_path).decode()
+        parsed = {}
+        for line in git_entries.strip().splitlines():
+            _mode, sha, _stage, name = line.replace("\t", " ").split()
+            parsed[name.encode()] = sha.encode()
+        self.assertEqual(parsed, expected)

@@ -34,6 +34,7 @@ __all__ = [
     "HFS_IGNORABLE_CHARS",
     "IEOT_EXTENSION",
     "INVALID_DOTNAMES",
+    "LINK_EXTENSION",
     "RESERVED_WINDOWS_DEVICE_NAMES",
     "REUC_EXTENSION",
     "SDIR_EXTENSION",
@@ -46,6 +47,7 @@ __all__ = [
     "IndexEntry",
     "IndexExtension",
     "InvalidPathError",
+    "LinkExtension",
     "ResolveUndoExtension",
     "SerializedIndexEntry",
     "SparseDirExtension",
@@ -130,6 +132,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    from .bitmap import EWAHBitmap
     from .config import Config
     from .diff_tree import TreeChange
     from .file import _GitFile
@@ -196,6 +199,7 @@ UNTR_EXTENSION = b"UNTR"
 EOIE_EXTENSION = b"EOIE"
 IEOT_EXTENSION = b"IEOT"
 SDIR_EXTENSION = b"sdir"  # Sparse directory extension
+LINK_EXTENSION = b"link"  # Split-index link extension
 
 
 def _encode_varint(value: int) -> bytes:
@@ -476,6 +480,8 @@ class IndexExtension:
             return UntrackedExtension.from_bytes(data)
         elif signature == SDIR_EXTENSION:
             return SparseDirExtension.from_bytes(data)
+        elif signature == LINK_EXTENSION:
+            return LinkExtension.from_bytes(data)
         else:
             # Unknown extension - just store raw data
             return cls(signature, data)
@@ -612,6 +618,105 @@ class SparseDirExtension(IndexExtension):
           Empty bytes (extension presence is the signal)
         """
         return b""
+
+
+class LinkExtension(IndexExtension):
+    """Split-index link extension.
+
+    Records the hash of the shared index this split index is based on, along
+    with two EWAH bitmaps describing how the shared entries are modified:
+
+    - replace_bitmap: for each bit set at position ``i``, the entry at
+      position ``i`` in the shared index is overridden by one of the extra
+      entries carried in the split index (consumed in order).
+    - delete_bitmap: entries whose positions are set here are removed from
+      the shared index before merging.
+
+    If both bitmaps are absent (``None``), the split index just extends the
+    shared index with any extra entries it carries (and no overrides or
+    deletions apply).
+    """
+
+    def __init__(
+        self,
+        base_sha: bytes,
+        delete_bitmap: "EWAHBitmap | None" = None,
+        replace_bitmap: "EWAHBitmap | None" = None,
+    ) -> None:
+        """Initialize LinkExtension.
+
+        Args:
+            base_sha: Raw hash (not hex) of the shared index file.
+            delete_bitmap: EWAH bitmap of positions to delete from the base.
+            replace_bitmap: EWAH bitmap of positions in the base to replace
+                with entries from the split index.
+        """
+        if (delete_bitmap is None) != (replace_bitmap is None):
+            raise ValueError(
+                "delete_bitmap and replace_bitmap must both be set or both be None"
+            )
+        self.base_sha = base_sha
+        self.delete_bitmap = delete_bitmap
+        self.replace_bitmap = replace_bitmap
+        super().__init__(LINK_EXTENSION, b"")
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "LinkExtension":
+        """Parse a LinkExtension from raw bytes.
+
+        Args:
+          data: Raw extension body.
+
+        Returns:
+          LinkExtension instance.
+        """
+        # The hash width is not carried in the extension body. Dulwich only
+        # supports SHA-1 and SHA-256 so pick based on the remaining data.
+        # The remaining body is either empty or two EWAH bitmaps, each
+        # self-describing.
+        if len(data) < 20:
+            raise ValueError("link extension too short")
+        for rawsz in (20, 32):
+            if len(data) < rawsz:
+                continue
+            tail_len = len(data) - rawsz
+            if tail_len == 0:
+                return cls(data[:rawsz])
+            try:
+                delete_bitmap, consumed = _parse_ewah_bitmap(data[rawsz:])
+            except ValueError:
+                continue
+            if consumed > tail_len:
+                continue
+            try:
+                replace_bitmap, consumed2 = _parse_ewah_bitmap(data[rawsz + consumed :])
+            except ValueError:
+                continue
+            if consumed + consumed2 != tail_len:
+                continue
+            return cls(data[:rawsz], delete_bitmap, replace_bitmap)
+        raise ValueError("corrupt link extension: unable to parse bitmaps")
+
+    def to_bytes(self) -> bytes:
+        """Serialize the link extension to raw bytes."""
+        out = bytearray(self.base_sha)
+        if self.delete_bitmap is not None and self.replace_bitmap is not None:
+            out += self.delete_bitmap.encode()
+            out += self.replace_bitmap.encode()
+        return bytes(out)
+
+
+def _parse_ewah_bitmap(data: bytes) -> "tuple[EWAHBitmap, int]":
+    """Parse a single EWAH bitmap, returning it and the bytes consumed."""
+    from .bitmap import EWAHBitmap
+
+    if len(data) < 12:
+        raise ValueError("EWAH bitmap too short")
+    word_count = struct.unpack(">I", data[4:8])[0]
+    consumed = 12 + 8 * word_count
+    if consumed > len(data):
+        raise ValueError("EWAH bitmap truncated")
+    return EWAHBitmap(data[:consumed]), consumed
 
 
 @dataclass
@@ -1094,6 +1199,203 @@ def read_index(
         yield entry
 
 
+def _serialized_entries_to_dict(
+    raw_entries: Iterable[SerializedIndexEntry],
+) -> dict[bytes, IndexEntry | ConflictedIndexEntry]:
+    """Fold an ordered SerializedIndexEntry sequence into the dict form."""
+    ret: dict[bytes, IndexEntry | ConflictedIndexEntry] = {}
+    for entry in raw_entries:
+        stage = entry.stage()
+        if stage == Stage.NORMAL:
+            ret[entry.name] = IndexEntry.from_serialized(entry)
+        else:
+            existing = ret.setdefault(entry.name, ConflictedIndexEntry())
+            if isinstance(existing, IndexEntry):
+                raise AssertionError(f"Non-conflicted entry for {entry.name!r} exists")
+            match stage:
+                case Stage.MERGE_CONFLICT_ANCESTOR:
+                    existing.ancestor = IndexEntry.from_serialized(entry)
+                case Stage.MERGE_CONFLICT_THIS:
+                    existing.this = IndexEntry.from_serialized(entry)
+                case Stage.MERGE_CONFLICT_OTHER:
+                    existing.other = IndexEntry.from_serialized(entry)
+    return ret
+
+
+def _read_index_raw_with_version(
+    f: _IndexReadable, object_format: ObjectFormat = DEFAULT_OBJECT_FORMAT
+) -> tuple[list[SerializedIndexEntry], int, list[IndexExtension]]:
+    """Read ordered serialized entries, the format version and extensions."""
+    version, num_entries = read_index_header(f)
+
+    entries: list[SerializedIndexEntry] = []
+    previous_path = b""
+    for _ in range(num_entries):
+        entry = read_cache_entry(f, version, previous_path, object_format)
+        previous_path = entry.name
+        entries.append(entry)
+
+    extensions = _read_extensions(f, object_format)
+    return entries, version, extensions
+
+
+def _read_extensions(
+    f: _IndexReadable, object_format: ObjectFormat
+) -> list[IndexExtension]:
+    """Read any index extensions from ``f`` until the trailing checksum."""
+    extensions: list[IndexExtension] = []
+    while True:
+        # Check if we're at the end (trailing checksum before EOF)
+        current_pos = f.tell()
+        f.seek(0, 2)  # EOF
+        eof_pos = f.tell()
+        f.seek(current_pos)
+
+        if current_pos >= eof_pos - object_format.oid_length:
+            break
+
+        signature = f.read(4)
+        if len(signature) < 4:
+            break
+
+        # Check if it's a valid extension signature (4 ASCII letters).
+        # Uppercase signatures are optional/ignorable; lowercase signatures
+        # (e.g. "link", "sdir") indicate extensions that readers should
+        # understand to produce a correct index.
+        if not all(65 <= b <= 90 or 97 <= b <= 122 for b in signature):
+            f.seek(-4, 1)
+            break
+
+        size_data = f.read(4)
+        if len(size_data) < 4:
+            break
+        size = struct.unpack(">I", size_data)[0]
+
+        data = f.read(size)
+        if len(data) < size:
+            break
+
+        extension = IndexExtension.from_raw(signature, data)
+        extensions.append(extension)
+    return extensions
+
+
+def _merge_split_index(
+    main_index_path: bytes | str,
+    link: "LinkExtension",
+    extras: list[SerializedIndexEntry],
+    object_format: ObjectFormat,
+) -> list[SerializedIndexEntry]:
+    """Merge the shared index referenced by ``link`` with ``extras``.
+
+    ``extras`` is the ordered list of entries carried in the split index
+    file. The returned list is the fully-reconstructed, sorted on-disk
+    order of the effective index.
+
+    Entries that participate in a replace carry an empty name in the split
+    file; the name is inherited from the base entry they override.
+    """
+    if link.base_sha == b"\x00" * len(link.base_sha):
+        # No shared base: all extras are the index.
+        return list(extras)
+
+    base_entries = _read_shared_index(main_index_path, link.base_sha, object_format)
+
+    replace_positions = sorted(link.replace_bitmap.bits) if link.replace_bitmap else []
+    delete_positions = set(link.delete_bitmap.bits) if link.delete_bitmap else set()
+
+    if len(replace_positions) > len(extras):
+        raise ValueError(
+            "split-index replace bitmap has more set bits than carried extras"
+        )
+
+    replacements: dict[int, SerializedIndexEntry] = {}
+    for k, pos in enumerate(replace_positions):
+        if pos >= len(base_entries):
+            raise ValueError(
+                f"split-index replace bit {pos} out of range for base index "
+                f"with {len(base_entries)} entries"
+            )
+        replacements[pos] = extras[k]
+
+    for pos in delete_positions:
+        if pos >= len(base_entries):
+            raise ValueError(
+                f"split-index delete bit {pos} out of range for base index "
+                f"with {len(base_entries)} entries"
+            )
+
+    merged: list[SerializedIndexEntry] = []
+    for i, base_entry in enumerate(base_entries):
+        if i in delete_positions:
+            continue
+        if i in replacements:
+            replacement = replacements[i]
+            name = replacement.name if replacement.name else base_entry.name
+            merged.append(
+                SerializedIndexEntry(
+                    name=name,
+                    ctime=replacement.ctime,
+                    mtime=replacement.mtime,
+                    dev=replacement.dev,
+                    ino=replacement.ino,
+                    mode=replacement.mode,
+                    uid=replacement.uid,
+                    gid=replacement.gid,
+                    size=replacement.size,
+                    sha=replacement.sha,
+                    flags=replacement.flags,
+                    extended_flags=replacement.extended_flags,
+                )
+            )
+        else:
+            merged.append(base_entry)
+
+    # Append-phase extras (those past the last replace) are brand-new.
+    merged.extend(extras[len(replace_positions) :])
+
+    # The base entries plus the extras are both sorted individually, but
+    # appended extras may interleave with existing names after replacements
+    # modify them. Sort by (name, stage) to produce the final on-disk order.
+    merged.sort(key=lambda e: (e.name, (e.flags & FLAG_STAGEMASK)))
+    return merged
+
+
+def _read_shared_index(
+    main_index_path: bytes | str,
+    base_sha: bytes,
+    object_format: ObjectFormat,
+) -> list[SerializedIndexEntry]:
+    """Load the shared index referenced by ``base_sha``.
+
+    The lookup first checks for ``sharedindex.<hex>`` next to
+    ``main_index_path``; if not present, this is treated as a corrupt
+    split-index (git itself emits a diagnostic in the same situation).
+    """
+    hex_sha = base_sha.hex()
+    main_str = (
+        main_index_path.decode()
+        if isinstance(main_index_path, bytes)
+        else main_index_path
+    )
+    directory = os.path.dirname(main_str) or "."
+    candidate = os.path.join(directory, f"sharedindex.{hex_sha}")
+    if not os.path.exists(candidate):
+        raise FileNotFoundError(
+            f"shared index file for split index not found: {candidate}"
+        )
+    f = GitFile(candidate, "rb")
+    try:
+        checksum_reader = IndexChecksumReader(f, object_format)
+        entries, _version, _exts = _read_index_raw_with_version(
+            checksum_reader, object_format
+        )
+        checksum_reader.check_checksum(allow_empty=True)
+    finally:
+        f.close()
+    return entries
+
+
 def read_index_dict_with_version(
     f: _IndexReadable, object_format: ObjectFormat = DEFAULT_OBJECT_FORMAT
 ) -> tuple[dict[bytes, IndexEntry | ConflictedIndexEntry], int, list[IndexExtension]]:
@@ -1124,43 +1426,7 @@ def read_index_dict_with_version(
                 case Stage.MERGE_CONFLICT_OTHER:
                     existing.other = IndexEntry.from_serialized(entry)
 
-    # Read extensions
-    extensions = []
-    while True:
-        # Check if we're at the end (trailing checksum before EOF)
-        current_pos = f.tell()
-        f.seek(0, 2)  # EOF
-        eof_pos = f.tell()
-        f.seek(current_pos)
-
-        if current_pos >= eof_pos - object_format.oid_length:
-            break
-
-        # Try to read extension signature
-        signature = f.read(4)
-        if len(signature) < 4:
-            break
-
-        # Check if it's a valid extension signature (4 uppercase letters)
-        if not all(65 <= b <= 90 for b in signature):
-            # Not an extension, seek back
-            f.seek(-4, 1)
-            break
-
-        # Read extension size
-        size_data = f.read(4)
-        if len(size_data) < 4:
-            break
-        size = struct.unpack(">I", size_data)[0]
-
-        # Read extension data
-        data = f.read(size)
-        if len(data) < size:
-            break
-
-        extension = IndexExtension.from_raw(signature, data)
-        extensions.append(extension)
-
+    extensions = _read_extensions(f, object_format)
     return ret, version, extensions
 
 
@@ -1391,13 +1657,23 @@ class Index:
         return f"{self.__class__.__name__}({self._filename!r})"
 
     def write(self) -> None:
-        """Write current contents of index to disk."""
+        """Write current contents of index to disk.
+
+        If the index was read as a split index, writing collapses it back
+        into a full index: the shared base entries are already materialised
+        in ``self._byname``, and the ``link`` extension is dropped so the
+        resulting file is a self-contained index. The shared index file on
+        disk is left untouched.
+        """
         f = GitFile(self._filename, "wb", shared_perm=self._shared_perm)
         try:
-            # Filter out extensions with no meaningful data
+            # Filter out extensions with no meaningful data, and drop any
+            # LinkExtension so we never re-emit a now-stale split-index
+            # pointer.
             meaningful_extensions = []
             for ext in self._extensions:
-                # Skip extensions that have empty data
+                if isinstance(ext, LinkExtension):
+                    continue
                 ext_data = ext.to_bytes()
                 if ext_data:
                     meaningful_extensions.append(ext)
@@ -1430,23 +1706,39 @@ class Index:
             raise
 
     def read(self) -> None:
-        """Read current contents of index from disk."""
+        """Read current contents of index from disk.
+
+        If the index is a split index (carrying a ``link`` extension), the
+        shared base index referenced by the extension is read as well and
+        the resulting entries are the merge of the base with the extras
+        recorded in this file.
+        """
         if not os.path.exists(self._filename):
             return
         f = GitFile(self._filename, "rb")
         try:
             checksum_reader = IndexChecksumReader(f, self._object_format)
-            entries, version, extensions = read_index_dict_with_version(
+            raw_entries, version, extensions = _read_index_raw_with_version(
                 checksum_reader, self._object_format
             )
-            self._version = version
-            self._extensions = extensions
-            for name, value in entries.items():
-                self.set_verbatim(name, value)
-            # Extensions have already been read by read_index_dict_with_version
             checksum_reader.check_checksum(allow_empty=True)
         finally:
             f.close()
+        self._version = version
+        self._extensions = extensions
+
+        link = next(
+            (ext for ext in self._extensions if isinstance(ext, LinkExtension)),
+            None,
+        )
+        if link is not None:
+            raw_entries = _merge_split_index(
+                self._filename, link, raw_entries, self._object_format
+            )
+
+        entries = _serialized_entries_to_dict(raw_entries)
+        for name, value in entries.items():
+            self.set_verbatim(name, value)
 
     def __len__(self) -> int:
         """Number of entries in this index file."""

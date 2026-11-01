@@ -404,6 +404,33 @@ class DiffTests(TestCase):
             f.getvalue().splitlines(),
         )
 
+    def test_blob_diff_no_newline_on_unchanged_last_line(self) -> None:
+        # Regression test for #2543: when the last line of a file has no
+        # trailing newline and is unchanged context, the "\ No newline at
+        # end of file" marker must still be emitted so git apply accepts
+        # the patch.
+        f = BytesIO()
+        write_blob_diff(
+            f,
+            (b"f", 0o100644, Blob.from_string(b"x\ny\nlast")),
+            (b"f", 0o100644, Blob.from_string(b"x\nY\nlast")),
+        )
+        self.assertEqual(
+            [
+                b"diff --git a/f b/f",
+                b"index 7424e00..92175ef 100644",
+                b"--- a/f",
+                b"+++ b/f",
+                b"@@ -1,3 +1,3 @@",
+                b" x",
+                b"-y",
+                b"+Y",
+                b" last",
+                b"\\ No newline at end of file",
+            ],
+            f.getvalue().splitlines(),
+        )
+
     def test_tree_diff(self) -> None:
         f = BytesIO()
         store = MemoryObjectStore()

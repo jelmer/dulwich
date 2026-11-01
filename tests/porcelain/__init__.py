@@ -47,7 +47,12 @@ from dulwich.am import AmConflict
 from dulwich.client import SendPackResult, TransportNotAllowed
 from dulwich.commit_graph import read_commit_graph
 from dulwich.diff_tree import TreeChange, tree_changes
-from dulwich.errors import CommitError, NoIndexPresent, WorkingTreeModifiedError
+from dulwich.errors import (
+    ChecksumMismatch,
+    CommitError,
+    NoIndexPresent,
+    WorkingTreeModifiedError,
+)
 from dulwich.index import (
     FLAG_VALID,
     ConflictedIndexEntry,
@@ -10619,6 +10624,23 @@ class FsckTests(PorcelainTestCase):
             [(obj.id, "invalid name .git")],
             [(sha, str(e)) for (sha, e) in porcelain.fsck(self.repo)],
         )
+
+    def test_checksum_mismatch(self) -> None:
+        blob = Blob.from_string(b"foo")
+        self.repo.object_store.add_object(blob)
+        sha = blob.id.decode("ascii")
+        obj_path = os.path.join(self.repo.path, ".git", "objects", sha[:2], sha[2:])
+        os.chmod(obj_path, stat.S_IWUSR | stat.S_IRUSR)
+        import zlib
+
+        with open(obj_path, "wb") as f:
+            f.write(zlib.compress(b"blob 7\x00corrupt"))
+
+        errors = list(porcelain.fsck(self.repo))
+        self.assertEqual(len(errors), 1)
+        bad_sha, exc = errors[0]
+        self.assertEqual(bad_sha, blob.id)
+        self.assertIsInstance(exc, ChecksumMismatch)
 
 
 class DescribeTests(PorcelainTestCase):

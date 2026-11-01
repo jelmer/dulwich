@@ -45,8 +45,8 @@ sequoia = ["pysequoia"]
 paramiko = ["paramiko"]
 colordiff = ["rich"]
 dev = [
-    "ruff==0.16.9",
-    "mypy==2.3.1",
+    "ruff==0.17.3",
+    "mypy==2.4.1",
     "dissolve>=0.1.1",
     "codespell==2.4.3",
 ]

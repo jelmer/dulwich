@@ -1,5 +1,9 @@
 1.2.21	UNRELEASED
 
+ * Emit the ``\ No newline at end of file`` marker when the final line is
+   unchanged context. Patches ending with such a line were truncated and
+   ``git apply`` rejected them as corrupt. (Jelmer Vernooĳ, #2543)
+
  * Honour ``protocol.<name>.allow`` for submodule URLs; the file transport
    is now refused for submodules by default. (Kartik Kenchi)
 

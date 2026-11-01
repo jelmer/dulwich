@@ -48,6 +48,7 @@ from dulwich.patch import (
     mailinfo,
     parse_unified_diff,
     patch_id,
+    unified_diff,
     unified_diff_with_algorithm,
     write_blob_diff,
     write_commit_patch,
@@ -358,6 +359,28 @@ class DiffTests(TestCase):
                 b"-old",
                 b"+new",
                 b" same",
+            ],
+            f.getvalue().splitlines(),
+        )
+
+    def test_blob_diff_no_newline_context(self) -> None:
+        f = BytesIO()
+        write_blob_diff(
+            f,
+            (b"foo.txt", 0o644, Blob.from_string(b"old\nsame")),
+            (b"bar.txt", 0o644, Blob.from_string(b"new\nsame")),
+        )
+        self.assertEqual(
+            [
+                b"diff --git a/foo.txt b/bar.txt",
+                b"index c7cf64f..d392cc8 644",
+                b"--- a/foo.txt",
+                b"+++ b/bar.txt",
+                b"@@ -1,2 +1,2 @@",
+                b"-old",
+                b"+new",
+                b" same",
+                b"\\ No newline at end of file",
             ],
             f.getvalue().splitlines(),
         )
@@ -782,6 +805,46 @@ class DiffAlgorithmTests(TestCase):
         self.assertTrue(any(b"+++" in line for line in result))
         self.assertTrue(any(b"-line2" in line for line in result))
         self.assertTrue(any(b"+line2 modified" in line for line in result))
+
+    def test_unified_diff_no_newline_context(self) -> None:
+        """Test unified_diff handles unchanged last line without newline."""
+        a = [b"x\n", b"y\n", b"last"]
+        b = [b"x\n", b"Y\n", b"last"]
+        result = list(unified_diff(a, b, fromfile=b"a.txt", tofile=b"b.txt"))
+        self.assertEqual(
+            [
+                b"--- a.txt\n",
+                b"+++ b.txt\n",
+                b"@@ -1,3 +1,3 @@\n",
+                b" x\n",
+                b"-y\n",
+                b"+Y\n",
+                b" last\n\\ No newline at end of file\n",
+            ],
+            result,
+        )
+
+    def test_unified_diff_with_algorithm_no_newline_context(self) -> None:
+        """Test unified_diff_with_algorithm handles unchanged last line without newline."""
+        a = [b"x\n", b"y\n", b"last"]
+        b = [b"x\n", b"Y\n", b"last"]
+        result = list(
+            unified_diff_with_algorithm(
+                a, b, fromfile=b"a.txt", tofile=b"b.txt", algorithm="myers"
+            )
+        )
+        self.assertEqual(
+            [
+                b"--- a.txt\n",
+                b"+++ b.txt\n",
+                b"@@ -1,3 +1,3 @@\n",
+                b" x\n",
+                b"-y\n",
+                b"+Y\n",
+                b" last\n\\ No newline at end of file\n",
+            ],
+            result,
+        )
 
     def test_unified_diff_with_patience_not_available(self) -> None:
         """Test that DiffAlgorithmNotAvailable is raised when patience not available."""

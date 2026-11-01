@@ -297,17 +297,19 @@ def unified_diff(
 
         for tag, i1, i2, j1, j2 in group:
             if tag == "equal":
-                for line in a[i1:i2]:
+                for idx, line in enumerate(a[i1:i2], i1):
+                    if idx == len(a) - 1 and not line[-1:] == b"\n":
+                        line += b"\n\\ No newline at end of file\n"
                     yield b" " + line
                 continue
             if tag in ("replace", "delete"):
-                for line in a[i1:i2]:
-                    if not line[-1:] == b"\n":
+                for idx, line in enumerate(a[i1:i2], i1):
+                    if idx == len(a) - 1 and not line[-1:] == b"\n":
                         line += b"\n\\ No newline at end of file\n"
                     yield b"-" + line
             if tag in ("replace", "insert"):
-                for line in b[j1:j2]:
-                    if not line[-1:] == b"\n":
+                for idx, line in enumerate(b[j1:j2], j1):
+                    if idx == len(b) - 1 and not line[-1:] == b"\n":
                         line += b"\n\\ No newline at end of file\n"
                     yield b"+" + line
 
@@ -400,17 +402,19 @@ def unified_diff_with_algorithm(
 
         for tag, i1, i2, j1, j2 in group:
             if tag == "equal":
-                for line in a[i1:i2]:
+                for idx, line in enumerate(a[i1:i2], i1):
+                    if idx == len(a) - 1 and not line[-1:] == b"\n":
+                        line += b"\n\\ No newline at end of file\n"
                     yield b" " + line
                 continue
             if tag in ("replace", "delete"):
-                for line in a[i1:i2]:
-                    if not line[-1:] == b"\n":
+                for idx, line in enumerate(a[i1:i2], i1):
+                    if idx == len(a) - 1 and not line[-1:] == b"\n":
                         line += b"\n\\ No newline at end of file\n"
                     yield b"-" + line
             if tag in ("replace", "insert"):
-                for line in b[j1:j2]:
-                    if not line[-1:] == b"\n":
+                for idx, line in enumerate(b[j1:j2], j1):
+                    if idx == len(b) - 1 and not line[-1:] == b"\n":
                         line += b"\n\\ No newline at end of file\n"
                     yield b"+" + line
 

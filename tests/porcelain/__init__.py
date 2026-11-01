@@ -10620,6 +10620,33 @@ class FsckTests(PorcelainTestCase):
             [(sha, str(e)) for (sha, e) in porcelain.fsck(self.repo)],
         )
 
+    def test_checksum_mismatch(self) -> None:
+        # A loose object whose contents don't match its filename should be
+        # yielded as an error rather than aborting the iteration (#2552).
+        a = Blob()
+        a.data = b"foo"
+        b = Blob()
+        b.data = b"bar"
+        self.repo.object_store.add_object(a)
+        self.repo.object_store.add_object(b)
+
+        from dulwich.object_store import DiskObjectStore
+
+        assert isinstance(self.repo.object_store, DiskObjectStore)
+        a_path = self.repo.object_store._get_shafile_path(a.id)
+        b_path = self.repo.object_store._get_shafile_path(b.id)
+        with open(a_path, "rb") as f:
+            a_contents = f.read()
+        # Overwrite b's loose object with a's contents, so a lookup at b.id
+        # finds data that hashes to a.id instead.
+        os.chmod(b_path, 0o644)
+        with open(b_path, "wb") as f:
+            f.write(a_contents)
+
+        errors = list(porcelain.fsck(self.repo))
+        shas = {sha for (sha, _e) in errors}
+        self.assertIn(b.id, shas)
+
 
 class DescribeTests(PorcelainTestCase):
     def test_no_commits(self) -> None:

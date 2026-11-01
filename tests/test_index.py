@@ -48,11 +48,13 @@ from dulwich.index import (
     EXTENDED_FLAG_SKIP_WORKTREE,
     FLAG_EXTENDED,
     FLAG_VALID,
+    LINK_EXTENSION,
     SDIR_EXTENSION,
     ConflictedIndexEntry,
     Index,
     IndexEntry,
     InvalidPathError,
+    LinkExtension,
     SerializedIndexEntry,
     SparseDirExtension,
     _compress_path,
@@ -4996,3 +4998,226 @@ class TestSparseIndex(TestCase):
             entry = idx[b"subdir/"]
             self.assertTrue(entry.is_sparse_dir(b"subdir/"))
             self.assertEqual(entry.sha, subtree.id)
+
+
+class TestSplitIndex(TestCase):
+    """Tests for split-index (`link` extension) support."""
+
+    def _make_entry(self, sha_hex: bytes) -> IndexEntry:
+        return IndexEntry(
+            ctime=0,
+            mtime=0,
+            dev=0,
+            ino=0,
+            mode=0o100644,
+            uid=0,
+            gid=0,
+            size=0,
+            sha=sha_hex,
+        )
+
+    def test_link_extension_roundtrip_no_bitmaps(self):
+        base = bytes.fromhex("ab" * 20)
+        ext = LinkExtension(base)
+        data = ext.to_bytes()
+        self.assertEqual(data, base)
+        parsed = LinkExtension.from_bytes(data)
+        self.assertEqual(parsed.base_sha, base)
+        self.assertIsNone(parsed.delete_bitmap)
+        self.assertIsNone(parsed.replace_bitmap)
+
+    def test_link_extension_roundtrip_with_bitmaps(self):
+        from dulwich.bitmap import EWAHBitmap
+
+        base = bytes.fromhex("cd" * 20)
+        delete = EWAHBitmap()
+        delete.add(3)
+        replace = EWAHBitmap()
+        replace.add(0)
+        replace.add(5)
+        ext = LinkExtension(base, delete, replace)
+        data = ext.to_bytes()
+        parsed = LinkExtension.from_bytes(data)
+        self.assertEqual(parsed.base_sha, base)
+        assert parsed.delete_bitmap is not None
+        assert parsed.replace_bitmap is not None
+        self.assertEqual(parsed.delete_bitmap.bits, {3})
+        self.assertEqual(parsed.replace_bitmap.bits, {0, 5})
+
+    def test_link_extension_signature(self):
+        ext = LinkExtension(bytes(20))
+        self.assertEqual(ext.signature, LINK_EXTENSION)
+
+    def test_link_extension_requires_both_bitmaps(self):
+        from dulwich.bitmap import EWAHBitmap
+
+        with self.assertRaises(ValueError):
+            LinkExtension(bytes(20), EWAHBitmap(), None)
+
+    def _write_shared(self, directory: str, entries: list[tuple[bytes, IndexEntry]]):
+        """Write a shared index file and return its hex hash."""
+        from dulwich.file import GitFile
+        from dulwich.index import (
+            IndexChecksumWriter,
+            Stage,
+            write_index,
+        )
+
+        serialized = [e.serialize(name, Stage.NORMAL) for name, e in entries]
+        tmp_path = os.path.join(directory, "sharedindex.tmp")
+        with GitFile(tmp_path, "wb") as f:
+            writer = IndexChecksumWriter(f)
+            write_index(writer, serialized, version=2)
+            digest = writer.write_checksum()
+        final_path = os.path.join(directory, f"sharedindex.{digest.hex()}")
+        os.rename(tmp_path, final_path)
+        return digest
+
+    def test_read_split_index_pure_passthrough(self):
+        """Reading a split index with no delta returns the shared entries."""
+        from dulwich.file import GitFile
+        from dulwich.index import IndexChecksumWriter, write_index
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            e1 = self._make_entry(b"1" * 40)
+            e2 = self._make_entry(b"2" * 40)
+            digest = self._write_shared(tmpdir, [(b"a.txt", e1), (b"b.txt", e2)])
+
+            # Write a split index that just points at the shared one.
+            main_path = os.path.join(tmpdir, "index")
+            link = LinkExtension(digest)
+            with GitFile(main_path, "wb") as f:
+                writer = IndexChecksumWriter(f)
+                write_index(writer, [], version=2, extensions=[link])
+                writer.close()
+
+            idx = Index(main_path)
+            self.assertEqual(sorted(idx), [b"a.txt", b"b.txt"])
+            self.assertEqual(idx[b"a.txt"].sha, e1.sha)
+            self.assertEqual(idx[b"b.txt"].sha, e2.sha)
+
+    def test_read_split_index_replace_and_delete(self):
+        """Replace and delete bitmaps modify the shared entries correctly."""
+        from dulwich.bitmap import EWAHBitmap
+        from dulwich.file import GitFile
+        from dulwich.index import IndexChecksumWriter, Stage, write_index
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_entries = [
+                (b"a.txt", self._make_entry(b"1" * 40)),
+                (b"b.txt", self._make_entry(b"2" * 40)),
+                (b"c.txt", self._make_entry(b"3" * 40)),
+            ]
+            digest = self._write_shared(tmpdir, base_entries)
+
+            # Delete b.txt (position 1), replace a.txt (position 0) with a
+            # new sha. The split-index extra for a replace carries an empty
+            # name; here the k-th extra (k=0) targets the k-th set bit of
+            # replace_bitmap (position 0 => a.txt).
+            replace = EWAHBitmap()
+            replace.add(0)
+            delete = EWAHBitmap()
+            delete.add(1)
+            link = LinkExtension(digest, delete, replace)
+
+            replacement = self._make_entry(b"9" * 40)
+            # Replacement entries carry an empty name (inherited from base).
+            serialized = [replacement.serialize(b"", Stage.NORMAL)]
+
+            main_path = os.path.join(tmpdir, "index")
+            with GitFile(main_path, "wb") as f:
+                writer = IndexChecksumWriter(f)
+                write_index(writer, serialized, version=2, extensions=[link])
+                writer.close()
+
+            idx = Index(main_path)
+            self.assertEqual(sorted(idx), [b"a.txt", b"c.txt"])
+            self.assertEqual(idx[b"a.txt"].sha, replacement.sha)
+            self.assertEqual(idx[b"c.txt"].sha, base_entries[2][1].sha)
+
+    def test_read_split_index_append_new(self):
+        """Extras past the replace positions are appended as new entries."""
+        from dulwich.bitmap import EWAHBitmap
+        from dulwich.file import GitFile
+        from dulwich.index import IndexChecksumWriter, Stage, write_index
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            e1 = self._make_entry(b"1" * 40)
+            digest = self._write_shared(tmpdir, [(b"a.txt", e1)])
+
+            # No replace/delete bits: the EWAH bitmaps are both empty but
+            # present (git writes them this way whenever there is a delta).
+            link = LinkExtension(digest, EWAHBitmap(), EWAHBitmap())
+            new_entry = self._make_entry(b"5" * 40)
+
+            main_path = os.path.join(tmpdir, "index")
+            with GitFile(main_path, "wb") as f:
+                writer = IndexChecksumWriter(f)
+                write_index(
+                    writer,
+                    [new_entry.serialize(b"d.txt", Stage.NORMAL)],
+                    version=2,
+                    extensions=[link],
+                )
+                writer.close()
+
+            idx = Index(main_path)
+            self.assertEqual(sorted(idx), [b"a.txt", b"d.txt"])
+            self.assertEqual(idx[b"a.txt"].sha, e1.sha)
+            self.assertEqual(idx[b"d.txt"].sha, new_entry.sha)
+
+    def test_write_collapses_split_index(self):
+        """Writing a split index collapses it to a self-contained index."""
+        from dulwich.bitmap import EWAHBitmap
+        from dulwich.file import GitFile
+        from dulwich.index import IndexChecksumWriter, Stage, write_index
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            e1 = self._make_entry(b"1" * 40)
+            e2 = self._make_entry(b"2" * 40)
+            digest = self._write_shared(tmpdir, [(b"a.txt", e1), (b"b.txt", e2)])
+
+            replace = EWAHBitmap()
+            replace.add(1)  # replace b.txt
+            delete = EWAHBitmap()
+            link = LinkExtension(digest, delete, replace)
+            replacement = self._make_entry(b"9" * 40)
+
+            main_path = os.path.join(tmpdir, "index")
+            with GitFile(main_path, "wb") as f:
+                writer = IndexChecksumWriter(f)
+                write_index(
+                    writer,
+                    [replacement.serialize(b"", Stage.NORMAL)],
+                    version=2,
+                    extensions=[link],
+                )
+                writer.close()
+
+            idx = Index(main_path)
+            idx.write()
+
+            # The written index must be self-contained: no link extension,
+            # and re-reading it (without the shared file) must still yield
+            # the merged entries.
+            idx2 = Index(main_path)
+            self.assertEqual(sorted(idx2), [b"a.txt", b"b.txt"])
+            self.assertEqual(idx2[b"a.txt"].sha, e1.sha)
+            self.assertEqual(idx2[b"b.txt"].sha, replacement.sha)
+            self.assertEqual([type(e).__name__ for e in idx2._extensions], [])
+
+    def test_read_split_index_missing_shared(self):
+        """Missing shared index file is reported, not silently ignored."""
+        from dulwich.file import GitFile
+        from dulwich.index import IndexChecksumWriter, write_index
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Link to a shared index that was never written.
+            link = LinkExtension(bytes.fromhex("aa" * 20))
+            main_path = os.path.join(tmpdir, "index")
+            with GitFile(main_path, "wb") as f:
+                writer = IndexChecksumWriter(f)
+                write_index(writer, [], version=2, extensions=[link])
+                writer.close()
+            with self.assertRaises(FileNotFoundError):
+                Index(main_path)

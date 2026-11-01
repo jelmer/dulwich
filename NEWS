@@ -3,6 +3,10 @@
  * Honour ``protocol.<name>.allow`` for submodule URLs; the file transport
    is now refused for submodules by default. (Kartik Kenchi)
 
+ * Yield checksum mismatches from ``porcelain.fsck`` instead of raising
+   them. Object store lookups now validate the SHA, so a corrupt loose
+   object aborted the iteration. (Jelmer Vernooĳ, #2552)
+
 1.2.20	2026-10-26
 
  * Apply zero-context insertion hunks (as written by ``diff -U0``) after

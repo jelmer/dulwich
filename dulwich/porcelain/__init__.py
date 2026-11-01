@@ -7098,8 +7098,8 @@ def fsck(repo: RepoPath | None = None) -> Iterator[tuple[bytes, Exception]]:
         # TODO(jelmer): check graph (excluding commits beyond shallow boundary)
         # TODO(jelmer): check refs
         for sha in r.object_store:
-            o = r.object_store[sha]
             try:
+                o = r.object_store[sha]
                 o.check()
             except Exception as e:
                 yield (sha, e)

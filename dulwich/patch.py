@@ -86,6 +86,8 @@ FIRST_FEW_BYTES = 8000
 
 DEFAULT_DIFF_ALGORITHM = "myers"
 
+NO_NEWLINE_AT_EOF = b"\n\\ No newline at end of file\n"
+
 
 class PatchApplicationFailure(Exception):
     """Raised when a patch does not apply cleanly."""
@@ -297,18 +299,20 @@ def unified_diff(
 
         for tag, i1, i2, j1, j2 in group:
             if tag == "equal":
-                for line in a[i1:i2]:
+                for idx, line in enumerate(a[i1:i2]):
+                    if not line[-1:] == b"\n" and i1 + idx == len(a) - 1:
+                        line += NO_NEWLINE_AT_EOF
                     yield b" " + line
                 continue
             if tag in ("replace", "delete"):
                 for line in a[i1:i2]:
                     if not line[-1:] == b"\n":
-                        line += b"\n\\ No newline at end of file\n"
+                        line += NO_NEWLINE_AT_EOF
                     yield b"-" + line
             if tag in ("replace", "insert"):
                 for line in b[j1:j2]:
                     if not line[-1:] == b"\n":
-                        line += b"\n\\ No newline at end of file\n"
+                        line += NO_NEWLINE_AT_EOF
                     yield b"+" + line
 
 
@@ -400,18 +404,20 @@ def unified_diff_with_algorithm(
 
         for tag, i1, i2, j1, j2 in group:
             if tag == "equal":
-                for line in a[i1:i2]:
+                for idx, line in enumerate(a[i1:i2]):
+                    if not line[-1:] == b"\n" and i1 + idx == len(a) - 1:
+                        line += NO_NEWLINE_AT_EOF
                     yield b" " + line
                 continue
             if tag in ("replace", "delete"):
                 for line in a[i1:i2]:
                     if not line[-1:] == b"\n":
-                        line += b"\n\\ No newline at end of file\n"
+                        line += NO_NEWLINE_AT_EOF
                     yield b"-" + line
             if tag in ("replace", "insert"):
                 for line in b[j1:j2]:
                     if not line[-1:] == b"\n":
-                        line += b"\n\\ No newline at end of file\n"
+                        line += NO_NEWLINE_AT_EOF
                     yield b"+" + line
 
 

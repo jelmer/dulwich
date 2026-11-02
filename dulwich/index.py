@@ -1840,6 +1840,38 @@ class Index:
         return current_tree.get_id(self._object_format)
 
 
+def _commit_tree_add(trees: dict[bytes, TreeDict], path: bytes) -> TreeDict:
+    if path in trees:
+        return trees[path]
+    dirname, basename = pathsplit(path)
+    t = _commit_tree_add(trees, dirname)
+    assert isinstance(basename, bytes)
+    newtree: TreeDict = {}
+    t[basename] = newtree
+    trees[path] = newtree
+    return newtree
+
+
+def _commit_tree_build(
+    object_store: ObjectContainer,
+    trees: dict[bytes, TreeDict],
+    path: bytes,
+    object_format: ObjectFormat,
+) -> ObjectID:
+    tree = Tree()
+    for basename, entry in trees[path].items():
+        if isinstance(entry, dict):
+            mode = stat.S_IFDIR
+            sha = _commit_tree_build(
+                object_store, trees, pathjoin(path, basename), object_format
+            )
+        else:
+            (mode, sha) = entry
+        tree.add(basename, mode, sha)
+    object_store.add_object(tree)
+    return ObjectID(tree.get_id(object_format))
+
+
 def commit_tree(
     object_store: ObjectContainer,
     blobs: Iterable[tuple[bytes, ObjectID, int]],
@@ -1855,36 +1887,11 @@ def commit_tree(
       ID of the created tree.
     """
     trees: dict[bytes, TreeDict] = {b"": {}}
-
-    def add_tree(path: bytes) -> TreeDict:
-        if path in trees:
-            return trees[path]
-        dirname, basename = pathsplit(path)
-        t = add_tree(dirname)
-        assert isinstance(basename, bytes)
-        newtree: TreeDict = {}
-        t[basename] = newtree
-        trees[path] = newtree
-        return newtree
-
     for path, sha, mode in blobs:
         tree_path, basename = pathsplit(path)
-        tree = add_tree(tree_path)
+        tree = _commit_tree_add(trees, tree_path)
         tree[basename] = (mode, sha)
-
-    def build_tree(path: bytes) -> ObjectID:
-        tree = Tree()
-        for basename, entry in trees[path].items():
-            if isinstance(entry, dict):
-                mode = stat.S_IFDIR
-                sha = build_tree(pathjoin(path, basename))
-            else:
-                (mode, sha) = entry
-            tree.add(basename, mode, sha)
-        object_store.add_object(tree)
-        return ObjectID(tree.get_id(object_format))
-
-    return build_tree(b"")
+    return _commit_tree_build(object_store, trees, b"", object_format)
 
 
 def commit_index(object_store: ObjectContainer, index: Index) -> ObjectID:

@@ -49,14 +49,15 @@ jobs:
             macos_last=$(echo -n "$macos_all" | awk '{print $NF}')
             macos_x86=$(echo -n "$macos_all" | tr ' ' '\n' | grep x86_64 | tail -1)
             echo "macos=$(echo $macos_last $macos_x86 | tr ' ' '\n' | sort -u | tr '\n' ' ')" >> $GITHUB_OUTPUT
-            echo "windows=$(echo -n '${{ steps.all-build-identifiers.outputs.windows }}' | awk '{print $NF}')" >> $GITHUB_OUTPUT
+            # Only build AMD64 on PRs; ARM64 wheels are built for releases only
+            echo "windows=$(echo -n '${{ steps.all-build-identifiers.outputs.windows }}' | tr ' ' '\n' | grep win_amd64 | tail -1)" >> $GITHUB_OUTPUT
           fi
       - name: Output build identifiers
         id: json-identifiers
         run: |
           echo "linux=$(echo -n '${{ steps.select-build-identifiers.outputs.linux }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "ubuntu-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
           echo "macos=$(echo -n '${{ steps.select-build-identifiers.outputs.macos }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "macos-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
-          echo "windows=$(echo -n '${{ steps.select-build-identifiers.outputs.windows }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: "windows-latest", "build-identifier": .}]')" >> $GITHUB_OUTPUT
+          echo "windows=$(echo -n '${{ steps.select-build-identifiers.outputs.windows }}' | jq -R -s -c 'split(" ") | map(select(length > 0)) | [.[] | {os: (if endswith("win_arm64") then "windows-11-arm" else "windows-latest" end), "build-identifier": .}]')" >> $GITHUB_OUTPUT
       - name: Merge build identifiers
         id: merged-identifiers
         run: |

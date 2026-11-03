@@ -22,6 +22,7 @@
 """Tests for the index."""
 
 import errno
+import gc
 import os
 import platform
 import shutil
@@ -30,6 +31,7 @@ import struct
 import sys
 import tempfile
 import unicodedata
+import weakref
 from io import BytesIO
 from pathlib import Path
 
@@ -537,6 +539,16 @@ class CommitTreeTests(TestCase):
         self.assertEqual((stat.S_IFDIR, dirid), self.store[rootid][b"bla"])
         self.assertEqual((stat.S_IFREG, blob.id), self.store[dirid][b"bar"])
         self.assertEqual({rootid, dirid, blob.id}, set(self.store._data.keys()))
+
+    def test_store_freed_without_cycle_collector(self) -> None:
+        gc.disable()
+        self.addCleanup(gc.enable)
+        blob = Blob.from_string(b"foo")
+        self.store.add_object(blob)
+        commit_tree(self.store, [(b"bla/bar", blob.id, stat.S_IFREG)])
+        ref = weakref.ref(self.store)
+        del self.store
+        self.assertIsNone(ref())
 
 
 class CleanupModeTests(TestCase):

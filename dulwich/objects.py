@@ -84,7 +84,6 @@ import stat
 import sys
 import zlib
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from hashlib import sha1
 from io import BufferedIOBase, BytesIO
 from typing import (
     IO,
@@ -92,6 +91,14 @@ from typing import (
     NamedTuple,
     TypeVar,
 )
+
+if TYPE_CHECKING:
+    from hashlib import sha1
+else:
+    try:
+        from sha1dc import sha1
+    except ImportError:
+        from hashlib import sha1
 
 if sys.version_info >= (3, 11):
     from typing import Self

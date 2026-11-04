@@ -24,6 +24,7 @@
 """Git object store interfaces and implementation."""
 
 __all__ = [
+    "DEFAULT_MAX_TREE_DEPTH",
     "DEFAULT_TEMPFILE_GRACE_PERIOD",
     "INFODIR",
     "PACKDIR",
@@ -35,6 +36,7 @@ __all__ = [
     "DiskObjectStore",
     "GraphTraversalReachability",
     "GraphWalker",
+    "MaxTreeDepthExceeded",
     "MemoryObjectStore",
     "MissingObjectFinder",
     "ObjectIterator",
@@ -84,6 +86,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    from .config import Config
     from .object_format import ObjectFormat
 
 from .errors import NotTreeError
@@ -445,8 +448,29 @@ class PackContainer(Protocol):
         ...
 
 
+# Default limit on tree traversal depth (``core.maxTreeDepth``). A
+# deeper tree is almost certainly a DoS attempt. See CVE-2017-15298.
+DEFAULT_MAX_TREE_DEPTH = 1280
+
+
+class MaxTreeDepthExceeded(Exception):
+    """Raised when a tree traversal exceeds `max_tree_depth`."""
+
+    def __init__(self, tree_id: ObjectID, limit: int) -> None:
+        """Record which traversal hit ``limit``."""
+        super().__init__(
+            f"tree {tree_id.decode('ascii', 'replace')} nests deeper "
+            f"than {limit} levels"
+        )
+        self.tree_id = tree_id
+        self.limit = limit
+
+
 class BaseObjectStore:
     """Object store interface."""
+
+    #: Depth cap for tree traversals performed through this store.
+    max_tree_depth: int | None = DEFAULT_MAX_TREE_DEPTH
 
     def __init__(self, *, object_format: "ObjectFormat | None" = None) -> None:
         """Initialize object store.
@@ -644,7 +668,11 @@ class BaseObjectStore:
             )
 
     def iter_tree_contents(
-        self, tree_id: ObjectID, include_trees: bool = False
+        self,
+        tree_id: ObjectID,
+        include_trees: bool = False,
+        *,
+        max_depth: int | None = DEFAULT_MAX_TREE_DEPTH,
     ) -> Iterator[TreeEntry]:
         """Iterate the contents of a tree and all subtrees.
 
@@ -653,15 +681,22 @@ class BaseObjectStore:
         Args:
           tree_id: SHA1 of the tree.
           include_trees: If True, include tree objects in the iteration.
+          max_depth: Override the store's :attr:`max_tree_depth`. Pass
+            ``None`` to disable the cap entirely. The store's default
+            comes from ``core.maxTreeDepth``.
+
         Returns: Iterator over TreeEntry namedtuples for all the objects in a
             tree.
+
+        Raises:
+          MaxTreeDepthExceeded: If the tree nests past the effective
+            depth limit.
         """
-        warnings.warn(
-            "Please use dulwich.object_store.iter_tree_contents",
-            DeprecationWarning,
-            stacklevel=2,
+        if max_depth is None:
+            max_depth = self.max_tree_depth
+        return iter_tree_contents(
+            self, tree_id, include_trees=include_trees, max_depth=max_depth
         )
-        return iter_tree_contents(self, tree_id, include_trees=include_trees)
 
     def iterobjects_subset(
         self, shas: Iterable[ObjectID], *, allow_missing: bool = False
@@ -998,6 +1033,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         packed_git_limit: int | None = None,
         delta_base_cache_limit: int | None = None,
         object_format: "ObjectFormat | None" = None,
+        max_tree_depth: int | None = None,
     ) -> None:
         """Initialize a PackBasedObjectStore.
 
@@ -1016,6 +1052,7 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
             Controls memory used to cache resolved base objects during delta
             unpacking, corresponding to Git's core.deltaBaseCacheLimit.
           object_format: Hash algorithm to use
+          max_tree_depth: Maximum tree depth
         """
         super().__init__(object_format=object_format)
         self._pack_cache: dict[str, Pack] = {}
@@ -1030,6 +1067,9 @@ class PackBasedObjectStore(PackCapableObjectStore, PackedObjectContainer):
         self.pack_depth = pack_depth
         self.pack_threads = pack_threads
         self.pack_big_file_threshold = pack_big_file_threshold
+        if max_tree_depth is None:
+            max_tree_depth = DEFAULT_MAX_TREE_DEPTH
+        self.max_tree_depth = max_tree_depth
 
     def get_reachability_provider(
         self,
@@ -1681,6 +1721,7 @@ class DiskObjectStore(PackBasedObjectStore):
         object_format: "ObjectFormat | None" = None,
         loose_object_size_limit: int | None = None,
         alternates: "Iterable[str | os.PathLike[str]] | None" = None,
+        max_tree_depth: int | None = None,
     ) -> None:
         """Open an object store.
 
@@ -1710,6 +1751,7 @@ class DiskObjectStore(PackBasedObjectStore):
           alternates: Extra alternate object directory paths to consult, in
             addition to those listed in ``objects/info/alternates``. Used to
             plumb ``GIT_ALTERNATE_OBJECT_DIRECTORIES`` through from porcelain.
+          max_tree_depth: Maximum tree traversal depth
         """
         # Import here to avoid circular dependency
         from .object_format import DEFAULT_OBJECT_FORMAT
@@ -1726,6 +1768,7 @@ class DiskObjectStore(PackBasedObjectStore):
             packed_git_limit=packed_git_limit,
             delta_base_cache_limit=delta_base_cache_limit,
             object_format=object_format if object_format else DEFAULT_OBJECT_FORMAT,
+            max_tree_depth=max_tree_depth,
         )
         self.path = path
         self.pack_dir = os.path.join(self.path, PACKDIR)
@@ -1905,6 +1948,11 @@ class DiskObjectStore(PackBasedObjectStore):
         except (KeyError, ValueError):
             pass
 
+        try:
+            max_tree_depth = int(config.get((b"core",), b"maxTreeDepth").decode())
+        except KeyError:
+            max_tree_depth = DEFAULT_MAX_TREE_DEPTH
+
         instance = cls(
             path,
             loose_compression_level=loose_compression_level,
@@ -1926,6 +1974,7 @@ class DiskObjectStore(PackBasedObjectStore):
             object_format=object_format,
             loose_object_size_limit=loose_object_size_limit,
             alternates=alternates,
+            max_tree_depth=max_tree_depth,
         )
         instance._use_commit_graph = use_commit_graph
         instance._use_midx = use_midx
@@ -3927,7 +3976,11 @@ def _collect_ancestors(
 
 
 def iter_tree_contents(
-    store: ObjectContainer, tree_id: ObjectID | None, *, include_trees: bool = False
+    store: ObjectContainer,
+    tree_id: ObjectID | None,
+    *,
+    include_trees: bool = False,
+    max_depth: int | None = None,
 ) -> Iterator[TreeEntry]:
     """Iterate the contents of a tree and all subtrees.
 
@@ -3937,25 +3990,32 @@ def iter_tree_contents(
       store: Object store to get trees from
       tree_id: SHA1 of the tree.
       include_trees: If True, include tree objects in the iteration.
+      max_depth: Raise :class:`MaxTreeDepthExceeded` once a subtree nests
+        past this many levels.
 
     Yields: TreeEntry namedtuples for all the objects in a tree.
+
+    Raises:
+      MaxTreeDepthExceeded: If the tree nests past the effective depth.
     """
     if tree_id is None:
         return
-    # This could be fairly easily generalized to >2 trees if we find a use
-    # case.
-    todo = [TreeEntry(b"", stat.S_IFDIR, tree_id)]
+    # Carry a depth alongside each queued entry so we can refuse deeply
+    # nested trees without materializing them first.
+    todo: list[tuple[int, TreeEntry]] = [(0, TreeEntry(b"", stat.S_IFDIR, tree_id))]
     while todo:
-        entry = todo.pop()
+        depth, entry = todo.pop()
         assert entry.mode is not None
         if stat.S_ISDIR(entry.mode):
+            if max_depth is not None and depth >= max_depth:
+                raise MaxTreeDepthExceeded(tree_id, max_depth)
             extra = []
             assert entry.sha is not None
             tree = store[entry.sha]
             assert isinstance(tree, Tree)
             for subentry in tree.iteritems(name_order=True):
                 assert entry.path is not None
-                extra.append(subentry.in_path(entry.path))
+                extra.append((depth + 1, subentry.in_path(entry.path)))
             todo.extend(reversed(extra))
         if not stat.S_ISDIR(entry.mode) or include_trees:
             yield entry

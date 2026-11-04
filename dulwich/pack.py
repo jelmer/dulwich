@@ -296,6 +296,9 @@ class DeltaCycle(UnresolvedDeltas):
 class ObjectContainer(Protocol):
     """Protocol for objects that can contain git objects."""
 
+    #: Depth cap for tree traversals performed through this container.
+    max_tree_depth: int | None
+
     def add_object(self, obj: ShaFile) -> None:
         """Add a single object to this object store."""
 

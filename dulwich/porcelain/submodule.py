@@ -29,6 +29,7 @@ __all__ = [
 ]
 
 import os
+import stat
 from collections.abc import Callable, Iterator, Sequence
 from typing import TYPE_CHECKING, BinaryIO
 
@@ -115,6 +116,41 @@ def _check_submodule_path(path: bytes, validator: Callable[[bytes], bool]) -> No
         raise Error(f"refusing submodule with absolute path: {path!r}")
     if not validate_path(path, validator):
         raise Error(f"refusing submodule with unsafe path: {path!r}")
+
+
+def _check_submodule_worktree_path(repo_path: str, path: bytes) -> None:
+    """Refuse a submodule path whose parent or leaf is already a symlink.
+
+    ``submodule_update`` writes files (including executables and the ``.git``
+    file) under the submodule path. If a parent component is a symlink, or if
+    the submodule path itself is a symlink, those writes follow the link and
+    land outside the work tree. Mirrors the leading-symlink refusal that
+    checkout, restore, patch-apply, and sparse checkout already apply.
+
+    Args:
+      repo_path: Filesystem path to the superproject work tree.
+      path: Submodule path in tree form (``/``-separated).
+
+    Raises:
+      Error: If any leading component resolves through a symlink, or if the
+        submodule path itself exists and is a symlink.
+    """
+    from ..index import InvalidPathError, verify_leading_dirs
+    from . import Error
+
+    repo_path_bytes = os.fsencode(repo_path)
+    try:
+        verify_leading_dirs(path, [], repo_path_bytes)
+    except InvalidPathError:
+        raise Error(f"refusing to write submodule through symlink: {path!r}")
+
+    full_path = os.path.join(repo_path_bytes, path)
+    try:
+        st = os.lstat(full_path)
+    except FileNotFoundError:
+        return
+    if stat.S_ISLNK(st.st_mode):
+        raise Error(f"refusing to write submodule through symlink: {path!r}")
 
 
 def submodule_list(repo: "RepoPath | None" = None) -> Iterator[tuple[str, str]]:
@@ -220,6 +256,16 @@ def submodule_update(
             # caller, so this transport is not user-initiated.
             client, _ = get_transport_and_path(url, config=protocol_config)
             check_transport_allowed(client, config=protocol_config, from_user=False)
+
+            # Refuse to write through a symlink at or above the submodule
+            # path. A worktree-preserving HEAD move can leave such a symlink
+            # in place; without this check the clone or fetch below would
+            # write the submodule content (including the ``.git`` file) into
+            # the link target, outside the work tree.
+            path_bytes = (
+                path if isinstance(path, bytes) else path.encode(DEFAULT_ENCODING)
+            )
+            _check_submodule_worktree_path(r.path, path_bytes)
 
             # Get or create the submodule repository paths
             submodule_path = os.path.join(r.path, path_str)

@@ -6562,6 +6562,41 @@ class SubmoduleTests(PorcelainTestCase):
             init=True,
         )
 
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_update_rejects_symlink_at_submodule_path(self) -> None:
+        # A victim's worktree may already contain a symlink where the new
+        # gitlink lives (e.g. after a worktree-preserving HEAD move). Without
+        # a check, submodule_update would clone and write the ``.git`` file
+        # through the link, outside the work tree.
+        self._build_malicious_submodule_repo(b"sub")
+        allow_file_transport(self.repo)
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside)
+        os.symlink(outside, os.path.join(self.repo.path, "sub"))
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.submodule_update,
+            self.repo,
+            init=True,
+        )
+        self.assertEqual([], os.listdir(outside))
+
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_update_rejects_symlinked_parent_directory(self) -> None:
+        # Same attack as above, but the symlink is on a parent directory.
+        self._build_malicious_submodule_repo(b"dir/sub")
+        allow_file_transport(self.repo)
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside)
+        os.symlink(outside, os.path.join(self.repo.path, "dir"))
+        self.assertRaises(
+            porcelain.Error,
+            porcelain.submodule_update,
+            self.repo,
+            init=True,
+        )
+        self.assertEqual([], os.listdir(outside))
+
     def test_check_submodule_path(self) -> None:
         # .git and .. components are rejected on every platform.
         for bad in (b".git/hooks", b"..", b"a/../b", b"/abs", b".git"):

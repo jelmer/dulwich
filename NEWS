@@ -1,5 +1,10 @@
 1.2.21	UNRELEASED
 
+ * SECURITY: Refuse ``porcelain.submodule_update`` when the submodule path
+   or a parent directory is already a symlink. A victim's worktree could
+   otherwise redirect the clone (including the submodule ``.git`` file) into
+   the link target. Reported by AnkitSingh411. (Jelmer Vernooĳ)
+
  * HARDEN: Add a ``sha1dc`` extra: ``pip install dulwich[sha1dc]`` pulls
    in the ``sha1dc`` package and dulwich picks it up for object ids, so
    SHA-1 collisions are detected rather than silently accepted. Without it,

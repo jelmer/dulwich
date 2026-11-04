@@ -40,18 +40,20 @@
    shallow clone silently dropped the pack while still updating the remote
    ref, leaving it pointing at missing objects. (Kartik Kenchi, #2478)
 
- * Validate object ids in LFS server batch requests. An absolute path or
-   ``..`` in the ``oid`` let a client probe for the existence of any file
-   readable by the server. Reported by @JMak-Security. (Jelmer Vernooĳ)
+ * SECURITY: Validate object ids in LFS server batch requests. An absolute
+   path or ``..`` in the ``oid`` let a client probe for the existence
+   of any file readable by the server.
+   Reported by @JMak-Security. (Jelmer Vernooĳ)
 
  * Add ``PySequoiaSignatureVendor``, which signs and verifies OpenPGP
    signatures with pysequoia using explicitly provided keys rather than
    a GnuPG keyring. (Jelmer Vernooĳ)
 
- * Pick the same commit and tag headers as git when they are repeated or out
-   of place, so a commit with two ``tree`` headers no longer checks out a
-   different tree than git does. Commits and tags that git refuses to parse
-   are now rejected, and unknown tag headers are preserved. (Jelmer Vernooĳ)
+ * SECURITY: Pick the same commit and tag headers as git when they are
+   repeated or out of place, so a commit with two ``tree`` headers no longer
+   checks out a different tree than git does. Commits and tags that git
+   refuses to parse are now rejected, and unknown tag headers are preserved.
+   (Jelmer Vernooĳ)
 
  * Verify commit signatures against the raw commit with its signature headers
    removed, rather than a re-serialization, and read and write SHA-256 commit

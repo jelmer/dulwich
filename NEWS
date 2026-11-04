@@ -14,6 +14,10 @@
    messages received from a remote, so a hostile server can no longer inject
    ANSI escape sequences into the user's terminal (matching git's fix for
    CVE-2024-52005). (Jelmer Vernooĳ)
+   
+ * HARDEN: Cap tree traversal depth in ``iter_tree_contents`` at 1280 levels
+   (``core.maxTreeDepth``). A tree nested more deeply raises
+   ``MaxTreeDepthExceeded``. (Jelmer Vernooĳ)
 
  * Free the object store passed to ``commit_tree`` without the cycle
    collector. Its nested helper functions kept it in a reference cycle,
@@ -62,7 +66,7 @@
 
  * Add ``PySequoiaSignatureVendor``, which signs and verifies OpenPGP
    signatures with pysequoia using explicitly provided keys rather than
-   a GnuPG keyring. (Jelmer Vernooĳ)
+   a GnuPG keyring. Requires pysequoia 0.1.35 or later. (Jelmer Vernooĳ)
 
  * SECURITY: Pick the same commit and tag headers as git when they are
    repeated or out of place, so a commit with two ``tree`` headers no longer

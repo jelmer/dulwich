@@ -557,14 +557,17 @@ class PySequoiaSignatureVendor(SignatureSigner, SignatureVerifier):
 
     @classmethod
     def available(cls) -> bool:
-        """Check if the pysequoia Python package is available.
+        """Check if a recent enough pysequoia package is available.
 
         Returns:
-          True if pysequoia package can be imported, False otherwise
+          True if pysequoia 0.1.35 or later can be imported, False otherwise
         """
-        import importlib.util
-
-        return importlib.util.find_spec("pysequoia") is not None
+        try:
+            import pysequoia
+        except ImportError:
+            return False
+        # Tsk.generate and Tsk.extract_certificate were added in 0.1.35.
+        return hasattr(pysequoia.Tsk, "extract_certificate")
 
     def sign(self, data: bytes, keyid: str | None = None) -> bytes:
         """Sign data with one of the configured secret keys.

@@ -374,7 +374,9 @@ class KeyIDMatchingTests(unittest.TestCase):
             self._run_with_status(vendor, status, stderr=stderr)
 
 
-@unittest.skipIf(pysequoia is None, "pysequoia not available")
+@unittest.skipUnless(
+    PySequoiaSignatureVendor.available(), "pysequoia >= 0.1.35 not available"
+)
 class PySequoiaSignatureVendorTests(unittest.TestCase):
     """Tests for PySequoiaSignatureVendor."""
 

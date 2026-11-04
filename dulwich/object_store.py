@@ -24,6 +24,7 @@
 """Git object store interfaces and implementation."""
 
 __all__ = [
+    "DEFAULT_MAX_TREE_DEPTH",
     "DEFAULT_TEMPFILE_GRACE_PERIOD",
     "INFODIR",
     "PACKDIR",
@@ -35,6 +36,7 @@ __all__ = [
     "DiskObjectStore",
     "GraphTraversalReachability",
     "GraphWalker",
+    "MaxTreeDepthExceeded",
     "MemoryObjectStore",
     "MissingObjectFinder",
     "ObjectIterator",
@@ -3926,8 +3928,30 @@ def _collect_ancestors(
     return (commits, bases)
 
 
+# Default limit on tree traversal depth (``core.maxTreeDepth``). A
+# deeper tree is almost certainly a DoS attempt. See CVE-2017-15298.
+DEFAULT_MAX_TREE_DEPTH = 1280
+
+
+class MaxTreeDepthExceeded(Exception):
+    """Raised when a tree traversal exceeds :data:`DEFAULT_MAX_TREE_DEPTH`."""
+
+    def __init__(self, tree_id: ObjectID, limit: int) -> None:
+        """Record which traversal hit ``limit``."""
+        super().__init__(
+            f"tree {tree_id.decode('ascii', 'replace')} nests deeper "
+            f"than {limit} levels"
+        )
+        self.tree_id = tree_id
+        self.limit = limit
+
+
 def iter_tree_contents(
-    store: ObjectContainer, tree_id: ObjectID | None, *, include_trees: bool = False
+    store: ObjectContainer,
+    tree_id: ObjectID | None,
+    *,
+    include_trees: bool = False,
+    max_depth: int = DEFAULT_MAX_TREE_DEPTH,
 ) -> Iterator[TreeEntry]:
     """Iterate the contents of a tree and all subtrees.
 
@@ -3937,25 +3961,32 @@ def iter_tree_contents(
       store: Object store to get trees from
       tree_id: SHA1 of the tree.
       include_trees: If True, include tree objects in the iteration.
+      max_depth: Raise :class:`MaxTreeDepthExceeded` once a subtree nests
+        past this many levels. Defaults to :data:`DEFAULT_MAX_TREE_DEPTH`.
 
     Yields: TreeEntry namedtuples for all the objects in a tree.
+
+    Raises:
+      MaxTreeDepthExceeded: If the tree nests past ``max_depth``.
     """
     if tree_id is None:
         return
-    # This could be fairly easily generalized to >2 trees if we find a use
-    # case.
-    todo = [TreeEntry(b"", stat.S_IFDIR, tree_id)]
+    # Carry a depth alongside each queued entry so we can refuse deeply
+    # nested trees without materializing them first.
+    todo: list[tuple[int, TreeEntry]] = [(0, TreeEntry(b"", stat.S_IFDIR, tree_id))]
     while todo:
-        entry = todo.pop()
+        depth, entry = todo.pop()
         assert entry.mode is not None
         if stat.S_ISDIR(entry.mode):
+            if depth >= max_depth:
+                raise MaxTreeDepthExceeded(tree_id, max_depth)
             extra = []
             assert entry.sha is not None
             tree = store[entry.sha]
             assert isinstance(tree, Tree)
             for subentry in tree.iteritems(name_order=True):
                 assert entry.path is not None
-                extra.append(subentry.in_path(entry.path))
+                extra.append((depth + 1, subentry.in_path(entry.path)))
             todo.extend(reversed(extra))
         if not stat.S_ISDIR(entry.mode) or include_trees:
             yield entry

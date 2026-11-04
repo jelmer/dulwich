@@ -5,6 +5,10 @@
    SHA-1 collisions are detected rather than silently accepted. Without it,
    dulwich falls back to ``hashlib.sha1``. (Jelmer Vernooĳ)
 
+ * HARDEN: Cap tree traversal depth in ``iter_tree_contents`` at 1280 levels
+   (``core.maxTreeDepth``). A tree nested more deeply raises
+   ``MaxTreeDepthExceeded``. (Jelmer Vernooĳ)
+
  * Free the object store passed to ``commit_tree`` without the cycle
    collector. Its nested helper functions kept it in a reference cycle,
    so pack files stayed open after use. (Zainab Mehmut)

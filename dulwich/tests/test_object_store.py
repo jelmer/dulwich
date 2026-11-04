@@ -37,6 +37,8 @@ from unittest.mock import patch
 
 from dulwich.index import commit_tree
 from dulwich.object_store import (
+    DEFAULT_MAX_TREE_DEPTH,
+    MaxTreeDepthExceeded,
     MemoryObjectStore,
     PackBasedObjectStore,
     find_shallow,
@@ -227,6 +229,31 @@ class ObjectStoreTests(Generic[_StoreT]):
             list(iter_tree_contents(self.store, tree_id)),
         )
         self.assertEqual([], list(iter_tree_contents(self.store, None)))
+
+    def test_iter_tree_contents_rejects_deep_nesting(self) -> None:
+        """A tree nested past max_depth raises MaxTreeDepthExceeded."""
+        blob = make_object(Blob, data=b"x")
+        self.store.add_object(blob)
+
+        # Build a chain of nested single-entry trees.
+        level = Tree()
+        level.add(b"leaf", 0o100644, blob.id)
+        self.store.add_object(level)
+        for _ in range(10):
+            nxt = Tree()
+            nxt.add(b"deeper", 0o040000, level.id)
+            self.store.add_object(nxt)
+            level = nxt
+
+        self.assertRaises(
+            MaxTreeDepthExceeded,
+            list,
+            iter_tree_contents(self.store, level.id, max_depth=5),
+        )
+
+    def test_iter_tree_contents_default_depth(self) -> None:
+        """Default depth cap is 1280."""
+        self.assertEqual(1280, DEFAULT_MAX_TREE_DEPTH)
 
     def test_iter_tree_contents_include_trees(self) -> None:
         """Test iterating tree contents including tree objects."""

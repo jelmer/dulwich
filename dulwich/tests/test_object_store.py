@@ -37,8 +37,10 @@ from unittest.mock import patch
 
 from dulwich.index import commit_tree
 from dulwich.object_store import (
+    DEFAULT_MAX_TREE_ENTRIES,
     MemoryObjectStore,
     PackBasedObjectStore,
+    TreeExpansionTooLarge,
     find_shallow,
     iter_commit_contents,
     iter_tree_contents,
@@ -227,6 +229,37 @@ class ObjectStoreTests(Generic[_StoreT]):
             list(iter_tree_contents(self.store, tree_id)),
         )
         self.assertEqual([], list(iter_tree_contents(self.store, None)))
+
+    def test_iter_tree_contents_bomb_capped(self) -> None:
+        """A tree with many shared subtrees is capped at max_entries."""
+        blob = make_object(Blob, data=b"x")
+        self.store.add_object(blob)
+
+        # Build a tree where every level has 10 entries referring back to the
+        # previous level. Four levels => 10^4 entries from five tree objects.
+        level = Tree()
+        level.add(b"a", 0o100644, blob.id)
+        self.store.add_object(level)
+        for _ in range(4):
+            nxt = Tree()
+            for i in range(10):
+                nxt.add(f"d{i}".encode(), 0o040000, level.id)
+            self.store.add_object(nxt)
+            level = nxt
+
+        self.assertRaises(
+            TreeExpansionTooLarge,
+            list,
+            iter_tree_contents(self.store, level.id, max_entries=500),
+        )
+
+        # With the limit disabled, iteration completes normally.
+        result = list(iter_tree_contents(self.store, level.id, max_entries=None))
+        self.assertEqual(10000, len(result))
+
+    def test_iter_tree_contents_default_limit_is_a_large_number(self) -> None:
+        """The public default must not block ordinary repositories."""
+        self.assertGreaterEqual(DEFAULT_MAX_TREE_ENTRIES, 1_000_000)
 
     def test_iter_tree_contents_include_trees(self) -> None:
         """Test iterating tree contents including tree objects."""

@@ -24,6 +24,7 @@
 """Git object store interfaces and implementation."""
 
 __all__ = [
+    "DEFAULT_MAX_TREE_ENTRIES",
     "DEFAULT_TEMPFILE_GRACE_PERIOD",
     "INFODIR",
     "PACKDIR",
@@ -46,6 +47,7 @@ __all__ = [
     "PackContainer",
     "PackInputTooLarge",
     "PeelCache",
+    "TreeExpansionTooLarge",
     "commit_tree_changes",
     "find_shallow",
     "get_depth",
@@ -3926,8 +3928,39 @@ def _collect_ancestors(
     return (commits, bases)
 
 
+# Default ceiling on the number of entries produced by iter_tree_contents.
+# A "git bomb" uses O(k) tree objects to imply O(k**d) entries via shared
+# subtrees (CVE-2017-15298 in git). Real repositories rarely exceed tens of
+# millions of paths, so a tree expanding to many times that count is almost
+# certainly a DoS attempt. Callers that need to exceed this can pass
+# ``max_entries=None`` to disable the guard.
+DEFAULT_MAX_TREE_ENTRIES = 10_000_000
+
+
+class TreeExpansionTooLarge(Exception):
+    """Raised when a tree's expanded contents exceed the configured limit.
+
+    Dulwich enforces a ceiling to protect against pack files that use a
+    handful of tree objects to imply billions of paths through shared
+    subtrees. See ``DEFAULT_MAX_TREE_ENTRIES``.
+    """
+
+    def __init__(self, tree_id: ObjectID, limit: int) -> None:
+        """Record which tree hit ``limit`` entries."""
+        super().__init__(
+            f"tree {tree_id.decode('ascii', 'replace')} expands to more "
+            f"than {limit} entries"
+        )
+        self.tree_id = tree_id
+        self.limit = limit
+
+
 def iter_tree_contents(
-    store: ObjectContainer, tree_id: ObjectID | None, *, include_trees: bool = False
+    store: ObjectContainer,
+    tree_id: ObjectID | None,
+    *,
+    include_trees: bool = False,
+    max_entries: int | None = DEFAULT_MAX_TREE_ENTRIES,
 ) -> Iterator[TreeEntry]:
     """Iterate the contents of a tree and all subtrees.
 
@@ -3937,14 +3970,22 @@ def iter_tree_contents(
       store: Object store to get trees from
       tree_id: SHA1 of the tree.
       include_trees: If True, include tree objects in the iteration.
+      max_entries: Raise :class:`TreeExpansionTooLarge` after this many
+        entries have been yielded. Pass ``None`` to disable the check
+        (not recommended for input from untrusted remotes).
 
     Yields: TreeEntry namedtuples for all the objects in a tree.
+
+    Raises:
+      TreeExpansionTooLarge: If ``max_entries`` is set and the tree
+        expands past it.
     """
     if tree_id is None:
         return
     # This could be fairly easily generalized to >2 trees if we find a use
     # case.
     todo = [TreeEntry(b"", stat.S_IFDIR, tree_id)]
+    produced = 0
     while todo:
         entry = todo.pop()
         assert entry.mode is not None
@@ -3958,6 +3999,9 @@ def iter_tree_contents(
                 extra.append(subentry.in_path(entry.path))
             todo.extend(reversed(extra))
         if not stat.S_ISDIR(entry.mode) or include_trees:
+            if max_entries is not None and produced >= max_entries:
+                raise TreeExpansionTooLarge(tree_id, max_entries)
+            produced += 1
             yield entry
 
 

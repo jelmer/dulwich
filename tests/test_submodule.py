@@ -23,8 +23,11 @@
 
 import os
 import shutil
+import sys
 import tempfile
+from unittest import skipIf
 
+from dulwich.index import InvalidPathError
 from dulwich.objects import (
     S_ISGITLINK,
     ShaFile,
@@ -146,3 +149,22 @@ class SubmoduleTests(TestCase):
 
         # Test idempotency - calling again should not fail
         ensure_submodule_placeholder(repo, b"libs/mylib")
+
+    @skipIf(sys.platform == "win32", "requires symlink support")
+    def test_ensure_submodule_placeholder_refuses_symlink(self) -> None:
+        repo_path = os.path.join(self.test_dir, "testrepo")
+        repo = Repo.init(repo_path, mkdir=True)
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside)
+
+        # Symlink at the submodule path itself.
+        os.symlink(outside, os.path.join(repo_path, "sub"))
+        self.assertRaises(InvalidPathError, ensure_submodule_placeholder, repo, b"sub")
+        self.assertEqual([], os.listdir(outside))
+
+        # Symlink on a parent component.
+        os.symlink(outside, os.path.join(repo_path, "dir"))
+        self.assertRaises(
+            InvalidPathError, ensure_submodule_placeholder, repo, b"dir/sub"
+        )
+        self.assertEqual([], os.listdir(outside))

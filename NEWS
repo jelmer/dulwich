@@ -1,5 +1,10 @@
 1.2.21	UNRELEASED
 
+ * HARDEN: Add a ``sha1dc`` extra: ``pip install dulwich[sha1dc]`` pulls
+   in the ``sha1dc`` package and dulwich picks it up for object ids, so
+   SHA-1 collisions are detected rather than silently accepted. Without it,
+   dulwich falls back to ``hashlib.sha1``. (Jelmer Vernooĳ)
+
  * Free the object store passed to ``commit_tree`` without the cycle
    collector. Its nested helper functions kept it in a reference cycle,
    so pack files stayed open after use. (Zainab Mehmut)

@@ -37,8 +37,16 @@ __all__ = [
 ]
 
 from collections.abc import Callable
-from hashlib import sha1, sha256
+from hashlib import sha256
 from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from hashlib import sha1
+else:
+    try:
+        from sha1dc import sha1
+    except ImportError:
+        from hashlib import sha1
 
 if TYPE_CHECKING:
     from _hashlib import HASH

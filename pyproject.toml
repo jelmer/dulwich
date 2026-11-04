@@ -56,6 +56,7 @@ fuzzing = ["atheris"]
 patiencediff = ["patiencediff"]
 range_diff = ["munkres"]
 aiohttp = ["aiohttp"]
+sha1dc = ["sha1dc"]
 
 [project.scripts]
 dulwich = "dulwich.cli:main"

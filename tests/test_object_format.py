@@ -66,7 +66,8 @@ class ObjectFormatTests(TestCase):
     def test_new_hash(self) -> None:
         """Test new_hash creates a hash object."""
         sha1_hash = SHA1.new_hash()
-        self.assertEqual("sha1", sha1_hash.name)
+        # sha1dc reports "sha1-dc"; hashlib reports "sha1".
+        self.assertIn(sha1_hash.name, ("sha1", "sha1-dc"))
 
         sha256_hash = SHA256.new_hash()
         self.assertEqual("sha256", sha256_hash.name)

@@ -5,6 +5,11 @@
    otherwise redirect the clone (including the submodule ``.git`` file) into
    the link target. Reported by AnkitSingh411. (Jelmer Vernooĳ)
 
+ * SECURITY: Refuse to open a pack index whose fanout claims more objects
+   than the file could possibly hold. Loading previously succeeded and
+   lookups then returned empty names or raised struct errors deep in the
+   call stack. (Jelmer Vernooĳ)
+
  * HARDEN: Add a ``sha1dc`` extra: ``pip install dulwich[sha1dc]`` pulls
    in the ``sha1dc`` package and dulwich picks it up for object ids, so
    SHA-1 collisions are detected rather than silently accepted. Without it,

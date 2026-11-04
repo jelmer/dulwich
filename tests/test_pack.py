@@ -1544,6 +1544,39 @@ class TestPackIndexWritingv3(TestCase, BaseTestFilePackIndexWriting):
         self.assertIn("wrong length", str(cm.exception))
 
 
+class MalformedPackIndexTests(TestCase):
+    """Reject pack indexes whose claimed object count can't fit in the file."""
+
+    def _write(self, data: bytes) -> str:
+        tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tempdir)
+        path = os.path.join(tempdir, "bad.idx")
+        with open(path, "wb") as f:
+            f.write(data)
+        return path
+
+    def test_v2_rejects_oversized_object_count(self) -> None:
+        from struct import pack as pack_bytes
+
+        header = b"\xfftOc" + pack_bytes(">L", 2)
+        fanout = b"\x00" * (255 * 4) + pack_bytes(">L", 0xFFFFFFFF)
+        trailer = b"\x00" * 40
+        path = self._write(header + fanout + trailer)
+        with self.assertRaises(AssertionError) as cm:
+            load_pack_index(path, DEFAULT_OBJECT_FORMAT)
+        self.assertIn("needs at least", str(cm.exception))
+
+    def test_v1_rejects_oversized_object_count(self) -> None:
+        from struct import pack as pack_bytes
+
+        fanout = b"\x00" * (255 * 4) + pack_bytes(">L", 0xFFFFFFFF)
+        trailer = b"\x00" * 40
+        path = self._write(fanout + trailer)
+        with self.assertRaises(AssertionError) as cm:
+            load_pack_index(path, DEFAULT_OBJECT_FORMAT)
+        self.assertIn("needs at least", str(cm.exception))
+
+
 class WritePackIndexTests(TestCase):
     """Tests for the configurable write_pack_index function."""
 

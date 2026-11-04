@@ -10,6 +10,11 @@
    SHA-1 collisions are detected rather than silently accepted. Without it,
    dulwich falls back to ``hashlib.sha1``. (Jelmer Vernooĳ)
 
+ * SECURITY: Strip terminal control bytes from sideband progress and fatal
+   messages received from a remote, so a hostile server can no longer inject
+   ANSI escape sequences into the user's terminal (matching git's fix for
+   CVE-2024-52005). (Jelmer Vernooĳ)
+
  * Free the object store passed to ``commit_tree`` without the cycle
    collector. Its nested helper functions kept it in a reference cycle,
    so pack files stayed open after use. (Zainab Mehmut)

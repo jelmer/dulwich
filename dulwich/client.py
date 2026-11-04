@@ -904,17 +904,43 @@ class _v1ReceivePackHeader:
             yield None
 
 
+# Bytes passed through unchanged when sanitising sideband progress/error
+# messages: TAB, LF, CR, BS (used by progress to redraw a line) and the
+# printable-ASCII range. Everything else (notably ESC = 0x1b, which starts
+# ANSI control sequences) is replaced with ``?`` so a hostile remote cannot
+# clear the terminal, change its title or inject colour via sideband text.
+_SIDEBAND_SAFE_BYTES = frozenset((0x08, 0x09, 0x0A, 0x0D, *range(0x20, 0x7F)))
+
+
+def _sanitize_sideband_message(data: bytes) -> bytes:
+    """Replace terminal control bytes in sideband data with ``?``.
+
+    Mirrors git's ``sideband.c`` ``maybe_colorize_sideband``/``SIDEBAND_HIDE``
+    handling (CVE-2024-52005): the remote controls the bytes written to the
+    user's terminal, so escape sequences must not pass through.
+    """
+    if all(b in _SIDEBAND_SAFE_BYTES for b in data):
+        return data
+    return bytes(b if b in _SIDEBAND_SAFE_BYTES else 0x3F for b in data)
+
+
 def _read_side_band64k_data(pkt_seq: Iterable[bytes]) -> Iterator[tuple[int, bytes]]:
     """Read per-channel data.
 
-    This requires the side-band-64k capability.
+    This requires the side-band-64k capability. Data on the progress and
+    fatal-error channels is passed through :func:`_sanitize_sideband_message`
+    so a hostile remote cannot inject terminal control sequences into
+    whatever a caller writes the bytes to.
 
     Args:
       pkt_seq: Sequence of packets to read
     """
     for pkt in pkt_seq:
         channel = ord(pkt[:1])
-        yield channel, pkt[1:]
+        data = pkt[1:]
+        if channel in (SIDE_BAND_CHANNEL_PROGRESS, SIDE_BAND_CHANNEL_FATAL):
+            data = _sanitize_sideband_message(data)
+        yield channel, data
 
 
 def find_capability(

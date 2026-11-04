@@ -41,7 +41,7 @@ GitHub = "https://github.com/dulwich/dulwich"
 fastimport = ["fastimport"]
 https = ["urllib3>=2.2.2"]
 pgp = ["gpg"]
-sequoia = ["pysequoia"]
+sequoia = ["pysequoia>=0.1.35"]
 paramiko = ["paramiko"]
 colordiff = ["rich"]
 dev = [

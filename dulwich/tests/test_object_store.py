@@ -740,3 +740,61 @@ class FindShallowTests(CommitTestHelper, TestCase):
             (set([c1.id]), set([c2.id])),
             find_shallow(self._store, [tag.id], 2),
         )
+
+
+class ObjectStoreMaxTreeDepthTests(TestCase):
+    """Tests for the ``max_tree_depth`` attribute on object stores."""
+
+    def _build_nested(self, store: "BaseObjectStore", depth: int) -> ObjectID:
+        blob = make_object(Blob, data=b"x")
+        store.add_object(blob)
+        level = Tree()
+        level.add(b"leaf", 0o100644, blob.id)
+        store.add_object(level)
+        for _ in range(depth):
+            nxt = Tree()
+            nxt.add(b"deeper", 0o040000, level.id)
+            store.add_object(nxt)
+            level = nxt
+        return level.id
+
+    def test_default_on_memory_store(self) -> None:
+        store = MemoryObjectStore()
+        self.assertEqual(DEFAULT_MAX_TREE_DEPTH, store.max_tree_depth)
+
+    def test_method_respects_store_attribute(self) -> None:
+        store = MemoryObjectStore()
+        store.max_tree_depth = 3
+        root = self._build_nested(store, 5)
+        self.assertRaises(MaxTreeDepthExceeded, list, store.iter_tree_contents(root))
+
+    def test_method_override_takes_precedence(self) -> None:
+        store = MemoryObjectStore()
+        store.max_tree_depth = 3
+        root = self._build_nested(store, 5)
+        # Passing a larger max_depth lifts the per-store cap for this call.
+        self.assertEqual(1, len(list(store.iter_tree_contents(root, max_depth=100))))
+
+    def test_free_function_reads_store_attribute(self) -> None:
+        store = MemoryObjectStore()
+        store.max_tree_depth = 3
+        root = self._build_nested(store, 5)
+        self.assertRaises(MaxTreeDepthExceeded, list, iter_tree_contents(store, root))
+
+    def test_disk_store_picks_up_config(self) -> None:
+        import shutil
+        import tempfile
+
+        from dulwich.repo import Repo
+
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        r = Repo.init(tmp)
+        self.addCleanup(r.close)
+        cfg = r.get_config()
+        cfg.set((b"core",), b"maxTreeDepth", b"7")
+        cfg.write_to_path()
+        r.close()
+        r2 = Repo(tmp)
+        self.addCleanup(r2.close)
+        self.assertEqual(7, r2.object_store.max_tree_depth)

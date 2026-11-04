@@ -1,4 +1,4 @@
-1.2.21	UNRELEASED
+1.2.21	2026-11-04
 
  * SECURITY: Refuse ``porcelain.submodule_update`` when the submodule path
    or a parent directory is already a symlink. A victim's worktree could

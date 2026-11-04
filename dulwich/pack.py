@@ -132,7 +132,7 @@ import threading
 import warnings
 import zlib
 from collections.abc import Callable, Iterable, Iterator, Sequence, Set
-from hashlib import sha1, sha256
+from hashlib import sha256
 from itertools import chain
 from os import SEEK_END
 from struct import unpack_from
@@ -146,6 +146,14 @@ from typing import (
     Protocol,
     TypeVar,
 )
+
+if TYPE_CHECKING:
+    from hashlib import sha1
+else:
+    try:
+        from sha1dc import sha1
+    except ImportError:
+        from hashlib import sha1
 
 if sys.version_info >= (3, 11):
     from typing import Self

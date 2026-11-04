@@ -114,6 +114,54 @@ class DeprecatedReexportTests(TestCase):
                 self.assertIs(getattr(bundle_uri, name), obj)
 
 
+class SidebandSanitizationTests(TestCase):
+    """Tests for terminal-control filtering on sideband progress/fatal data."""
+
+    def _pkt(self, chan: int, data: bytes) -> bytes:
+        return bytes([chan]) + data
+
+    def test_progress_strips_ansi(self) -> None:
+        from dulwich.client import _read_side_band64k_data
+        from dulwich.protocol import (
+            SIDE_BAND_CHANNEL_PROGRESS,
+        )
+
+        payload = b"progress\x1b[2J\x1b]0;hacked\x07 90%"
+        pkts = [self._pkt(SIDE_BAND_CHANNEL_PROGRESS, payload)]
+        result = list(_read_side_band64k_data(pkts))
+        self.assertEqual(
+            result,
+            [(SIDE_BAND_CHANNEL_PROGRESS, b"progress?[2J?]0;hacked? 90%")],
+        )
+
+    def test_fatal_strips_ansi(self) -> None:
+        from dulwich.client import _read_side_band64k_data
+        from dulwich.protocol import SIDE_BAND_CHANNEL_FATAL
+
+        pkts = [self._pkt(SIDE_BAND_CHANNEL_FATAL, b"nope\x1b[31mred")]
+        result = list(_read_side_band64k_data(pkts))
+        self.assertEqual(result, [(SIDE_BAND_CHANNEL_FATAL, b"nope?[31mred")])
+
+    def test_data_channel_untouched(self) -> None:
+        from dulwich.client import _read_side_band64k_data
+        from dulwich.protocol import SIDE_BAND_CHANNEL_DATA
+
+        # Pack data on channel 1 is binary; it must not be rewritten.
+        payload = b"\x1b\x00\x01\x02binary"
+        pkts = [self._pkt(SIDE_BAND_CHANNEL_DATA, payload)]
+        result = list(_read_side_band64k_data(pkts))
+        self.assertEqual(result, [(SIDE_BAND_CHANNEL_DATA, payload)])
+
+    def test_progress_keeps_cr_lf_bs_tab(self) -> None:
+        from dulwich.client import _read_side_band64k_data
+        from dulwich.protocol import SIDE_BAND_CHANNEL_PROGRESS
+
+        payload = b"line1\n\rprogress\t50%\x08\x08\x0875%"
+        pkts = [self._pkt(SIDE_BAND_CHANNEL_PROGRESS, payload)]
+        result = list(_read_side_band64k_data(pkts))
+        self.assertEqual(result, [(SIDE_BAND_CHANNEL_PROGRESS, payload)])
+
+
 class DummyClient(TraditionalGitClient):
     def __init__(self, can_read, read, write) -> None:
         self.can_read = can_read

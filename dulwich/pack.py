@@ -1385,11 +1385,14 @@ class PackIndex1(FilePackIndex):
         self._fan_out_table = self._read_fan_out_table(0)
         self.hash_size = self.object_format.oid_length
         self._entry_size = 4 + self.hash_size
+        # Avoid len(self) here: on 32-bit platforms a __len__ return above
+        # 2**31-1 raises OverflowError before we can reject the index.
+        num_objects = self._fan_out_table[-1]
         file_size = len(self._contents)
-        minimum_size = 0x100 * 4 + len(self) * self._entry_size
+        minimum_size = 0x100 * 4 + num_objects * self._entry_size
         if file_size < minimum_size:
             raise AssertionError(
-                f"pack index claims {len(self)} objects but file is only "
+                f"pack index claims {num_objects} objects but file is only "
                 f"{file_size} bytes (needs at least {minimum_size})"
             )
 
@@ -1444,10 +1447,15 @@ class PackIndex2(FilePackIndex):
         self._fan_out_table = self._read_fan_out_table(8)
         self.hash_size = self.object_format.oid_length
         self._name_table_offset = 8 + 0x100 * 4
-        self._crc32_table_offset = self._name_table_offset + self.hash_size * len(self)
-        self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
-        self._pack_offset_largetable_offset = self._pack_offset_table_offset + 4 * len(
-            self
+        # Avoid len(self) here: on 32-bit platforms a __len__ return above
+        # 2**31-1 raises OverflowError before we can reject the index.
+        num_objects = self._fan_out_table[-1]
+        self._crc32_table_offset = (
+            self._name_table_offset + self.hash_size * num_objects
+        )
+        self._pack_offset_table_offset = self._crc32_table_offset + 4 * num_objects
+        self._pack_offset_largetable_offset = (
+            self._pack_offset_table_offset + 4 * num_objects
         )
         # Reject claims the file is obviously too small to back. A corrupt
         # (or hostile) ``.idx`` with fanout[-1] = 0xFFFFFFFF would otherwise
@@ -1460,7 +1468,7 @@ class PackIndex2(FilePackIndex):
         minimum_size = self._pack_offset_largetable_offset
         if file_size < minimum_size:
             raise AssertionError(
-                f"pack index claims {len(self)} objects but file is only "
+                f"pack index claims {num_objects} objects but file is only "
                 f"{file_size} bytes (needs at least {minimum_size})"
             )
 
@@ -1576,16 +1584,21 @@ class PackIndex3(FilePackIndex):
             16
         )  # After header (4 + 4 + 4 + 4)
         self._name_table_offset = 16 + 0x100 * 4
-        self._crc32_table_offset = self._name_table_offset + self.hash_size * len(self)
-        self._pack_offset_table_offset = self._crc32_table_offset + 4 * len(self)
-        self._pack_offset_largetable_offset = self._pack_offset_table_offset + 4 * len(
-            self
+        # Avoid len(self) here: on 32-bit platforms a __len__ return above
+        # 2**31-1 raises OverflowError before we can reject the index.
+        num_objects = self._fan_out_table[-1]
+        self._crc32_table_offset = (
+            self._name_table_offset + self.hash_size * num_objects
+        )
+        self._pack_offset_table_offset = self._crc32_table_offset + 4 * num_objects
+        self._pack_offset_largetable_offset = (
+            self._pack_offset_table_offset + 4 * num_objects
         )
         file_size = len(self._contents)
         minimum_size = self._pack_offset_largetable_offset
         if file_size < minimum_size:
             raise AssertionError(
-                f"pack index claims {len(self)} objects but file is only "
+                f"pack index claims {num_objects} objects but file is only "
                 f"{file_size} bytes (needs at least {minimum_size})"
             )
 

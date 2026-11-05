@@ -8177,6 +8177,25 @@ def cherry_pick(  # noqa: D417
         except KeyError:
             raise Error("No HEAD reference found")
 
+        # A normal cherry-pick requires the index to match HEAD. Check the
+        # index, not just the worktree (which may already match HEAD).
+        assert isinstance(head_commit, Commit)
+        index = r.open_index(config=r.get_config_stack())
+        if index.has_conflicts():
+            from ..errors import WorkingTreeModifiedError
+
+            raise WorkingTreeModifiedError(
+                "Cannot cherry-pick with unresolved conflicts"
+            )
+
+        index_tree = index.commit(r.object_store)
+        if not no_commit and index_tree != head_commit.tree:
+            from ..errors import WorkingTreeModifiedError
+
+            raise WorkingTreeModifiedError(
+                "Cannot cherry-pick with staged changes; commit or stash them first."
+            )
+
         # Parse the commit to cherry-pick
         # committish cannot be None here due to validation above
         assert committish is not None
@@ -8196,29 +8215,26 @@ def cherry_pick(  # noqa: D417
         parent_commit = r[cherry_pick_commit.parents[0]]
         assert isinstance(parent_commit, Commit)
 
-        # Perform three-way merge
-        assert isinstance(head_commit, Commit)
-        merged_tree, conflicts = three_way_merge(
-            r.object_store, parent_commit, head_commit, cherry_pick_commit
-        )
+        # --no-commit applies the change against the index, not HEAD.
+        if no_commit:
+            ours_commit = Commit()
+            ours_commit.tree = index_tree
+            old_tree = index_tree
+        else:
+            ours_commit = head_commit
+            old_tree = head_commit.tree
 
-        # Add merged tree to object store
+        merged_tree, conflicts = three_way_merge(
+            r.object_store, parent_commit, ours_commit, cherry_pick_commit
+        )
         r.object_store.add_object(merged_tree)
 
-        # Update working tree and index
-        # Reset index to match merged tree
-        r.get_worktree().reset_index(merged_tree.id, config=r.get_config_stack())
-
-        # Update working tree from the new index
-        # Allow overwriting because we're applying the merge result
-        assert isinstance(head_commit, Commit)
-        changes = tree_changes(r.object_store, head_commit.tree, merged_tree.id)
+        changes = tree_changes(r.object_store, old_tree, merged_tree.id)
         update_working_tree(
             r,
-            head_commit.tree,
+            old_tree,
             merged_tree.id,
             change_iterator=changes,
-            allow_overwrite_modified=True,
             config=r.get_config_stack(),
         )
 

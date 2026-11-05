@@ -4614,7 +4614,33 @@ class cmd_branch(Command):
             const="*",
             help="List branches matching a pattern",
         )
+        parser.add_argument(
+            "--show-current",
+            action="store_true",
+            help="Print the name of the current branch",
+        )
         parsed_args = parser.parse_args(args)
+
+        if parsed_args.show_current:
+            if (
+                parsed_args.delete
+                or parsed_args.list is not None
+                or parsed_args.merged
+                or parsed_args.no_merged
+                or parsed_args.contains
+            ):
+                parser.error(
+                    "--show-current cannot be used with --delete, --list, "
+                    "--merged, --no-merged or --contains"
+                )
+            with porcelain.open_repo_closing(None) as repo:
+                try:
+                    current = porcelain.active_branch(repo)
+                except (IndexError, ValueError):
+                    # Like git, print nothing when HEAD is detached.
+                    return 0
+            sys.stdout.write(f"{current.decode()}\n")
+            return 0
 
         def print_branches(
             branches: Iterator[bytes] | Sequence[bytes], use_columns: bool = False

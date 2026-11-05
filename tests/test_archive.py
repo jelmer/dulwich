@@ -21,8 +21,11 @@
 
 """Tests for archive support."""
 
+import os
+import shutil
 import struct
 import tarfile
+import tempfile
 from io import BytesIO
 from unittest.mock import patch
 
@@ -30,10 +33,13 @@ from dulwich.archive import (
     ChunkedBytesIO,
     UnsafeArchivePathError,
     _is_unsafe_archive_path,
+    read_repo_attributes,
     tar_stream,
 )
+from dulwich.attrs import compile_gitattributes_patterns, parse_git_attributes
 from dulwich.object_store import MemoryObjectStore
 from dulwich.objects import Blob, Tree
+from dulwich.repo import Repo
 from dulwich.tests.utils import build_commit_graph
 
 from . import TestCase
@@ -214,6 +220,256 @@ class ArchiveTests(TestCase):
         self.assertEqual(0o755, modes["exec"])
         for mode in modes.values():
             self.assertEqual(0, mode & 0o7000)
+
+    def _archive_names(self, store, tree, **kwargs) -> list[str]:
+        stream = b"".join(tar_stream(store, tree, mtime=0, **kwargs))
+        tf = tarfile.TarFile(fileobj=BytesIO(stream))
+        self.addCleanup(tf.close)
+        return sorted(tf.getnames())
+
+    def test_export_ignore(self) -> None:
+        """Paths marked ``export-ignore`` in the tree are left out.
+
+        git archive takes the attribute from the tree it is archiving, skips
+        matching files, and does not descend into a matching directory.
+        """
+        store = MemoryObjectStore()
+        attrs = Blob.from_string(
+            b"ignored.txt export-ignore\n"
+            b"docs export-ignore\n"
+            b"build/ export-ignore\n"
+            b"sub/dropped.txt export-ignore\n"
+        )
+        payload = Blob.from_string(b"payload")
+        for blob in (attrs, payload):
+            store.add_object(blob)
+        docs = Tree()
+        docs.add(b"guide.md", 0o100644, payload.id)
+        build = Tree()
+        build.add(b"out.o", 0o100644, payload.id)
+        sub = Tree()
+        sub.add(b"dropped.txt", 0o100644, payload.id)
+        sub.add(b"kept.txt", 0o100644, payload.id)
+        for tree in (docs, build, sub):
+            store.add_object(tree)
+        root = Tree()
+        root.add(b".gitattributes", 0o100644, attrs.id)
+        root.add(b"ignored.txt", 0o100644, payload.id)
+        root.add(b"kept.txt", 0o100644, payload.id)
+        root.add(b"docs", 0o040000, docs.id)
+        root.add(b"build", 0o040000, build.id)
+        root.add(b"sub", 0o040000, sub.id)
+        store.add_object(root)
+
+        self.assertEqual(
+            [
+                "blah/.gitattributes",
+                "blah/kept.txt",
+                "blah/sub/kept.txt",
+            ],
+            self._archive_names(store, root, prefix=b"blah"),
+        )
+
+    def test_export_ignore_negated(self) -> None:
+        """``-export-ignore`` on a path overrides a broader pattern."""
+        store = MemoryObjectStore()
+        attrs = Blob.from_string(
+            b"*.secret export-ignore\nkeep.secret -export-ignore\n"
+        )
+        payload = Blob.from_string(b"payload")
+        for blob in (attrs, payload):
+            store.add_object(blob)
+        root = Tree()
+        root.add(b".gitattributes", 0o100644, attrs.id)
+        root.add(b"drop.secret", 0o100644, payload.id)
+        root.add(b"keep.secret", 0o100644, payload.id)
+        store.add_object(root)
+
+        self.assertEqual(
+            [".gitattributes", "keep.secret"], self._archive_names(store, root)
+        )
+
+    def test_export_ignore_subdirectory(self) -> None:
+        """A subdirectory's ``.gitattributes`` applies to its own contents.
+
+        Its patterns are relative to that directory, so ``dropped.txt`` only
+        drops ``sub/dropped.txt``, and ``deep`` prunes ``sub/deep``.
+        """
+        store = MemoryObjectStore()
+        sub_attrs = Blob.from_string(b"dropped.txt export-ignore\ndeep export-ignore\n")
+        payload = Blob.from_string(b"payload")
+        for blob in (sub_attrs, payload):
+            store.add_object(blob)
+        deep = Tree()
+        deep.add(b"deeper.txt", 0o100644, payload.id)
+        store.add_object(deep)
+        sub = Tree()
+        sub.add(b".gitattributes", 0o100644, sub_attrs.id)
+        sub.add(b"dropped.txt", 0o100644, payload.id)
+        sub.add(b"kept.txt", 0o100644, payload.id)
+        sub.add(b"deep", 0o040000, deep.id)
+        store.add_object(sub)
+        root = Tree()
+        # Same name as the one dropped below, to show the pattern is scoped
+        # to the directory holding the .gitattributes.
+        root.add(b"dropped.txt", 0o100644, payload.id)
+        root.add(b"sub", 0o040000, sub.id)
+        store.add_object(root)
+
+        self.assertEqual(
+            ["dropped.txt", "sub/.gitattributes", "sub/kept.txt"],
+            self._archive_names(store, root),
+        )
+
+    def test_export_ignore_subdirectory_overrides_root(self) -> None:
+        """A deeper ``.gitattributes`` overrides a shallower one."""
+        store = MemoryObjectStore()
+        root_attrs = Blob.from_string(b"*.secret export-ignore\n")
+        sub_attrs = Blob.from_string(b"keep.secret -export-ignore\n")
+        payload = Blob.from_string(b"payload")
+        for blob in (root_attrs, sub_attrs, payload):
+            store.add_object(blob)
+        sub = Tree()
+        sub.add(b".gitattributes", 0o100644, sub_attrs.id)
+        sub.add(b"drop.secret", 0o100644, payload.id)
+        sub.add(b"keep.secret", 0o100644, payload.id)
+        store.add_object(sub)
+        root = Tree()
+        root.add(b".gitattributes", 0o100644, root_attrs.id)
+        root.add(b"top.secret", 0o100644, payload.id)
+        root.add(b"sub", 0o040000, sub.id)
+        store.add_object(root)
+
+        self.assertEqual(
+            [".gitattributes", "sub/.gitattributes", "sub/keep.secret"],
+            self._archive_names(store, root),
+        )
+
+    def test_export_ignore_non_blob_gitattributes(self) -> None:
+        """A ``.gitattributes`` that is not a regular file is ignored."""
+        store = MemoryObjectStore()
+        payload = Blob.from_string(b"payload")
+        store.add_object(payload)
+        attrs_dir = Tree()
+        attrs_dir.add(b"nested", 0o100644, payload.id)
+        store.add_object(attrs_dir)
+        root = Tree()
+        root.add(b".gitattributes", 0o040000, attrs_dir.id)
+        root.add(b"kept.txt", 0o100644, payload.id)
+        store.add_object(root)
+
+        self.assertEqual(
+            [".gitattributes/nested", "kept.txt"], self._archive_names(store, root)
+        )
+
+    def test_export_ignore_nested_trailing_slash(self) -> None:
+        """A ``dir/`` pattern without other slashes matches at any depth."""
+        store = MemoryObjectStore()
+        attrs = Blob.from_string(b"build/ export-ignore\n")
+        payload = Blob.from_string(b"payload")
+        for blob in (attrs, payload):
+            store.add_object(blob)
+        build = Tree()
+        build.add(b"out.o", 0o100644, payload.id)
+        store.add_object(build)
+        sub = Tree()
+        sub.add(b"build", 0o040000, build.id)
+        # A file named like the directory is not matched by ``build/``.
+        other = Tree()
+        other.add(b"build", 0o100644, payload.id)
+        for tree in (sub, other):
+            store.add_object(tree)
+        root = Tree()
+        root.add(b".gitattributes", 0o100644, attrs.id)
+        root.add(b"sub", 0o040000, sub.id)
+        root.add(b"other", 0o040000, other.id)
+        store.add_object(root)
+
+        self.assertEqual(
+            [".gitattributes", "other/build"], self._archive_names(store, root)
+        )
+
+    def test_export_ignore_gitlink(self) -> None:
+        """A submodule is matched as a directory."""
+        store = MemoryObjectStore()
+        attrs = Blob.from_string(b"vendor/lib/ export-ignore\n")
+        store.add_object(attrs)
+        vendor = Tree()
+        vendor.add(b"lib", 0o160000, attrs.id)
+        store.add_object(vendor)
+        root = Tree()
+        root.add(b".gitattributes", 0o100644, attrs.id)
+        root.add(b"vendor", 0o040000, vendor.id)
+        store.add_object(root)
+
+        # Without the attribute the gitlink entry would be emitted, since its
+        # sha happens to name a blob in this store.
+        self.assertEqual([".gitattributes"], self._archive_names(store, root))
+
+    def test_export_ignore_global_and_info_attributes(self) -> None:
+        """Info attributes override the tree, which overrides global ones."""
+        store = MemoryObjectStore()
+        attrs = Blob.from_string(b"b.txt -export-ignore\nc.txt export-ignore\n")
+        payload = Blob.from_string(b"payload")
+        for blob in (attrs, payload):
+            store.add_object(blob)
+        root = Tree()
+        root.add(b".gitattributes", 0o100644, attrs.id)
+        for name in (b"a.txt", b"b.txt", b"c.txt", b"d.txt"):
+            root.add(name, 0o100644, payload.id)
+        store.add_object(root)
+
+        global_attributes = compile_gitattributes_patterns(
+            parse_git_attributes(BytesIO(b"a.txt export-ignore\nb.txt export-ignore\n"))
+        )
+        info_attributes = compile_gitattributes_patterns(
+            parse_git_attributes(
+                BytesIO(b"c.txt -export-ignore\nd.txt export-ignore\n")
+            )
+        )
+        self.assertEqual(
+            [".gitattributes", "b.txt", "c.txt"],
+            self._archive_names(
+                store,
+                root,
+                global_attributes=global_attributes,
+                info_attributes=info_attributes,
+            ),
+        )
+
+    def test_export_ignore_missing_gitattributes_blob(self) -> None:
+        """A ``.gitattributes`` whose blob is missing is skipped."""
+        store = MemoryObjectStore()
+        payload = Blob.from_string(b"payload")
+        store.add_object(payload)
+        root = Tree()
+        root.add(b".gitattributes", 0o100644, b"a" * 40)
+        root.add(b"kept.txt", 0o100644, payload.id)
+        store.add_object(root)
+
+        with self.assertLogs("dulwich.attrs", "WARNING"):
+            names = self._archive_names(store, root)
+        self.assertEqual(["kept.txt"], names)
+
+    def test_read_repo_attributes(self) -> None:
+        """core.attributesFile and info/attributes are read from the repo."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir)
+        repo = Repo.init(tmp_dir)
+        self.addCleanup(repo.close)
+        global_path = os.path.join(tmp_dir, "global-attributes")
+        with open(global_path, "wb") as f:
+            f.write(b"a.txt export-ignore\n")
+        config = repo.get_config()
+        config.set((b"core",), b"attributesFile", global_path.encode())
+        config.write_to_path()
+        os.makedirs(os.path.join(repo.controldir(), "info"), exist_ok=True)
+        with open(os.path.join(repo.controldir(), "info", "attributes"), "wb") as f:
+            f.write(b"b.txt export-ignore\n")
+
+        global_attributes, info_attributes = read_repo_attributes(repo)
+        self.assertEqual([b"a.txt"], [p.pattern for p, _ in global_attributes])
+        self.assertEqual([b"b.txt"], [p.pattern for p, _ in info_attributes])
 
     def test_tar_stream_with_submodule(self) -> None:
         """Test tar_stream handles missing objects (submodules) gracefully."""

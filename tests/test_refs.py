@@ -25,6 +25,7 @@ import errno
 import os
 import sys
 import tempfile
+import threading
 from io import BytesIO
 from pathlib import Path
 from typing import ClassVar
@@ -536,7 +537,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_remove_packed_ref_with_unread_packed_refs(self) -> None:
         # An unconditional delete never reads packed-refs on the way in, so
-        # _remove_packed_ref() is reached without the cache being populated.
+        # the packed entry is removed without the cache being populated.
         self.assertIsNone(self._refs._packed_refs)
         self.assertTrue(self._refs.remove_if_equals(b"refs/heads/packed", None))
 
@@ -544,18 +545,113 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         self.assertNotIn(b"refs/heads/packed", DiskRefsContainer(self._refs.path))
 
     def test_remove_loose_ref_while_packed_refs_locked(self) -> None:
-        # refs/heads/master is loose in this fixture, so removing it has no
-        # reason to touch packed-refs at all.
-        self.assertNotIn(b"refs/heads/master", self._refs.get_packed_refs())
+        ref = b"refs/heads/master"
+        value = self._refs[ref]
+        self.assertNotIn(ref, self._refs.get_packed_refs())
 
         # Simulate a concurrent `git pack-refs` holding the packed-refs lock.
         lockpath = os.path.join(self._refs.path, b"packed-refs.lock")
-        with open(lockpath, "wb"):
-            pass
+        with open(lockpath, "wb") as f:
+            write_packed_refs(f, {ref: value})
         self.addCleanup(lambda: os.path.exists(lockpath) and os.remove(lockpath))
+        self._refs.packed_refs_lock_timeout = 0.05
 
-        self.assertTrue(self._refs.remove_if_equals(b"refs/heads/master", None))
-        self.assertNotIn(b"refs/heads/master", self._refs.keys())
+        with self.assertRaises(FileLocked):
+            self._refs.remove_if_equals(ref, None)
+        self.assertEqual(value, self._refs[ref])
+
+        # A pending packed-refs replacement must not make the failed delete
+        # appear to have succeeded.
+        os.replace(lockpath, os.path.join(self._refs.path, b"packed-refs"))
+        self.assertEqual(value, self._refs[ref])
+
+    def _hold_packed_refs_lock(self, refs: dict) -> bytes:
+        # Simulate a concurrent `git pack-refs` holding the packed-refs lock.
+        lockpath = os.path.join(self._refs.path, b"packed-refs.lock")
+        with open(lockpath, "wb") as f:
+            write_packed_refs(f, refs)
+        self.addCleanup(lambda: os.path.exists(lockpath) and os.remove(lockpath))
+        self._refs.packed_refs_lock_timeout = 0.05
+        return lockpath
+
+    def test_remove_packed_ref_with_newer_loose_while_locked(self) -> None:
+        ref = b"refs/heads/packed"
+        packed_value = self._refs.get_packed_refs()[ref]
+        self._refs.set_if_equals(ref, None, ONES)
+        lockpath = self._hold_packed_refs_lock({ref: ONES})
+
+        with self.assertRaises(FileLocked):
+            self._refs.remove_if_equals(ref, None)
+        self.assertEqual(ONES, self._refs.read_loose_ref(ref))
+        self.assertEqual(packed_value, self._refs.get_packed_refs()[ref])
+
+        os.replace(lockpath, os.path.join(self._refs.path, b"packed-refs"))
+        self.assertEqual(ONES, self._refs[ref])
+
+    def test_remove_waits_for_packed_refs_lock(self) -> None:
+        ref = b"refs/heads/packed"
+        lockpath = self._hold_packed_refs_lock({})
+        self._refs.packed_refs_lock_timeout = 5.0
+        timer = threading.Timer(0.05, os.remove, [lockpath])
+        timer.start()
+        self.addCleanup(timer.cancel)
+
+        self.assertTrue(self._refs.remove_if_equals(ref, None))
+        self.assertNotIn(ref, self._refs.keys())
+
+    def _assert_locked_when_loose_removed(self, delete) -> None:
+        ref = b"refs/heads/packed"
+        self._refs.set_if_equals(ref, None, ONES)
+        filename = self._refs.refpath(ref)
+        lockpath = os.path.join(self._refs.path, b"packed-refs.lock")
+        packed_path = os.path.join(self._refs.path, b"packed-refs")
+        seen = []
+        original_remove = os.remove
+
+        def checking_remove(path, *args, **kwargs):
+            if os.fsencode(path) == filename:
+                with open(packed_path, "rb") as f:
+                    seen.append((os.path.exists(lockpath), ref in f.read()))
+            return original_remove(path, *args, **kwargs)
+
+        with patch("dulwich.refs.os.remove", checking_remove):
+            delete(ref)
+        # packed-refs.lock was held and the packed entry already gone when
+        # the loose file was removed.
+        self.assertEqual([(True, False)], seen)
+        self.assertNotIn(ref, self._refs.keys())
+        self.assertFalse(os.path.exists(lockpath))
+
+    def test_remove_if_equals_holds_lock_until_loose_removed(self) -> None:
+        self._assert_locked_when_loose_removed(
+            lambda ref: self.assertTrue(self._refs.remove_if_equals(ref, ONES))
+        )
+
+    def test_locked_ref_delete_holds_lock_until_loose_removed(self) -> None:
+        def delete(ref):
+            with locked_ref(self._refs, ref) as lr:
+                lr.delete()
+
+        self._assert_locked_when_loose_removed(delete)
+
+    def test_remove_failed_packed_write_leaves_ref_untouched(self) -> None:
+        ref = b"refs/heads/packed"
+        packed_value = self._refs.get_packed_refs()[ref]
+        self._refs.set_if_equals(ref, None, ONES)
+        packed_path = os.path.join(self._refs.path, b"packed-refs")
+        with open(packed_path, "rb") as f:
+            packed_before = f.read()
+
+        with patch("dulwich.refs.write_packed_refs", side_effect=OSError("boom")):
+            with self.assertRaises(OSError):
+                self._refs.remove_if_equals(ref, None)
+
+        self.assertEqual(ONES, self._refs.read_loose_ref(ref))
+        with open(packed_path, "rb") as f:
+            self.assertEqual(packed_before, f.read())
+        self.assertEqual(packed_value, self._refs.get_packed_refs()[ref])
+        self.assertFalse(os.path.exists(packed_path + b".new"))
+        self.assertFalse(os.path.exists(packed_path + b".lock"))
 
     def test_get_packed_refs_reloads_when_replaced(self) -> None:
         # Populate the cache.

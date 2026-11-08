@@ -4,6 +4,13 @@
    32-bit platforms with AssertionError rather than OverflowError.
    (Jelmer Vernooĳ, #2574)
 
+ * Support ``uploadpack.allowTipSHA1InWant``,
+   ``uploadpack.allowReachableSHA1InWant`` and
+   ``uploadpack.allowAnySHA1InWant`` in ``UploadPackHandler``: unadvertised
+   wants are validated against the configured policy and the corresponding
+   capabilities are advertised. All three remain disabled by default.
+   (Bojan Zivanovic)
+
 1.2.21	2026-11-04
 
  * SECURITY: Refuse ``porcelain.submodule_update`` when the submodule path
@@ -418,13 +425,6 @@
  * Strip leading blank lines in ``stripspace`` in a single pass. The previous
    ``pop(0)`` loop made an all-blank input O(n^2); it is now linear like git.
    (Kartik Kenchi)
-
- * Support ``uploadpack.allowTipSHA1InWant``,
-   ``uploadpack.allowReachableSHA1InWant`` and
-   ``uploadpack.allowAnySHA1InWant`` in ``UploadPackHandler``: unadvertised
-   wants are validated against the configured policy and the corresponding
-   capabilities are advertised. All three remain disabled by default.
-   (Bojan Zivanovic)
 
 1.2.15	2026-09-14
 

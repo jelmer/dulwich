@@ -24,9 +24,11 @@ import hashlib
 import logging
 import os
 import shutil
+import socket
 import stat
 import sys
 import tempfile
+import threading
 import time
 import warnings
 import zlib
@@ -2851,6 +2853,46 @@ class HttpGitClientTests(TestCase):
 
 
 class TCPGitClientTests(TestCase):
+    def test_timeout(self) -> None:
+        server = socket.socket()
+        self.addCleanup(server.close)
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        c, path = get_transport_and_path_from_url(
+            f"git://127.0.0.1:{server.getsockname()[1]}/repo", timeout=0.1
+        )
+        with self.assertRaises(GitProtocolError) as cm:
+            c.get_refs(path)
+        self.assertEqual("timed out", str(cm.exception))
+
+    def test_timeout_write(self) -> None:
+        server = socket.socket()
+        self.addCleanup(server.close)
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        received = []
+
+        def read_all() -> None:
+            conn, _ = server.accept()
+            with conn:
+                time.sleep(0.2)
+                while data := conn.recv(65536):
+                    received.append(data)
+
+        reader = threading.Thread(target=read_all)
+        reader.start()
+        c = TCPGitClient("127.0.0.1", port=server.getsockname()[1], timeout=30)
+        proto, _, _ = c._connect(b"receive-pack", b"/repo")
+        self.addCleanup(proto.close)
+        data = b"x" * (8 * 1024 * 1024)
+        proto.write(data)
+        proto.close()
+        reader.join()
+        self.assertEqual(
+            b"002agit-receive-pack /repo\x00host=127.0.0.1\x00" + data,
+            b"".join(received),
+        )
+
     def test_get_url(self) -> None:
         host = "github.com"
         path = "/jelmer/dulwich"

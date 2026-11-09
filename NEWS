@@ -15,6 +15,12 @@
    them. Object store lookups now validate the SHA, so a corrupt loose
    object aborted the iteration. (Jelmer Vernooĳ, #2552)
 
+ * Hold ``packed-refs.lock`` while deleting a ref, removing the packed
+   entry before the loose file. A delete racing with ``git pack-refs``
+   could stop halfway and move the ref back to its packed value, or report
+   success while the ref survived. Deletes now wait up to a second for the
+   lock and raise ``FileLocked`` if it is still held. (Matt Van Horn, #2501)
+
 1.2.20	2026-10-26
 
  * Apply zero-context insertion hunks (as written by ``diff -U0``) after

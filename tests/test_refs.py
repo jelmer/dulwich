@@ -536,13 +536,28 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         )
 
     def test_remove_packed_ref_with_unread_packed_refs(self) -> None:
-        # An unconditional delete never reads packed-refs on the way in, so
-        # the packed entry is removed without the cache being populated.
+        # An unconditional delete has no old value to check, so the cache is
+        # still cold when the delete starts and has to be loaded from disk
+        # to find the packed entry.
         self.assertIsNone(self._refs._packed_refs)
         self.assertTrue(self._refs.remove_if_equals(b"refs/heads/packed", None))
 
         self.assertNotIn(b"refs/heads/packed", self._refs.get_packed_refs())
         self.assertNotIn(b"refs/heads/packed", DiskRefsContainer(self._refs.path))
+
+    def test_remove_loose_ref_with_warm_cache_does_not_reparse(self) -> None:
+        # refs/heads/master is loose only, so deleting it leaves packed-refs
+        # unchanged and the cached copy can be reused.
+        ref = b"refs/heads/master"
+        self.assertNotIn(ref, self._refs.get_packed_refs())
+
+        with patch(
+            "dulwich.refs.read_packed_refs_with_peeled",
+            side_effect=AssertionError("packed-refs was reparsed"),
+        ) as read_packed:
+            self.assertTrue(self._refs.remove_if_equals(ref, None))
+        read_packed.assert_not_called()
+        self.assertNotIn(ref, self._refs.keys())
 
     def test_remove_loose_ref_while_packed_refs_locked(self) -> None:
         ref = b"refs/heads/master"

@@ -22,8 +22,14 @@
 
 """Generates tarballs for Git trees."""
 
-__all__ = ["ChunkedBytesIO", "UnsafeArchivePathError", "tar_stream"]
+__all__ = [
+    "ChunkedBytesIO",
+    "UnsafeArchivePathError",
+    "read_repo_attributes",
+    "tar_stream",
+]
 
+import os
 import posixpath
 import stat
 import struct
@@ -31,15 +37,19 @@ import tarfile
 from collections.abc import Generator
 from contextlib import closing
 from io import BytesIO
+from itertools import chain
 from os import SEEK_END
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from .object_store import BaseObjectStore
     from .objects import TreeEntry
+    from .repo import Repo
 
+from .attrs import AttrPatterns, parse_gitattributes_file, parse_gitattributes_tree
+from .config import get_xdg_config_home_path
 from .index import cleanup_mode
-from .objects import Blob, Tree
+from .objects import S_ISGITLINK, Blob, Tree
 
 
 class UnsafeArchivePathError(ValueError):
@@ -90,6 +100,53 @@ def _is_unsafe_archive_path(path: bytes) -> bool:
         if normalized in _INVALID_PATH_COMPONENTS:
             return True
     return False
+
+
+def _export_ignore_patterns(patterns: AttrPatterns) -> AttrPatterns:
+    """Keep only the patterns that set or unset ``export-ignore``."""
+    return [
+        (pattern, attrs) for pattern, attrs in patterns if b"export-ignore" in attrs
+    ]
+
+
+def _is_export_ignored(info: AttrPatterns, patterns: AttrPatterns, path: bytes) -> bool:
+    """Return True if ``path`` carries the ``export-ignore`` attribute.
+
+    ``info`` takes precedence over ``patterns``, and later patterns over
+    earlier ones, so the first match walking backwards decides. A directory
+    is passed with a trailing slash.
+    """
+    for pattern, attrs in chain(reversed(info), reversed(patterns)):
+        if pattern.match(path):
+            return attrs[b"export-ignore"] is True
+    return False
+
+
+def read_repo_attributes(repo: "Repo") -> tuple[AttrPatterns, AttrPatterns]:
+    """Read the attributes a repository adds on top of its trees.
+
+    Args:
+      repo: Repository to read from
+
+    Returns:
+      Tuple of the ``core.attributesFile`` patterns and the
+      ``$GIT_DIR/info/attributes`` patterns, either empty if the file
+      doesn't exist
+    """
+    try:
+        value = repo.get_config_stack().get((b"core",), b"attributesFile")
+    except KeyError:
+        global_path = get_xdg_config_home_path("git", "attributes")
+    else:
+        global_path = os.path.expanduser(os.fsdecode(value))
+    info_path = os.path.join(repo.controldir(), "info", "attributes")
+    result = []
+    for path in (global_path, info_path):
+        try:
+            result.append(parse_gitattributes_file(path))
+        except FileNotFoundError:
+            result.append([])
+    return result[0], result[1]
 
 
 class ChunkedBytesIO:
@@ -152,6 +209,9 @@ def tar_stream(
     mtime: int,
     prefix: bytes = b"",
     format: str = "",
+    *,
+    global_attributes: AttrPatterns = (),
+    info_attributes: AttrPatterns = (),
 ) -> Generator[bytes, None, None]:
     """Generate a tar stream for the contents of a Git tree.
 
@@ -166,6 +226,10 @@ def tar_stream(
         all files, and the gzip header modification time if format='gz'
       prefix: Optional prefix to prepend to all paths in the archive
       format: Optional compression format for tarball
+      global_attributes: Patterns applied below the tree's own
+        ``.gitattributes``, as from ``core.attributesFile``
+      info_attributes: Patterns applied above the tree's own
+        ``.gitattributes``, as from ``$GIT_DIR/info/attributes``
     Returns:
       Bytestrings
     """
@@ -186,7 +250,12 @@ def tar_stream(
             buf.write(struct.pack("<L", mtime))
             buf.seek(0, SEEK_END)
 
-        for entry_abspath, entry in _walk_tree(store, tree, prefix):
+        for entry_path, entry in _walk_tree(
+            store,
+            tree,
+            inherited=_export_ignore_patterns(global_attributes),
+            info=_export_ignore_patterns(info_attributes),
+        ):
             assert entry.sha is not None
             try:
                 blob = store[entry.sha]
@@ -202,7 +271,9 @@ def tar_stream(
 
             info = tarfile.TarInfo()
             # tarfile only works with ascii.
-            info.name = entry_abspath.decode("utf-8", "surrogateescape")
+            info.name = posixpath.join(prefix, entry_path).decode(
+                "utf-8", "surrogateescape"
+            )
             info.size = blob.raw_length()
             assert entry.mode is not None
             # Canonicalize the tree-supplied mode the same way git's archive
@@ -223,25 +294,42 @@ def tar_stream(
 
 
 def _walk_tree(
-    store: "BaseObjectStore", tree: "Tree", root: bytes = b""
+    store: "BaseObjectStore",
+    tree: "Tree",
+    root: bytes = b"",
+    inherited: AttrPatterns = (),
+    info: AttrPatterns = (),
 ) -> Generator[tuple[bytes, "TreeEntry"], None, None]:
-    """Recursively walk a dulwich Tree, yielding tuples of (absolute path, TreeEntry) along the way.
+    """Recursively walk a dulwich Tree, yielding tuples of (tree path, TreeEntry) along the way.
+
+    Entries carrying the ``export-ignore`` attribute from the tree's own
+    ``.gitattributes`` are skipped; an ignored directory is not descended into.
 
     Raises:
       UnsafeArchivePathError: if a tree entry's name is unsafe to emit into
         an archive (matches the spirit of git's ``verify_path`` /
         ``error: invalid path``).
     """
+    dir_patterns = _export_ignore_patterns(parse_gitattributes_tree(store, tree, root))
+    # Later patterns win, so this directory's own file goes after its parents'.
+    patterns = [*inherited, *dir_patterns] if dir_patterns else inherited
     for entry in tree.iteritems():
         assert entry.path is not None
         if _is_unsafe_archive_path(entry.path):
             raise UnsafeArchivePathError(entry.path)
-        entry_abspath = posixpath.join(root, entry.path)
+        entry_path = posixpath.join(root, entry.path)
         assert entry.mode is not None
-        if stat.S_ISDIR(entry.mode):
+        is_dir = stat.S_ISDIR(entry.mode)
+        # Submodules are matched as directories too.
+        match_as = (
+            entry_path + b"/" if is_dir or S_ISGITLINK(entry.mode) else entry_path
+        )
+        if (patterns or info) and _is_export_ignored(info, patterns, match_as):
+            continue
+        if is_dir:
             assert entry.sha is not None
             subtree = store[entry.sha]
             if isinstance(subtree, Tree):
-                yield from _walk_tree(store, subtree, entry_abspath)
+                yield from _walk_tree(store, subtree, entry_path, patterns, info)
         else:
-            yield (entry_abspath, entry)
+            yield (entry_path, entry)

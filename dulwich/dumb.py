@@ -45,7 +45,6 @@ from .errors import NotGitRepository, ObjectFormatException
 from .object_store import BaseObjectStore
 from .objects import (
     ZERO_SHA,
-    Blob,
     Commit,
     ObjectID,
     RawObjectID,
@@ -53,6 +52,7 @@ from .objects import (
     Tag,
     Tree,
     hex_to_sha,
+    object_class,
     sha_to_hex,
 )
 from .pack import Pack, PackData, PackIndex, UnpackedObject, load_pack_index_file
@@ -60,6 +60,38 @@ from .protocol import split_peeled_refs
 from .refs import Ref, read_info_refs
 
 logger = logging.getLogger(__name__)
+
+# Inflated loose objects larger than this spill to disk while streaming.
+_LOOSE_OBJECT_SPOOL_SIZE = 1024 * 1024
+
+
+def _inflate_chunks(
+    read: Callable[..., bytes], read_size: int = 4096, max_length: int = 65536
+) -> Iterator[bytes]:
+    """Incrementally inflate a zlib stream read in chunks.
+
+    Yields decompressed chunks of at most max_length bytes, so memory use
+    stays bounded regardless of the stream's compression ratio.
+
+    Raises:
+      zlib.error: If the stream is corrupt or truncated.
+    """
+    decompressor = zlib.decompressobj()
+    while not decompressor.eof:
+        chunk = read(read_size)
+        if not chunk:
+            break
+        buf = decompressor.decompress(chunk, max_length)
+        while buf:
+            yield buf
+            if not decompressor.unconsumed_tail:
+                break
+            buf = decompressor.decompress(decompressor.unconsumed_tail, max_length)
+    tail = decompressor.flush()
+    if tail:
+        yield tail
+    if not decompressor.eof:
+        raise zlib.error("incomplete or truncated zlib stream")
 
 
 class DumbHTTPObjectStore(BaseObjectStore):
@@ -125,6 +157,12 @@ class DumbHTTPObjectStore(BaseObjectStore):
     def _fetch_loose_object(self, sha: bytes) -> tuple[int, bytes]:
         """Fetch a loose object by SHA.
 
+        The response is inflated incrementally through a bounded buffer and
+        spooled to a temporary file, hashing as it goes, so a malicious dumb
+        server cannot expand a small response into an unbounded amount of
+        memory. The content is only loaded once the stream has hashed to the
+        requested object ID, like C git's dumb-http walker.
+
         Args:
           sha: SHA1 of the object (hex string as bytes)
 
@@ -133,48 +171,67 @@ class DumbHTTPObjectStore(BaseObjectStore):
 
         Raises:
           KeyError: If object not found
+          ObjectFormatException: If the response is not a valid loose object
+            or does not hash to the requested object ID
         """
         hex_sha = sha.decode("ascii")
-        path = f"objects/{hex_sha[:2]}/{hex_sha[2:]}"
-
+        url = urljoin(self.base_url, f"objects/{hex_sha[:2]}/{hex_sha[2:]}")
+        resp, read = self._http_request(url, {})
         try:
-            compressed = self._fetch_url(path)
+            if resp.status != 200:
+                raise KeyError(sha)
+
+            hasher = self.object_format.new_hash()
+            obj_class: type[ShaFile] | None = None
+            obj_size = 0
+            content_size = 0
+            header = b""
+            with tempfile.SpooledTemporaryFile(
+                max_size=_LOOSE_OBJECT_SPOOL_SIZE, prefix="dulwich-dumb-"
+            ) as content_file:
+                for buf in _inflate_chunks(read):
+                    hasher.update(buf)
+                    if obj_class is None:
+                        header += buf
+                        header_end = header.find(b"\x00")
+                        if header_end == -1:
+                            # "<type> <size>\0" is at most a few dozen bytes;
+                            # anything longer is not a loose object header.
+                            if len(header) > 64:
+                                raise ObjectFormatException("Invalid object header")
+                            continue
+                        header, buf = header[:header_end], header[header_end + 1 :]
+                        parts = header.split(b" ", 1)
+                        if len(parts) != 2:
+                            raise ObjectFormatException("Invalid object header")
+                        obj_class = object_class(parts[0])
+                        if obj_class is None:
+                            raise ObjectFormatException(
+                                f"Unknown object type: {parts[0]!r}"
+                            )
+                        try:
+                            obj_size = int(parts[1])
+                        except ValueError:
+                            raise ObjectFormatException("Invalid object header")
+                    content_file.write(buf)
+                    content_size += len(buf)
+
+                if obj_class is None:
+                    raise ObjectFormatException("Invalid object header")
+                if content_size != obj_size:
+                    raise ObjectFormatException("Object size mismatch")
+                actual_sha = hasher.hexdigest().encode("ascii")
+                if actual_sha != sha:
+                    raise ObjectFormatException(
+                        f"Fetched object has sha {actual_sha.decode('ascii')}, "
+                        f"expected {hex_sha}"
+                    )
+                content_file.seek(0)
+                return obj_class.type_num, content_file.read()
         except OSError:
             raise KeyError(sha)
-
-        # Decompress and parse the object
-        decompressed = zlib.decompress(compressed)
-
-        # Parse header
-        header_end = decompressed.find(b"\x00")
-        if header_end == -1:
-            raise ObjectFormatException("Invalid object header")
-
-        header = decompressed[:header_end]
-        content = decompressed[header_end + 1 :]
-
-        parts = header.split(b" ", 1)
-        if len(parts) != 2:
-            raise ObjectFormatException("Invalid object header")
-
-        obj_type = parts[0]
-        obj_size = int(parts[1])
-
-        if len(content) != obj_size:
-            raise ObjectFormatException("Object size mismatch")
-
-        # Convert type name to type number
-        type_map = {
-            b"blob": Blob.type_num,
-            b"tree": Tree.type_num,
-            b"commit": Commit.type_num,
-            b"tag": Tag.type_num,
-        }
-
-        if obj_type not in type_map:
-            raise ObjectFormatException(f"Unknown object type: {obj_type!r}")
-
-        return type_map[obj_type], content
+        finally:
+            resp.close()
 
     def _load_packs(self) -> None:
         """Load the list of available packs from the remote."""

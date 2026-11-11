@@ -5022,6 +5022,20 @@ class RevertTests(PorcelainTestCase):
         revert_commit = self.repo[revert_sha]
         self.assertEqual(custom_msg.encode("utf-8"), revert_commit.message)
 
+    def test_revert_conflict(self) -> None:
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+        _commit_file_with_content(self.repo, "foo", "initial\n")
+        change_sha, fullpath = _commit_file_with_content(self.repo, "foo", "change\n")
+        _commit_file_with_content(self.repo, "foo", "later\n")
+
+        self.assertRaises(porcelain.Error, porcelain.revert, self.repo, [change_sha])
+
+        with open(fullpath, "rb") as f:
+            self.assertEqual(
+                b"<<<<<<< ours\nlater\n=======\ninitial\n>>>>>>> theirs\n", f.read()
+            )
+
     def test_revert_no_parent(self) -> None:
         # Try to revert the initial commit (no parent)
         fullpath = os.path.join(self.repo.path, "foo")

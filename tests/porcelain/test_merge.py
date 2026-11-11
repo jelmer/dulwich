@@ -231,6 +231,18 @@ class PorcelainMergeTests(TestCase):
                 self.assertTrue(
                     os.path.exists(os.path.join(r.controldir(), "MERGE_MSG"))
                 )
+                self.assertTrue(
+                    os.path.exists(os.path.join(r.controldir(), "MERGE_LABELS"))
+                )
+
+            # Committing the resolution clears MERGE_LABELS
+            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
+                f.write("Resolved content\n")
+            porcelain.add(tmpdir, paths=["file1.txt"])
+            porcelain.commit(tmpdir, message=b"Merge feature")
+            self.assertFalse(
+                os.path.exists(os.path.join(tmpdir, ".git", "MERGE_LABELS"))
+            )
 
     def test_merge_no_commit(self):
         """Test merge with no_commit flag."""

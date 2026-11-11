@@ -145,6 +145,9 @@ class PorcelainCherryPickTests(TestCase):
 
             self.assertIn("Conflicts in:", str(cm.exception))
             self.assertIn("file1.txt", str(cm.exception))
+            self.assertTrue(
+                os.path.exists(os.path.join(tmpdir, ".git", "MERGE_LABELS"))
+            )
 
     def test_cherry_pick_root_commit(self):
         """Test cherry-pick of root commit (should fail)."""
@@ -207,9 +210,16 @@ class PorcelainCherryPickTests(TestCase):
             except porcelain.Error:
                 pass  # Expected
 
+            self.assertTrue(
+                os.path.exists(os.path.join(tmpdir, ".git", "MERGE_LABELS"))
+            )
+
             # Abort the cherry-pick
             result = porcelain.cherry_pick(tmpdir, None, abort=True)
             self.assertIsNone(result)
+            self.assertFalse(
+                os.path.exists(os.path.join(tmpdir, ".git", "MERGE_LABELS"))
+            )
 
             # Check that we're back to the master state
             with open(os.path.join(tmpdir, "file1.txt")) as f:

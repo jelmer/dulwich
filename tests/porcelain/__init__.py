@@ -4725,10 +4725,19 @@ class ResetTests(PorcelainTestCase):
         self.assertTrue(
             os.path.exists(os.path.join(self.repo.controldir(), "MERGE_HEAD"))
         )
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo.controldir(), "MERGE_LABELS"))
+        )
         return base, feature_tip
 
     def _assert_no_merge_state(self) -> None:
-        for name in ("MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "AUTO_MERGE"):
+        for name in (
+            "MERGE_HEAD",
+            "MERGE_MSG",
+            "MERGE_MODE",
+            "AUTO_MERGE",
+            "MERGE_LABELS",
+        ):
             self.assertFalse(
                 os.path.exists(os.path.join(self.repo.controldir(), name)), name
             )

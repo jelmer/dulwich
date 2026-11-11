@@ -3404,6 +3404,7 @@ def _remove_branch_state(r: Repo) -> None:
         "AUTO_MERGE",
         "SQUASH_MSG",
         "MERGE_HEAD",
+        "MERGE_LABELS",
         "MERGE_RR",
         "MERGE_MSG",
         "MERGE_MODE",
@@ -7308,6 +7309,28 @@ def write_tree(repo: RepoPath | None = None) -> bytes:
         return r.open_index(config=r.get_config_stack()).commit(r.object_store)
 
 
+def _write_pending_conflict_state(
+    r: Repo,
+    head_name: str,
+    head_commit_id: ObjectID,
+    message: bytes,
+) -> None:
+    """Write the head-pointer, MERGE_MSG and MERGE_LABELS files together.
+
+    ``head_name`` is the file that names the other side of the pending
+    operation (``MERGE_HEAD`` for merges, ``CHERRY_PICK_HEAD`` for
+    cherry-picks). Keeping the three writes in one place means a new caller
+    cannot forget MERGE_LABELS.
+    """
+    from ..merge import write_merge_labels
+
+    with open(os.path.join(r.controldir(), head_name), "wb") as f:
+        f.write(head_commit_id + b"\n")
+    with open(os.path.join(r.controldir(), "MERGE_MSG"), "wb") as f:
+        f.write(message)
+    write_merge_labels(r)
+
+
 def _record_merge_conflicts(
     r: Repo,
     conflict_info: "Mapping[bytes, MergeConflictInfo]",
@@ -7318,8 +7341,8 @@ def _record_merge_conflicts(
 
     For each conflicted path, replace the index entry with stage 1/2/3
     entries describing the ancestor, ours, and theirs blobs. Also write
-    MERGE_HEAD and MERGE_MSG so ``git commit`` can pick up where dulwich
-    left off.
+    MERGE_HEAD, MERGE_MSG and MERGE_LABELS so ``git commit`` can pick up
+    where dulwich left off.
     """
     from ..index import ConflictedIndexEntry, IndexEntry
 
@@ -7347,14 +7370,11 @@ def _record_merge_conflicts(
         )
     index.write()
 
-    with open(os.path.join(r.controldir(), "MERGE_HEAD"), "wb") as f:
-        f.write(merge_commit_id + b"\n")
     if message is None:
         msg_bytes = f"Merge commit '{merge_commit_id.decode()[:7]}'\n".encode()
     else:
         msg_bytes = message.encode() if isinstance(message, str) else message
-    with open(os.path.join(r.controldir(), "MERGE_MSG"), "wb") as f:
-        f.write(msg_bytes)
+    _write_pending_conflict_state(r, "MERGE_HEAD", merge_commit_id, msg_bytes)
 
 
 def _do_merge(
@@ -8094,14 +8114,9 @@ def cherry_pick(  # noqa: D417
         # Handle abort
         if abort:
             # Clean up any cherry-pick state
-            try:
-                os.remove(os.path.join(r.controldir(), "CHERRY_PICK_HEAD"))
-            except FileNotFoundError:
-                pass
-            try:
-                os.remove(os.path.join(r.controldir(), "MERGE_MSG"))
-            except FileNotFoundError:
-                pass
+            r._del_named_file("CHERRY_PICK_HEAD")
+            r._del_named_file("MERGE_MSG")
+            r._del_named_file("MERGE_LABELS")
             # Reset index to HEAD
             head_commit = r[b"HEAD"]
             assert isinstance(head_commit, Commit)
@@ -8146,14 +8161,8 @@ def cherry_pick(  # noqa: D417
             )
 
             # Clean up state files
-            try:
-                os.remove(cherry_pick_head_path)
-            except FileNotFoundError:
-                pass
-            try:
-                os.remove(merge_msg_path)
-            except FileNotFoundError:
-                pass
+            r._del_named_file("CHERRY_PICK_HEAD")
+            r._del_named_file("MERGE_MSG")
 
             return new_commit
 
@@ -8210,13 +8219,12 @@ def cherry_pick(  # noqa: D417
         )
 
         if conflicts:
-            # Save state for later continuation
-            with open(os.path.join(r.controldir(), "CHERRY_PICK_HEAD"), "wb") as f:
-                f.write(cherry_pick_commit.id + b"\n")
-
-            # Save commit message
-            with open(os.path.join(r.controldir(), "MERGE_MSG"), "wb") as f:
-                f.write(cherry_pick_commit.message)
+            _write_pending_conflict_state(
+                r,
+                "CHERRY_PICK_HEAD",
+                cherry_pick_commit.id,
+                cherry_pick_commit.message,
+            )
 
             raise Error(
                 f"Conflicts in: {', '.join(c.decode('utf-8', 'replace') for c in conflicts)}\n"

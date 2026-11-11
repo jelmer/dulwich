@@ -30,6 +30,7 @@ from dulwich.merge import (
     octopus_merge,
     recursive_merge,
     three_way_merge,
+    write_merge_labels,
 )
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import MemoryRepo
@@ -1177,3 +1178,13 @@ class OctopusMergeTests(unittest.TestCase):
                 commit,
                 [],
             )
+
+
+class MergeLabelsTests(unittest.TestCase):
+    def test_write(self) -> None:
+        repo = MemoryRepo()
+        write_merge_labels(repo)
+        f = repo.get_named_file("MERGE_LABELS")
+        assert f is not None
+        with f:
+            self.assertEqual(b"base\nours\ntheirs\n", f.read())

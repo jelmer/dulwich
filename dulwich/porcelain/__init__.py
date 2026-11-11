@@ -8341,6 +8341,7 @@ def revert(
                 head_for_merge,  # ours
                 parent_commit,  # theirs
             )
+            r.object_store.add_object(merged_tree)
 
             if conflicts:
                 # Update working tree with conflicts
@@ -8354,9 +8355,6 @@ def revert(
                 )
                 conflicted_paths = [c.decode("utf-8", "replace") for c in conflicts]
                 raise Error(f"Conflicts while reverting: {', '.join(conflicted_paths)}")
-
-            # Add merged tree to object store
-            r.object_store.add_object(merged_tree)
 
             # Update working tree
             changes = tree_changes(r.object_store, current_tree, merged_tree.id)

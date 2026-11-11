@@ -3,6 +3,11 @@
  * Fix ``PanicException`` from the Rust ``sorted_tree_items`` on trees
    whose entry names contain '/'. (Jelmer Vernooĳ)
 
+ * Write ``.git/MERGE_LABELS`` when a merge or cherry-pick stops with
+   conflicts, and remove it on commit, reset and ``cherry-pick --abort``,
+   so ``git checkout -m <path>`` finds the expected state.
+   (Jelmer Vernooĳ)
+
  * Fix ``porcelain.revert`` raising ``KeyError`` instead of reporting the
    conflicts when the revert does not apply cleanly. (Jelmer Vernooĳ)
 

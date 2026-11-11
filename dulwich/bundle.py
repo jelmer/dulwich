@@ -86,7 +86,7 @@ class Bundle:
     capabilities: dict[str, str | None]
     prerequisites: list[tuple[ObjectID, bytes]]
     references: dict[Ref, ObjectID]
-    pack_data: PackDataLike | None
+    pack_data: PackDataLike | None = None
 
     def __repr__(self) -> str:
         """Return string representation of Bundle."""

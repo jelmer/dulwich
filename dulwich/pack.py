@@ -4512,8 +4512,8 @@ class Pack:
     _data_load: Callable[[], PackData] | None
     _idx_load: Callable[[], PackIndex] | None
 
-    _data: PackData | None
-    _idx: PackIndex | None
+    _data: PackData | None = None
+    _idx: PackIndex | None = None
     _bitmap: "PackBitmap | None"
 
     def __init__(

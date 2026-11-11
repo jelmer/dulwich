@@ -65,6 +65,8 @@ logger = logging.getLogger(__name__)
 class DumbHTTPObjectStore(BaseObjectStore):
     """Object store implementation that fetches objects over dumb HTTP."""
 
+    _temp_pack_dir: str | None = None
+
     def __init__(
         self,
         base_url: str,
@@ -86,7 +88,6 @@ class DumbHTTPObjectStore(BaseObjectStore):
         self._http_request = http_request_func
         self._packs: list[tuple[str, PackIndex | None]] | None = None
         self._cached_objects: dict[bytes, tuple[int, bytes]] = {}
-        self._temp_pack_dir: str | None = None
 
     def _ensure_temp_pack_dir(self) -> None:
         """Ensure we have a temporary directory for storing pack files."""

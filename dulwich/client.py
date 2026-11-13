@@ -2603,6 +2603,7 @@ class TCPGitClient(TraditionalGitClient):
         quiet: bool = False,
         include_tags: bool = False,
         proxy_command: str | None = None,
+        timeout: float | None = None,
     ) -> None:
         """Initialize a TCPGitClient.
 
@@ -2616,12 +2617,16 @@ class TCPGitClient(TraditionalGitClient):
           proxy_command: Optional proxy command (core.gitProxy).
             The command is run with host and port as arguments and
             communicates over stdin/stdout.
+          timeout: Optional timeout in seconds for connecting and for
+            each socket read or write (None waits forever). Not used
+            with proxy_command.
         """
         if port is None:
             port = TCP_GIT_PORT
         self._host = host
         self._port = port
         self._proxy_command = proxy_command
+        self._timeout = timeout
         super().__init__(
             thin_packs=thin_packs,
             report_activity=report_activity,
@@ -2641,6 +2646,7 @@ class TCPGitClient(TraditionalGitClient):
         username: str | None = None,
         password: str | None = None,
         config: Config | None = None,
+        timeout: float | None = None,
     ) -> "TCPGitClient":
         """Create an instance of TCPGitClient from a parsed URL.
 
@@ -2654,6 +2660,7 @@ class TCPGitClient(TraditionalGitClient):
           username: Username for authentication (not used for TCPGitClient)
           password: Password for authentication (not used for TCPGitClient)
           config: Configuration object
+          timeout: Optional timeout in seconds for socket operations
 
         Returns:
           A TCPGitClient instance
@@ -2670,6 +2677,7 @@ class TCPGitClient(TraditionalGitClient):
             quiet=quiet,
             include_tags=include_tags,
             proxy_command=proxy_command,
+            timeout=timeout,
         )
 
     def get_url(self, path: str) -> str:
@@ -2713,6 +2721,7 @@ class TCPGitClient(TraditionalGitClient):
         for family, socktype, protof, canonname, sockaddr in sockaddrs:
             s = socket.socket(family, socktype, protof)
             s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            s.settimeout(self._timeout)
             try:
                 s.connect(sockaddr)
                 break
@@ -2738,9 +2747,15 @@ class TCPGitClient(TraditionalGitClient):
             with suppress(OSError):
                 s.shutdown(socket.SHUT_WR)
 
+        def write(data: bytes) -> None:
+            # With a timeout, send() can write only part of the data.
+            view = memoryview(data)
+            while view:
+                view = view[s.send(view) :]
+
         proto = Protocol(
             rfile.read,
-            wfile.write,
+            write,
             close,
             report_activity=self._report_activity,
             shutdown_write=shutdown_write,
@@ -5573,6 +5588,7 @@ def get_transport_and_path_from_url(
     key_filename: str | None = None,
     ssh_command: str | None = None,
     pool_manager: "urllib3.PoolManager | None" = None,
+    timeout: float | None = None,
 ) -> tuple[GitClient, str]:
     """Obtain a git client from a URL.
 
@@ -5589,6 +5605,7 @@ def get_transport_and_path_from_url(
       key_filename: Optional SSH key file
       ssh_command: Optional custom SSH command
       pool_manager: Optional urllib3 PoolManager for HTTP(S) connections
+      timeout: Optional timeout in seconds for git:// connections
 
     Returns:
       Tuple with client instance and relative path.
@@ -5610,6 +5627,7 @@ def get_transport_and_path_from_url(
         key_filename=key_filename,
         ssh_command=ssh_command,
         pool_manager=pool_manager,
+        timeout=timeout,
     )
 
 
@@ -5626,6 +5644,7 @@ def _get_transport_and_path_from_url(
     key_filename: str | None = None,
     ssh_command: str | None = None,
     pool_manager: "urllib3.PoolManager | None" = None,
+    timeout: float | None = None,
 ) -> tuple[GitClient, str]:
     parsed = urlparse(url)
     match parsed.scheme:
@@ -5638,6 +5657,7 @@ def _get_transport_and_path_from_url(
                     quiet=quiet,
                     include_tags=include_tags,
                     config=config,
+                    timeout=timeout,
                 ),
                 parsed.path,
             )
@@ -5723,6 +5743,7 @@ def get_transport_and_path(
     key_filename: str | None = None,
     ssh_command: str | None = None,
     pool_manager: "urllib3.PoolManager | None" = None,
+    timeout: float | None = None,
 ) -> tuple[GitClient, str]:
     """Obtain a git client from a URL.
 
@@ -5739,6 +5760,7 @@ def get_transport_and_path(
       key_filename: Optional SSH key file
       ssh_command: Optional custom SSH command
       pool_manager: Optional urllib3 PoolManager for HTTP(S) connections
+      timeout: Optional timeout in seconds for git:// connections
 
     Returns:
       Tuple with client instance and relative path.
@@ -5762,6 +5784,7 @@ def get_transport_and_path(
             key_filename=key_filename,
             ssh_command=ssh_command,
             pool_manager=pool_manager,
+            timeout=timeout,
         )
     except ValueError:
         pass

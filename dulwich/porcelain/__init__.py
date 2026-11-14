@@ -369,7 +369,7 @@ from ..diff_tree import (
     TreeChange,
     tree_changes,
 )
-from ..errors import NoIndexPresent, SendPackError
+from ..errors import NoIndexPresent, NotTreeError, SendPackError
 from ..file import FileLocked, open_nofollow
 from ..graph import can_fast_forward
 from ..ignore import IgnoreFilterManager
@@ -6002,7 +6002,7 @@ def _check_uncommitted_changes(
         # No HEAD yet (empty repo)
         return
 
-    status_report = status(repo)
+    status_report = status(repo, untracked_files="all")
     changes = []
     # staged is a dict with 'add', 'delete', 'modify' keys
     if isinstance(status_report.staged, dict):
@@ -6032,6 +6032,23 @@ def _check_uncommitted_changes(
                     f"Your local changes to '{change.decode()}' would be "
                     "overwritten. Please commit or stash before switching."
                 )
+
+    # Untracked files that the target tree would replace
+    target_tree_obj = repo[target_tree_id]
+    assert isinstance(target_tree_obj, Tree), "Expected a Tree object"
+    for path in status_report.untracked:
+        if isinstance(path, str):
+            path = path.encode(DEFAULT_ENCODING)
+        try:
+            target_tree_obj.lookup_path(repo.object_store.__getitem__, path)
+        except KeyError:
+            continue
+        except NotTreeError:
+            pass  # a parent directory of path is a file in the target tree
+        raise CheckoutError(
+            f"The untracked working tree file '{path.decode()}' would be "
+            "overwritten. Please move or remove it before switching."
+        )
 
 
 def _get_worktree_update_config(

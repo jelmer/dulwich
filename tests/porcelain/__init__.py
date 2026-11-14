@@ -5115,6 +5115,34 @@ class CheckoutTests(PorcelainTestCase):
         porcelain.checkout(self.repo, b"uni", force=True)
         self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
+    def test_checkout_keeps_untracked_file_the_branch_would_overwrite(self) -> None:
+        porcelain.checkout(self.repo, b"uni")
+        _commit_file_with_content(self.repo, "settings.ini", "from uni\n")
+        porcelain.checkout(self.repo, b"master")
+        settings = os.path.join(self.repo.path, "settings.ini")
+        with open(settings, "w") as f:
+            f.write("local notes\n")
+
+        with self.assertRaises(porcelain.CheckoutError):
+            porcelain.checkout(self.repo, b"uni")
+
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+        with open(settings) as f:
+            self.assertEqual("local notes\n", f.read())
+
+    def test_checkout_keeps_untracked_file_under_a_path_the_branch_has_as_file(
+        self,
+    ) -> None:
+        porcelain.checkout(self.repo, b"uni")
+        _commit_file_with_content(self.repo, "d", "file in uni\n")
+        porcelain.checkout(self.repo, b"master")
+        os.mkdir(os.path.join(self.repo.path, "d"))
+        with open(os.path.join(self.repo.path, "d", "u"), "w") as f:
+            f.write("local\n")
+
+        with self.assertRaises(porcelain.CheckoutError):
+            porcelain.checkout(self.repo, b"uni")
+
     def test_checkout_with_deleted_files(self) -> None:
         porcelain.remove(self.repo.path, [os.path.join(self.repo.path, "foo")])
         status = list(porcelain.status(self.repo))

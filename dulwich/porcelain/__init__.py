@@ -2065,6 +2065,15 @@ def add(
                 dir_relpath = posixpath.join(relpath, "") if relpath != "." else ""
                 if dir_relpath and ignore_manager.may_prune_directory(dir_relpath):
                     ignored.add(dir_relpath)
+                    # Tracked files inside are still staged, as in git
+                    prefix = os.fsencode(dir_relpath)
+                    relpaths.extend(
+                        os.fsdecode(p)
+                        for p in get_unstaged_changes(
+                            index, r.path, filter_callback, preload_index, trust_ctime
+                        )
+                        if p.startswith(prefix)
+                    )
                     continue
 
                 # When adding a directory, add all untracked files within it
@@ -2104,18 +2113,16 @@ def add(
                     unstaged_full_path = repo_path / unstaged_path_str
                     try:
                         unstaged_full_path.relative_to(resolved_path)
-                        # File is within this directory, add it
-                        if not ignore_manager.is_ignored(unstaged_path_str):
-                            relpaths.append(unstaged_path_str)
-                        else:
-                            ignored.add(unstaged_path_str)
+                        # File is within this directory and already tracked, so
+                        # ignore rules do not apply to it (as in git)
+                        relpaths.append(unstaged_path_str)
                     except ValueError:
                         # File is not within this directory, skip it
                         continue
                 continue
 
             # FIXME: Support patterns
-            if ignore_manager.is_ignored(relpath):
+            if os.fsencode(relpath) not in index and ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)
                 continue
             relpaths.append(relpath)

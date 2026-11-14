@@ -1978,6 +1978,27 @@ class AddTests(PorcelainTestCase):
         self.assertEqual({"bar"}, set(added))
         self.assertEqual({"foo", "subdir/"}, ignored)
 
+    def test_add_tracked_file_in_ignored_directory(self) -> None:
+        # git applies ignore rules to untracked files only
+        os.mkdir(os.path.join(self.repo.path, "build"))
+        config = os.path.join(self.repo.path, "build", "config.txt")
+        with open(config, "w") as f:
+            f.write("v1")
+        porcelain.add(self.repo.path, paths=[config])
+        porcelain.commit(self.repo.path, message=b"init")
+        with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
+            f.write("build/\n")
+
+        for paths in (None, [config], [os.path.join(self.repo.path, "build")]):
+            content = repr(paths).encode()
+            with open(config, "wb") as f:
+                f.write(content)
+            porcelain.add(self.repo.path, paths=paths)
+            self.assertEqual(
+                Blob.from_string(content).id,
+                self.repo.open_index()[b"build/config.txt"].sha,
+            )
+
     def test_add_directory_with_reincluded_file(self) -> None:
         # "__tmp/*" excludes the contents rather than naming the directory, so
         # git descends into it and "!__tmp/keep" still applies.

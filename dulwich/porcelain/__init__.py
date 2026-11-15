@@ -527,6 +527,7 @@ class TransportKwargs(TypedDict, total=False):
     key_filename: str | None
     ssh_command: str | None
     pool_manager: "urllib3.PoolManager | None"
+    timeout: float | None
 
 
 @dataclass
@@ -1833,6 +1834,7 @@ def _filter_transport_kwargs(**kwargs: object) -> TransportKwargs:
         "key_filename",
         "ssh_command",
         "pool_manager",
+        "timeout",
     }
     return cast(TransportKwargs, {k: v for k, v in kwargs.items() if k in valid_params})
 

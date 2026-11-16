@@ -1978,8 +1978,7 @@ class AddTests(PorcelainTestCase):
         self.assertEqual({"bar"}, set(added))
         self.assertEqual({"foo", "subdir/"}, ignored)
 
-    def test_add_tracked_file_in_ignored_directory(self) -> None:
-        # git applies ignore rules to untracked files only
+    def _commit_tracked_file_then_ignore_its_directory(self) -> str:
         os.mkdir(os.path.join(self.repo.path, "build"))
         config = os.path.join(self.repo.path, "build", "config.txt")
         with open(config, "w") as f:
@@ -1988,16 +1987,34 @@ class AddTests(PorcelainTestCase):
         porcelain.commit(self.repo.path, message=b"init")
         with open(os.path.join(self.repo.path, ".gitignore"), "w") as f:
             f.write("build/\n")
+        with open(config, "w") as f:
+            f.write("v2")
+        return config
 
-        for paths in (None, [config], [os.path.join(self.repo.path, "build")]):
-            content = repr(paths).encode()
-            with open(config, "wb") as f:
-                f.write(content)
-            porcelain.add(self.repo.path, paths=paths)
-            self.assertEqual(
-                Blob.from_string(content).id,
-                self.repo.open_index()[b"build/config.txt"].sha,
-            )
+    def assertConfigStaged(self) -> None:
+        self.assertEqual(
+            Blob.from_string(b"v2").id,
+            self.repo.open_index()[b"build/config.txt"].sha,
+        )
+
+    def test_add_all_stages_tracked_file_in_ignored_directory(self) -> None:
+        self._commit_tracked_file_then_ignore_its_directory()
+        porcelain.add(self.repo.path)
+        self.assertConfigStaged()
+
+    def test_add_tracked_file_in_ignored_directory(self) -> None:
+        config = self._commit_tracked_file_then_ignore_its_directory()
+        porcelain.add(self.repo.path, paths=[config])
+        self.assertConfigStaged()
+
+    def test_add_ignored_directory_stages_tracked_file(self) -> None:
+        self._commit_tracked_file_then_ignore_its_directory()
+        added, ignored = porcelain.add(
+            self.repo.path, paths=[os.path.join(self.repo.path, "build")]
+        )
+        self.assertConfigStaged()
+        self.assertEqual(["build/config.txt"], added)
+        self.assertEqual({"build/"}, ignored)
 
     def test_add_directory_with_reincluded_file(self) -> None:
         # "__tmp/*" excludes the contents rather than naming the directory, so

@@ -2028,7 +2028,7 @@ def add(
         if paths is None:
             # When no paths specified, add all untracked and modified files from repo root
             paths = [str(repo_path)]
-        relpaths = []
+        relpaths: list[str] = []
         if isinstance(paths, str | bytes | os.PathLike):
             paths = [paths]
         for p in paths:
@@ -2065,13 +2065,20 @@ def add(
                 dir_relpath = posixpath.join(relpath, "") if relpath != "." else ""
                 if dir_relpath and ignore_manager.may_prune_directory(dir_relpath):
                     ignored.add(dir_relpath)
-                    # Tracked files inside are still staged, as in git
+                    if all_unstaged_paths is None:
+                        all_unstaged_paths = list(
+                            get_unstaged_changes(
+                                index,
+                                r.path,
+                                filter_callback,
+                                preload_index,
+                                trust_ctime,
+                            )
+                        )
                     prefix = os.fsencode(dir_relpath)
                     relpaths.extend(
                         os.fsdecode(p)
-                        for p in get_unstaged_changes(
-                            index, r.path, filter_callback, preload_index, trust_ctime
-                        )
+                        for p in all_unstaged_paths
                         if p.startswith(prefix)
                     )
                     continue
@@ -2113,8 +2120,7 @@ def add(
                     unstaged_full_path = repo_path / unstaged_path_str
                     try:
                         unstaged_full_path.relative_to(resolved_path)
-                        # File is within this directory and already tracked, so
-                        # ignore rules do not apply to it (as in git)
+                        # Tracked files aren't subject to ignore rules
                         relpaths.append(unstaged_path_str)
                     except ValueError:
                         # File is not within this directory, skip it
@@ -2122,6 +2128,7 @@ def add(
                 continue
 
             # FIXME: Support patterns
+            # Tracked files aren't subject to ignore rules
             if os.fsencode(relpath) not in index and ignore_manager.is_ignored(relpath):
                 ignored.add(relpath)
                 continue

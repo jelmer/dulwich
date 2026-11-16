@@ -2265,7 +2265,7 @@ class RepoConfigIncludeIfTests(TestCase):
             r.close()
 
     def test_repo_config_includeif_gitdir_pattern(self) -> None:
-        """Test includeIf gitdir pattern matching in repository config."""
+        """Test wildcard matching in includeIf gitdir patterns."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a repository under "work" directory
             work_dir = os.path.join(tmpdir, "work", "project1")
@@ -2280,8 +2280,7 @@ class RepoConfigIncludeIfTests(TestCase):
             # Add includeIf with pattern to the repo config
             config_path = os.path.join(work_dir, ".git", "config")
             with open(config_path, "ab") as f:
-                # Use a pattern that will match paths containing /work/
-                f.write(b'\n[includeIf "gitdir:**/work/**"]\n')
+                f.write(b'\n[includeIf "gitdir:**/work*/**"]\n')
                 escaped_path = included_path.replace("\\", "\\\\")
                 f.write(f"    path = {escaped_path}\n".encode())
 
@@ -2292,6 +2291,30 @@ class RepoConfigIncludeIfTests(TestCase):
             # Check if include was processed
             config = r.get_config()
             self.assertEqual(b"work@company.com", config.get((b"user",), b"email"))
+            r.close()
+
+    def test_repo_config_includeif_gitdir_pattern_requires_path_component(
+        self,
+    ) -> None:
+        """A gitdir pattern must not match only part of a path component."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_path = os.path.join(tmpdir, "not-repo")
+            r = Repo.init_bare(repo_path, mkdir=True)
+
+            included_path = os.path.join(tmpdir, "work.config")
+            with open(included_path, "wb") as f:
+                f.write(b"[user]\n    email = work@example.com\n")
+
+            config_path = os.path.join(repo_path, "config")
+            with open(config_path, "ab") as f:
+                f.write(b'\n[includeIf "gitdir:**/repo"]\n')
+                f.write(f"    path = {included_path}\n".encode())
+
+            r.close()
+            r = Repo(repo_path)
+            config = r.get_config()
+            with self.assertRaises(KeyError):
+                config.get((b"user",), b"email")
             r.close()
 
     def test_repo_config_includeif_no_match(self) -> None:

@@ -101,10 +101,7 @@ DEFAULT_MAX_INCLUDE_DEPTH = 10  # Maximum recursion depth for includes
 def _match_gitdir_pattern(
     path: bytes, pattern: bytes, ignorecase: bool = False
 ) -> bool:
-    """Simple gitdir pattern matching for includeIf conditions.
-
-    This handles the basic gitdir patterns used in includeIf directives.
-    """
+    """Match a Git directory path against an includeIf gitdir pattern."""
     # Convert to strings for easier manipulation
     path_str = path.decode("utf-8", errors="replace")
     pattern_str = pattern.decode("utf-8", errors="replace")
@@ -117,39 +114,23 @@ def _match_gitdir_pattern(
         path_str = path_str.lower()
         pattern_str = pattern_str.lower()
 
-    # Handle the common cases for gitdir patterns
-    if pattern_str.startswith("**/") and pattern_str.endswith("/**"):
-        # Pattern like **/dirname/** should match any path containing dirname
-        dirname = pattern_str[3:-3]  # Remove **/ and /**
-        # Check if path contains the directory name as a path component
-        return ("/" + dirname + "/") in path_str or path_str.endswith("/" + dirname)
-    elif pattern_str.startswith("**/"):
-        # Pattern like **/filename
-        suffix = pattern_str[3:]  # Remove **/
-        return suffix in path_str or path_str.endswith("/" + suffix)
-    elif pattern_str.endswith("/**"):
-        # Pattern like /path/to/dir/** should match /path/to/dir and any subdirectory
-        base_pattern = pattern_str[:-3]  # Remove /**
-        return path_str == base_pattern or path_str.startswith(base_pattern + "/")
-    elif "**" in pattern_str:
-        # Handle patterns with ** in the middle
-        parts = pattern_str.split("**")
-        if len(parts) == 2:
-            prefix, suffix = parts
-            # Path must start with prefix and end with suffix (if any)
-            if prefix and not path_str.startswith(prefix):
-                return False
-            if suffix and not path_str.endswith(suffix):
-                return False
-            return True
+    from .wildmatch import MalformedPattern, translate
 
-    # Direct match or simple glob pattern
-    if "*" in pattern_str or "?" in pattern_str or "[" in pattern_str:
-        import fnmatch
-
-        return fnmatch.fnmatch(path_str, pattern_str)
-    else:
-        return path_str == pattern_str
+    pattern_bytes = pattern_str.encode("utf-8", errors="replace")
+    path_bytes = path_str.encode("utf-8", errors="replace")
+    try:
+        pattern_regex = translate(pattern_bytes)
+    except MalformedPattern:
+        return False
+    if re.fullmatch(pattern_regex, path_bytes) is not None:
+        return True
+    if pattern_str.endswith("/**"):
+        try:
+            base_regex = translate(pattern_str[:-3].encode("utf-8", errors="replace"))
+        except MalformedPattern:
+            return False
+        return re.fullmatch(base_regex, path_bytes) is not None
+    return False
 
 
 def match_glob_pattern(value: str, pattern: str) -> bool:

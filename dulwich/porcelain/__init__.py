@@ -369,7 +369,7 @@ from ..diff_tree import (
     TreeChange,
     tree_changes,
 )
-from ..errors import NoIndexPresent, NotTreeError, SendPackError
+from ..errors import NoIndexPresent, SendPackError
 from ..file import FileLocked, open_nofollow
 from ..graph import can_fast_forward
 from ..ignore import IgnoreFilterManager
@@ -378,6 +378,7 @@ from ..index import (
     Index,
     InvalidPathError,
     _fs_to_tree_path,
+    _tree_to_fs_path,
     apply_stat_refresh,
     blob_from_path_and_stat,
     build_file_from_blob,
@@ -6002,7 +6003,7 @@ def _check_uncommitted_changes(
         # No HEAD yet (empty repo)
         return
 
-    status_report = status(repo, untracked_files="all")
+    status_report = status(repo)
     changes = []
     # staged is a dict with 'add', 'delete', 'modify' keys
     if isinstance(status_report.staged, dict):
@@ -6033,22 +6034,42 @@ def _check_uncommitted_changes(
                     "overwritten. Please commit or stash before switching."
                 )
 
-    # Untracked files that the target tree would replace
-    target_tree_obj = repo[target_tree_id]
-    assert isinstance(target_tree_obj, Tree), "Expected a Tree object"
-    for path in status_report.untracked:
-        if isinstance(path, str):
-            path = path.encode(DEFAULT_ENCODING)
-        try:
-            target_tree_obj.lookup_path(repo.object_store.__getitem__, path)
-        except KeyError:
+    # Untracked files in the way of a path the checkout will write
+    index = repo.open_index()
+    ignore_manager = IgnoreFilterManager.from_repo(repo, config=repo.get_config_stack())
+    repo_path = os.fsencode(repo.path)
+    for change in tree_changes(repo.object_store, current_tree_id, target_tree_id):
+        if change.new is None or change.new.path is None:
             continue
-        except NotTreeError:
-            pass  # a parent directory of path is a file in the target tree
-        raise CheckoutError(
-            f"The untracked working tree file '{path.decode()}' would be "
-            "overwritten. Please move or remove it before switching."
-        )
+        parts = change.new.path.split(b"/")
+        for i in range(1, len(parts) + 1):
+            path = b"/".join(parts[:i])
+            full_path = _tree_to_fs_path(repo_path, path)
+            try:
+                st = os.lstat(full_path)
+            except FileNotFoundError:
+                break
+            blocking = None
+            if stat.S_ISDIR(st.st_mode):
+                if i < len(parts):
+                    continue
+                # A file is to be written where there is a directory
+                untracked = next(
+                    get_untracked_paths(
+                        full_path, repo.path, index, exclude_ignored=True, repo=repo
+                    ),
+                    None,
+                )
+                if untracked is not None:
+                    blocking = path + b"/" + _fs_to_tree_path(untracked)
+            elif path not in index and not ignore_manager.is_ignored(path.decode()):
+                blocking = path
+            if blocking is not None:
+                raise CheckoutError(
+                    f"The untracked working tree file '{blocking.decode()}' would "
+                    "be overwritten. Please move or remove it before switching."
+                )
+            break
 
 
 def _get_worktree_update_config(

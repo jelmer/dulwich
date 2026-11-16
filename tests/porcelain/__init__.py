@@ -5143,6 +5143,32 @@ class CheckoutTests(PorcelainTestCase):
         with self.assertRaises(porcelain.CheckoutError):
             porcelain.checkout(self.repo, b"uni")
 
+    def test_checkout_keeps_untracked_file_where_the_branch_has_a_directory(
+        self,
+    ) -> None:
+        porcelain.checkout(self.repo, b"uni")
+        os.mkdir(os.path.join(self.repo.path, "d"))
+        _commit_file_with_content(self.repo, "d/f", "file in uni\n")
+        porcelain.checkout(self.repo, b"master")
+        with open(os.path.join(self.repo.path, "d"), "w") as f:
+            f.write("local\n")
+
+        with self.assertRaises(porcelain.CheckoutError):
+            porcelain.checkout(self.repo, b"uni")
+
+    def test_checkout_overwrites_ignored_file(self) -> None:
+        porcelain.checkout(self.repo, b"uni")
+        _commit_file_with_content(self.repo, "build.log", "from uni\n")
+        porcelain.checkout(self.repo, b"master")
+        with open(os.path.join(self.repo.path, ".git", "info", "exclude"), "w") as f:
+            f.write("*.log\n")
+        with open(os.path.join(self.repo.path, "build.log"), "w") as f:
+            f.write("local\n")
+
+        porcelain.checkout(self.repo, b"uni")
+
+        self.assertEqual(b"uni", porcelain.active_branch(self.repo))
+
     def test_checkout_with_deleted_files(self) -> None:
         porcelain.remove(self.repo.path, [os.path.join(self.repo.path, "foo")])
         status = list(porcelain.status(self.repo))

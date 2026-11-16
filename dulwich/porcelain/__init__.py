@@ -5981,6 +5981,23 @@ def _get_current_head_tree(repo: Repo) -> ObjectID | None:
         return None
 
 
+def _is_case_variant_of_tracked(full_path: bytes, path: bytes, index: Index) -> bool:
+    """Check if full_path was only found as a tracked file with another case.
+
+    On a case-insensitive filesystem, lstat of ``ex/Foo.txt`` succeeds when
+    the tracked file on disk is ``ex/foo.txt``.
+    """
+    parent, name = os.path.split(full_path)
+    entries = os.listdir(parent)
+    if name in entries:
+        return False
+    prefix = path.rpartition(b"/")[0]
+    prefix = prefix + b"/" if prefix else b""
+    return any(
+        entry.lower() == name.lower() and prefix + entry in index for entry in entries
+    )
+
+
 def _check_uncommitted_changes(
     repo: Repo, target_tree_id: ObjectID, force: bool = False
 ) -> None:
@@ -6062,7 +6079,11 @@ def _check_uncommitted_changes(
                 )
                 if untracked is not None:
                     blocking = path + b"/" + _fs_to_tree_path(untracked)
-            elif path not in index and not ignore_manager.is_ignored(path.decode()):
+            elif (
+                path not in index
+                and not ignore_manager.is_ignored(path.decode())
+                and not _is_case_variant_of_tracked(full_path, path, index)
+            ):
                 blocking = path
             if blocking is not None:
                 raise CheckoutError(

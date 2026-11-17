@@ -96,19 +96,16 @@ fn parse_tree(
 }
 
 fn cmp_with_suffix(a: (u32, &[u8]), b: (u32, &[u8])) -> std::cmp::Ordering {
-    let len = std::cmp::min(a.1.len(), b.1.len());
-    let cmp = a.1[..len].cmp(&b.1[..len]);
-    if cmp != std::cmp::Ordering::Equal {
-        return cmp;
+    // Compare as if directory names had '/' appended.
+    fn key((mode, name): (u32, &[u8])) -> impl Iterator<Item = &u8> {
+        let suffix: &[u8] = if (mode & S_IFMT) == S_IFDIR {
+            b"/"
+        } else {
+            b""
+        };
+        name.iter().chain(suffix)
     }
-
-    let c1 =
-        a.1.get(len)
-            .map_or_else(|| if (a.0 & S_IFMT) == S_IFDIR { b'/' } else { 0 }, |&c| c);
-    let c2 =
-        b.1.get(len)
-            .map_or_else(|| if (b.0 & S_IFMT) == S_IFDIR { b'/' } else { 0 }, |&c| c);
-    c1.cmp(&c2)
+    key(a).cmp(key(b))
 }
 
 /// Iterate over a tree entries dictionary.

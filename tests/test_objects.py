@@ -1485,6 +1485,34 @@ class TreeTests(ShaFileCheckTests):
             _do_test_sorted_tree_items, _sorted_tree_items_rs
         )
 
+    def _do_test_sorted_tree_items_slash_in_names(self, sorted_tree_items) -> None:
+        # Names containing '/' are invalid, but must still sort consistently
+        # rather than tripping up the sort implementation.
+        names = [
+            b"a/aa/", b"a", b"aaa/a", b"a/a//a", b"a//", b"aaa", b"a//a/a",
+            b"a/a/a", b"a/aa/a", b"a/a//", b"a//a", b"a//aa", b"aa/a", b"a///a",
+            b"a/a/a/a", b"a/a/", b"a/a/aa", b"a///", b"aa/", b"a/a/a/", b"a/aaa",
+        ]  # fmt: skip
+        dirs = {
+            b"a", b"aaa/a", b"a/a//a", b"a//", b"a//a/a", b"a/a/a", b"a/aa/a",
+            b"aa/a", b"a///a", b"a///", b"a/aaa",
+        }  # fmt: skip
+        sha = b"0" * 40
+        entries = {n: (stat.S_IFDIR if n in dirs else 0o100644, sha) for n in names}
+        expected = [
+            TreeEntry(n, entries[n][0], sha)
+            for n in sorted(names, key=lambda n: n + b"/" if n in dirs else n)
+        ]
+        self.assertEqual(expected, list(sorted_tree_items(entries, False)))
+
+    test_sorted_tree_items_slash_in_names = functest_builder(
+        _do_test_sorted_tree_items_slash_in_names, _sorted_tree_items_py
+    )
+    if _sorted_tree_items_rs is not None:
+        test_sorted_tree_items_slash_in_names_extension = ext_functest_builder(
+            _do_test_sorted_tree_items_slash_in_names, _sorted_tree_items_rs
+        )
+
     def _do_test_sorted_tree_items_name_order(self, sorted_tree_items) -> None:
         self.assertEqual(
             [

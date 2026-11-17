@@ -1,5 +1,8 @@
 1.2.22	UNRELEASED
 
+ * Fix ``PanicException`` from the Rust ``sorted_tree_items`` on trees
+   whose entry names contain '/'. (Jelmer Vernooĳ)
+
  * Reject pack indexes whose fanout claims more than 2**31-1 objects on
    32-bit platforms with AssertionError rather than OverflowError.
    (Jelmer Vernooĳ, #2574)

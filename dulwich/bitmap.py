@@ -545,6 +545,7 @@ def read_bitmap(
     filename: str | os.PathLike[str],
     pack_index: "PackIndex | None" = None,
     pack_checksum: bytes | None = None,
+    num_objects: int | None = None,
 ) -> PackBitmap:
     """Read a bitmap index file.
 
@@ -553,6 +554,10 @@ def read_bitmap(
         pack_index: Optional PackIndex to resolve object positions to SHAs
         pack_checksum: Optional checksum of the pack this bitmap belongs to.
             When given, the checksum stored in the bitmap header must match it.
+        num_objects: Number of objects in the pack. Bitmaps that declare more
+            bits than this, rounded up to a whole 64-bit word, are rejected.
+            Defaults to the size of pack_index;
+            when neither is given, bitmap sizes are not bounded.
 
     Returns:
         Loaded PackBitmap
@@ -563,7 +568,12 @@ def read_bitmap(
             checksum recorded in the bitmap header
     """
     with GitFile(filename, "rb") as f:
-        return read_bitmap_file(f, pack_index=pack_index, pack_checksum=pack_checksum)
+        return read_bitmap_file(
+            f,
+            pack_index=pack_index,
+            pack_checksum=pack_checksum,
+            num_objects=num_objects,
+        )
 
 
 def _max_bit_count(num_objects: int) -> int:

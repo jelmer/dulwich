@@ -9,6 +9,10 @@
    answering no longer blocks a fetch or push forever.
    (Zainab Mehmut)
 
+ * HARDEN: Reject pack bitmaps that declare more bits than the pack has
+   objects. A 20-byte EWAH run could otherwise expand into billions of set
+   entries and exhaust memory. (Jelmer Vernooĳ)
+
 1.2.21	2026-11-04
 
  * SECURITY: Refuse ``porcelain.submodule_update`` when the submodule path

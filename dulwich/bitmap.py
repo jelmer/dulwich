@@ -168,24 +168,36 @@ class EWAHBitmap:
     - Bits 33-63: literal_words (31 bits) - count of literal words following this RLW
     """
 
-    def __init__(self, data: bytes | None = None) -> None:
+    def __init__(
+        self, data: bytes | None = None, max_bit_count: int | None = None
+    ) -> None:
         """Initialize EWAH bitmap.
 
         Args:
             data: Optional compressed bitmap data to decode
+            max_bit_count: Optional upper bound on the declared bit count of
+                data; see _decode
         """
         self.bits: set[int] = set()
         self.bit_count = 0
 
         if data:
-            self._decode(data)
+            self._decode(data, max_bit_count=max_bit_count)
 
-    def _decode(self, data: bytes) -> None:
+    def _decode(self, data: bytes, max_bit_count: int | None = None) -> None:
         """Decode EWAH compressed bitmap data.
 
         Args:
             data: Compressed bitmap data (EWAH format with header + words +
                 RLW position)
+            max_bit_count: Optional upper bound on the declared bit count,
+                rounded up to the next 64-bit word boundary. Runs are
+                expanded into one set entry per bit, so without a bound a
+                few bytes of input can claim billions of set bits.
+
+        Raises:
+            ValueError: If the data is corrupt or declares more than
+                max_bit_count bits
         """
         f = BytesIO(data)
 
@@ -198,6 +210,15 @@ class EWAHBitmap:
 
         bit_count = struct.unpack(">I", bit_count_bytes)[0]
         word_count = struct.unpack(">I", word_count_bytes)[0]
+
+        if max_bit_count is not None:
+            # Bitmaps are stored as whole 64-bit words, so round the bound up
+            # to the next word boundary before comparing.
+            rounded_max = ((max_bit_count + 63) // 64) * 64
+            if bit_count > rounded_max:
+                raise ValueError(
+                    f"EWAH bit count {bit_count} exceeds maximum {max_bit_count}"
+                )
 
         self.bit_count = bit_count
         current_bit = 0
@@ -524,6 +545,7 @@ def read_bitmap(
     filename: str | os.PathLike[str],
     pack_index: "PackIndex | None" = None,
     pack_checksum: bytes | None = None,
+    num_objects: int | None = None,
 ) -> PackBitmap:
     """Read a bitmap index file.
 
@@ -532,6 +554,10 @@ def read_bitmap(
         pack_index: Optional PackIndex to resolve object positions to SHAs
         pack_checksum: Optional checksum of the pack this bitmap belongs to.
             When given, the checksum stored in the bitmap header must match it.
+        num_objects: Number of objects in the pack. Bitmaps that declare more
+            bits than this, rounded up to a whole 64-bit word, are rejected.
+            Defaults to the size of pack_index;
+            when neither is given, bitmap sizes are not bounded.
 
     Returns:
         Loaded PackBitmap
@@ -542,13 +568,25 @@ def read_bitmap(
             checksum recorded in the bitmap header
     """
     with GitFile(filename, "rb") as f:
-        return read_bitmap_file(f, pack_index=pack_index, pack_checksum=pack_checksum)
+        return read_bitmap_file(
+            f,
+            pack_index=pack_index,
+            pack_checksum=pack_checksum,
+            num_objects=num_objects,
+        )
+
+
+def _max_bit_count(num_objects: int) -> int:
+    # git pads bitmaps to whole 64-bit words and writes at least one word,
+    # even for an empty bitmap.
+    return max(1, (num_objects + 63) // 64) * 64
 
 
 def read_bitmap_file(
     f: IO[bytes],
     pack_index: "PackIndex | None" = None,
     pack_checksum: bytes | None = None,
+    num_objects: int | None = None,
 ) -> PackBitmap:
     """Read bitmap data from a file object.
 
@@ -557,6 +595,10 @@ def read_bitmap_file(
         pack_index: Optional PackIndex to resolve object positions to SHAs
         pack_checksum: Optional checksum of the pack this bitmap belongs to.
             When given, the checksum stored in the bitmap header must match it.
+        num_objects: Number of objects in the pack. Bitmaps that declare more
+            bits than this, rounded up to a whole 64-bit word, are rejected.
+            Defaults to the size of pack_index;
+            when neither is given, bitmap sizes are not bounded.
 
     Returns:
         Loaded PackBitmap
@@ -598,6 +640,10 @@ def read_bitmap_file(
     if pack_checksum is not None and stored_pack_checksum != pack_checksum:
         raise ChecksumMismatch(pack_checksum, stored_pack_checksum)
 
+    if num_objects is None and pack_index is not None:
+        num_objects = len(pack_index)
+    max_bit_count = None if num_objects is None else _max_bit_count(num_objects)
+
     bitmap = PackBitmap(version=version, flags=flags)
     bitmap.pack_checksum = stored_pack_checksum
 
@@ -637,7 +683,7 @@ def read_bitmap_file(
 
         # Reconstruct the full EWAH data to pass to _decode
         ewah_data = bit_count_bytes + word_count_bytes + words_data + rlw_pos_bytes
-        type_bitmap._decode(ewah_data)
+        type_bitmap._decode(ewah_data, max_bit_count=max_bit_count)
 
     # Read bitmap entries
     for _ in range(entry_count):
@@ -683,7 +729,11 @@ def read_bitmap_file(
         bitmap_data = bit_count_bytes + word_count_bytes + words_data + rlw_pos_bytes
 
         # Create bitmap entry
-        ewah_bitmap = EWAHBitmap(bitmap_data) if word_count > 0 else EWAHBitmap()
+        ewah_bitmap = (
+            EWAHBitmap(bitmap_data, max_bit_count=max_bit_count)
+            if word_count > 0
+            else EWAHBitmap()
+        )
         entry = BitmapEntry(
             object_pos=obj_pos,
             xor_offset=xor_offset,

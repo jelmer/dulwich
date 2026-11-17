@@ -857,6 +857,82 @@ class BitmapErrorHandlingTests(unittest.TestCase):
             read_bitmap_file(BytesIO(data))
         self.assertIn("running length", str(ctx.exception).lower())
 
+    def test_decode_bit_count_exceeds_max(self):
+        """A declared bit count above max_bit_count is rejected."""
+        # bit_count=2**32-1 with a single run of 2**26 set words would expand
+        # to billions of set entries.
+        rlw = ((1 << 26) << 1) | 1
+        data = struct.pack(">II", 0xFFFFFFFF, 1)
+        data += struct.pack(">Q", rlw)
+        data += struct.pack(">I", 0)
+
+        with self.assertRaises(ValueError) as ctx:
+            EWAHBitmap(data, max_bit_count=128)
+        self.assertEqual(
+            "EWAH bit count 4294967295 exceeds maximum 128", str(ctx.exception)
+        )
+
+    def test_decode_bit_count_at_max(self):
+        rlw = (2 << 1) | 1
+        data = struct.pack(">II", 128, 1)
+        data += struct.pack(">Q", rlw)
+        data += struct.pack(">I", 0)
+
+        decoded = EWAHBitmap(data, max_bit_count=128)
+        self.assertEqual(set(range(128)), decoded.bits)
+
+    def test_decode_bit_count_max_rounded_up_to_word(self):
+        # max_bit_count is rounded up to a whole 64-bit word.
+        rlw = (1 << 1) | 1
+        data = struct.pack(">II", 64, 1)
+        data += struct.pack(">Q", rlw)
+        data += struct.pack(">I", 0)
+
+        decoded = EWAHBitmap(data, max_bit_count=10)
+        self.assertEqual(set(range(64)), decoded.bits)
+
+    def _bitmap_file_with_type_bitmap_bit_count(self, bit_count):
+        data = BITMAP_SIGNATURE
+        data += BITMAP_VERSION.to_bytes(2, "big")
+        data += b"\x00\x00"  # Flags
+        data += b"\x00\x00\x00\x00"  # Entry count
+        data += b"\x00" * 20  # Pack checksum
+        # Commit type bitmap: one RLW with running_bit=0 covering bit_count.
+        data += struct.pack(">II", bit_count, 1)
+        data += struct.pack(">Q", ((bit_count + 63) // 64) << 1)
+        data += struct.pack(">I", 0)
+        for _ in range(3):
+            data += struct.pack(">III", 0, 0, 0)
+        return data
+
+    def test_read_bitmap_file_bit_count_exceeds_pack(self):
+        """Bitmaps larger than the pack's object count are rejected."""
+        data = self._bitmap_file_with_type_bitmap_bit_count(0xFFFFFFC0)
+        with self.assertRaises(ValueError) as ctx:
+            read_bitmap_file(BytesIO(data), num_objects=5)
+        self.assertEqual(
+            "EWAH bit count 4294967232 exceeds maximum 64", str(ctx.exception)
+        )
+
+    def test_read_bitmap_file_bit_count_from_pack_index(self):
+        shas = sorted(bytes([i]) + b"\x00" * 19 for i in range(65))
+        pack_index = MemoryPackIndex(
+            [(sha, i, i) for i, sha in enumerate(shas)], DEFAULT_OBJECT_FORMAT
+        )
+        # git pads to whole words: 65 objects allow up to 128 bits.
+        data = self._bitmap_file_with_type_bitmap_bit_count(128)
+        read_bitmap_file(BytesIO(data), pack_index=pack_index)
+        data = self._bitmap_file_with_type_bitmap_bit_count(192)
+        with self.assertRaises(ValueError) as ctx:
+            read_bitmap_file(BytesIO(data), pack_index=pack_index)
+        self.assertEqual("EWAH bit count 192 exceeds maximum 128", str(ctx.exception))
+
+    def test_read_bitmap_file_empty_pack(self):
+        """git writes empty bitmaps as one word, even for an empty pack."""
+        data = self._bitmap_file_with_type_bitmap_bit_count(64)
+        bitmap = read_bitmap_file(BytesIO(data), num_objects=0)
+        self.assertEqual(64, bitmap.commit_bitmap.bit_count)
+
     def test_empty_bitmap_file(self):
         """Test reading completely empty file."""
         with self.assertRaises(ValueError):

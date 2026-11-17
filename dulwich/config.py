@@ -125,6 +125,9 @@ def _match_gitdir_pattern(
     if re.fullmatch(pattern_regex, path_bytes) is not None:
         return True
     if pattern_str.endswith("/**"):
+        # Git can represent a bare repository's gitdir as "<repo>/." when
+        # discovered from inside it; after resolving the path, treat /** as
+        # matching the repository directory itself too.
         try:
             base_regex = translate(pattern_str[:-3].encode("utf-8", errors="replace"))
         except MalformedPattern:

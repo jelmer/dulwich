@@ -5541,8 +5541,6 @@ def show_branch(
             stack = [sha]
             while stack:
                 sha = stack.pop()
-                # TODO by @bartbroere (2026-11-18): I copied the check below from the original logic, but I need to find out why wouldn't sha be in r?
-                #                                   Is this just to deal with slightly broken repositories with refs pointing to missing objects?
                 if sha in all_commits or sha not in r:
                     continue
                 commit = r[sha]
@@ -5620,18 +5618,14 @@ def show_branch(
         output_lines.append("-" * (len(sorted_branches) + 2))
 
         # Output commits
-        # TODO by @bartbroere (2026-11-18): The line below still triggers a mypy error, even though it seems to work
-        #                                   Find out how to fix that.
-        #                                   dulwich\porcelain\__init__.py:5623: error: Incompatible types in assignment (expression has type "bytes", variable has type "ObjectID")  [assignment]
-        #                                   Found 1 error in 1 file (checked 85 source files)
-        for commit_sha, (_, _, message) in sorted_commits:
+        for commit_sha_bytes, (_, _, message) in sorted_commits:
             # Build marker string
             markers = []
             for i, (ref_name, branch_sha) in enumerate(sorted_branches):
-                if commit_sha == branch_sha:
+                if commit_sha_bytes == branch_sha:
                     # This is the tip of the branch
                     markers.append("*")
-                elif commit_sha in branch_contains[i]:
+                elif commit_sha_bytes in branch_contains[i]:
                     # This commit is in the branch
                     markers.append("+")
                 else:

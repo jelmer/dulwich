@@ -120,7 +120,8 @@ def _match_gitdir_pattern(
     path_bytes = path_str.encode("utf-8", errors="replace")
     try:
         pattern_regex = translate(pattern_bytes)
-    except MalformedPattern:
+    except MalformedPattern as e:
+        logger.debug("Invalid gitdir pattern %r: %s", pattern, e)
         return False
     if re.fullmatch(pattern_regex, path_bytes) is not None:
         return True
@@ -130,7 +131,8 @@ def _match_gitdir_pattern(
         # matching the repository directory itself too.
         try:
             base_regex = translate(pattern_str[:-3].encode("utf-8", errors="replace"))
-        except MalformedPattern:
+        except MalformedPattern as e:
+            logger.debug("Invalid gitdir pattern %r: %s", pattern, e)
             return False
         return re.fullmatch(base_regex, path_bytes) is not None
     return False

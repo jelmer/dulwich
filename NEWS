@@ -5,7 +5,7 @@
 
  * Match ``includeIf gitdir`` patterns using Git's path-aware wildmatch
    semantics, avoiding matches against partial path components and honoring
-   wildcards within directory names. (#2580)
+   wildcards within directory names. (Ravi Jaiswar, #2580)
 
  * Reject pack indexes whose fanout claims more than 2**31-1 objects on
    32-bit platforms with AssertionError rather than OverflowError.

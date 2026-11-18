@@ -5538,7 +5538,7 @@ def show_branch(
 
         # Collect commits from all branches
         for _, sha in sorted_branches:
-            stack: list[bytes] = [sha]
+            stack = [sha]
             while stack:
                 sha = stack.pop()
                 # TODO by @bartbroere (2026-11-18): I copied the check below from the original logic, but I need to find out why wouldn't sha be in r?
@@ -5546,10 +5546,12 @@ def show_branch(
                 if sha in all_commits or sha not in r:
                     continue
                 commit = r[sha]
+                if not isinstance(commit, Commit):
+                    continue
                 timestamp = commit.commit_time
-                message = ""
-                if isinstance(commit, Commit):  # TODO by @bartbroere (2026-11-18): Find out in which scenario commit is not a Commit
-                    message = commit.message.decode("utf-8", errors="replace").split("\n")[0]
+                message = commit.message.decode("utf-8", errors="replace").split("\n")[
+                    0
+                ]
                 all_commits[sha] = (timestamp, commit.parents, message)
                 stack.extend(commit.parents)
 
@@ -5618,6 +5620,10 @@ def show_branch(
         output_lines.append("-" * (len(sorted_branches) + 2))
 
         # Output commits
+        # TODO by @bartbroere (2026-11-18): The line below still triggers a mypy error, even though it seems to work
+        #                                   Find out how to fix that.
+        #                                   dulwich\porcelain\__init__.py:5623: error: Incompatible types in assignment (expression has type "bytes", variable has type "ObjectID")  [assignment]
+        #                                   Found 1 error in 1 file (checked 85 source files)
         for commit_sha, (_, _, message) in sorted_commits:
             # Build marker string
             markers = []

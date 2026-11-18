@@ -5537,13 +5537,16 @@ def show_branch(
         ] = {}  # sha -> (timestamp, parents, message)
 
         # Collect commits from all branches
-        for _, sha in sorted_branches:
-            stack = [sha]
+        for _, root in sorted_branches:
+            stack = [root]
             while stack:
                 sha = stack.pop()
-                if sha in all_commits or sha not in r:
+                if sha in all_commits:
                     continue
-                commit = r[sha]
+                try:
+                    commit = r[sha]
+                except KeyError:
+                    continue
                 if not isinstance(commit, Commit):
                     continue
                 timestamp = commit.commit_time

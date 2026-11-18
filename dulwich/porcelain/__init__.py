@@ -5533,7 +5533,7 @@ def show_branch(
         # Build commit history for visualization
         # Collect all commits reachable from any branch
         all_commits: dict[
-            bytes, tuple[int, list[ObjectID], str]
+            ObjectID, tuple[int, list[ObjectID], str]
         ] = {}  # sha -> (timestamp, parents, message)
 
         # Collect commits from all branches
@@ -5589,9 +5589,9 @@ def show_branch(
                     sorted_commits = sorted_commits[: ancestor_idx + 1 + more]
 
         # Determine which branches contain which commits
-        branch_contains: list[set[bytes]] = []
+        branch_contains: list[set[ObjectID]] = []
         for ref_name, sha in sorted_branches:
-            reachable: set[bytes] = set()
+            reachable: set[ObjectID] = set()
             stack = [sha]
             while stack:
                 commit_sha = stack.pop()
@@ -5618,14 +5618,14 @@ def show_branch(
         output_lines.append("-" * (len(sorted_branches) + 2))
 
         # Output commits
-        for commit_sha_bytes, (_, _, message) in sorted_commits:
+        for commit_sha, (_, _, message) in sorted_commits:
             # Build marker string
             markers = []
             for i, (ref_name, branch_sha) in enumerate(sorted_branches):
-                if commit_sha_bytes == branch_sha:
+                if commit_sha == branch_sha:
                     # This is the tip of the branch
                     markers.append("*")
-                elif commit_sha_bytes in branch_contains[i]:
+                elif commit_sha in branch_contains[i]:
                     # This commit is in the branch
                     markers.append("+")
                 else:

@@ -419,6 +419,8 @@ class Protocol:
         Documentation/technical/protocol-common.txt
     """
 
+    _close: Callable[[], None] | None = None
+
     def __init__(
         self,
         read: Callable[[int], bytes],

@@ -1120,7 +1120,7 @@ class FilePackIndex(PackIndex):
     """
 
     _fan_out_table: list[int]
-    _file: IO[bytes] | _GitFile
+    _file: IO[bytes] | _GitFile | None = None
 
     def __init__(
         self,
@@ -1166,11 +1166,12 @@ class FilePackIndex(PackIndex):
     def close(self) -> None:
         """Close the underlying file and any mmap."""
         _close_file_contents(self._contents)
-        self._file.close()
+        if self._file is not None:
+            self._file.close()
 
     def __del__(self) -> None:
         """Ensure the file and mmap are closed when GCed."""
-        if not getattr(self._file, "closed", True):
+        if self._file is not None and not getattr(self._file, "closed", True):
             import warnings
 
             warnings.warn(
@@ -4512,8 +4513,8 @@ class Pack:
     _data_load: Callable[[], PackData] | None
     _idx_load: Callable[[], PackIndex] | None
 
-    _data: PackData | None
-    _idx: PackIndex | None
+    _data: PackData | None = None
+    _idx: PackIndex | None = None
     _bitmap: "PackBitmap | None"
 
     def __init__(

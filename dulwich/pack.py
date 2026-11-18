@@ -1121,7 +1121,6 @@ class FilePackIndex(PackIndex):
 
     _fan_out_table: list[int]
     _file: IO[bytes] | _GitFile | None = None
-    _contents: "bytes | mmap.mmap | None" = None
 
     def __init__(
         self,

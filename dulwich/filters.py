@@ -134,6 +134,8 @@ class CompositeFilterDriver:
 class ProcessFilterDriver:
     """Filter driver that executes external processes."""
 
+    _process: subprocess.Popen[bytes] | None = None
+
     def __init__(
         self,
         clean_cmd: str | None = None,
@@ -156,7 +158,6 @@ class ProcessFilterDriver:
         self.required = required
         self.cwd = cwd
         self.process_cmd = process_cmd
-        self._process: subprocess.Popen[bytes] | None = None
         self._protocol: Protocol | None = None
         self._capabilities: set[bytes] = set()
         self._process_lock = threading.Lock()

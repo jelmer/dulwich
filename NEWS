@@ -20,6 +20,10 @@
    ``add_pack`` by resolving each object once. A rejected pack no longer
    leaves its temporary file behind. (Zainab Mehmut)
 
+ * Avoid ``AttributeError`` in ``__del__`` of ``Pack``, ``Protocol``,
+   ``Bundle`` and other classes when their constructor failed before
+   setting any attributes. (Jelmer Vernooĳ)
+
 1.2.21	2026-11-04
 
  * SECURITY: Refuse ``porcelain.submodule_update`` when the submodule path

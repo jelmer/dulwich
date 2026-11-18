@@ -5533,42 +5533,28 @@ def show_branch(
         # Build commit history for visualization
         # Collect all commits reachable from any branch
         all_commits: dict[
-            bytes, tuple[int, list[ObjectID], str]
+            ObjectID, tuple[int, list[ObjectID], str]
         ] = {}  # sha -> (timestamp, parents, message)
 
-        def collect_commits(sha: bytes, branch_idx: int, visited: set[bytes]) -> None:
-            """Recursively collect commits."""
-            if sha in visited:
-                return
-            visited.add(sha)
-
-            try:
-                commit = r[sha]
-            except KeyError:
-                # Commit not found, stop traversal
-                pass
-            else:
-                if not isinstance(commit, Commit):
-                    return
-
-                timestamp = commit.commit_time
-                parents = commit.parents if isinstance(commit, Commit) else []
-                message = (
-                    commit.message.decode("utf-8", errors="replace").split("\n")[0]
-                    if isinstance(commit, Commit)
-                    else ""
-                )
-
-                if sha not in all_commits:
-                    all_commits[sha] = (timestamp, parents, message)
-
-                # Recurse to parents
-                for parent in parents:
-                    collect_commits(parent, branch_idx, visited)
-
         # Collect commits from all branches
-        for i, (_, sha) in enumerate(sorted_branches):
-            collect_commits(sha, i, set())
+        for _, root in sorted_branches:
+            stack = [root]
+            while stack:
+                sha = stack.pop()
+                if sha in all_commits:
+                    continue
+                try:
+                    commit = r[sha]
+                except KeyError:
+                    continue
+                if not isinstance(commit, Commit):
+                    continue
+                timestamp = commit.commit_time
+                message = commit.message.decode("utf-8", errors="replace").split("\n")[
+                    0
+                ]
+                all_commits[sha] = (timestamp, commit.parents, message)
+                stack.extend(commit.parents)
 
         # Find common ancestor
         common_ancestor_sha = None
@@ -5606,20 +5592,19 @@ def show_branch(
                     sorted_commits = sorted_commits[: ancestor_idx + 1 + more]
 
         # Determine which branches contain which commits
-        branch_contains: list[set[bytes]] = []
+        branch_contains: list[set[ObjectID]] = []
         for ref_name, sha in sorted_branches:
-            reachable = set()
-
-            def mark_reachable(commit_sha: bytes) -> None:
+            reachable: set[ObjectID] = set()
+            stack = [sha]
+            while stack:
+                commit_sha = stack.pop()
                 if commit_sha in reachable:
-                    return
+                    continue
                 reachable.add(commit_sha)
                 if commit_sha in all_commits:
                     _, parents, _ = all_commits[commit_sha]
-                    for parent in parents:
-                        mark_reachable(parent)
+                    stack.extend(parents)
 
-            mark_reachable(sha)
             branch_contains.append(reachable)
 
         # Output branch headers

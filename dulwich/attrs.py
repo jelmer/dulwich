@@ -23,6 +23,7 @@
 """Parse .gitattributes file."""
 
 __all__ = [
+    "AttrPatterns",
     "AttributeValue",
     "GitAttributes",
     "Pattern",
@@ -30,20 +31,28 @@ __all__ = [
     "match_path",
     "parse_git_attributes",
     "parse_gitattributes_file",
+    "parse_gitattributes_tree",
     "read_gitattributes",
 ]
 
 import errno
 import logging
 import os
+import posixpath
 import re
+import stat
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
+from io import BytesIO
 from itertools import chain
-from typing import IO
+from typing import IO, TYPE_CHECKING
 
 from .file import open_nofollow_read
+from .objects import Blob, Tree
 from .wildmatch import MalformedPattern
 from .wildmatch import translate as translate_wildmatch
+
+if TYPE_CHECKING:
+    from .object_store import BaseObjectStore
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +124,9 @@ def _translate_pattern(pattern: bytes, base: bytes = b"") -> bytes:
     """Translate a gitattributes pattern to a regular expression.
 
     Similar to gitignore patterns, but simpler as gitattributes doesn't support
-    all the same features (e.g., no directory-only patterns with trailing /).
+    all the same features (e.g., no negated patterns). A trailing ``/`` should
+    already have been stripped; :class:`Pattern` handles directory-only
+    patterns itself.
 
     Args:
       pattern: The pattern to translate
@@ -151,12 +162,15 @@ class Pattern:
         """
         self.pattern = pattern
         self.base = base
+        # A trailing slash means the pattern only matches directories.
+        self.dir_only = pattern.endswith(b"/")
         self._regex: re.Pattern[bytes] | None = None
         self._compile()
 
     def _compile(self) -> None:
         """Compile the pattern to a regular expression."""
-        regex_pattern = _translate_pattern(self.pattern, self.base)
+        pattern = self.pattern[:-1] if self.dir_only else self.pattern
+        regex_pattern = _translate_pattern(pattern, self.base)
         # Add anchors
         regex_pattern = b"^" + regex_pattern + b"$"
         self._regex = re.compile(regex_pattern)
@@ -165,7 +179,8 @@ class Pattern:
         """Check if path matches this pattern.
 
         Args:
-            path: Path to check (relative to repository root, using / separators)
+            path: Path to check (relative to repository root, using / separators);
+              a directory is passed with a trailing slash
 
         Returns:
             True if path matches this pattern
@@ -173,10 +188,19 @@ class Pattern:
         # Normalize path
         if path.startswith(b"/"):
             path = path[1:]
+        if path.endswith(b"/"):
+            path = path[:-1]
+        elif self.dir_only:
+            return False
 
         # Try to match
         assert self._regex is not None  # Always set by _compile()
         return bool(self._regex.match(path))
+
+
+# Compiled .gitattributes patterns, as returned by
+# compile_gitattributes_patterns.
+AttrPatterns = Sequence[tuple[Pattern, Mapping[bytes, AttributeValue]]]
 
 
 def match_path(
@@ -257,6 +281,46 @@ def parse_gitattributes_file(
 
     with open(filename, "rb") as f:
         return compile_gitattributes_patterns(parse_git_attributes(f), filename)
+
+
+def parse_gitattributes_tree(
+    store: "BaseObjectStore", tree: Tree, base: bytes = b""
+) -> AttrPatterns:
+    """Read and compile the ``.gitattributes`` of one tree (directory).
+
+    A ``.gitattributes`` entry that is not a regular file is skipped. Patterns
+    are relative to the directory holding the file, so ``base`` is passed as
+    their base.
+
+    Args:
+        store: Object store to read the blob from
+        tree: Tree of the directory
+        base: Path of the directory relative to the repository root; empty
+          for the root itself
+
+    Returns:
+        Compiled patterns, empty if the tree has no readable
+        ``.gitattributes``
+    """
+    try:
+        mode, sha = tree[b".gitattributes"]
+    except KeyError:
+        return []
+    source = posixpath.join(base, b".gitattributes")
+    if not stat.S_ISREG(mode):
+        logger.debug("Ignoring %r: not a regular file", source)
+        return []
+    try:
+        blob = store[sha]
+    except KeyError:
+        logger.warning("Ignoring %r: object %s is missing", source, sha.decode("ascii"))
+        return []
+    if not isinstance(blob, Blob):
+        logger.warning("Ignoring %r: not a blob", source)
+        return []
+    return compile_gitattributes_patterns(
+        parse_git_attributes(BytesIO(blob.data)), source, base
+    )
 
 
 def read_gitattributes(

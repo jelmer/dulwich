@@ -5988,13 +5988,23 @@ def _is_case_variant_of_tracked(full_path: bytes, path: bytes, index: Index) -> 
     the tracked file on disk is ``ex/foo.txt``.
     """
     parent, name = os.path.split(full_path)
-    entries = os.listdir(parent)
-    if name in entries:
-        return False
+    folded = name.lower()
     prefix = path.rpartition(b"/")[0]
     prefix = prefix + b"/" if prefix else b""
-    return any(
-        entry.lower() == name.lower() and prefix + entry in index for entry in entries
+    found = False
+    with os.scandir(parent) as entries:
+        for entry in entries:
+            if entry.name == name:
+                return False
+            if entry.name.lower() == folded and prefix + entry.name in index:
+                found = True
+    return found
+
+
+def _untracked_file_error(path: bytes) -> CheckoutError:
+    return CheckoutError(
+        f"The untracked working tree file '{path.decode()}' would "
+        "be overwritten. Please move or remove it before switching."
     )
 
 
@@ -6053,7 +6063,13 @@ def _check_uncommitted_changes(
 
     # Untracked files in the way of a path the checkout will write
     index = repo.open_index()
-    ignore_manager = IgnoreFilterManager.from_repo(repo, config=repo.get_config_stack())
+    config = repo.get_config_stack()
+    ignore_manager = IgnoreFilterManager.from_repo(repo, config=config)
+    # Same default as update_working_tree. On a case-sensitive filesystem
+    # lstat never finds a file under another case, so skip the check there.
+    ignore_case = config.get_boolean(
+        (b"core",), b"ignorecase", sys.platform in ("win32", "darwin")
+    )
     repo_path = os.fsencode(repo.path)
     for change in tree_changes(repo.object_store, current_tree_id, target_tree_id):
         if change.new is None or change.new.path is None:
@@ -6066,7 +6082,6 @@ def _check_uncommitted_changes(
                 st = os.lstat(full_path)
             except FileNotFoundError:
                 break
-            blocking = None
             if stat.S_ISDIR(st.st_mode):
                 if i < len(parts):
                     continue
@@ -6078,18 +6093,17 @@ def _check_uncommitted_changes(
                     None,
                 )
                 if untracked is not None:
-                    blocking = path + b"/" + _fs_to_tree_path(untracked)
+                    raise _untracked_file_error(
+                        path + b"/" + _fs_to_tree_path(untracked)
+                    )
             elif (
                 path not in index
                 and not ignore_manager.is_ignored(path.decode())
-                and not _is_case_variant_of_tracked(full_path, path, index)
-            ):
-                blocking = path
-            if blocking is not None:
-                raise CheckoutError(
-                    f"The untracked working tree file '{blocking.decode()}' would "
-                    "be overwritten. Please move or remove it before switching."
+                and not (
+                    ignore_case and _is_case_variant_of_tracked(full_path, path, index)
                 )
+            ):
+                raise _untracked_file_error(path)
             break
 
 

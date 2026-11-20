@@ -5143,6 +5143,10 @@ class CheckoutTests(PorcelainTestCase):
         with self.assertRaises(porcelain.CheckoutError):
             porcelain.checkout(self.repo, b"uni")
 
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+        with open(os.path.join(self.repo.path, "d", "u")) as f:
+            self.assertEqual("local\n", f.read())
+
     def test_checkout_keeps_untracked_file_where_the_branch_has_a_directory(
         self,
     ) -> None:
@@ -5155,6 +5159,22 @@ class CheckoutTests(PorcelainTestCase):
 
         with self.assertRaises(porcelain.CheckoutError):
             porcelain.checkout(self.repo, b"uni")
+
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+        with open(os.path.join(self.repo.path, "d")) as f:
+            self.assertEqual("local\n", f.read())
+
+    def test_checkout_case_only_rename(self) -> None:
+        if not os.path.exists(os.path.join(self.repo.path, "FOO")):
+            self.skipTest("needs a case-insensitive filesystem")
+        porcelain.checkout(self.repo, b"uni")
+        porcelain.remove(self.repo.path, [self._foo_path])
+        _commit_file_with_content(self.repo, "Foo", "hello\n")
+
+        porcelain.checkout(self.repo, b"master")
+        self.assertEqual(b"master", porcelain.active_branch(self.repo))
+        porcelain.checkout(self.repo, b"uni")
+        self.assertEqual(b"uni", porcelain.active_branch(self.repo))
 
     def test_checkout_overwrites_ignored_file(self) -> None:
         porcelain.checkout(self.repo, b"uni")

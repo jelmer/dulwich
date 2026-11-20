@@ -4725,10 +4725,19 @@ class ResetTests(PorcelainTestCase):
         self.assertTrue(
             os.path.exists(os.path.join(self.repo.controldir(), "MERGE_HEAD"))
         )
+        self.assertTrue(
+            os.path.exists(os.path.join(self.repo.controldir(), "MERGE_LABELS"))
+        )
         return base, feature_tip
 
     def _assert_no_merge_state(self) -> None:
-        for name in ("MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "AUTO_MERGE"):
+        for name in (
+            "MERGE_HEAD",
+            "MERGE_MSG",
+            "MERGE_MODE",
+            "AUTO_MERGE",
+            "MERGE_LABELS",
+        ):
             self.assertFalse(
                 os.path.exists(os.path.join(self.repo.controldir(), name)), name
             )
@@ -5021,6 +5030,20 @@ class RevertTests(PorcelainTestCase):
         # Check the message
         revert_commit = self.repo[revert_sha]
         self.assertEqual(custom_msg.encode("utf-8"), revert_commit.message)
+
+    def test_revert_conflict(self) -> None:
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+        _commit_file_with_content(self.repo, "foo", "initial\n")
+        change_sha, fullpath = _commit_file_with_content(self.repo, "foo", "change\n")
+        _commit_file_with_content(self.repo, "foo", "later\n")
+
+        self.assertRaises(porcelain.Error, porcelain.revert, self.repo, [change_sha])
+
+        with open(fullpath, "rb") as f:
+            self.assertEqual(
+                b"<<<<<<< ours\nlater\n=======\ninitial\n>>>>>>> theirs\n", f.read()
+            )
 
     def test_revert_no_parent(self) -> None:
         # Try to revert the initial commit (no parent)

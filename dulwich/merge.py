@@ -22,6 +22,7 @@
 """Git merge implementation."""
 
 __all__ = [
+    "MERGE_LABELS_CONTENT",
     "MergeConflict",
     "MergeConflictInfo",
     "Merger",
@@ -30,6 +31,7 @@ __all__ = [
     "octopus_merge",
     "recursive_merge",
     "three_way_merge",
+    "write_merge_labels",
 ]
 
 import stat
@@ -39,6 +41,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import merge3
+
+    from dulwich.repo import BaseRepo
 else:
     try:
         import merge3
@@ -50,6 +54,17 @@ from dulwich.config import Config
 from dulwich.merge_drivers import get_merge_driver_registry
 from dulwich.object_store import BaseObjectStore
 from dulwich.objects import S_ISGITLINK, Blob, Commit, ObjectID, Tree, is_blob, is_tree
+
+MERGE_LABELS_CONTENT = b"base\nours\ntheirs\n"
+
+
+def write_merge_labels(repo: "BaseRepo") -> None:
+    """Record the conflict marker labels in MERGE_LABELS.
+
+    This allows ``git checkout -m <path>`` to recreate conflicts with the
+    same labels dulwich used when writing the working tree.
+    """
+    repo._put_named_file("MERGE_LABELS", MERGE_LABELS_CONTENT)
 
 
 def make_merge3(

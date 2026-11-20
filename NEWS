@@ -3,6 +3,10 @@
  * Fix ``PanicException`` from the Rust ``sorted_tree_items`` on trees
    whose entry names contain '/'. (Jelmer Vernooĳ)
 
+ * ``porcelain.checkout`` and ``porcelain.switch`` refuse to overwrite an
+   untracked file that the target tree would replace, as git does, instead of
+   replacing it silently. (Jay Hemnani)
+
  * Reject pack indexes whose fanout claims more than 2**31-1 objects on
    32-bit platforms with AssertionError rather than OverflowError.
    Reported by @lenix123. (Jelmer Vernooĳ, #2574)

@@ -60,6 +60,7 @@ __all__ = [
 
 import os
 import sys
+import time
 import types
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping
@@ -83,7 +84,7 @@ if TYPE_CHECKING:
     from .file import _GitFile
 
 from .errors import PackedRefsException, RefFormatError
-from .file import GitFile, ensure_dir_exists
+from .file import FileLocked, GitFile, ensure_dir_exists
 from .objects import ZERO_SHA, ObjectID, git_line, valid_hexsha
 
 Ref = NewType("Ref", bytes)
@@ -1191,33 +1192,82 @@ class DiskRefsContainer(RefsContainer):
             # errors depending on the specific operating system
             return None
 
-    def _remove_packed_ref(self, name: Ref) -> None:
-        if name not in self.get_packed_refs():
-            return
+    #: How long to keep retrying to take packed-refs.lock, in seconds. This
+    #: mirrors git's core.packedRefsTimeout default.
+    packed_refs_lock_timeout = 1.0
 
-        filename = os.path.join(self.path, b"packed-refs")
-        # reread cached refs from disk, while holding the lock
-        f = GitFile(filename, "wb")
-        try:
-            self._invalidate_packed_refs_cache()
-            packed_refs = self.get_packed_refs().copy()
+    def _lock_packed_refs(self) -> "_GitFile":
+        """Take packed-refs.lock, retrying for a short while if it is held.
+
+        Returns: The lock file. The caller must abort it when done.
+
+        Raises:
+          FileLocked: if the lock is still held when the timeout expires.
+        """
+        path = os.path.join(self.path, b"packed-refs")
+        deadline = time.monotonic() + self.packed_refs_lock_timeout
+        delay = 0.001
+        while True:
+            try:
+                return GitFile(path, "wb")
+            except FileLocked:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(delay)
+                delay = min(delay * 2, 0.1)
+
+    def _delete_ref_under_locks(self, name: Ref, filename: bytes) -> None:
+        """Delete a ref from packed-refs and then its loose file.
+
+        The caller must hold both the loose ref lock and packed-refs.lock,
+        and keep holding them until this returns. The packed entry is removed
+        first, by writing packed-refs.new and renaming it into place, so that
+        a failure leaves both representations untouched and the lock is never
+        released while the loose file still exists.
+
+        Args:
+          name: The ref to delete.
+          filename: Path of the loose ref file.
+        """
+        # While we hold packed-refs.lock the file can only change by being
+        # renamed into place, which the stat check in get_packed_refs()
+        # notices, so the cache does not need to be invalidated here.
+        packed_refs = self.get_packed_refs()
+        if name in packed_refs:
+            packed_refs = packed_refs.copy()
+            del packed_refs[name]
             peeled_refs = (
                 self._peeled_refs.copy() if self._peeled_refs is not None else None
             )
-
-            if name not in packed_refs:
-                f.abort()
-                return
-
-            del packed_refs[name]
             if peeled_refs is not None:
                 peeled_refs.pop(name, None)
-            write_packed_refs(f, packed_refs, peeled_refs)
-            f.close()
-        finally:
-            if not f.closed:
-                f.abort()
-            self._invalidate_packed_refs_cache()
+            packed_path = os.path.join(self.path, b"packed-refs")
+            new_path = packed_path + b".new"
+            # A leftover from an interrupted delete; nobody else can be
+            # using it while we hold the lock.
+            with suppress(FileNotFoundError):
+                os.remove(new_path)
+            try:
+                fd = os.open(
+                    new_path,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0),
+                    0o644,
+                )
+                with os.fdopen(fd, "wb") as f:
+                    write_packed_refs(f, packed_refs, peeled_refs)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(new_path, packed_path)
+            except BaseException:
+                with suppress(OSError):
+                    os.remove(new_path)
+                raise
+            finally:
+                self._invalidate_packed_refs_cache()
+
+        # The loose ref goes last, still under both locks.
+        with suppress(FileNotFoundError):
+            os.remove(filename)
 
     def set_symbolic_ref(
         self,
@@ -1434,26 +1484,21 @@ class DiskRefsContainer(RefsContainer):
         ensure_dir_exists(os.path.dirname(filename))
         f = GitFile(filename, "wb")
         try:
-            if old_ref is not None:
-                orig_ref = self.read_loose_ref(name)
-                if orig_ref is None:
-                    orig_ref = self.get_packed_refs().get(name)
-                    if orig_ref is None:
-                        orig_ref = ZERO_SHA
-                if orig_ref != old_ref:
-                    return False
-
-            # remove the reference file itself
+            packed_lock = self._lock_packed_refs()
             try:
-                found = os.path.lexists(filename)
-            except OSError:
-                # may only be packed, or otherwise unstorable
-                found = False
+                if old_ref is not None:
+                    orig_ref = self.read_loose_ref(name)
+                    if orig_ref is None:
+                        orig_ref = self.get_packed_refs().get(name)
+                        if orig_ref is None:
+                            orig_ref = ZERO_SHA
+                    if orig_ref != old_ref:
+                        return False
 
-            if found:
-                os.remove(filename)
-
-            self._remove_packed_ref(name)
+                self._delete_ref_under_locks(name, filename)
+            finally:
+                # never committed, we only wanted the lock
+                packed_lock.abort()
             self._log(
                 name,
                 old_ref,
@@ -2024,13 +2069,13 @@ class locked_ref:
 
         # Delete the actual ref file while holding the lock
         if self._realname:
-            filename = self._refs_container.refpath(self._realname)
+            container = self._refs_container
+            filename = container.refpath(self._realname)
+            packed_lock = container._lock_packed_refs()
             try:
-                if os.path.lexists(filename):
-                    os.remove(filename)
-            except FileNotFoundError:
-                pass
-            self._refs_container._remove_packed_ref(self._realname)
+                container._delete_ref_under_locks(self._realname, filename)
+            finally:
+                packed_lock.abort()
 
         self._deleted = True
 

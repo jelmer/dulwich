@@ -26,7 +26,7 @@ import shutil
 import sys
 import tempfile
 from io import BytesIO
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from dulwich.errors import (
     GitProtocolError,
@@ -35,6 +35,7 @@ from dulwich.errors import (
     NotGitRepository,
     UnexpectedCommandError,
 )
+from dulwich.file import FileLocked
 from dulwich.object_filters import BlobNoneFilter
 from dulwich.object_store import MemoryObjectStore, find_shallow
 from dulwich.objects import Tree
@@ -388,6 +389,24 @@ class ReceivePackHandlerTestCase(TestCase):
         self.assertEqual(status[0][1], b"ok")
         self.assertEqual(status[1][0], b"refs/heads/fake-branch")
         self.assertEqual(status[1][1], b"ok")
+
+    def test_apply_pack_del_ref_locked(self) -> None:
+        refs = {b"refs/heads/master": TWO, b"refs/heads/fake-branch": ONE}
+        self._repo.refs._update(refs)
+        update_refs = [
+            [ONE, ZERO_SHA, b"refs/heads/fake-branch"],
+        ]
+        self._handler.set_client_capabilities([b"delete-refs"])
+        with patch.object(
+            self._repo.refs,
+            "remove_if_equals",
+            side_effect=FileLocked(b"packed-refs", b"packed-refs.lock"),
+        ):
+            status = list(self._handler._apply_pack(update_refs))
+        self.assertEqual((b"unpack", b"ok"), tuple(status[0]))
+        self.assertEqual(
+            (b"refs/heads/fake-branch", b"failed to delete"), tuple(status[1])
+        )
 
     def _push_empty_pack(self, caps, update_refs):
         path = tempfile.mkdtemp()

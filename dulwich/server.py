@@ -97,6 +97,7 @@ from .errors import (
     ObjectFormatException,
     UnexpectedCommandError,
 )
+from .file import FileLocked
 from .object_filters import (
     CombineFilter,
     FilterSpec,
@@ -1491,6 +1492,7 @@ class ReceivePackHandler(PackHandler):
             socket.error,
             zlib.error,
             ObjectFormatException,
+            FileLocked,
         )
         will_send_pack = False
         zero_sha = ObjectID(b"0" * self.repo.object_format.hex_length)

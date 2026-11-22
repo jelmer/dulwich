@@ -11,22 +11,23 @@ with atheris.instrument_imports():
 
     from dulwich.bundle import Bundle, read_bundle, write_bundle
     from dulwich.pack import PackData, write_pack_objects
+    from dulwich.object_format import DEFAULT_OBJECT_FORMAT
 
 
 def TestOneInput(data) -> int | None:
     fdp = EnhancedFuzzedDataProvider(data)
     bundle = Bundle()
     bundle.version = fdp.PickValueInList([2, 3, None])
-    bundle.references = {fdp.ConsumeRandomString(): fdp.ConsumeBytes(20)}
+    bundle.references = {fdp.ConsumeRandomBytes(): fdp.ConsumeBytes(20)}
     bundle.prerequisites = [(fdp.ConsumeBytes(20), fdp.ConsumeRandomBytes())]
     bundle.capabilities = {
         fdp.ConsumeRandomString(): fdp.ConsumeRandomString(),
     }
 
     b = BytesIO()
-    write_pack_objects(b.write, [])
+    write_pack_objects(b.write, [], DEFAULT_OBJECT_FORMAT)
     b.seek(0)
-    bundle.pack_data = PackData.from_file(b)
+    bundle.pack_data = PackData.from_file(b, DEFAULT_OBJECT_FORMAT)
 
     # Test __repr__ method
     _ = repr(bundle)

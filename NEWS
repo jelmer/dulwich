@@ -15,11 +15,10 @@
    them. Object store lookups now validate the SHA, so a corrupt loose
    object aborted the iteration. (Jelmer Vernooĳ, #2552)
 
- * Hold ``packed-refs.lock`` while deleting a ref, removing the packed
-   entry before the loose file. A delete racing with ``git pack-refs``
-   could stop halfway and move the ref back to its packed value, or report
-   success while the ref survived. Deletes now wait up to a second for the
-   lock and raise ``FileLocked`` if it is still held. (Matt Van Horn, #2501)
+ * Hold ``packed-refs.lock`` while deleting a ref, so a delete racing with
+   ``git pack-refs`` can no longer revert the ref or leave it behind. Deletes
+   wait up to ``core.packedRefsTimeout`` (default one second) for the lock,
+   then raise ``FileLocked``. (Matt Van Horn, #2501)
 
 1.2.20	2026-10-26
 

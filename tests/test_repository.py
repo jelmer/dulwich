@@ -39,7 +39,13 @@ from dulwich.attrs import GitAttributes
 from dulwich.client import LocalGitClient
 from dulwich.config import Config
 from dulwich.errors import NotGitRepository, ObjectFormatException
-from dulwich.file import PERM_EVERYBODY, PERM_GROUP, SharedPerm, calc_shared_perm
+from dulwich.file import (
+    PERM_EVERYBODY,
+    PERM_GROUP,
+    FileLocked,
+    SharedPerm,
+    calc_shared_perm,
+)
 from dulwich.index import commit_tree
 from dulwich.index import get_unstaged_changes as _get_unstaged_changes
 from dulwich.object_store import tree_lookup_path
@@ -1590,6 +1596,39 @@ class BuildRepoRootTests(TestCase):
         r = Repo(self._repo_dir)
         self.addCleanup(r.close)
         self.assertEqual(r.object_store.loose_compression_level, 4)
+
+    def test_packed_refs_timeout_default(self) -> None:
+        self.assertEqual(1.0, self._repo.refs.packed_refs_lock_timeout)
+
+    def test_packed_refs_timeout(self) -> None:
+        r = self._repo
+        c = r.get_config()
+        c.set(("core",), "packedRefsTimeout", "50")
+        c.write_to_path()
+        r = Repo(self._repo_dir)
+        self.addCleanup(r.close)
+        self.assertEqual(0.05, r.refs.packed_refs_lock_timeout)
+
+        # A held packed-refs.lock makes the delete give up after the
+        # configured timeout rather than git's one-second default.
+        lockpath = os.path.join(r.controldir(), "packed-refs.lock")
+        with open(lockpath, "wb"):
+            pass
+        self.addCleanup(os.remove, lockpath)
+        start = time.monotonic()
+        with self.assertRaises(FileLocked):
+            r.refs.remove_if_equals(b"refs/heads/master", None)
+        self.assertLess(time.monotonic() - start, 0.9)
+        self.assertEqual(self._root_commit, r.refs[b"refs/heads/master"])
+
+    def test_packed_refs_timeout_invalid(self) -> None:
+        r = self._repo
+        c = r.get_config()
+        c.set(("core",), "packedRefsTimeout", "soon")
+        c.write_to_path()
+        r = Repo(self._repo_dir)
+        self.addCleanup(r.close)
+        self.assertEqual(1.0, r.refs.packed_refs_lock_timeout)
 
     def test_repositoryformatversion_unsupported(self) -> None:
         r = self._repo

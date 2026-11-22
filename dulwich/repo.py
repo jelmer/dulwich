@@ -1721,9 +1721,10 @@ class Repo(BaseRepo):
             self._index_file_override = None
 
         # Initialize refs early so they're available for config condition matchers
-        self.refs = DiskRefsContainer(
+        disk_refs = DiskRefsContainer(
             self.commondir(), self._controldir, logger=self._write_reflog
         )
+        self.refs = disk_refs
 
         # Initialize worktrees container
         from .worktree import WorkTreeContainer
@@ -1765,6 +1766,15 @@ class Repo(BaseRepo):
                 self.path = os.path.join(
                     self._controldir, os.fsdecode(configured_worktree)
                 )
+
+        # core.packedRefsTimeout is in milliseconds; a negative value means
+        # retry forever, as in git.
+        try:
+            packed_refs_timeout_ms = int(config.get((b"core",), b"packedRefsTimeout"))
+        except (KeyError, ValueError):
+            pass
+        else:
+            disk_refs.packed_refs_lock_timeout = packed_refs_timeout_ms / 1000
 
         # Track extensions we encounter
         has_reftable_extension = False

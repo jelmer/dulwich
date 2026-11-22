@@ -568,12 +568,7 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         value = self._refs[ref]
         self.assertNotIn(ref, self._refs.get_packed_refs())
 
-        # Simulate a concurrent `git pack-refs` holding the packed-refs lock.
-        lockpath = os.path.join(self._refs.path, b"packed-refs.lock")
-        with open(lockpath, "wb") as f:
-            write_packed_refs(f, {ref: value})
-        self.addCleanup(lambda: os.path.exists(lockpath) and os.remove(lockpath))
-        self._refs.packed_refs_lock_timeout = 0.05
+        lockpath = self._hold_packed_refs_lock({ref: value})
 
         with self.assertRaises(FileLocked):
             self._refs.remove_if_equals(ref, None)
@@ -584,14 +579,21 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
         os.replace(lockpath, os.path.join(self._refs.path, b"packed-refs"))
         self.assertEqual(value, self._refs[ref])
 
-    def _hold_packed_refs_lock(self, refs: dict) -> bytes:
+    def _hold_packed_refs_lock(self, refs: dict, timeout: float = 0.05) -> bytes:
         # Simulate a concurrent `git pack-refs` holding the packed-refs lock.
+        self._refs = DiskRefsContainer(
+            self._repo.commondir(), packed_refs_lock_timeout=timeout
+        )
         lockpath = os.path.join(self._refs.path, b"packed-refs.lock")
         with open(lockpath, "wb") as f:
             write_packed_refs(f, refs)
         self.addCleanup(lambda: os.path.exists(lockpath) and os.remove(lockpath))
-        self._refs.packed_refs_lock_timeout = 0.05
         return lockpath
+
+    def test_packed_refs_lock_timeout_default(self) -> None:
+        self.assertEqual(
+            1.0, DiskRefsContainer(self._repo.path).packed_refs_lock_timeout
+        )
 
     def test_remove_packed_ref_with_newer_loose_while_locked(self) -> None:
         ref = b"refs/heads/packed"
@@ -609,8 +611,18 @@ class DiskRefsContainerTests(RefsContainerTests, TestCase):
 
     def test_remove_waits_for_packed_refs_lock(self) -> None:
         ref = b"refs/heads/packed"
-        lockpath = self._hold_packed_refs_lock({})
-        self._refs.packed_refs_lock_timeout = 5.0
+        lockpath = self._hold_packed_refs_lock({}, timeout=5.0)
+        timer = threading.Timer(0.05, os.remove, [lockpath])
+        timer.start()
+        self.addCleanup(timer.cancel)
+
+        self.assertTrue(self._refs.remove_if_equals(ref, None))
+        self.assertNotIn(ref, self._refs.keys())
+
+    def test_remove_negative_timeout_waits_for_packed_refs_lock(self) -> None:
+        # As in git, a negative core.packedRefsTimeout retries forever.
+        ref = b"refs/heads/packed"
+        lockpath = self._hold_packed_refs_lock({}, timeout=-1)
         timer = threading.Timer(0.05, os.remove, [lockpath])
         timer.start()
         self.addCleanup(timer.cancel)

@@ -930,9 +930,20 @@ class DiskRefsContainer(RefsContainer):
             [bytes, bytes, bytes, bytes | None, int | None, int | None, bytes], None
         ]
         | None = None,
+        packed_refs_lock_timeout: float = 1.0,
     ) -> None:
-        """Initialize DiskRefsContainer."""
+        """Initialize DiskRefsContainer.
+
+        Args:
+          path: Path to the repository's common directory
+          worktree_path: Path to the worktree's control directory, if any
+          logger: Optional reflog writer
+          packed_refs_lock_timeout: How long to keep retrying to take
+            packed-refs.lock, in seconds (git's core.packedRefsTimeout).
+            A negative value retries forever.
+        """
         super().__init__(logger=logger)
+        self.packed_refs_lock_timeout = packed_refs_lock_timeout
         # Convert path-like objects to strings, then to bytes for Git compatibility
         self.path = os.fsencode(os.fspath(path))
         if worktree_path is None:
@@ -1192,10 +1203,6 @@ class DiskRefsContainer(RefsContainer):
             # errors depending on the specific operating system
             return None
 
-    #: How long to keep retrying to take packed-refs.lock, in seconds. This
-    #: mirrors git's core.packedRefsTimeout default.
-    packed_refs_lock_timeout = 1.0
-
     def _lock_packed_refs(self) -> "_GitFile":
         """Take packed-refs.lock, retrying for a short while if it is held.
 
@@ -1205,7 +1212,8 @@ class DiskRefsContainer(RefsContainer):
           FileLocked: if the lock is still held when the timeout expires.
         """
         path = os.path.join(self.path, b"packed-refs")
-        deadline = time.monotonic() + self.packed_refs_lock_timeout
+        timeout = self.packed_refs_lock_timeout
+        deadline = time.monotonic() + (timeout if timeout >= 0 else float("inf"))
         delay = 0.001
         while True:
             try:

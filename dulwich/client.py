@@ -3886,7 +3886,7 @@ class SubprocessSSHVendor(SSHVendor):
             host = f"{username}@{host}"
         if host.startswith("-"):
             raise StrangeHostname(hostname=host)
-        args.append(host)
+        args.extend(["--", host])
 
         proc = subprocess.Popen(
             [*args, command],

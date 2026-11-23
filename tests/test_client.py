@@ -3504,6 +3504,7 @@ class SubprocessSSHVendorTests(TestCase):
                 f"SetEnv GIT_PROTOCOL=version={DEFAULT_GIT_PROTOCOL_VERSION_FETCH}",
             ]
         expected += [
+            "--",
             "user@host",
             "git-clone-url",
         ]
@@ -3534,6 +3535,7 @@ class SubprocessSSHVendorTests(TestCase):
                 f"SetEnv GIT_PROTOCOL=version={DEFAULT_GIT_PROTOCOL_VERSION_FETCH}",
             ]
         expected += [
+            "--",
             "host",
             "git-clone-url",
         ]

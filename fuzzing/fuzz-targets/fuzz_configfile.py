@@ -22,6 +22,7 @@ def TestOneInput(data) -> int | None:
             "Invalid subsection",
             "escape character",
             "missing end quote",
+            "embedded null byte",
         ]
         if is_expected_exception(expected_exceptions, e):
             return -1

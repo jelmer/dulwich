@@ -48,6 +48,7 @@ from dulwich.patch import (
     mailinfo,
     parse_unified_diff,
     patch_id,
+    unified_diff,
     unified_diff_with_algorithm,
     write_blob_diff,
     write_commit_patch,
@@ -541,6 +542,48 @@ class DiffTests(TestCase):
                 b" same",
             ],
             f.getvalue().splitlines(),
+        )
+
+    def test_object_diff_non_utf8_path(self) -> None:
+        # Git paths are bytes; a Latin-1 name is not valid UTF-8.
+        path = "caf\xe9.txt".encode("latin-1")
+        f = BytesIO()
+        b1 = Blob.from_string(b"old\nsame\n")
+        b2 = Blob.from_string(b"new\nsame\n")
+        store = MemoryObjectStore()
+        store.add_objects([(b1, None), (b2, None)])
+        write_object_diff(f, store, (path, 0o644, b1.id), (path, 0o644, b2.id))
+        self.assertEqual(
+            [
+                b"diff --git a/" + path + b" b/" + path,
+                b"index 3b0f961..a116b51 644",
+                b"--- a/" + path,
+                b"+++ b/" + path,
+                b"@@ -1,2 +1,2 @@",
+                b"-old",
+                b"+new",
+                b" same",
+            ],
+            f.getvalue().splitlines(),
+        )
+
+    def test_blob_diff_non_utf8_path(self) -> None:
+        path = "caf\xe9.txt".encode("latin-1")
+        f = BytesIO()
+        write_blob_diff(
+            f,
+            (path, 0o644, Blob.from_string(b"old\n")),
+            (path, 0o644, Blob.from_string(b"new\n")),
+        )
+        lines = f.getvalue().splitlines()
+        self.assertIn(b"--- a/" + path, lines)
+        self.assertIn(b"+++ b/" + path, lines)
+
+    def test_unified_diff_non_utf8_path(self) -> None:
+        path = "caf\xe9.txt".encode("latin-1")
+        lines = list(unified_diff([b"old\n"], [b"new\n"], b"a/" + path, b"b/" + path))
+        self.assertEqual(
+            [b"--- a/" + path + b"\n", b"+++ b/" + path + b"\n"], lines[:2]
         )
 
     def test_object_diff_add_blob(self) -> None:

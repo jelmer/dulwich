@@ -263,6 +263,29 @@ def _format_range_unified(start: int, stop: int) -> str:
     return f"{beginning},{length}"
 
 
+def _unified_diff_header(
+    fromfile: bytes,
+    tofile: bytes,
+    fromfiledate: str,
+    tofiledate: str,
+    lineterm: str,
+    tree_encoding: str,
+    output_encoding: str,
+) -> Generator[bytes, None, None]:
+    """Generate the ``---`` and ``+++`` lines of a unified diff."""
+    for prefix, path, date in (
+        (b"---", fromfile, fromfiledate),
+        (b"+++", tofile, tofiledate),
+    ):
+        # Paths are bytes and need not be valid in tree_encoding; like git,
+        # pass through any bytes that don't decode.
+        name = path.decode(tree_encoding, "surrogateescape")
+        suffix = f"\t{date}" if date else ""
+        yield prefix + f" {name}{suffix}{lineterm}".encode(
+            output_encoding, "surrogateescape"
+        )
+
+
 def unified_diff(
     a: Sequence[bytes],
     b: Sequence[bytes],
@@ -283,13 +306,14 @@ def unified_diff(
     for group in SequenceMatcher(a=a, b=b).get_grouped_opcodes(n):
         if not started:
             started = True
-            fromdate = f"\t{fromfiledate}" if fromfiledate else ""
-            todate = f"\t{tofiledate}" if tofiledate else ""
-            yield f"--- {fromfile.decode(tree_encoding)}{fromdate}{lineterm}".encode(
-                output_encoding
-            )
-            yield f"+++ {tofile.decode(tree_encoding)}{todate}{lineterm}".encode(
-                output_encoding
+            yield from _unified_diff_header(
+                fromfile,
+                tofile,
+                fromfiledate,
+                tofiledate,
+                lineterm,
+                tree_encoding,
+                output_encoding,
             )
 
         first, last = group[0], group[-1]
@@ -388,13 +412,14 @@ def unified_diff_with_algorithm(
     for group in matcher.get_grouped_opcodes(n):
         if not started:
             started = True
-            fromdate = f"\t{fromfiledate}" if fromfiledate else ""
-            todate = f"\t{tofiledate}" if tofiledate else ""
-            yield f"--- {fromfile.decode(tree_encoding)}{fromdate}{lineterm}".encode(
-                output_encoding
-            )
-            yield f"+++ {tofile.decode(tree_encoding)}{todate}{lineterm}".encode(
-                output_encoding
+            yield from _unified_diff_header(
+                fromfile,
+                tofile,
+                fromfiledate,
+                tofiledate,
+                lineterm,
+                tree_encoding,
+                output_encoding,
             )
 
         first, last = group[0], group[-1]

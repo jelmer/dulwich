@@ -1,6 +1,6 @@
 1.2.22	UNRELEASED
 
- * SECURITY: Pass ``--`` before the host in ``SubprocessSSHVendor`` so an
+ * HARDEN: Pass ``--`` before the host in ``SubprocessSSHVendor`` so an
    argument split by MSYS2's runtime on Windows cannot be parsed as an
    ``ssh`` option. Reported by EZO Labs Security. (Jelmer Vernooĳ)
 

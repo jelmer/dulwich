@@ -10,8 +10,8 @@ with atheris.instrument_imports():
     from test_utils import EnhancedFuzzedDataProvider, is_expected_exception
 
     from dulwich.bundle import Bundle, read_bundle, write_bundle
-    from dulwich.pack import PackData, write_pack_objects
     from dulwich.object_format import DEFAULT_OBJECT_FORMAT
+    from dulwich.pack import PackData, write_pack_objects
 
 
 def TestOneInput(data) -> int | None:

@@ -263,29 +263,6 @@ def _format_range_unified(start: int, stop: int) -> str:
     return f"{beginning},{length}"
 
 
-def _unified_diff_header(
-    fromfile: bytes,
-    tofile: bytes,
-    fromfiledate: str,
-    tofiledate: str,
-    lineterm: str,
-    tree_encoding: str,
-    output_encoding: str,
-) -> Generator[bytes, None, None]:
-    """Generate the ``---`` and ``+++`` lines of a unified diff."""
-    for prefix, path, date in (
-        (b"---", fromfile, fromfiledate),
-        (b"+++", tofile, tofiledate),
-    ):
-        # Paths are bytes and need not be valid in tree_encoding; like git,
-        # pass through any bytes that don't decode.
-        name = path.decode(tree_encoding, "surrogateescape")
-        suffix = f"\t{date}" if date else ""
-        yield prefix + f" {name}{suffix}{lineterm}".encode(
-            output_encoding, "surrogateescape"
-        )
-
-
 def unified_diff(
     a: Sequence[bytes],
     b: Sequence[bytes],
@@ -302,42 +279,19 @@ def unified_diff(
 
     Based on the same function in Python2.7 difflib.py
     """
-    started = False
-    for group in SequenceMatcher(a=a, b=b).get_grouped_opcodes(n):
-        if not started:
-            started = True
-            yield from _unified_diff_header(
-                fromfile,
-                tofile,
-                fromfiledate,
-                tofiledate,
-                lineterm,
-                tree_encoding,
-                output_encoding,
-            )
-
-        first, last = group[0], group[-1]
-        file1_range = _format_range_unified(first[1], last[2])
-        file2_range = _format_range_unified(first[3], last[4])
-        yield f"@@ -{file1_range} +{file2_range} @@{lineterm}".encode(output_encoding)
-
-        for tag, i1, i2, j1, j2 in group:
-            if tag == "equal":
-                for idx, line in enumerate(a[i1:i2]):
-                    if not line[-1:] == b"\n" and i1 + idx == len(a) - 1:
-                        line += NO_NEWLINE_AT_EOF
-                    yield b" " + line
-                continue
-            if tag in ("replace", "delete"):
-                for line in a[i1:i2]:
-                    if not line[-1:] == b"\n":
-                        line += NO_NEWLINE_AT_EOF
-                    yield b"-" + line
-            if tag in ("replace", "insert"):
-                for line in b[j1:j2]:
-                    if not line[-1:] == b"\n":
-                        line += NO_NEWLINE_AT_EOF
-                    yield b"+" + line
+    yield from unified_diff_with_algorithm(
+        a,
+        b,
+        fromfile,
+        tofile,
+        fromfiledate,
+        tofiledate,
+        n,
+        lineterm,
+        tree_encoding,
+        output_encoding,
+        algorithm="myers",
+    )
 
 
 def _get_sequence_matcher(
@@ -412,14 +366,17 @@ def unified_diff_with_algorithm(
     for group in matcher.get_grouped_opcodes(n):
         if not started:
             started = True
-            yield from _unified_diff_header(
-                fromfile,
-                tofile,
-                fromfiledate,
-                tofiledate,
-                lineterm,
-                tree_encoding,
-                output_encoding,
+            fromdate = f"\t{fromfiledate}" if fromfiledate else ""
+            todate = f"\t{tofiledate}" if tofiledate else ""
+            # Paths are bytes and need not be valid in tree_encoding; like git,
+            # pass through any bytes that don't decode.
+            fromname = fromfile.decode(tree_encoding, "surrogateescape")
+            toname = tofile.decode(tree_encoding, "surrogateescape")
+            yield f"--- {fromname}{fromdate}{lineterm}".encode(
+                output_encoding, "surrogateescape"
+            )
+            yield f"+++ {toname}{todate}{lineterm}".encode(
+                output_encoding, "surrogateescape"
             )
 
         first, last = group[0], group[-1]

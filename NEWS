@@ -1,4 +1,4 @@
-1.2.22	UNRELEASED
+1.2.22	2026-11-24
 
  * HARDEN: Pass ``--`` before the host in ``SubprocessSSHVendor`` so an
    argument split by MSYS2's runtime on Windows cannot be parsed as an

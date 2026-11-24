@@ -5034,9 +5034,23 @@ class RevertTests(PorcelainTestCase):
     def test_revert_conflict(self) -> None:
         if importlib.util.find_spec("merge3") is None:
             raise DependencyMissing("merge3")
-        _commit_file_with_content(self.repo, "foo", "initial\n")
-        change_sha, fullpath = _commit_file_with_content(self.repo, "foo", "change\n")
-        _commit_file_with_content(self.repo, "foo", "later\n")
+
+        def commit_bytes(content: bytes) -> bytes:
+            path = os.path.join(self.repo.path, "foo")
+            with open(path, "wb") as f:
+                f.write(content)
+            porcelain.add(self.repo, paths=[path])
+            return porcelain.commit(
+                self.repo,
+                message=b"update foo",
+                committer=b"Jane <jane@example.com>",
+                author=b"John <john@example.com>",
+            )
+
+        commit_bytes(b"initial\n")
+        change_sha = commit_bytes(b"change\n")
+        commit_bytes(b"later\n")
+        fullpath = os.path.join(self.repo.path, "foo")
 
         self.assertRaises(porcelain.Error, porcelain.revert, self.repo, [change_sha])
 

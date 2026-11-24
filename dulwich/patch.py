@@ -272,8 +272,6 @@ def unified_diff(
     tofiledate: str = "",
     n: int = 3,
     lineterm: str = "\n",
-    tree_encoding: str = "utf-8",
-    output_encoding: str = "utf-8",
 ) -> Generator[bytes, None, None]:
     """difflib.unified_diff that can detect "No newline at end of file" as original "git diff" does.
 
@@ -288,8 +286,6 @@ def unified_diff(
         tofiledate,
         n,
         lineterm,
-        tree_encoding,
-        output_encoding,
         algorithm="myers",
     )
 
@@ -332,8 +328,6 @@ def unified_diff_with_algorithm(
     tofiledate: str = "",
     n: int = 3,
     lineterm: str = "\n",
-    tree_encoding: str = "utf-8",
-    output_encoding: str = "utf-8",
     algorithm: str | None = None,
 ) -> Generator[bytes, None, None]:
     """Generate unified diff with specified algorithm.
@@ -347,8 +341,6 @@ def unified_diff_with_algorithm(
         tofiledate: Date of second file
         n: Number of context lines
         lineterm: Line terminator
-        tree_encoding: Encoding for tree paths
-        output_encoding: Encoding for output
         algorithm: Diff algorithm to use ("myers" or "patience")
 
     Returns:
@@ -368,21 +360,13 @@ def unified_diff_with_algorithm(
             started = True
             fromdate = f"\t{fromfiledate}" if fromfiledate else ""
             todate = f"\t{tofiledate}" if tofiledate else ""
-            # Paths are bytes and need not be valid in tree_encoding; like git,
-            # pass through any bytes that don't decode.
-            fromname = fromfile.decode(tree_encoding, "surrogateescape")
-            toname = tofile.decode(tree_encoding, "surrogateescape")
-            yield f"--- {fromname}{fromdate}{lineterm}".encode(
-                output_encoding, "surrogateescape"
-            )
-            yield f"+++ {toname}{todate}{lineterm}".encode(
-                output_encoding, "surrogateescape"
-            )
+            yield b"--- " + fromfile + f"{fromdate}{lineterm}".encode()
+            yield b"+++ " + tofile + f"{todate}{lineterm}".encode()
 
         first, last = group[0], group[-1]
         file1_range = _format_range_unified(first[1], last[2])
         file2_range = _format_range_unified(first[3], last[4])
-        yield f"@@ -{file1_range} +{file2_range} @@{lineterm}".encode(output_encoding)
+        yield f"@@ -{file1_range} +{file2_range} @@{lineterm}".encode()
 
         for tag, i1, i2, j1, j2 in group:
             if tag == "equal":

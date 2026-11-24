@@ -1,10 +1,9 @@
 1.2.22	2026-11-24
 
- * Write the paths on the ``---`` and ``+++`` lines of a diff as bytes, so
-   ``unified_diff`` and ``write_object_diff`` no longer raise
-   ``UnicodeDecodeError`` for paths that aren't valid UTF-8. Git treats paths
-   as bytes, and its output with ``core.quotePath=false`` is the same.
-   (Bojan Zivanovic)
+ * Write the ``---`` and ``+++`` diff paths as bytes, fixing
+   ``UnicodeDecodeError`` for paths that aren't valid UTF-8. The
+   ``tree_encoding`` and ``output_encoding`` arguments of ``unified_diff``
+   and ``unified_diff_with_algorithm`` are removed. (Bojan Zivanovic)
 
  * Preserve indentation in ``stripspace`` and only treat a comment
    character at the very start of a line as a comment. ``dulwich commit``

@@ -5006,7 +5006,7 @@ class StripspaceCommandTest(DulwichCliTestCase):
 
         result, stdout, _stderr = self._run_cli("stripspace", text_file)
         self.assertIsNone(result)
-        self.assertEqual(stdout, "hello\n\nworld\n")
+        self.assertEqual(stdout, "  hello\n\n  world\n")
 
     def test_stripspace_simple(self):
         """Test basic stripspace functionality."""

@@ -4725,10 +4725,18 @@ class ResetTests(PorcelainTestCase):
         self.assertTrue(
             os.path.exists(os.path.join(self.repo.controldir(), "MERGE_HEAD"))
         )
+        with open(os.path.join(self.repo.controldir(), "MERGE_LABELS"), "rb") as f:
+            self.assertEqual(b"base\nHEAD\nmaster\n", f.read())
         return base, feature_tip
 
     def _assert_no_merge_state(self) -> None:
-        for name in ("MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "AUTO_MERGE"):
+        for name in (
+            "MERGE_HEAD",
+            "MERGE_MSG",
+            "MERGE_MODE",
+            "AUTO_MERGE",
+            "MERGE_LABELS",
+        ):
             self.assertFalse(
                 os.path.exists(os.path.join(self.repo.controldir(), name)), name
             )
@@ -5021,6 +5029,34 @@ class RevertTests(PorcelainTestCase):
         # Check the message
         revert_commit = self.repo[revert_sha]
         self.assertEqual(custom_msg.encode("utf-8"), revert_commit.message)
+
+    def test_revert_conflict(self) -> None:
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+
+        def commit_bytes(content: bytes) -> bytes:
+            path = os.path.join(self.repo.path, "foo")
+            with open(path, "wb") as f:
+                f.write(content)
+            porcelain.add(self.repo, paths=[path])
+            return porcelain.commit(
+                self.repo,
+                message=b"update foo",
+                committer=b"Jane <jane@example.com>",
+                author=b"John <john@example.com>",
+            )
+
+        commit_bytes(b"initial\n")
+        change_sha = commit_bytes(b"change\n")
+        commit_bytes(b"later\n")
+        fullpath = os.path.join(self.repo.path, "foo")
+
+        self.assertRaises(porcelain.Error, porcelain.revert, self.repo, [change_sha])
+
+        with open(fullpath, "rb") as f:
+            self.assertEqual(
+                b"<<<<<<< ours\nlater\n=======\ninitial\n>>>>>>> theirs\n", f.read()
+            )
 
     def test_revert_no_parent(self) -> None:
         # Try to revert the initial commit (no parent)

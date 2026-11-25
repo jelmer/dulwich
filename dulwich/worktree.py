@@ -794,6 +794,7 @@ class WorkTree:
                 raise CommitError(f"{ref!r} changed during commit")
 
         self._repo._del_named_file("MERGE_HEAD")
+        self._repo._del_named_file("MERGE_LABELS")
 
         try:
             self._repo.hooks["post-commit"].execute()

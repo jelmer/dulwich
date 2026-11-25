@@ -11,6 +11,15 @@
  * Fix ``PanicException`` from the Rust ``sorted_tree_items`` on trees
    whose entry names contain '/'. (Jelmer Vernooĳ)
 
+ * Use descriptive conflict marker labels (such as ``HEAD`` and the
+   merged ref or commit) and record them in ``.git/MERGE_LABELS`` when a
+   merge or cherry-pick stops with conflicts, removing it on commit, reset
+   and ``cherry-pick --abort``, so ``git checkout -m <path>`` recreates
+   conflicts with the same labels. (Jelmer Vernooĳ)
+
+ * Fix ``porcelain.revert`` raising ``KeyError`` instead of reporting the
+   conflicts when the revert does not apply cleanly. (Jelmer Vernooĳ)
+
  * Reject pack indexes whose fanout claims more than 2**31-1 objects on
    32-bit platforms with AssertionError rather than OverflowError.
    Reported by @lenix123. (Jelmer Vernooĳ, #2574)

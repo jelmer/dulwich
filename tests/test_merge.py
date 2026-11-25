@@ -27,9 +27,11 @@ import unittest
 from dulwich.merge import (
     MergeConflict,
     Merger,
+    merge_blobs,
     octopus_merge,
     recursive_merge,
     three_way_merge,
+    write_merge_labels,
 )
 from dulwich.objects import Blob, Commit, Tree
 from dulwich.repo import MemoryRepo
@@ -1177,3 +1179,37 @@ class OctopusMergeTests(unittest.TestCase):
                 commit,
                 [],
             )
+
+
+class MergeLabelsTests(unittest.TestCase):
+    def test_write(self) -> None:
+        repo = MemoryRepo()
+        write_merge_labels(repo, b"base", b"HEAD", b"feature")
+        f = repo.get_named_file("MERGE_LABELS")
+        assert f is not None
+        with f:
+            self.assertEqual(b"base\nHEAD\nfeature\n", f.read())
+
+    def test_write_rejects_newlines(self) -> None:
+        repo = MemoryRepo()
+        with self.assertRaises(ValueError):
+            write_merge_labels(repo, b"base\nextra", b"HEAD", b"feature")
+        with self.assertRaises(ValueError):
+            write_merge_labels(repo, b"base", b"HEAD\r", b"feature")
+        with self.assertRaises(ValueError):
+            write_merge_labels(repo, b"base", b"HEAD", b"feat\nure")
+
+    def test_merge_blobs_custom_labels(self) -> None:
+        if importlib.util.find_spec("merge3") is None:
+            raise DependencyMissing("merge3")
+        base = Blob.from_string(b"base\n")
+        ours = Blob.from_string(b"ours\n")
+        theirs = Blob.from_string(b"theirs\n")
+        merged, has_conflicts = merge_blobs(
+            base, ours, theirs, ours_label=b"HEAD", theirs_label=b"feature"
+        )
+        self.assertTrue(has_conflicts)
+        self.assertEqual(
+            b"<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> feature\n",
+            merged,
+        )

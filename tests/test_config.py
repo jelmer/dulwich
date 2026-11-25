@@ -39,6 +39,7 @@ from dulwich.config import (
     _check_variable_name,
     _escape_value,
     _format_string,
+    _match_gitdir_pattern,
     _parse_string,
     apply_instead_of,
     env_config,
@@ -49,6 +50,55 @@ from dulwich.config import (
 )
 
 from . import TestCase
+
+
+class GitdirPatternTests(TestCase):
+    def test_literal_pattern(self) -> None:
+        self.assertTrue(
+            _match_gitdir_pattern(b"/home/user/repo/.git", b"/home/user/repo/.git")
+        )
+        self.assertFalse(
+            _match_gitdir_pattern(
+                b"/home/user/not-repo/.git", b"/home/user/repo/.git"
+            )
+        )
+
+    def test_wildcards_match_path_components(self) -> None:
+        self.assertTrue(
+            _match_gitdir_pattern(b"/home/user/work/project/.git", b"**/work/**")
+        )
+        self.assertFalse(
+            _match_gitdir_pattern(
+                b"/home/user/not-work/project/.git", b"**/work/**"
+            )
+        )
+
+    def test_wildcard_within_path_component(self) -> None:
+        self.assertTrue(
+            _match_gitdir_pattern(
+                b"/home/user/workspace/project/.git", b"**/work*/**"
+            )
+        )
+
+    def test_ignorecase(self) -> None:
+        self.assertFalse(
+            _match_gitdir_pattern(b"/home/user/Work/repo/.git", b"**/work/**")
+        )
+        self.assertTrue(
+            _match_gitdir_pattern(
+                b"/home/user/Work/repo/.git", b"**/work/**", ignorecase=True
+            )
+        )
+
+    def test_trailing_double_star_matches_directory_itself(self) -> None:
+        self.assertTrue(_match_gitdir_pattern(b"/home/user/work", b"**/work/**"))
+
+    def test_malformed_pattern_is_logged_and_does_not_match(self) -> None:
+        with self.assertLogs("dulwich.config", level="DEBUG") as logs:
+            self.assertFalse(
+                _match_gitdir_pattern(b"/home/user/repo/.git", b"**/[")
+            )
+        self.assertIn("Invalid gitdir pattern", logs.output[0])
 
 
 class ConfigFileTests(TestCase):

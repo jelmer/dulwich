@@ -7309,11 +7309,36 @@ def write_tree(repo: RepoPath | None = None) -> bytes:
         return r.open_index(config=r.get_config_stack()).commit(r.object_store)
 
 
+def _committish_label(
+    committish: str | bytes | Commit | Tag, commit_id: ObjectID
+) -> bytes:
+    """Return a conflict marker label for a user-supplied committish."""
+    if isinstance(committish, str):
+        return committish.encode("utf-8")
+    if isinstance(committish, bytes):
+        return committish
+    return commit_id
+
+
+def _commit_description_label(commit: Commit) -> bytes:
+    """Format a commit as ``<short-sha> (<subject>)`` for conflict labels."""
+    short_sha: bytes = commit.id[:7]
+    message: bytes = commit.message
+    subject = message.split(b"\n", 1)[0].split(b"\r", 1)[0]
+    if subject:
+        return short_sha + b" (" + subject + b")"
+    return short_sha
+
+
 def _write_pending_conflict_state(
     r: Repo,
     head_name: str,
     head_commit_id: ObjectID,
     message: bytes,
+    *,
+    base_label: bytes,
+    ours_label: bytes,
+    theirs_label: bytes,
 ) -> None:
     """Write the head-pointer, MERGE_MSG and MERGE_LABELS files together.
 
@@ -7328,7 +7353,7 @@ def _write_pending_conflict_state(
         f.write(head_commit_id + b"\n")
     with open(os.path.join(r.controldir(), "MERGE_MSG"), "wb") as f:
         f.write(message)
-    write_merge_labels(r)
+    write_merge_labels(r, base_label, ours_label, theirs_label)
 
 
 def _record_merge_conflicts(
@@ -7336,6 +7361,10 @@ def _record_merge_conflicts(
     conflict_info: "Mapping[bytes, MergeConflictInfo]",
     merge_commit_id: ObjectID,
     message: bytes | str | None,
+    *,
+    base_label: bytes,
+    ours_label: bytes,
+    theirs_label: bytes,
 ) -> None:
     """Rewrite the index and merge state files for a conflicted merge.
 
@@ -7374,7 +7403,15 @@ def _record_merge_conflicts(
         msg_bytes = f"Merge commit '{merge_commit_id.decode()[:7]}'\n".encode()
     else:
         msg_bytes = message.encode() if isinstance(message, str) else message
-    _write_pending_conflict_state(r, "MERGE_HEAD", merge_commit_id, msg_bytes)
+    _write_pending_conflict_state(
+        r,
+        "MERGE_HEAD",
+        merge_commit_id,
+        msg_bytes,
+        base_label=base_label,
+        ours_label=ours_label,
+        theirs_label=theirs_label,
+    )
 
 
 def _do_merge(
@@ -7386,6 +7423,7 @@ def _do_merge(
     author: bytes | None = None,
     committer: bytes | None = None,
     env: Mapping[str, str] | None = None,
+    theirs_label: bytes | None = None,
 ) -> tuple[ObjectID | None, list[bytes]]:
     """Internal merge implementation that operates on an open repository.
 
@@ -7398,6 +7436,8 @@ def _do_merge(
       author: Optional author for merge commit
       committer: Optional committer for merge commit
       env: Environment to read the user identity from (defaults to os.environ)
+      theirs_label: Optional conflict marker label for the incoming side
+        (defaults to ``merge_commit_id``)
 
     Returns:
       Tuple of (merge_commit_sha, conflicts) where merge_commit_sha is None
@@ -7458,7 +7498,18 @@ def _do_merge(
     # Perform recursive merge (handles multiple merge bases automatically)
     gitattributes = r.get_gitattributes()
     config = r.get_config()
-    merger = Merger(r.object_store, gitattributes, config)
+    base_label = b"merged common ancestors" if len(merge_bases) > 1 else b"base"
+    ours_label = b"HEAD"
+    resolved_theirs_label = (
+        theirs_label if theirs_label is not None else merge_commit_id
+    )
+    merger = Merger(
+        r.object_store,
+        gitattributes,
+        config,
+        ours_label=ours_label,
+        theirs_label=resolved_theirs_label,
+    )
     merged_tree, conflicts = recursive_merge(
         r.object_store,
         merge_bases,
@@ -7487,8 +7538,17 @@ def _do_merge(
 
     if conflicts:
         # Rewrite the index so conflicted paths carry stage 1/2/3 entries and
-        # record MERGE_HEAD/MERGE_MSG so `git commit` can finish the merge.
-        _record_merge_conflicts(r, merger.conflict_info, merge_commit_id, message)
+        # record MERGE_HEAD/MERGE_MSG/MERGE_LABELS so `git commit` and
+        # `git checkout -m` can pick up where dulwich left off.
+        _record_merge_conflicts(
+            r,
+            merger.conflict_info,
+            merge_commit_id,
+            message,
+            base_label=base_label,
+            ours_label=ours_label,
+            theirs_label=resolved_theirs_label,
+        )
         return (None, conflicts)
 
     if no_commit:
@@ -7724,6 +7784,7 @@ def merge(
                     author,
                     committer,
                     env,
+                    theirs_label=_committish_label(committish[0], merge_commit_ids[0]),
                 )
             else:
                 # Multiple commits, use octopus merge
@@ -7749,7 +7810,15 @@ def merge(
                 )
 
             result = _do_merge(
-                r, merge_commit_id, no_commit, no_ff, message, author, committer, env
+                r,
+                merge_commit_id,
+                no_commit,
+                no_ff,
+                message,
+                author,
+                committer,
+                env,
+                theirs_label=_committish_label(single_committish, merge_commit_id),
             )
 
         # Trigger auto GC if needed
@@ -8192,10 +8261,19 @@ def cherry_pick(  # noqa: D417
         parent_commit = r[cherry_pick_commit.parents[0]]
         assert isinstance(parent_commit, Commit)
 
+        ours_label = b"HEAD"
+        theirs_label = _commit_description_label(cherry_pick_commit)
+        base_label = b"parent of " + theirs_label
+
         # Perform three-way merge
         assert isinstance(head_commit, Commit)
         merged_tree, conflicts = three_way_merge(
-            r.object_store, parent_commit, head_commit, cherry_pick_commit
+            r.object_store,
+            parent_commit,
+            head_commit,
+            cherry_pick_commit,
+            ours_label=ours_label,
+            theirs_label=theirs_label,
         )
 
         # Add merged tree to object store
@@ -8224,6 +8302,9 @@ def cherry_pick(  # noqa: D417
                 "CHERRY_PICK_HEAD",
                 cherry_pick_commit.id,
                 cherry_pick_commit.message,
+                base_label=base_label,
+                ours_label=ours_label,
+                theirs_label=theirs_label,
             )
 
             raise Error(

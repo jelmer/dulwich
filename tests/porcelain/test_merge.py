@@ -210,9 +210,9 @@ class PorcelainMergeTests(TestCase):
             # Check conflict markers in file
             with open(os.path.join(tmpdir, "file1.txt"), "rb") as f:
                 content = f.read()
-                self.assertIn(b"<<<<<<< ours", content)
+                self.assertIn(b"<<<<<<< HEAD", content)
                 self.assertIn(b"=======", content)
-                self.assertIn(b">>>>>>> theirs", content)
+                self.assertIn(b">>>>>>> feature", content)
 
             # Index carries stage 1/2/3 entries and MERGE_HEAD/MERGE_MSG are
             # written so `git commit` can finish the merge.
@@ -231,9 +231,8 @@ class PorcelainMergeTests(TestCase):
                 self.assertTrue(
                     os.path.exists(os.path.join(r.controldir(), "MERGE_MSG"))
                 )
-                self.assertTrue(
-                    os.path.exists(os.path.join(r.controldir(), "MERGE_LABELS"))
-                )
+                with open(os.path.join(r.controldir(), "MERGE_LABELS"), "rb") as f:
+                    self.assertEqual(b"base\nHEAD\nfeature\n", f.read())
 
             # Committing the resolution clears MERGE_LABELS
             with open(os.path.join(tmpdir, "file1.txt"), "w") as f:

@@ -22,7 +22,6 @@
 """Git merge implementation."""
 
 __all__ = [
-    "MERGE_LABELS_CONTENT",
     "MergeConflict",
     "MergeConflictInfo",
     "Merger",
@@ -55,16 +54,32 @@ from dulwich.merge_drivers import get_merge_driver_registry
 from dulwich.object_store import BaseObjectStore
 from dulwich.objects import S_ISGITLINK, Blob, Commit, ObjectID, Tree, is_blob, is_tree
 
-MERGE_LABELS_CONTENT = b"base\nours\ntheirs\n"
 
-
-def write_merge_labels(repo: "BaseRepo") -> None:
+def write_merge_labels(
+    repo: "BaseRepo",
+    base: bytes,
+    ours: bytes,
+    theirs: bytes,
+) -> None:
     """Record the conflict marker labels in MERGE_LABELS.
 
-    This allows ``git checkout -m <path>`` to recreate conflicts with the
-    same labels dulwich used when writing the working tree.
+    Writes ``base``, ``ours``, and ``theirs`` on separate lines so
+    ``git checkout -m <path>`` recreates conflicts with the same labels
+    dulwich used when writing the working tree.
+
+    Args:
+        repo: Repository whose control directory receives ``MERGE_LABELS``
+        base: Label for the common ancestor (stage 1)
+        ours: Label for the current side (stage 2)
+        theirs: Label for the incoming side (stage 3)
+
+    Raises:
+        ValueError: If any label contains a newline or carriage return
     """
-    repo._put_named_file("MERGE_LABELS", MERGE_LABELS_CONTENT)
+    for name, value in (("base", base), ("ours", ours), ("theirs", theirs)):
+        if b"\n" in value or b"\r" in value:
+            raise ValueError(f"Merge label {name!r} must not contain newlines")
+    repo._put_named_file("MERGE_LABELS", base + b"\n" + ours + b"\n" + theirs + b"\n")
 
 
 def make_merge3(
@@ -130,16 +145,23 @@ def _can_merge_lines(
 
 if merge3 is not None:
 
-    def _merge3_to_bytes(m: "merge3.Merge3[bytes]") -> bytes:
+    def _merge3_to_bytes(
+        m: "merge3.Merge3[bytes]",
+        ours_label: bytes = b"ours",
+        theirs_label: bytes = b"theirs",
+    ) -> tuple[bytes, bool]:
         """Convert merge3 result to bytes with conflict markers.
 
         Args:
             m: Merge3 object
+            ours_label: Label for the ``<<<<<<<`` marker
+            theirs_label: Label for the ``>>>>>>>`` marker
 
         Returns:
-            Merged content as bytes
+            Tuple of (merged_content, had_conflicts)
         """
         result: list[bytes] = []
+        had_conflicts = False
         for group in m.merge_groups():  # type: ignore[no-untyped-call,unused-ignore]
             match group[0]:
                 case "unchanged" | "a" | "b" | "same":
@@ -154,15 +176,16 @@ if merge3 is not None:
                         result.extend(merged_lines)
                     else:
                         # Real conflict - add conflict markers
-                        result.append(b"<<<<<<< ours\n")
+                        had_conflicts = True
+                        result.append(b"<<<<<<< " + ours_label + b"\n")
                         result.extend(a_lines)
                         result.append(b"=======\n")
                         result.extend(b_lines)
-                        result.append(b">>>>>>> theirs\n")
+                        result.append(b">>>>>>> " + theirs_label + b"\n")
                 case _:
                     raise ValueError(f"Unexpected merge3 group type {group[0]!r}")
 
-        return b"".join(result)
+        return b"".join(result), had_conflicts
 
 
 def _merge_lines(
@@ -185,6 +208,8 @@ def merge_blobs(
     path: bytes | None = None,
     gitattributes: GitAttributes | None = None,
     config: Config | None = None,
+    ours_label: bytes = b"ours",
+    theirs_label: bytes = b"theirs",
 ) -> tuple[bytes, bool]:
     """Perform three-way merge on blob contents.
 
@@ -195,6 +220,8 @@ def merge_blobs(
         path: Optional path of the file being merged
         gitattributes: Optional GitAttributes object for checking merge drivers
         config: Optional Config object for loading merge driver configuration
+        ours_label: Label for the ``<<<<<<<`` conflict marker
+        theirs_label: Label for the ``>>>>>>>`` conflict marker
 
     Returns:
         Tuple of (merged_content, had_conflicts)
@@ -250,7 +277,10 @@ def merge_blobs(
                 ours_blob.data.splitlines(True),
                 theirs_blob.data.splitlines(True),
             )
-            return _merge3_to_bytes(m), True
+            merged_content, _ = _merge3_to_bytes(
+                m, ours_label=ours_label, theirs_label=theirs_label
+            )
+            return merged_content, True
 
     # Get content for each version
     base_content = base_blob.data if base_blob else b""
@@ -272,7 +302,10 @@ def merge_blobs(
                     [],
                     theirs_content.splitlines(True),
                 )
-                return _merge3_to_bytes(m), True
+                merged_content, _ = _merge3_to_bytes(
+                    m, ours_label=ours_label, theirs_label=theirs_label
+                )
+                return merged_content, True
         else:
             # They deleted, check if we modified
             if base_content == ours_content:
@@ -284,7 +317,10 @@ def merge_blobs(
                     ours_content.splitlines(True),
                     [],
                 )
-                return _merge3_to_bytes(m), True
+                merged_content, _ = _merge3_to_bytes(
+                    m, ours_label=ours_label, theirs_label=theirs_label
+                )
+                return merged_content, True
 
     # Both sides exist, check if merge is needed
     if ours_content == theirs_content:
@@ -302,10 +338,7 @@ def merge_blobs(
     )
 
     # Check for conflicts and generate merged content
-    merged_content = _merge3_to_bytes(m)
-    has_conflicts = b"<<<<<<< ours" in merged_content
-
-    return merged_content, has_conflicts
+    return _merge3_to_bytes(m, ours_label=ours_label, theirs_label=theirs_label)
 
 
 class Merger:
@@ -316,6 +349,8 @@ class Merger:
         object_store: BaseObjectStore,
         gitattributes: GitAttributes | None = None,
         config: Config | None = None,
+        ours_label: bytes = b"ours",
+        theirs_label: bytes = b"theirs",
     ) -> None:
         """Initialize merger.
 
@@ -323,10 +358,14 @@ class Merger:
             object_store: Object store to read objects from
             gitattributes: Optional GitAttributes object for checking merge drivers
             config: Optional Config object for loading merge driver configuration
+            ours_label: Label for the ``<<<<<<<`` conflict marker
+            theirs_label: Label for the ``>>>>>>>`` conflict marker
         """
         self.object_store = object_store
         self.gitattributes = gitattributes
         self.config = config
+        self.ours_label = ours_label
+        self.theirs_label = theirs_label
         self.conflict_info: dict[bytes, MergeConflictInfo] = {}
 
     def merge_blobs(
@@ -348,7 +387,14 @@ class Merger:
             Tuple of (merged_content, had_conflicts)
         """
         return merge_blobs(
-            base_blob, ours_blob, theirs_blob, path, self.gitattributes, self.config
+            base_blob,
+            ours_blob,
+            theirs_blob,
+            path,
+            self.gitattributes,
+            self.config,
+            ours_label=self.ours_label,
+            theirs_label=self.theirs_label,
         )
 
     def merge_trees(
@@ -697,6 +743,8 @@ def recursive_merge(
     gitattributes: GitAttributes | None = None,
     config: Config | None = None,
     merger: "Merger | None" = None,
+    ours_label: bytes = b"ours",
+    theirs_label: bytes = b"theirs",
 ) -> tuple[Tree, list[bytes]]:
     """Perform a recursive merge with multiple merge bases.
 
@@ -720,6 +768,10 @@ def recursive_merge(
             (mode, sha) triples, which callers need to write index stages
             1/2/3. Intermediate virtual-base merges use their own Merger and
             do not populate this instance's ``conflict_info``.
+        ours_label: Label for the ``<<<<<<<`` conflict marker (ignored if
+            ``merger`` is provided)
+        theirs_label: Label for the ``>>>>>>>`` conflict marker (ignored if
+            ``merger`` is provided)
 
     Returns:
         tuple of (merged_tree, list_of_conflicted_paths)
@@ -734,6 +786,8 @@ def recursive_merge(
             gitattributes,
             config,
             merger=merger,
+            ours_label=ours_label,
+            theirs_label=theirs_label,
         )
     elif len(merge_bases) == 1:
         # Single merge base - simple three-way merge
@@ -750,6 +804,8 @@ def recursive_merge(
             gitattributes,
             config,
             merger=merger,
+            ours_label=ours_label,
+            theirs_label=theirs_label,
         )
     else:
         # Multiple merge bases - need to create a virtual merge base
@@ -804,6 +860,8 @@ def recursive_merge(
             gitattributes,
             config,
             merger=merger,
+            ours_label=ours_label,
+            theirs_label=theirs_label,
         )
 
 
@@ -815,6 +873,8 @@ def three_way_merge(
     gitattributes: GitAttributes | None = None,
     config: Config | None = None,
     merger: "Merger | None" = None,
+    ours_label: bytes = b"ours",
+    theirs_label: bytes = b"theirs",
 ) -> tuple[Tree, list[bytes]]:
     """Perform a three-way merge between commits.
 
@@ -827,13 +887,21 @@ def three_way_merge(
         config: Optional Config object for loading merge driver configuration
         merger: Optional Merger instance to reuse. If provided, its
             ``conflict_info`` will contain per-path conflict details after
-            the call and ``gitattributes``/``config`` are ignored.
+            the call and ``gitattributes``/``config``/labels are ignored.
+        ours_label: Label for the ``<<<<<<<`` conflict marker
+        theirs_label: Label for the ``>>>>>>>`` conflict marker
 
     Returns:
         tuple of (merged_tree, list_of_conflicted_paths)
     """
     if merger is None:
-        merger = Merger(object_store, gitattributes, config)
+        merger = Merger(
+            object_store,
+            gitattributes,
+            config,
+            ours_label=ours_label,
+            theirs_label=theirs_label,
+        )
 
     base_tree = None
     if base_commit:

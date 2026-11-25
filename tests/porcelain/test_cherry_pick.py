@@ -118,8 +118,8 @@ class PorcelainCherryPickTests(TestCase):
             porcelain.init(tmpdir)
 
             # Create initial commit with a file
-            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
-                f.write("Initial content\n")
+            with open(os.path.join(tmpdir, "file1.txt"), "wb") as f:
+                f.write(b"Initial content\n")
             porcelain.add(tmpdir, paths=["file1.txt"])
             porcelain.commit(tmpdir, message=b"Initial commit")
 
@@ -127,15 +127,15 @@ class PorcelainCherryPickTests(TestCase):
             porcelain.branch_create(tmpdir, "feature")
             porcelain.checkout(tmpdir, "feature")
 
-            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
-                f.write("Feature modification\n")
+            with open(os.path.join(tmpdir, "file1.txt"), "wb") as f:
+                f.write(b"Feature modification\n")
             porcelain.add(tmpdir, paths=["file1.txt"])
             feature_commit = porcelain.commit(tmpdir, message=b"Modify file on feature")
 
             # Go back to master and make a different modification
             porcelain.checkout(tmpdir, "master")
-            with open(os.path.join(tmpdir, "file1.txt"), "w") as f:
-                f.write("Master modification\n")
+            with open(os.path.join(tmpdir, "file1.txt"), "wb") as f:
+                f.write(b"Master modification\n")
             porcelain.add(tmpdir, paths=["file1.txt"])
             porcelain.commit(tmpdir, message=b"Modify file on master")
 
@@ -145,9 +145,22 @@ class PorcelainCherryPickTests(TestCase):
 
             self.assertIn("Conflicts in:", str(cm.exception))
             self.assertIn("file1.txt", str(cm.exception))
-            self.assertTrue(
-                os.path.exists(os.path.join(tmpdir, ".git", "MERGE_LABELS"))
-            )
+            short = feature_commit[:7]
+            theirs_label = short + b" (Modify file on feature)"
+            with open(os.path.join(tmpdir, "file1.txt"), "rb") as f:
+                self.assertEqual(
+                    b"<<<<<<< HEAD\n"
+                    b"Master modification\n"
+                    b"=======\n"
+                    b"Feature modification\n"
+                    b">>>>>>> " + theirs_label + b"\n",
+                    f.read(),
+                )
+            with open(os.path.join(tmpdir, ".git", "MERGE_LABELS"), "rb") as f:
+                self.assertEqual(
+                    b"parent of " + theirs_label + b"\nHEAD\n" + theirs_label + b"\n",
+                    f.read(),
+                )
 
     def test_cherry_pick_root_commit(self):
         """Test cherry-pick of root commit (should fail)."""

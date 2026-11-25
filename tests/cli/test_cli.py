@@ -422,6 +422,19 @@ class CommitCommandTest(DulwichCliTestCase):
                         self._run_cli("commit", flag, source)
                     self.assertEqual(self.repo.head(), head)
 
+    @patch(
+        "dulwich.cli.launch_editor",
+        return_value=b"# comment\nSubject\n\n- one\n  - two\n\n    #include <x.h>\n",
+    )
+    def test_commit_editor_keeps_indentation(self, editor):
+        """Indentation in a message from the editor is kept."""
+        result, _, _ = self._run_cli("commit")
+        self.assertIsNone(result)
+        commit = self.repo[self.repo.head()]
+        self.assertEqual(
+            commit.message, b"Subject\n\n- one\n  - two\n\n    #include <x.h>\n"
+        )
+
     @patch("dulwich.cli.launch_editor", return_value=b"")
     def test_commit_reedit_empty_message(self, editor):
         """Cancelling the reused message editor leaves the existing commit intact."""
@@ -5006,7 +5019,7 @@ class StripspaceCommandTest(DulwichCliTestCase):
 
         result, stdout, _stderr = self._run_cli("stripspace", text_file)
         self.assertIsNone(result)
-        self.assertEqual(stdout, "hello\n\nworld\n")
+        self.assertEqual(stdout, "  hello\n\n  world\n")
 
     def test_stripspace_simple(self):
         """Test basic stripspace functionality."""

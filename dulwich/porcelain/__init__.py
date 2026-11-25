@@ -1751,6 +1751,7 @@ def stripspace(
 
     The function performs the following operations:
         1. If comment_lines is True, prepend comment_char + space to each line
+           (no space if the line starts with a tab)
         2. Strip trailing whitespace from each line
         3. If strip_comments is True, remove lines starting with comment_char
         4. Collapse multiple consecutive blank lines into a single blank line
@@ -1760,7 +1761,7 @@ def stripspace(
 
     Examples:
         >>> stripspace(b"  hello  \\n\\n\\nworld  \\n\\n")
-        b'hello\\n\\nworld\\n'
+        b'  hello\\n\\nworld\\n'
 
         >>> stripspace(b"# comment\\ntext\\n", strip_comments=True)
         b'text\\n'

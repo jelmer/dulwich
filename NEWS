@@ -1,3 +1,9 @@
+1.2.23	UNRELEASED
+
+ * Keep indentation in ``stripspace``, and only treat a comment character
+   at the start of a line as a comment, like git. ``dulwich commit`` used
+   to unindent messages written in the editor. (Mradul Singh)
+
 1.2.22	2026-11-24
 
  * HARDEN: Pass ``--`` before the host in ``SubprocessSSHVendor`` so an

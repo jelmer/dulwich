@@ -49,6 +49,7 @@ def stripspace(
 
     The function performs the following operations (in order):
       1. If comment_lines is True, prepend comment_char + space to each line
+         (no space if the line starts with a tab)
       2. Strip trailing whitespace from each line
       3. If strip_comments is True, remove lines starting with comment_char
       4. Collapse multiple consecutive blank lines into a single blank line
@@ -62,7 +63,8 @@ def stripspace(
     # Split into lines (preserving line endings for processing)
     lines = text.splitlines(keepends=True)
 
-    # Step 1 & 2: Strip leading and trailing whitespace from each line (but keep newlines)
+    # Step 1 & 2: Strip trailing whitespace from each line (but keep newlines).
+    # Indentation is kept, as git does.
     processed_lines = []
     for line in lines:
         # Determine line ending
@@ -74,12 +76,13 @@ def stripspace(
         elif line.endswith(b"\r"):
             line_ending = b"\r"
 
-        # Strip all whitespace from the line content
-        stripped_content = line.rstrip(b"\r\n\t ").lstrip()
+        stripped_content = line.rstrip(b"\r\n\t ")
 
         # If comment_lines is True, prepend comment char to non-empty lines only
         if comment_lines and stripped_content:
-            stripped_content = comment_char + b" " + stripped_content
+            # Like git, don't put a space in front of a tab
+            separator = b"" if stripped_content.startswith(b"\t") else b" "
+            stripped_content = comment_char + separator + stripped_content
 
         # Reassemble with line ending
         processed_lines.append(stripped_content + line_ending)
@@ -87,9 +90,7 @@ def stripspace(
     # Step 3: Strip comments if requested
     if strip_comments:
         processed_lines = [
-            line
-            for line in processed_lines
-            if not line.lstrip().startswith(comment_char)
+            line for line in processed_lines if not line.startswith(comment_char)
         ]
 
     if not processed_lines:

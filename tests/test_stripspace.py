@@ -76,7 +76,13 @@ class StripspaceTests(unittest.TestCase):
     def test_complex_whitespace(self):
         """Test complex whitespace cleanup."""
         input_text = b"  hello  \n\n\n\n  world  \n\n"
-        expected = b"hello\n\nworld\n"
+        expected = b"  hello\n\n  world\n"
+        self.assertEqual(stripspace(input_text), expected)
+
+    def test_indentation(self):
+        """Test that indentation is kept."""
+        input_text = b"\n \n  list:  \n\n- one\n  - two \n\n\tcode\n\t\tmore\n"
+        expected = b"  list:\n\n- one\n  - two\n\n\tcode\n\t\tmore\n"
         self.assertEqual(stripspace(input_text), expected)
 
     def test_strip_comments(self):
@@ -86,9 +92,9 @@ class StripspaceTests(unittest.TestCase):
         self.assertEqual(stripspace(input_text, strip_comments=True), expected)
 
     def test_strip_comments_indented(self):
-        """Test that indented comments are also stripped."""
-        input_text = b"  # comment\nhello\n\t# another comment\nworld\n"
-        expected = b"hello\nworld\n"
+        """Test that only a comment character at the start of a line counts."""
+        input_text = b"# comment\nhello\n\t# not a comment\n  #include\nworld\n"
+        expected = b"hello\n\t# not a comment\n  #include\nworld\n"
         self.assertEqual(stripspace(input_text, strip_comments=True), expected)
 
     def test_strip_comments_custom_char(self):
@@ -104,6 +110,12 @@ class StripspaceTests(unittest.TestCase):
         """Test prepending comment character to each line."""
         input_text = b"hello\nworld\n"
         expected = b"# hello\n# world\n"
+        self.assertEqual(stripspace(input_text, comment_lines=True), expected)
+
+    def test_comment_lines_indented(self):
+        """Test prepending comment character to indented lines."""
+        input_text = b"  hello\n\tworld\n"
+        expected = b"#   hello\n#\tworld\n"
         self.assertEqual(stripspace(input_text, comment_lines=True), expected)
 
     def test_comment_lines_custom_char(self):

@@ -378,6 +378,7 @@ from ..index import (
     Index,
     InvalidPathError,
     _fs_to_tree_path,
+    _tree_to_fs_path,
     apply_stat_refresh,
     blob_from_path_and_stat,
     build_file_from_blob,
@@ -5966,6 +5967,33 @@ def _get_current_head_tree(repo: Repo) -> ObjectID | None:
         return None
 
 
+def _is_case_variant_of_tracked(full_path: bytes, path: bytes, index: Index) -> bool:
+    """Check if full_path was only found as a tracked file with another case.
+
+    On a case-insensitive filesystem, lstat of ``ex/Foo.txt`` succeeds when
+    the tracked file on disk is ``ex/foo.txt``.
+    """
+    parent, name = os.path.split(full_path)
+    folded = name.lower()
+    prefix = path.rpartition(b"/")[0]
+    prefix = prefix + b"/" if prefix else b""
+    found = False
+    with os.scandir(parent) as entries:
+        for entry in entries:
+            if entry.name == name:
+                return False
+            if entry.name.lower() == folded and prefix + entry.name in index:
+                found = True
+    return found
+
+
+def _untracked_file_error(path: bytes) -> CheckoutError:
+    return CheckoutError(
+        f"The untracked working tree file '{path.decode()}' would "
+        "be overwritten. Please move or remove it before switching."
+    )
+
+
 def _check_uncommitted_changes(
     repo: Repo, target_tree_id: ObjectID, force: bool = False
 ) -> None:
@@ -6018,6 +6046,51 @@ def _check_uncommitted_changes(
                     f"Your local changes to '{change.decode()}' would be "
                     "overwritten. Please commit or stash before switching."
                 )
+
+    # Untracked files in the way of a path the checkout will write
+    index = repo.open_index()
+    config = repo.get_config_stack()
+    ignore_manager = IgnoreFilterManager.from_repo(repo, config=config)
+    # Same default as update_working_tree. On a case-sensitive filesystem
+    # lstat never finds a file under another case, so skip the check there.
+    ignore_case = config.get_boolean(
+        (b"core",), b"ignorecase", sys.platform in ("win32", "darwin")
+    )
+    repo_path = os.fsencode(repo.path)
+    for change in tree_changes(repo.object_store, current_tree_id, target_tree_id):
+        if change.new is None or change.new.path is None:
+            continue
+        parts = change.new.path.split(b"/")
+        for i in range(1, len(parts) + 1):
+            path = b"/".join(parts[:i])
+            full_path = _tree_to_fs_path(repo_path, path)
+            try:
+                st = os.lstat(full_path)
+            except FileNotFoundError:
+                break
+            if stat.S_ISDIR(st.st_mode):
+                if i < len(parts):
+                    continue
+                # A file is to be written where there is a directory
+                untracked = next(
+                    get_untracked_paths(
+                        full_path, repo.path, index, exclude_ignored=True, repo=repo
+                    ),
+                    None,
+                )
+                if untracked is not None:
+                    raise _untracked_file_error(
+                        path + b"/" + _fs_to_tree_path(untracked)
+                    )
+            elif (
+                path not in index
+                and not ignore_manager.is_ignored(path.decode())
+                and not (
+                    ignore_case and _is_case_variant_of_tracked(full_path, path, index)
+                )
+            ):
+                raise _untracked_file_error(path)
+            break
 
 
 def _get_worktree_update_config(

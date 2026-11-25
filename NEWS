@@ -1,5 +1,9 @@
 1.2.22	UNRELEASED
 
+ * Preserve indentation in ``stripspace`` and only treat a comment
+   character at the very start of a line as a comment. ``dulwich commit``
+   no longer unindents editor messages.
+
  * HARDEN: Pass ``--`` before the host in ``SubprocessSSHVendor`` so an
    argument split by MSYS2's runtime on Windows cannot be parsed as an
    ``ssh`` option. Reported by EZO Labs Security. (Jelmer Vernooĳ)

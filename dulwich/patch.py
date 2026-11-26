@@ -272,48 +272,22 @@ def unified_diff(
     tofiledate: str = "",
     n: int = 3,
     lineterm: str = "\n",
-    tree_encoding: str = "utf-8",
-    output_encoding: str = "utf-8",
 ) -> Generator[bytes, None, None]:
     """difflib.unified_diff that can detect "No newline at end of file" as original "git diff" does.
 
     Based on the same function in Python2.7 difflib.py
     """
-    started = False
-    for group in SequenceMatcher(a=a, b=b).get_grouped_opcodes(n):
-        if not started:
-            started = True
-            fromdate = f"\t{fromfiledate}" if fromfiledate else ""
-            todate = f"\t{tofiledate}" if tofiledate else ""
-            yield f"--- {fromfile.decode(tree_encoding)}{fromdate}{lineterm}".encode(
-                output_encoding
-            )
-            yield f"+++ {tofile.decode(tree_encoding)}{todate}{lineterm}".encode(
-                output_encoding
-            )
-
-        first, last = group[0], group[-1]
-        file1_range = _format_range_unified(first[1], last[2])
-        file2_range = _format_range_unified(first[3], last[4])
-        yield f"@@ -{file1_range} +{file2_range} @@{lineterm}".encode(output_encoding)
-
-        for tag, i1, i2, j1, j2 in group:
-            if tag == "equal":
-                for idx, line in enumerate(a[i1:i2]):
-                    if not line[-1:] == b"\n" and i1 + idx == len(a) - 1:
-                        line += NO_NEWLINE_AT_EOF
-                    yield b" " + line
-                continue
-            if tag in ("replace", "delete"):
-                for line in a[i1:i2]:
-                    if not line[-1:] == b"\n":
-                        line += NO_NEWLINE_AT_EOF
-                    yield b"-" + line
-            if tag in ("replace", "insert"):
-                for line in b[j1:j2]:
-                    if not line[-1:] == b"\n":
-                        line += NO_NEWLINE_AT_EOF
-                    yield b"+" + line
+    yield from unified_diff_with_algorithm(
+        a,
+        b,
+        fromfile,
+        tofile,
+        fromfiledate,
+        tofiledate,
+        n,
+        lineterm,
+        algorithm="myers",
+    )
 
 
 def _get_sequence_matcher(
@@ -354,8 +328,6 @@ def unified_diff_with_algorithm(
     tofiledate: str = "",
     n: int = 3,
     lineterm: str = "\n",
-    tree_encoding: str = "utf-8",
-    output_encoding: str = "utf-8",
     algorithm: str | None = None,
 ) -> Generator[bytes, None, None]:
     """Generate unified diff with specified algorithm.
@@ -369,8 +341,6 @@ def unified_diff_with_algorithm(
         tofiledate: Date of second file
         n: Number of context lines
         lineterm: Line terminator
-        tree_encoding: Encoding for tree paths
-        output_encoding: Encoding for output
         algorithm: Diff algorithm to use ("myers" or "patience")
 
     Returns:
@@ -390,17 +360,13 @@ def unified_diff_with_algorithm(
             started = True
             fromdate = f"\t{fromfiledate}" if fromfiledate else ""
             todate = f"\t{tofiledate}" if tofiledate else ""
-            yield f"--- {fromfile.decode(tree_encoding)}{fromdate}{lineterm}".encode(
-                output_encoding
-            )
-            yield f"+++ {tofile.decode(tree_encoding)}{todate}{lineterm}".encode(
-                output_encoding
-            )
+            yield b"--- " + fromfile + f"{fromdate}{lineterm}".encode()
+            yield b"+++ " + tofile + f"{todate}{lineterm}".encode()
 
         first, last = group[0], group[-1]
         file1_range = _format_range_unified(first[1], last[2])
         file2_range = _format_range_unified(first[3], last[4])
-        yield f"@@ -{file1_range} +{file2_range} @@{lineterm}".encode(output_encoding)
+        yield f"@@ -{file1_range} +{file2_range} @@{lineterm}".encode()
 
         for tag, i1, i2, j1, j2 in group:
             if tag == "equal":

@@ -1,5 +1,10 @@
 1.2.22	2026-11-24
 
+ * Write the ``---`` and ``+++`` diff paths as bytes, fixing
+   ``UnicodeDecodeError`` for paths that aren't valid UTF-8. The
+   ``tree_encoding`` and ``output_encoding`` arguments of ``unified_diff``
+   and ``unified_diff_with_algorithm`` are removed. (Bojan Zivanovic)
+
  * Preserve indentation in ``stripspace`` and only treat a comment
    character at the very start of a line as a comment. ``dulwich commit``
    no longer unindents editor messages.

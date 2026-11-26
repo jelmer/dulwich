@@ -1,3 +1,9 @@
+1.2.23	UNRELEASED
+
+ * Read split-index files: merge the shared ``sharedindex.<hash>`` entries
+   with the main index's replace/delete bitmaps. Writing collapses the
+   split index back to a self-contained index. (Jelmer Vernooĳ, #2511)
+
 1.2.22	2026-11-24
 
  * Preserve indentation in ``stripspace`` and only treat a comment

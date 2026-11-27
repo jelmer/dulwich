@@ -134,8 +134,9 @@ class ArchiveTests(TestCase):
         """Tree entry names that git would reject as invalid are refused.
 
         Mirrors git's ``error: invalid path`` from ``git archive`` for
-        absolute paths, parent-traversal, ``.git`` aliases, embedded
-        backslashes, and NTFS alternate-data-stream separators.
+        absolute paths, parent-traversal, ``.git`` / ``git~1`` aliases
+        (including NTFS alternate-data-stream spellings), and embedded
+        backslashes.
         """
         # NUL is excluded here because Tree serialization uses it as a name
         # terminator, so a NUL-containing name cannot be round-tripped via the
@@ -146,7 +147,11 @@ class ArchiveTests(TestCase):
             b".git/hooks/pre-commit",
             b"..\\evil.txt",
             b".git\\hooks\\pre-commit",
-            b"visible.txt:hidden",
+            b".git::$INDEX_ALLOCATION",
+            b".git:hidden",
+            b".GIT :stream",
+            b"git~1",
+            b"git~1:stream",
             b"..",
             b".git",
             b".GIT",
@@ -162,6 +167,33 @@ class ArchiveTests(TestCase):
             with self.assertRaises(UnsafeArchivePathError, msg=repr(name)) as cm:
                 b"".join(tar_stream(store, t, mtime=0))
             self.assertEqual(name, cm.exception.path)
+
+    def test_colon_in_filename_allowed(self) -> None:
+        """Ordinary tree entry names containing ':' are emitted by tar_stream."""
+        store = MemoryObjectStore()
+        b1 = Blob.from_string(b"colon payload")
+        store.add_object(b1)
+
+        subtree = Tree()
+        subtree.add(b"usb:btusb", 0o100644, b1.id)
+        store.add_object(subtree)
+
+        root = Tree()
+        root.add(b"usb:btusb", 0o100644, b1.id)
+        root.add(b"visible.txt:hidden", 0o100644, b1.id)
+        root.add(b"drivers", 0o040000, subtree.id)
+        store.add_object(root)
+
+        stream = b"".join(tar_stream(store, root, mtime=0))
+        tf = tarfile.TarFile(fileobj=BytesIO(stream))
+        self.addCleanup(tf.close)
+        self.assertEqual(
+            ["drivers/usb:btusb", "usb:btusb", "visible.txt:hidden"],
+            sorted(tf.getnames()),
+        )
+        extracted = tf.extractfile("drivers/usb:btusb")
+        assert extracted is not None
+        self.assertEqual(b"colon payload", extracted.read())
 
     def test_is_unsafe_archive_path_nul(self) -> None:
         """NUL bytes in a path are rejected even though they can't be stored in a Tree."""

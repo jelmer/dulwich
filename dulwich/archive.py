@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from .object_store import BaseObjectStore
     from .objects import TreeEntry
 
-from .index import cleanup_mode
+from .index import _is_ntfs_dotgit, cleanup_mode
 from .objects import Blob, Tree
 
 
@@ -48,8 +48,8 @@ class UnsafeArchivePathError(ValueError):
     Mirrors git's ``verify_path`` rejection (``error: invalid path``) for tree
     entries whose names would escape the archive root or alias a special
     directory on extraction. Examples include absolute paths, ``..`` or
-    ``.git`` components, embedded backslashes, and NTFS alternate-data-stream
-    separators (``:``).
+    ``.git`` / ``git~1`` components (including NTFS alternate-data-stream
+    spellings such as ``.git:stream``), and embedded backslashes.
     """
 
     def __init__(self, path: bytes) -> None:
@@ -61,10 +61,9 @@ class UnsafeArchivePathError(ValueError):
 
 
 # Characters that are never safe in a tree path destined for an archive:
-# NUL terminates C strings, ``\`` is the Windows path separator (and would
-# let a hostile name like ``..\evil.txt`` slip past a POSIX-only split), and
-# ``:`` is the NTFS alternate-data-stream / drive-letter separator.
-_UNSAFE_PATH_CHARS = (b"\x00", b"\\", b":")
+# NUL terminates C strings, and ``\`` is the Windows path separator (which
+# would let a hostile name like ``..\evil.txt`` slip past a POSIX-only split).
+_UNSAFE_PATH_CHARS = (b"\x00", b"\\")
 
 _INVALID_PATH_COMPONENTS = (b".", b"..", b".git", b"")
 
@@ -72,10 +71,11 @@ _INVALID_PATH_COMPONENTS = (b".", b"..", b".git", b"")
 def _is_unsafe_archive_path(path: bytes) -> bool:
     """Return True if ``path`` should not be emitted into an archive.
 
-    Matches the spirit of git's ``verify_path``: absolute paths, ``.``/``..``/
-    ``.git`` components (case-insensitive), embedded NUL bytes, backslashes,
-    and colons are all rejected, regardless of host platform, because the
-    resulting archive may be extracted anywhere.
+    Matches git's ``verify_path``: absolute paths, ``.``/``..``/``.git``/
+    ``git~1`` components (case-insensitive, including NTFS
+    alternate-data-stream spellings with ``:``), embedded NUL bytes, and
+    backslashes are rejected regardless of host platform, while ordinary
+    filenames containing ``:`` (such as ``usb:btusb``) are allowed.
     """
     if not path:
         return True
@@ -83,6 +83,8 @@ def _is_unsafe_archive_path(path: bytes) -> bool:
         if ch in path:
             return True
     for component in path.split(b"/"):
+        if _is_ntfs_dotgit(component):
+            return True
         # Match git's protectNTFS-style normalization: trailing dots and
         # spaces are stripped before comparison so ``.git.`` / ``.GIT `` are
         # still recognised as ``.git`` on Windows.
